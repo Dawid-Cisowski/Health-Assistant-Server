@@ -25,15 +25,18 @@ COPY --from=build /app/build/libs/*.jar /app/app.jar
 
 # Cloud Run ustawia PORT — Spring musi go użyć
 ENV PORT=8080
+
+# Profil produkcyjny (może być nadpisany przez Cloud Run env vars)
+ENV SPRING_PROFILES_ACTIVE=production
+
 USER nonroot
 EXPOSE 8080
 
 # Uwaga: HEALTHCHECK z Dockera jest ignorowany w Cloud Run
 # Zamiast tego włącz Spring Actuator i ustaw /actuator/health jako probe w serwisie.
 
-ENTRYPOINT ["java",
-  "-XX:MaxRAMPercentage=75.0",
-  "-Djava.security.egd=file:/dev/./urandom",
-  "-Dserver.port=${PORT}",
-  "-jar","/app/app.jar"
-]
+ENTRYPOINT ["java", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-Dserver.port=${PORT}", \
+  "-jar", "/app/app.jar"]

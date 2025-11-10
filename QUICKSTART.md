@@ -1,12 +1,12 @@
 # Quick Start Guide
 
-Get the Health Assistant Backend running in 5 minutes!
+Get the Health Assistant Event Collector running in 5 minutes!
 
 ## Option 1: Docker Compose (Fastest) 🚀
 
 ```bash
 # 1. Clone and navigate to project
-cd /path/to/health-assistant-backend
+cd /path/to/health-assistant-event-collector
 
 # 2. Start everything with one command
 docker-compose up --build

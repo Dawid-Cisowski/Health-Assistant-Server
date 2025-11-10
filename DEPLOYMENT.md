@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Complete guide for deploying the Health Assistant Backend to production.
+Complete guide for deploying the Health Assistant Event Collector to production.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: health-assistant-backend:latest
+    image: health-assistant-event-collector:latest
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/health_assistant
       DB_USER: \${DB_USER}
@@ -51,7 +51,7 @@ volumes:
 EOF
 
 # 2. Build image
-docker build -t health-assistant-backend:latest .
+docker build -t health-assistant-event-collector:latest .
 
 # 3. Create .env file with secrets
 cat > .env <<EOF
@@ -114,7 +114,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: health-assistant-backend:latest
+        image: health-assistant-event-collector:latest
         ports:
         - containerPort: 8080
         env:

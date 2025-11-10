@@ -1,6 +1,6 @@
 # Integration Tests
 
-This module contains integration tests for the Health Assistant Backend.
+This module contains integration tests for the Health Assistant Event Collector.
 
 ## Overview
 

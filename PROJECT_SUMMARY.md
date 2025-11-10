@@ -1,4 +1,4 @@
-# Health Assistant Backend - Project Summary
+# Health Assistant Event Collector - Project Summary
 
 ## 📦 Deliverables
 
@@ -41,7 +41,7 @@ This is a **complete, production-ready** Spring Boot 3.3 backend implementation 
 ## 🗂️ Project Structure
 
 ```
-health-assistant-backend/
+health-assistant-event-collector/
 ├── src/main/java/com/healthassistant/
 │   ├── config/                      # Configuration
 │   │   ├── AppProperties.java       # Environment-based config

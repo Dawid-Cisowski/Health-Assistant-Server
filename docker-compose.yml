@@ -24,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: health-assistant-backend
+    container_name: health-assistant-event-collector
     depends_on:
       postgres:
         condition: service_healthy
@@ -35,7 +35,7 @@ services:
       HMAC_DEVICES_JSON: '{"test-device-1":"dGVzdC1zZWNyZXQtMTIz","test-device-2":"YW5vdGhlci1zZWNyZXQ="}'
       HMAC_TOLERANCE_SEC: 600
       NONCE_CACHE_TTL_SEC: 600
-      SPRING_PROFILES_ACTIVE: default
+      SPRING_PROFILES_ACTIVE: local
     ports:
       - "8080:8080"
     healthcheck:

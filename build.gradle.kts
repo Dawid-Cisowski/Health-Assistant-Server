@@ -32,9 +32,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-cache")
     
     // Database
-    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.postgresql:postgresql:42.7.4")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
+    
+    // Google Cloud SQL support (for production)
+    implementation("com.google.cloud.sql:postgres-socket-factory:1.13.1")
     
     // Cache
     implementation("com.github.ben-manes.caffeine:caffeine")

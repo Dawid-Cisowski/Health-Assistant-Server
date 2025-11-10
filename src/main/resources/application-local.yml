@@ -1,0 +1,14 @@
+# Local development profile
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/health_assistant}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+
+logging:
+  level:
+    root: INFO
+    com.healthassistant: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+

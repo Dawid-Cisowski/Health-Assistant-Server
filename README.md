@@ -1,4 +1,4 @@
-# Health Assistant Backend - Event Ingestion API
+# Health Assistant Event Collector - Event Ingestion API
 
 A Spring Boot 3.3 backend service for ingesting normalized health events from mobile applications with HMAC authentication and idempotency guarantees.
 
@@ -26,7 +26,7 @@ A Spring Boot 3.3 backend service for ingesting normalized health events from mo
 ## 🏗️ Project Structure
 
 ```
-health-assistant-backend/
+health-assistant-event-collector/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/healthassistant/

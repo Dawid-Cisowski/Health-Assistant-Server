@@ -1,4 +1,4 @@
-# Health Assistant Backend - Test Scenarios (BDD)
+# Health Assistant Event Collector - Test Scenarios (BDD)
 
 ## Feature 1: HMAC Authentication
 

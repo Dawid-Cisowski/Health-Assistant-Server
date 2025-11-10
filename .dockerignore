@@ -23,7 +23,6 @@ docker-compose*.yml
 
 # Gradle
 .gradle/
-gradle/wrapper/gradle-wrapper.jar
 
 # Logs
 *.log

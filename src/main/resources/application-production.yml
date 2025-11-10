@@ -1,0 +1,24 @@
+# Production profile (Google Cloud Run + Cloud SQL)
+spring:
+  datasource:
+    # Cloud SQL connection via socket factory
+    # Format: jdbc:postgresql:///<DB_NAME>?cloudSqlInstance=<CONNECTION_NAME>&socketFactory=com.google.cloud.sql.postgres.SocketFactory
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:5}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:0}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:none}
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
+    com.healthassistant: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+
