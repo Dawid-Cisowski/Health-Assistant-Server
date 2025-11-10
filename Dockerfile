@@ -1,51 +1,39 @@
-# Multi-stage build for Spring Boot application
-
-# Stage 1: Build
-FROM gradle:8.5-jdk21 AS build
+# --- build stage ---
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 
-# Copy gradle files
-COPY build.gradle.kts settings.gradle.kts ./
+# Kopiujemy tylko pliki builda, żeby zcache'ować zależności
+COPY gradlew ./
 COPY gradle gradle
+COPY build.gradle.kts settings.gradle.kts ./
 
-# Download dependencies (cached layer)
-RUN gradle dependencies --no-daemon || true
+# Pobierz zależności (cache)
+RUN chmod +x ./gradlew && ./gradlew dependencies --no-daemon || true
 
-# Copy source code
+# Dopiero teraz źródła
 COPY src src
 
-# Build application
-RUN gradle bootJar --no-daemon
+# Build bez testów
+RUN ./gradlew bootJar --no-daemon -x test
 
-# Stage 2: Runtime
-FROM eclipse-temurin:21-jre-jammy
-
-# Create non-root user
-RUN groupadd -r spring && useradd -r -g spring spring
-
+# --- runtime stage (distroless) ---
+FROM gcr.io/distroless/java21
 WORKDIR /app
 
-# Copy jar from build stage
-COPY --from=build /app/build/libs/*.jar app.jar
+# JAR — dopasuj pattern jeśli masz inną nazwę
+COPY --from=build /app/build/libs/*.jar /app/app.jar
 
-# Change ownership
-RUN chown -R spring:spring /app
-
-# Switch to non-root user
-USER spring
-
-# Expose port
+# Cloud Run ustawia PORT — Spring musi go użyć
+ENV PORT=8080
+USER nonroot
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+# Uwaga: HEALTHCHECK z Dockera jest ignorowany w Cloud Run
+# Zamiast tego włącz Spring Actuator i ustaw /actuator/health jako probe w serwisie.
 
-# Run application
-ENTRYPOINT ["java", \
-    "-XX:+UseContainerSupport", \
-    "-XX:MaxRAMPercentage=75.0", \
-    "-Djava.security.egd=file:/dev/./urandom", \
-    "-jar", \
-    "app.jar"]
-
+ENTRYPOINT ["java",
+  "-XX:MaxRAMPercentage=75.0",
+  "-Djava.security.egd=file:/dev/./urandom",
+  "-Dserver.port=${PORT}",
+  "-jar","/app/app.jar"
+]

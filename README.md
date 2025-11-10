@@ -40,9 +40,18 @@ health-assistant-backend/
 │   │   └── resources/
 │   │       ├── application.yml
 │   │       └── db/migration/     # Flyway migrations
-│   └── test/
-│       └── java/com/healthassistant/
+├── integration-tests/            # Integration tests module (46 tests)
+│   ├── src/test/groovy/
+│   │   └── com/healthassistant/
+│   │       ├── BaseIntegrationSpec.groovy
+│   │       ├── HmacAuthenticationSpec.groovy
+│   │       ├── EventIngestionSpec.groovy
+│   │       ├── EventValidationSpec.groovy
+│   │       └── ErrorHandlingSpec.groovy
+│   ├── build.gradle.kts
+│   └── README.md
 ├── build.gradle.kts
+├── settings.gradle.kts
 ├── docker-compose.yml
 ├── Dockerfile
 └── README.md
@@ -218,33 +227,52 @@ curl -X POST http://localhost:8080/v1/ingest/events \
 
 ## 🧪 Testing
 
-### Run all tests:
+The project uses a separate `integration-tests` module with **46 integration tests** covering:
+- HMAC authentication (11 tests)
+- Event validation (13 tests)
+- Batch processing (13 tests)
+- Error handling (9 tests)
+
+### Run all tests (main + integration):
 ```bash
-./gradlew test
+./gradlew build
 ```
 
-### Run integration tests:
+### Run only integration tests:
 ```bash
-./gradlew integrationTest
+./gradlew :integration-tests:test
 ```
 
-### Test with coverage:
+### Run specific test class:
 ```bash
-./gradlew test jacocoTestReport
+./gradlew :integration-tests:test --tests "HmacAuthenticationSpec"
 ```
+
+### View test reports:
+```bash
+open integration-tests/build/reports/tests/test/index.html
+```
+
+**Testing Stack:**
+- Spock Framework (Groovy BDD)
+- Testcontainers (PostgreSQL)
+- REST Assured (API testing)
+- No mocks - all tests use real components
+
+See [integration-tests/README.md](integration-tests/README.md) for detailed testing documentation.
 
 ## 📊 Supported Event Types
 
-| Event Type | Description |
-|------------|-------------|
-| `StepsBucketedRecorded.v1` | Bucketed step counts from health sources |
-| `HeartRateSummaryRecorded.v1` | Heart rate statistics over a time window |
-| `SleepSessionRecorded.v1` | Sleep session with optional stage breakdown |
-| `ActiveCaloriesBurnedRecorded.v1` | Active calories burned in a time bucket |
-| `ActiveMinutesRecorded.v1` | Active minutes in a time bucket |
-| `WorkoutSessionImported.v1` | Imported workout session (e.g., from GymRun) |
-| `SetPerformedImported.v1` | Individual exercise set performance |
-| `MealLoggedEstimated.v1` | Logged meal with nutritional estimates |
+| Event Type | Description | Status |
+|------------|-------------|--------|
+| `StepsBucketedRecorded.v1` | Bucketed step counts from health sources | ✅ Active |
+| `HeartRateSummaryRecorded.v1` | Heart rate statistics over a time window | ✅ Active |
+| `SleepSessionRecorded.v1` | Sleep session with optional stage breakdown | ✅ Active |
+| `ActiveCaloriesBurnedRecorded.v1` | Active calories burned in a time bucket | ✅ Active |
+| `ActiveMinutesRecorded.v1` | Active minutes in a time bucket | ✅ Active |
+| `WorkoutSessionImported.v1` | Imported workout session (e.g., from GymRun) | 🚧 Coming soon |
+| `SetPerformedImported.v1` | Individual exercise set performance | 🚧 Coming soon |
+| `MealLoggedEstimated.v1` | Logged meal with nutritional estimates | 🚧 Coming soon |
 
 See [OpenAPI spec](http://localhost:8080/swagger-ui.html) for detailed payload schemas.
 

@@ -16,10 +16,8 @@ public class EventValidator {
         "HeartRateSummaryRecorded.v1",
         "SleepSessionRecorded.v1",
         "ActiveCaloriesBurnedRecorded.v1",
-        "ActiveMinutesRecorded.v1",
-        "WorkoutSessionImported.v1",
-        "SetPerformedImported.v1",
-        "MealLoggedEstimated.v1"
+        "ActiveMinutesRecorded.v1"
+        // WorkoutSessionImported.v1, SetPerformedImported.v1, MealLoggedEstimated.v1 - TODO: implement later
     );
 
     public List<String> validate(EventEnvelope envelope) {
@@ -44,9 +42,6 @@ public class EventValidator {
             case "SleepSessionRecorded.v1" -> validateSleepSession(payload, errors);
             case "ActiveCaloriesBurnedRecorded.v1" -> validateActiveCaloriesBurned(payload, errors);
             case "ActiveMinutesRecorded.v1" -> validateActiveMinutes(payload, errors);
-            case "WorkoutSessionImported.v1" -> validateWorkoutSession(payload, errors);
-            case "SetPerformedImported.v1" -> validateSetPerformed(payload, errors);
-            case "MealLoggedEstimated.v1" -> validateMealLogged(payload, errors);
         }
 
         return errors;
@@ -103,56 +98,6 @@ public class EventValidator {
         requireField(payload, "originPackage", errors);
         
         validateNonNegativeNumber(payload.get("activeMinutes"), "activeMinutes", errors);
-    }
-
-    private void validateWorkoutSession(Map<String, Object> payload, List<String> errors) {
-        requireField(payload, "source", errors);
-        requireField(payload, "sessionId", errors);
-        requireField(payload, "start", errors);
-        requireField(payload, "end", errors);
-    }
-
-    private void validateSetPerformed(Map<String, Object> payload, List<String> errors) {
-        requireField(payload, "source", errors);
-        requireField(payload, "sessionId", errors);
-        requireField(payload, "exercise", errors);
-        requireField(payload, "setIndex", errors);
-        requireField(payload, "weightKg", errors);
-        requireField(payload, "reps", errors);
-        
-        if (payload.containsKey("exercise") && payload.get("exercise") instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> exercise = (Map<String, Object>) payload.get("exercise");
-            requireField(exercise, "name", errors);
-        }
-        
-        validatePositiveNumber(payload.get("setIndex"), "setIndex", errors);
-        validateNonNegativeNumber(payload.get("weightKg"), "weightKg", errors);
-        validateNonNegativeNumber(payload.get("reps"), "reps", errors);
-    }
-
-    private void validateMealLogged(Map<String, Object> payload, List<String> errors) {
-        requireField(payload, "when", errors);
-        requireField(payload, "items", errors);
-        requireField(payload, "total", errors);
-        
-        if (payload.containsKey("items") && payload.get("items") instanceof List) {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> items = (List<Map<String, Object>>) payload.get("items");
-            if (items.isEmpty()) {
-                errors.add("items must contain at least one item");
-            }
-            for (Map<String, Object> item : items) {
-                requireField(item, "name", errors);
-                requireField(item, "kcal", errors);
-            }
-        }
-        
-        if (payload.containsKey("total") && payload.get("total") instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> total = (Map<String, Object>) payload.get("total");
-            requireField(total, "kcal", errors);
-        }
     }
 
     private void requireField(Map<String, Object> map, String field, List<String> errors) {
