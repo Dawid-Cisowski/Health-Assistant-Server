@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: health-assistant-postgres
+    environment:
+      POSTGRES_DB: health_assistant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - health-assistant-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health-assistant-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/health_assistant
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      HMAC_DEVICES_JSON: '{"test-device-1":"dGVzdC1zZWNyZXQtMTIz","test-device-2":"YW5vdGhlci1zZWNyZXQ="}'
+      HMAC_TOLERANCE_SEC: 600
+      NONCE_CACHE_TTL_SEC: 600
+      SPRING_PROFILES_ACTIVE: default
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - health-assistant-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  health-assistant-network:
+    driver: bridge
+
