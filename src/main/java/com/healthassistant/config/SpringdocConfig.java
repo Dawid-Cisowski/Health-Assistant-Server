@@ -20,7 +20,8 @@ class SpringdocConfig {
             }
 
             schemas.forEach((name, schema) -> {
-                if (name.contains("Payload") && schema.getAllOf() != null && !schema.getAllOf().isEmpty()) {
+                if (name.contains("Payload") && !name.equals("EventPayload") 
+                    && schema.getAllOf() != null && !schema.getAllOf().isEmpty()) {
                     Schema actualSchema = (Schema) schema.getAllOf().get(schema.getAllOf().size() - 1);
                     if (actualSchema.getProperties() != null) {
                         schema.setProperties(actualSchema.getProperties());

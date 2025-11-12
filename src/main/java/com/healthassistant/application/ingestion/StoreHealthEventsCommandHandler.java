@@ -39,6 +39,16 @@ class StoreHealthEventsCommandHandler {
             DeviceId deviceId
     ) {
         try {
+            if ("ExerciseSessionRecorded.v1".equals(envelope.eventType())) {
+                log.warn("=== ExerciseSessionRecorded.v1 RECEIVED ===");
+                log.warn("Event type: {}", envelope.eventType());
+                log.warn("Idempotency key: {}", envelope.idempotencyKey().value());
+                log.warn("Occurred at: {}", envelope.occurredAt());
+                log.warn("Payload: {}", envelope.payload());
+                log.warn("Payload class: {}", envelope.payload().getClass().getName());
+                log.warn("===========================================");
+            }
+            
             List<EventValidationError> validationErrors = eventValidator.validate(
                     envelope.eventType(),
                     envelope.payload()

@@ -51,7 +51,19 @@ public class HealthEventsMapper {
             case SleepSessionPayload p -> convertInstantFields(map, "sleepStart", "sleepEnd");
             case ActiveCaloriesPayload p -> convertInstantFields(map, "bucketStart", "bucketEnd");
             case ActiveMinutesPayload p -> convertInstantFields(map, "bucketStart", "bucketEnd");
+            case ExerciseSessionPayload p -> {
+                convertInstantFields(map, "start", "end");
+                normalizeExerciseType(map);
+                yield map;
+            }
         };
+    }
+    
+    private static void normalizeExerciseType(Map<String, Object> map) {
+        Object type = map.get("type");
+        if (type != null && "other_0".equals(type.toString())) {
+            map.put("type", "WALK");
+        }
     }
     
     private static Map<String, Object> convertInstantFields(Map<String, Object> map, String... fieldNames) {

@@ -53,14 +53,15 @@ public class EventEnvelope {
     @Schema(
         description = "Event type identifier. Supported types: " +
                      "StepsBucketedRecorded.v1, HeartRateSummaryRecorded.v1, SleepSessionRecorded.v1, " +
-                     "ActiveCaloriesBurnedRecorded.v1, ActiveMinutesRecorded.v1",
+                     "ActiveCaloriesBurnedRecorded.v1, ActiveMinutesRecorded.v1, ExerciseSessionRecorded.v1 (🚧 logging only)",
         example = "StepsBucketedRecorded.v1",
         allowableValues = {
             "StepsBucketedRecorded.v1",
             "HeartRateSummaryRecorded.v1",
             "SleepSessionRecorded.v1",
             "ActiveCaloriesBurnedRecorded.v1",
-            "ActiveMinutesRecorded.v1"
+            "ActiveMinutesRecorded.v1",
+            "ExerciseSessionRecorded.v1"
         }
     )
     private String type;
@@ -85,7 +86,8 @@ public class EventEnvelope {
             com.healthassistant.dto.payload.HeartRatePayload.class,
             com.healthassistant.dto.payload.SleepSessionPayload.class,
             com.healthassistant.dto.payload.ActiveCaloriesPayload.class,
-            com.healthassistant.dto.payload.ActiveMinutesPayload.class
+            com.healthassistant.dto.payload.ActiveMinutesPayload.class,
+            com.healthassistant.dto.payload.ExerciseSessionPayload.class
         }
     )
     private EventPayload payload;

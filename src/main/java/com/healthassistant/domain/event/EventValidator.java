@@ -40,6 +40,7 @@ public class EventValidator {
             case SleepSessionRecorded sleep -> validateSleepSession(payload, errors);
             case ActiveCaloriesBurnedRecorded calories -> validateActiveCaloriesBurned(payload, errors);
             case ActiveMinutesRecorded minutes -> validateActiveMinutes(payload, errors);
+            case ExerciseSessionRecorded exercise -> validateExerciseSession(payload, errors);
         }
     }
 
@@ -94,6 +95,32 @@ public class EventValidator {
         requireField(payload, "originPackage", errors);
 
         validateNonNegativeNumber(payload.get("activeMinutes"), "activeMinutes", errors);
+    }
+
+    private void validateExerciseSession(Map<String, Object> payload, List<EventValidationError> errors) {
+        System.out.println("=== ExerciseSessionRecorded.v1 VALIDATION (logging only) ===");
+        System.out.println("Payload in validator: " + payload);
+        System.out.println("============================================================");
+        
+        requireField(payload, "sessionId", errors);
+        requireField(payload, "type", errors);
+        requireField(payload, "start", errors);
+        requireField(payload, "end", errors);
+        requireField(payload, "durationMinutes", errors);
+        requireField(payload, "originPackage", errors);
+
+        if (payload.containsKey("durationMinutes")) {
+            validateNonNegativeNumber(payload.get("durationMinutes"), "durationMinutes", errors);
+        }
+        if (payload.containsKey("steps")) {
+            validateNonNegativeNumber(payload.get("steps"), "steps", errors);
+        }
+        if (payload.containsKey("avgHr")) {
+            validateNonNegativeNumber(payload.get("avgHr"), "avgHr", errors);
+        }
+        if (payload.containsKey("maxHr")) {
+            validateNonNegativeNumber(payload.get("maxHr"), "maxHr", errors);
+        }
     }
 
     private void requireField(Map<String, Object> map, String field, List<EventValidationError> errors) {

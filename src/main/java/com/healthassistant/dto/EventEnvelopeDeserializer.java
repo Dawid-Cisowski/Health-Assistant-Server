@@ -9,6 +9,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.healthassistant.dto.payload.*;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class EventEnvelopeDeserializer extends JsonDeserializer<EventEnvelope> {
 
@@ -42,6 +45,7 @@ public class EventEnvelopeDeserializer extends JsonDeserializer<EventEnvelope> {
                 case "SleepSessionRecorded.v1" -> deserializeSleepSessionPayload(payloadNode);
                 case "ActiveCaloriesBurnedRecorded.v1" -> deserializeActiveCaloriesPayload(payloadNode);
                 case "ActiveMinutesRecorded.v1" -> deserializeActiveMinutesPayload(payloadNode);
+                case "ExerciseSessionRecorded.v1" -> deserializeExerciseSessionPayload(payloadNode, p);
                 default -> throw new IllegalArgumentException("Unknown event type: " + eventType);
             };
         } catch (Exception e) {
@@ -98,6 +102,31 @@ public class EventEnvelopeDeserializer extends JsonDeserializer<EventEnvelope> {
             parseInstant(node.get("bucketStart")),
             parseInstant(node.get("bucketEnd")),
             node.has("activeMinutes") ? node.get("activeMinutes").asInt() : null,
+            node.has("originPackage") ? node.get("originPackage").asText() : null
+        );
+    }
+    
+    private ExerciseSessionPayload deserializeExerciseSessionPayload(JsonNode node, JsonParser p) throws IOException {
+        String payloadJson = objectMapper.writeValueAsString(node);
+        List<String> fieldNames = new ArrayList<>();
+        node.fieldNames().forEachRemaining(fieldNames::add);
+        
+        System.out.println("=== ExerciseSessionRecorded.v1 PAYLOAD DEBUG ===");
+        System.out.println("Full payload JSON: " + payloadJson);
+        System.out.println("Payload fields: " + String.join(", ", fieldNames));
+        System.out.println("================================================");
+        
+        return new ExerciseSessionPayload(
+            node.has("sessionId") ? node.get("sessionId").asText() : null,
+            node.has("type") ? node.get("type").asText() : null,
+            parseInstant(node.get("start")),
+            parseInstant(node.get("end")),
+            node.has("durationMinutes") ? node.get("durationMinutes").asInt() : null,
+            node.has("distanceMeters") ? node.get("distanceMeters").asText() : null,
+            node.has("steps") ? node.get("steps").asInt() : null,
+            node.has("avgSpeedMetersPerSecond") ? node.get("avgSpeedMetersPerSecond").asText() : null,
+            node.has("avgHr") && !node.get("avgHr").isNull() ? node.get("avgHr").asInt() : null,
+            node.has("maxHr") && !node.get("maxHr").isNull() ? node.get("maxHr").asInt() : null,
             node.has("originPackage") ? node.get("originPackage").asText() : null
         );
     }
