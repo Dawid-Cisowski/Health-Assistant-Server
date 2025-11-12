@@ -1,5 +1,8 @@
 package com.healthassistant.infrastructure.web.rest.mapper;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.healthassistant.application.ingestion.StoreHealthEventsCommand;
 import com.healthassistant.application.ingestion.StoreHealthEventsResult;
 import com.healthassistant.domain.event.DeviceId;
@@ -7,10 +10,16 @@ import com.healthassistant.domain.event.IdempotencyKey;
 import com.healthassistant.dto.EventEnvelope;
 import com.healthassistant.dto.HealthEventsRequest;
 import com.healthassistant.dto.HealthEventsResponse;
+import com.healthassistant.dto.payload.*;
 
 import java.util.List;
+import java.util.Map;
 
 public class HealthEventsMapper {
+    
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     
     public static StoreHealthEventsCommand toCommand(HealthEventsRequest request, String deviceIdStr) {
         DeviceId deviceId = DeviceId.of(deviceIdStr);
@@ -23,12 +32,36 @@ public class HealthEventsMapper {
     }
     
     private static StoreHealthEventsCommand.EventEnvelope toCommandEnvelope(EventEnvelope dto) {
+        Map<String, Object> payloadMap = convertPayloadToMap(dto.getPayload());
+        
         return new StoreHealthEventsCommand.EventEnvelope(
             IdempotencyKey.of(dto.getIdempotencyKey()),
             dto.getType(),
             dto.getOccurredAt(),
-            dto.getPayload()
+            payloadMap
         );
+    }
+    
+    private static Map<String, Object> convertPayloadToMap(EventPayload payload) {
+        Map<String, Object> map = objectMapper.convertValue(payload, Map.class);
+        
+        return switch (payload) {
+            case StepsPayload p -> convertInstantFields(map, "bucketStart", "bucketEnd");
+            case HeartRatePayload p -> convertInstantFields(map, "bucketStart", "bucketEnd");
+            case SleepSessionPayload p -> convertInstantFields(map, "sleepStart", "sleepEnd");
+            case ActiveCaloriesPayload p -> convertInstantFields(map, "bucketStart", "bucketEnd");
+            case ActiveMinutesPayload p -> convertInstantFields(map, "bucketStart", "bucketEnd");
+        };
+    }
+    
+    private static Map<String, Object> convertInstantFields(Map<String, Object> map, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            Object value = map.get(fieldName);
+            if (value instanceof java.time.Instant instant) {
+                map.put(fieldName, instant.toString());
+            }
+        }
+        return map;
     }
     
     public static HealthEventsResponse toResponse(StoreHealthEventsResult result) {
