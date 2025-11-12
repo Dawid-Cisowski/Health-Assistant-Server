@@ -9,12 +9,9 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.concurrent.TimeUnit;
 
-/**
- * Cache configuration for nonce anti-replay
- */
 @Configuration
 @EnableCaching
-public class CacheConfig {
+class CacheConfig {
 
     public static final String NONCE_CACHE = "nonces";
 
@@ -22,8 +19,8 @@ public class CacheConfig {
     public CacheManager cacheManager(AppProperties appProperties) {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(NONCE_CACHE);
         cacheManager.setCaffeine(Caffeine.newBuilder()
-            .expireAfterWrite(appProperties.getNonce().getCacheTtlSeconds(), TimeUnit.SECONDS)
-            .maximumSize(10000));
+                .expireAfterWrite(appProperties.getNonce().getCacheTtlSeconds(), TimeUnit.SECONDS)
+                .maximumSize(10000));
         return cacheManager;
     }
 }

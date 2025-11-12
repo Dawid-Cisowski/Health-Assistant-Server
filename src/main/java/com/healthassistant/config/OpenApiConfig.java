@@ -8,16 +8,13 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.servers.Server;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * OpenAPI/Swagger configuration
- */
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
-        title = "Health Assistant – Event Ingest API",
+        title = "Health Assistant – Health Events API",
         version = "1.0.0",
         description = """
-            Batch ingest of normalized events from the mobile app.
+            Store normalized health events from the mobile app.
             Auth: HMAC via headers (see securitySchemes).
             
             Required headers for authenticated requests:
@@ -25,8 +22,6 @@ import org.springframework.context.annotation.Configuration;
             - X-Timestamp: RFC3339 UTC (e.g., 2025-11-09T07:05:12Z)
             - X-Nonce: random UUID
             - X-Signature: HMAC-SHA256 base64 over canonical string
-            
-            Optional: Content-SHA256 header (hex/base64) for body integrity.
             """
     ),
     servers = {

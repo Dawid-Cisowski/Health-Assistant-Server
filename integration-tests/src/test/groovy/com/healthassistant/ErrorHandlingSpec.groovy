@@ -32,7 +32,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -70,7 +70,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -108,7 +108,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -147,7 +147,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -181,7 +181,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -215,7 +215,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -242,7 +242,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
         and: "signature computed for the body"
         def timestamp = generateTimestamp()
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, body, secretBase64)
+        def signature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body, secretBase64)
 
         when: "I POST with Content-Type: text/plain"
         def response = RestAssured.given()
@@ -253,7 +253,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature)
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -293,7 +293,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -335,7 +335,7 @@ class ErrorHandlingSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 

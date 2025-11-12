@@ -1,6 +1,6 @@
 package com.healthassistant
 
-import com.healthassistant.repository.HealthEventRepository
+import com.healthassistant.application.ingestion.HealthEventJpaRepository
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,12 +18,6 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
-/**
- * Base specification for integration tests.
- * - Starts PostgreSQL in Testcontainers
- * - Starts Spring Boot application
- * - Provides helper methods for HMAC signing and API calls
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ContextConfiguration(classes = [com.healthassistant.HealthAssistantApplication])
 @ActiveProfiles("test")
@@ -33,7 +27,7 @@ abstract class BaseIntegrationSpec extends Specification {
     int port
 
     @Autowired
-    HealthEventRepository eventRepository
+    HealthEventJpaRepository eventRepository
 
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -75,9 +69,6 @@ abstract class BaseIntegrationSpec extends Specification {
         }
     }
 
-    /**
-     * Generate HMAC signature for request
-     */
     String generateHmacSignature(String method, String path, String timestamp, String nonce, String deviceId, String body, String secretBase64) {
         // Decode base64 secret
         byte[] secret = Base64.decoder.decode(secretBase64)
@@ -95,27 +86,18 @@ abstract class BaseIntegrationSpec extends Specification {
         return Base64.encoder.encodeToString(hmacBytes)
     }
 
-    /**
-     * Generate current timestamp in ISO-8601 UTC format
-     */
     String generateTimestamp() {
         return DateTimeFormatter.ISO_INSTANT.format(Instant.now())
     }
 
-    /**
-     * Generate random nonce (UUID)
-     */
     String generateNonce() {
         return UUID.randomUUID().toString().toLowerCase()
     }
 
-    /**
-     * Build authenticated request with HMAC headers
-     */
     def authenticatedRequest(String deviceId, String secretBase64, String body) {
         String timestamp = generateTimestamp()
         String nonce = generateNonce()
-        String signature = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, body, secretBase64)
+        String signature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body, secretBase64)
 
         return RestAssured.given()
                 .contentType(ContentType.JSON)
@@ -126,9 +108,6 @@ abstract class BaseIntegrationSpec extends Specification {
                 .body(body)
     }
 
-    /**
-     * Create simple test event payload
-     */
     String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z") {
         return """
         {
@@ -149,9 +128,6 @@ abstract class BaseIntegrationSpec extends Specification {
         """.stripIndent().trim()
     }
 
-    /**
-     * Create heart rate event payload
-     */
     String createHeartRateEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:15:00Z") {
         return """
         {

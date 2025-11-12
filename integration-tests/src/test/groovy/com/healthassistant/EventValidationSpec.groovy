@@ -34,7 +34,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -74,7 +74,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -111,7 +111,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -151,7 +151,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -190,7 +190,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -234,7 +234,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -277,7 +277,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -320,7 +320,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -367,7 +367,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -409,7 +409,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -446,7 +446,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -488,7 +488,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -528,7 +528,7 @@ class EventValidationSpec extends BaseIntegrationSpec {
 
         when: "I POST event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 

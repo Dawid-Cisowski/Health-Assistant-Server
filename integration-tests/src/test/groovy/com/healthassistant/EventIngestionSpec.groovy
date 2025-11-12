@@ -17,9 +17,9 @@ class EventIngestionSpec extends BaseIntegrationSpec {
         def idempotencyKey = "user1|steps|${System.currentTimeMillis()}|single"
         def body = createStepsEvent(idempotencyKey)
 
-        when: "I POST event to /v1/ingest/events"
+        when: "I POST event to /v1/health-events"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -89,9 +89,9 @@ class EventIngestionSpec extends BaseIntegrationSpec {
         }
         """.stripIndent().trim()
 
-        when: "I POST batch to /v1/ingest/events"
+        when: "I POST batch to /v1/health-events"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -130,7 +130,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I send event first time"
         def response1 = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -141,7 +141,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I send EXACT same event again (same idempotency key)"
         def response2 = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -167,7 +167,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
         def existingKey = "partial|steps|${timestamp}|existing"
         def existingBody = createStepsEvent(existingKey)
         def existingResponse = authenticatedRequest(deviceId, secretBase64, existingBody)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
         def existingEventId = existingResponse.body().jsonPath().getString("results[0].eventId")
@@ -203,7 +203,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
         """.stripIndent().trim()
 
         def response = authenticatedRequest(deviceId, secretBase64, batchBody)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -246,7 +246,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST event with invalid type"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -287,7 +287,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST event with invalid payload"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -354,7 +354,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST mixed batch"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -392,7 +392,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST heart rate event"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -428,7 +428,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST empty batch"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -470,7 +470,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST oversized batch"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -536,7 +536,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST batch"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -567,7 +567,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST malformed JSON"
         def response = authenticatedRequest(deviceId, secretBase64, malformedBody)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -592,7 +592,7 @@ class EventIngestionSpec extends BaseIntegrationSpec {
 
         when: "I POST body without events"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 

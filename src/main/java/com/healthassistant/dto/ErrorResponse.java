@@ -7,13 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * Standard error response
- */
-@Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Data
 public class ErrorResponse {
 
     private String code;

@@ -20,9 +20,9 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         def idempotencyKey = "user1|steps|${System.currentTimeMillis()}|com.test"
         def body = createStepsEvent(idempotencyKey)
 
-        when: "I POST to /v1/ingest/events with valid HMAC signature"
+        when: "I POST to /v1/health-events with valid HMAC signature"
         def response = authenticatedRequest(deviceId, secretBase64, body)
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
                 .then()
                 .extract()
 
@@ -79,9 +79,9 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         def wrongSecret = "d3Jvbmctc2VjcmV0" // base64("wrong-secret")
         def timestamp = generateTimestamp()
         def nonce = generateNonce()
-        def invalidSignature = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, body, wrongSecret)
+        def invalidSignature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body, wrongSecret)
 
-        when: "I POST to /v1/ingest/events with invalid signature"
+        when: "I POST to /v1/health-events with invalid signature"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", deviceId)
@@ -90,7 +90,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", invalidSignature)
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -119,9 +119,9 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         and: "signature calculated with test secret"
         def timestamp = generateTimestamp()
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, unknownDeviceId, body, secretBase64)
+        def signature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, unknownDeviceId, body, secretBase64)
 
-        when: "I POST to /v1/ingest/events with unknown device ID"
+        when: "I POST to /v1/health-events with unknown device ID"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", unknownDeviceId)
@@ -130,7 +130,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature)
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -158,9 +158,9 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         and: "timestamp is older than tolerance window (15 minutes ago)"
         def expiredTimestamp = Instant.now().minusSeconds(900).toString() // 15 minutes ago
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", "/v1/ingest/events", expiredTimestamp, nonce, deviceId, body, secretBase64)
+        def signature = generateHmacSignature("POST", "/v1/health-events", expiredTimestamp, nonce, deviceId, body, secretBase64)
 
-        when: "I POST to /v1/ingest/events with expired timestamp"
+        when: "I POST to /v1/health-events with expired timestamp"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", deviceId)
@@ -169,7 +169,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature)
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -197,7 +197,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         and: "first request with specific payload and nonce"
         def idempotencyKey1 = "user1|steps|${System.currentTimeMillis()}|com.test|1"
         def body1 = createStepsEvent(idempotencyKey1)
-        def signature1 = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, body1, secretBase64)
+        def signature1 = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body1, secretBase64)
 
         when: "I send first request"
         def response1 = RestAssured.given()
@@ -208,7 +208,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature1)
                 .body(body1)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -219,7 +219,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         // Use different body but SAME nonce - this simulates replay attack
         def idempotencyKey2 = "user1|steps|${System.currentTimeMillis()}|com.test|2"
         def body2 = createStepsEvent(idempotencyKey2)
-        def signature2 = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, body2, secretBase64)
+        def signature2 = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body2, secretBase64)
         
         def response2 = RestAssured.given()
                 .contentType("application/json")
@@ -229,7 +229,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature2)
                 .body(body2)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -249,12 +249,12 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         given: "valid event payload"
         def body = createStepsEvent("test-key-${System.currentTimeMillis()}")
 
-        when: "I POST to /v1/ingest/events without authentication headers"
+        when: "I POST to /v1/health-events without authentication headers"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -285,9 +285,9 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
 
         and: "valid HMAC signature for that timestamp"
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, body, secretBase64)
+        def signature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body, secretBase64)
 
-        when: "I POST to /v1/ingest/events"
+        when: "I POST to /v1/health-events"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", deviceId)
@@ -296,7 +296,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature)
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -321,9 +321,9 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
 
         and: "valid HMAC signature"
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, body, secretBase64)
+        def signature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body, secretBase64)
 
-        when: "I POST to /v1/ingest/events"
+        when: "I POST to /v1/health-events"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", deviceId)
@@ -332,7 +332,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature)
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -353,7 +353,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         and: "valid event payload"
         def body = createStepsEvent("invalid|timestamp|${System.currentTimeMillis()}")
 
-        when: "I POST to /v1/ingest/events"
+        when: "I POST to /v1/health-events"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", deviceId)
@@ -362,7 +362,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", "dummy-signature")
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -392,9 +392,9 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
 
         and: "valid HMAC signature for that future timestamp"
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", "/v1/ingest/events", futureTimestamp, nonce, deviceId, body, secretBase64)
+        def signature = generateHmacSignature("POST", "/v1/health-events", futureTimestamp, nonce, deviceId, body, secretBase64)
 
-        when: "I POST to /v1/ingest/events"
+        when: "I POST to /v1/health-events"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", deviceId)
@@ -403,7 +403,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature)
                 .body(body)
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
@@ -427,12 +427,12 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
         def bodyA = createStepsEvent("body|a|${System.currentTimeMillis()}")
         def timestamp = generateTimestamp()
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", "/v1/ingest/events", timestamp, nonce, deviceId, bodyA, secretBase64)
+        def signature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, bodyA, secretBase64)
 
         and: "actual request body is B (different)"
         def bodyB = createStepsEvent("body|b|${System.currentTimeMillis()}")
 
-        when: "I POST to /v1/ingest/events with body B but signature for body A"
+        when: "I POST to /v1/health-events with body B but signature for body A"
         def response = RestAssured.given()
                 .contentType("application/json")
                 .header("X-Device-Id", deviceId)
@@ -441,7 +441,7 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature) // Signature for bodyA!
                 .body(bodyB) // But sending bodyB!
         .when()
-                .post("/v1/ingest/events")
+                .post("/v1/health-events")
         .then()
                 .extract()
 
