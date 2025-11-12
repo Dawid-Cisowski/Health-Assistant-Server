@@ -45,3 +45,4 @@ out/
 ### Environment ###
 .env
 .env.local
+/target/
