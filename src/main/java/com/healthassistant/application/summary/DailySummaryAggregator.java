@@ -53,52 +53,44 @@ class DailySummaryAggregator {
         for (HealthEventsQuery.EventData event : events) {
             Map<String, Object> payload = event.payload();
 
-            switch (event.eventType()) {
-                case "StepsBucketedRecorded.v1" -> {
-                    Object count = payload.get("count");
-                    if (count instanceof Number) {
-                        totalSteps += ((Number) count).intValue();
-                    }
-                }
-                case "ActiveMinutesRecorded.v1" -> {
-                    Object minutes = payload.get("activeMinutes");
-                    if (minutes instanceof Number) {
-                        totalActiveMinutes += ((Number) minutes).intValue();
-                    }
-                }
-                case "ActiveCaloriesBurnedRecorded.v1" -> {
-                    Object calories = payload.get("energyKcal");
-                    if (calories instanceof Number) {
-                        totalActiveCalories += ((Number) calories).intValue();
-                    }
-                }
-            }
-        }
-
-        for (HealthEventsQuery.EventData event : events) {
-            if ("ExerciseSessionRecorded.v1".equals(event.eventType())) {
-                Map<String, Object> payload = event.payload();
-                Object distance = payload.get("distanceMeters");
-                if (distance != null) {
-                    try {
-                        if (distance instanceof String) {
-                            totalDistanceMeters += Double.parseDouble((String) distance);
-                        } else if (distance instanceof Number) {
-                            totalDistanceMeters += ((Number) distance).doubleValue();
-                        }
-                    } catch (Exception e) {
-                        log.warn("Failed to parse distanceMeters: {}", distance);
-                    }
-                }
-            }
+            totalSteps += extractSteps(event.eventType(), payload);
+            totalActiveMinutes += extractActiveMinutes(event.eventType(), payload);
+            totalActiveCalories += extractActiveCalories(event.eventType(), payload);
+            totalDistanceMeters += extractDistance(event.eventType(), payload);
         }
 
         return new DailySummary.Activity(
-                totalSteps > 0 ? totalSteps : null,
-                totalActiveMinutes > 0 ? totalActiveMinutes : null,
-                totalActiveCalories > 0 ? totalActiveCalories : null,
-                totalDistanceMeters > 0 ? totalDistanceMeters : null
+                nullIfZero(totalSteps),
+                nullIfZero(totalActiveMinutes),
+                nullIfZero(totalActiveCalories),
+                nullIfZero(totalDistanceMeters)
         );
+    }
+
+    private int extractSteps(String eventType, Map<String, Object> payload) {
+        if (!"StepsBucketedRecorded.v1".equals(eventType)) return 0;
+        return getInteger(payload, "count", 0);
+    }
+
+    private int extractActiveMinutes(String eventType, Map<String, Object> payload) {
+        if (!"ActiveMinutesRecorded.v1".equals(eventType)) return 0;
+        return getInteger(payload, "activeMinutes", 0);
+    }
+
+    private int extractActiveCalories(String eventType, Map<String, Object> payload) {
+        if (!"ActiveCaloriesBurnedRecorded.v1".equals(eventType)) return 0;
+        return getInteger(payload, "energyKcal", 0);
+    }
+
+    private double extractDistance(String eventType, Map<String, Object> payload) {
+        if (!"ExerciseSessionRecorded.v1".equals(eventType)) return 0.0;
+        Double distance = getDouble(payload, "distanceMeters");
+        return distance != null ? distance : 0.0;
+    }
+
+    private <T extends Number> T nullIfZero(T value) {
+        if (value == null) return null;
+        return value.doubleValue() == 0.0 ? null : value;
     }
 
     private List<DailySummary.Workout> aggregateWorkouts(List<HealthEventsQuery.EventData> events) {
@@ -211,16 +203,32 @@ class DailySummaryAggregator {
         if (activity == null) return 0;
 
         int score = 0;
-        if (activity.steps() != null && activity.steps() >= 10000) score += 40;
-        else if (activity.steps() != null && activity.steps() >= 5000) score += 20;
-
-        if (activity.activeMinutes() != null && activity.activeMinutes() >= 30) score += 30;
-        else if (activity.activeMinutes() != null && activity.activeMinutes() >= 15) score += 15;
-
-        if (activity.activeCalories() != null && activity.activeCalories() >= 400) score += 30;
-        else if (activity.activeCalories() != null && activity.activeCalories() >= 200) score += 15;
+        score += scoreSteps(activity.steps());
+        score += scoreActiveMinutes(activity.activeMinutes());
+        score += scoreActiveCalories(activity.activeCalories());
 
         return Math.min(score, 100);
+    }
+
+    private int scoreSteps(Integer steps) {
+        if (steps == null) return 0;
+        if (steps >= 10000) return 40;
+        if (steps >= 5000) return 20;
+        return 0;
+    }
+
+    private int scoreActiveMinutes(Integer minutes) {
+        if (minutes == null) return 0;
+        if (minutes >= 30) return 30;
+        if (minutes >= 15) return 15;
+        return 0;
+    }
+
+    private int scoreActiveCalories(Integer calories) {
+        if (calories == null) return 0;
+        if (calories >= 400) return 30;
+        if (calories >= 200) return 15;
+        return 0;
     }
 
     private int calculateSleepScore(DailySummary.Sleep sleep) {
@@ -228,10 +236,8 @@ class DailySummaryAggregator {
 
         int minutes = sleep.totalMinutes();
         if (minutes >= 420 && minutes <= 540) return 100;
-        if (minutes >= 360 && minutes < 420) return 80;
-        if (minutes > 540 && minutes <= 600) return 80;
-        if (minutes >= 300 && minutes < 360) return 60;
-        if (minutes > 600 && minutes <= 660) return 60;
+        if ((minutes >= 360 && minutes < 420) || (minutes > 540 && minutes <= 600)) return 80;
+        if ((minutes >= 300 && minutes < 360) || (minutes > 600 && minutes <= 660)) return 60;
         return 40;
     }
 
@@ -254,15 +260,19 @@ class DailySummaryAggregator {
     }
 
     private Integer getInteger(Map<String, Object> map, String key) {
+        return getInteger(map, key, null);
+    }
+
+    private Integer getInteger(Map<String, Object> map, String key, Integer defaultValue) {
         Object value = map.get(key);
-        if (value == null) return null;
+        if (value == null) return defaultValue;
         if (value instanceof Number) {
             return ((Number) value).intValue();
         }
         try {
             return Integer.parseInt(value.toString());
         } catch (Exception e) {
-            return null;
+            return defaultValue;
         }
     }
 

@@ -3,8 +3,10 @@ package com.healthassistant.domain.event;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 @Component
 public class EventValidator {
@@ -45,88 +47,54 @@ public class EventValidator {
     }
 
     private void validateStepsBucketed(Map<String, Object> payload, List<EventValidationError> errors) {
-        requireField(payload, "bucketStart", errors);
-        requireField(payload, "bucketEnd", errors);
-        requireField(payload, "count", errors);
-        requireField(payload, "originPackage", errors);
-
-        if (payload.containsKey("count")) {
-            validateNonNegativeNumber(payload.get("count"), "count", errors);
-        }
+        requireFields(payload, errors, "bucketStart", "bucketEnd", "count", "originPackage");
+        validateOptionalNonNegative(payload, errors, "count");
     }
 
     private void validateHeartRateSummary(Map<String, Object> payload, List<EventValidationError> errors) {
-        requireField(payload, "bucketStart", errors);
-        requireField(payload, "bucketEnd", errors);
-        requireField(payload, "avg", errors);
-        requireField(payload, "min", errors);
-        requireField(payload, "max", errors);
-        requireField(payload, "samples", errors);
-        requireField(payload, "originPackage", errors);
-
-        validateNonNegativeNumber(payload.get("avg"), "avg", errors);
-        validateNonNegativeNumber(payload.get("min"), "min", errors);
-        validateNonNegativeNumber(payload.get("max"), "max", errors);
+        requireFields(payload, errors, "bucketStart", "bucketEnd", "avg", "min", "max", "samples", "originPackage");
+        validateNonNegative(payload, errors, "avg", "min", "max");
         validatePositiveNumber(payload.get("samples"), "samples", errors);
     }
 
     private void validateSleepSession(Map<String, Object> payload, List<EventValidationError> errors) {
-        requireField(payload, "sleepStart", errors);
-        requireField(payload, "sleepEnd", errors);
-        requireField(payload, "totalMinutes", errors);
-        requireField(payload, "originPackage", errors);
-
-        validateNonNegativeNumber(payload.get("totalMinutes"), "totalMinutes", errors);
+        requireFields(payload, errors, "sleepStart", "sleepEnd", "totalMinutes", "originPackage");
+        validateNonNegative(payload, errors, "totalMinutes");
     }
 
     private void validateActiveCaloriesBurned(Map<String, Object> payload, List<EventValidationError> errors) {
-        requireField(payload, "bucketStart", errors);
-        requireField(payload, "bucketEnd", errors);
-        requireField(payload, "energyKcal", errors);
-        requireField(payload, "originPackage", errors);
-
-        validateNonNegativeNumber(payload.get("energyKcal"), "energyKcal", errors);
+        requireFields(payload, errors, "bucketStart", "bucketEnd", "energyKcal", "originPackage");
+        validateNonNegative(payload, errors, "energyKcal");
     }
 
     private void validateActiveMinutes(Map<String, Object> payload, List<EventValidationError> errors) {
-        requireField(payload, "bucketStart", errors);
-        requireField(payload, "bucketEnd", errors);
-        requireField(payload, "activeMinutes", errors);
-        requireField(payload, "originPackage", errors);
-
-        validateNonNegativeNumber(payload.get("activeMinutes"), "activeMinutes", errors);
+        requireFields(payload, errors, "bucketStart", "bucketEnd", "activeMinutes", "originPackage");
+        validateNonNegative(payload, errors, "activeMinutes");
     }
 
     private void validateExerciseSession(Map<String, Object> payload, List<EventValidationError> errors) {
-        System.out.println("=== ExerciseSessionRecorded.v1 VALIDATION (logging only) ===");
-        System.out.println("Payload in validator: " + payload);
-        System.out.println("============================================================");
-        
-        requireField(payload, "sessionId", errors);
-        requireField(payload, "type", errors);
-        requireField(payload, "start", errors);
-        requireField(payload, "end", errors);
-        requireField(payload, "durationMinutes", errors);
-        requireField(payload, "originPackage", errors);
-
-        if (payload.containsKey("durationMinutes")) {
-            validateNonNegativeNumber(payload.get("durationMinutes"), "durationMinutes", errors);
-        }
-        if (payload.containsKey("steps")) {
-            validateNonNegativeNumber(payload.get("steps"), "steps", errors);
-        }
-        if (payload.containsKey("avgHr")) {
-            validateNonNegativeNumber(payload.get("avgHr"), "avgHr", errors);
-        }
-        if (payload.containsKey("maxHr")) {
-            validateNonNegativeNumber(payload.get("maxHr"), "maxHr", errors);
-        }
+        requireFields(payload, errors, "sessionId", "type", "start", "end", "durationMinutes", "originPackage");
+        validateOptionalNonNegative(payload, errors, "durationMinutes", "steps", "avgHr", "maxHr");
     }
 
-    private void requireField(Map<String, Object> map, String field, List<EventValidationError> errors) {
-        if (!map.containsKey(field) || map.get(field) == null) {
-            errors.add(EventValidationError.missingField(field));
-        }
+    private void requireFields(Map<String, Object> payload, List<EventValidationError> errors, String... fields) {
+        Arrays.stream(fields).forEach(field -> {
+            if (!payload.containsKey(field) || payload.get(field) == null) {
+                errors.add(EventValidationError.missingField(field));
+            }
+        });
+    }
+
+    private void validateNonNegative(Map<String, Object> payload, List<EventValidationError> errors, String... fields) {
+        Arrays.stream(fields).forEach(field ->
+            validateNonNegativeNumber(payload.get(field), field, errors)
+        );
+    }
+
+    private void validateOptionalNonNegative(Map<String, Object> payload, List<EventValidationError> errors, String... fields) {
+        Arrays.stream(fields)
+            .filter(payload::containsKey)
+            .forEach(field -> validateNonNegativeNumber(payload.get(field), field, errors));
     }
 
     private void validateNonNegativeNumber(Object value, String field, List<EventValidationError> errors) {

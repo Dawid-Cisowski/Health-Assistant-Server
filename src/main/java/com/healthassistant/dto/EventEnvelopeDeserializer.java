@@ -115,89 +115,93 @@ public class EventEnvelopeDeserializer extends JsonDeserializer<EventEnvelope> {
     }
     
     private StepsPayload deserializeStepsPayload(JsonNode node) throws IOException {
-        JsonNode bucketStartNode = node.get("bucketStart");
-        JsonNode bucketEndNode = node.get("bucketEnd");
         return new StepsPayload(
-            (bucketStartNode != null && !bucketStartNode.isNull() && !bucketStartNode.isMissingNode()) ? parseInstant(bucketStartNode) : null,
-            (bucketEndNode != null && !bucketEndNode.isNull() && !bucketEndNode.isMissingNode()) ? parseInstant(bucketEndNode) : null,
-            node.has("count") && !node.get("count").isNull() ? node.get("count").asInt() : null,
-            node.has("originPackage") && !node.get("originPackage").isNull() ? node.get("originPackage").asText() : null
+            parseInstantField(node, "bucketStart"),
+            parseInstantField(node, "bucketEnd"),
+            getIntField(node, "count"),
+            getTextField(node, "originPackage")
         );
     }
-    
+
     private HeartRatePayload deserializeHeartRatePayload(JsonNode node) throws IOException {
-        JsonNode bucketStartNode = node.get("bucketStart");
-        JsonNode bucketEndNode = node.get("bucketEnd");
         return new HeartRatePayload(
-            (bucketStartNode != null && !bucketStartNode.isNull() && !bucketStartNode.isMissingNode()) ? parseInstant(bucketStartNode) : null,
-            (bucketEndNode != null && !bucketEndNode.isNull() && !bucketEndNode.isMissingNode()) ? parseInstant(bucketEndNode) : null,
-            node.has("avg") && !node.get("avg").isNull() ? node.get("avg").asDouble() : null,
-            node.has("min") && !node.get("min").isNull() ? node.get("min").asInt() : null,
-            node.has("max") && !node.get("max").isNull() ? node.get("max").asInt() : null,
-            node.has("samples") && !node.get("samples").isNull() ? node.get("samples").asInt() : null,
-            node.has("originPackage") && !node.get("originPackage").isNull() ? node.get("originPackage").asText() : null
+            parseInstantField(node, "bucketStart"),
+            parseInstantField(node, "bucketEnd"),
+            getDoubleField(node, "avg"),
+            getIntField(node, "min"),
+            getIntField(node, "max"),
+            getIntField(node, "samples"),
+            getTextField(node, "originPackage")
         );
     }
-    
+
     private SleepSessionPayload deserializeSleepSessionPayload(JsonNode node) throws IOException {
-        JsonNode sleepStartNode = node.get("sleepStart");
-        JsonNode sleepEndNode = node.get("sleepEnd");
         return new SleepSessionPayload(
-            (sleepStartNode != null && !sleepStartNode.isNull() && !sleepStartNode.isMissingNode()) ? parseInstant(sleepStartNode) : null,
-            (sleepEndNode != null && !sleepEndNode.isNull() && !sleepEndNode.isMissingNode()) ? parseInstant(sleepEndNode) : null,
-            node.has("totalMinutes") && !node.get("totalMinutes").isNull() ? node.get("totalMinutes").asInt() : null,
-            node.has("originPackage") && !node.get("originPackage").isNull() ? node.get("originPackage").asText() : null
+            parseInstantField(node, "sleepStart"),
+            parseInstantField(node, "sleepEnd"),
+            getIntField(node, "totalMinutes"),
+            getTextField(node, "originPackage")
         );
     }
-    
+
     private ActiveCaloriesPayload deserializeActiveCaloriesPayload(JsonNode node) throws IOException {
-        JsonNode bucketStartNode = node.get("bucketStart");
-        JsonNode bucketEndNode = node.get("bucketEnd");
         return new ActiveCaloriesPayload(
-            (bucketStartNode != null && !bucketStartNode.isNull() && !bucketStartNode.isMissingNode()) ? parseInstant(bucketStartNode) : null,
-            (bucketEndNode != null && !bucketEndNode.isNull() && !bucketEndNode.isMissingNode()) ? parseInstant(bucketEndNode) : null,
-            node.has("energyKcal") && !node.get("energyKcal").isNull() ? node.get("energyKcal").asDouble() : null,
-            node.has("originPackage") && !node.get("originPackage").isNull() ? node.get("originPackage").asText() : null
+            parseInstantField(node, "bucketStart"),
+            parseInstantField(node, "bucketEnd"),
+            getDoubleField(node, "energyKcal"),
+            getTextField(node, "originPackage")
         );
     }
-    
+
     private ActiveMinutesPayload deserializeActiveMinutesPayload(JsonNode node) throws IOException {
-        JsonNode bucketStartNode = node.get("bucketStart");
-        JsonNode bucketEndNode = node.get("bucketEnd");
         return new ActiveMinutesPayload(
-            (bucketStartNode != null && !bucketStartNode.isNull() && !bucketStartNode.isMissingNode()) ? parseInstant(bucketStartNode) : null,
-            (bucketEndNode != null && !bucketEndNode.isNull() && !bucketEndNode.isMissingNode()) ? parseInstant(bucketEndNode) : null,
-            node.has("activeMinutes") && !node.get("activeMinutes").isNull() ? node.get("activeMinutes").asInt() : null,
-            node.has("originPackage") && !node.get("originPackage").isNull() ? node.get("originPackage").asText() : null
+            parseInstantField(node, "bucketStart"),
+            parseInstantField(node, "bucketEnd"),
+            getIntField(node, "activeMinutes"),
+            getTextField(node, "originPackage")
         );
     }
-    
+
     private ExerciseSessionPayload deserializeExerciseSessionPayload(JsonNode node, JsonParser p) throws IOException {
-        String payloadJson = objectMapper.writeValueAsString(node);
-        List<String> fieldNames = new ArrayList<>();
-        node.fieldNames().forEachRemaining(fieldNames::add);
-        
-        System.out.println("=== ExerciseSessionRecorded.v1 PAYLOAD DEBUG ===");
-        System.out.println("Full payload JSON: " + payloadJson);
-        System.out.println("Payload fields: " + String.join(", ", fieldNames));
-        System.out.println("================================================");
-        
-        JsonNode startNode = node.get("start");
-        JsonNode endNode = node.get("end");
-        
         return new ExerciseSessionPayload(
-            node.has("sessionId") && !node.get("sessionId").isNull() ? node.get("sessionId").asText() : null,
-            node.has("type") && !node.get("type").isNull() ? node.get("type").asText() : null,
-            (startNode != null && !startNode.isNull() && !startNode.isMissingNode()) ? parseInstant(startNode) : null,
-            (endNode != null && !endNode.isNull() && !endNode.isMissingNode()) ? parseInstant(endNode) : null,
-            node.has("durationMinutes") && !node.get("durationMinutes").isNull() ? node.get("durationMinutes").asInt() : null,
-            node.has("distanceMeters") && !node.get("distanceMeters").isNull() ? node.get("distanceMeters").asText() : null,
-            node.has("steps") && !node.get("steps").isNull() ? node.get("steps").asInt() : null,
-            node.has("avgSpeedMetersPerSecond") && !node.get("avgSpeedMetersPerSecond").isNull() ? node.get("avgSpeedMetersPerSecond").asText() : null,
-            node.has("avgHr") && !node.get("avgHr").isNull() ? node.get("avgHr").asInt() : null,
-            node.has("maxHr") && !node.get("maxHr").isNull() ? node.get("maxHr").asInt() : null,
-            node.has("originPackage") && !node.get("originPackage").isNull() ? node.get("originPackage").asText() : null
+            getTextField(node, "sessionId"),
+            getTextField(node, "type"),
+            parseInstantField(node, "start"),
+            parseInstantField(node, "end"),
+            getIntField(node, "durationMinutes"),
+            getTextField(node, "distanceMeters"),
+            getIntField(node, "steps"),
+            getTextField(node, "avgSpeedMetersPerSecond"),
+            getIntField(node, "avgHr"),
+            getIntField(node, "maxHr"),
+            getTextField(node, "originPackage")
         );
+    }
+
+    private java.time.Instant parseInstantField(JsonNode parent, String fieldName) throws IOException {
+        JsonNode node = parent.get(fieldName);
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        return parseInstant(node);
+    }
+
+    private String getTextField(JsonNode node, String fieldName) {
+        return node.has(fieldName) && !node.get(fieldName).isNull()
+            ? node.get(fieldName).asText()
+            : null;
+    }
+
+    private Integer getIntField(JsonNode node, String fieldName) {
+        return node.has(fieldName) && !node.get(fieldName).isNull()
+            ? node.get(fieldName).asInt()
+            : null;
+    }
+
+    private Double getDoubleField(JsonNode node, String fieldName) {
+        return node.has(fieldName) && !node.get(fieldName).isNull()
+            ? node.get(fieldName).asDouble()
+            : null;
     }
     
     private java.time.Instant parseInstant(JsonNode node) throws IOException {

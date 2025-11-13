@@ -32,26 +32,28 @@ public class HealthEventsMapper {
     }
     
     private static StoreHealthEventsCommand.EventEnvelope toCommandEnvelope(EventEnvelope dto) {
-        Map<String, Object> payloadMap = dto.getPayload() != null 
+        Map<String, Object> payloadMap = dto.getPayload() != null
             ? convertPayloadToMap(dto.getPayload())
             : java.util.Map.of();
-        
-        String idempotencyKeyStr = dto.getIdempotencyKey();
-        IdempotencyKey idempotencyKey;
-        try {
-            idempotencyKey = idempotencyKeyStr != null && !idempotencyKeyStr.isBlank() 
-                ? IdempotencyKey.of(idempotencyKeyStr)
-                : IdempotencyKey.of("temp-key-for-validation");
-        } catch (Exception e) {
-            idempotencyKey = IdempotencyKey.of("temp-key-for-validation");
-        }
-        
+
+        IdempotencyKey idempotencyKey = parseIdempotencyKey(dto.getIdempotencyKey());
+
         return new StoreHealthEventsCommand.EventEnvelope(
             idempotencyKey,
             dto.getType(),
             dto.getOccurredAt(),
             payloadMap
         );
+    }
+
+    private static IdempotencyKey parseIdempotencyKey(String idempotencyKeyStr) {
+        try {
+            return idempotencyKeyStr != null && !idempotencyKeyStr.isBlank()
+                ? IdempotencyKey.of(idempotencyKeyStr)
+                : IdempotencyKey.of("temp-key-for-validation");
+        } catch (Exception e) {
+            return IdempotencyKey.of("temp-key-for-validation");
+        }
     }
     
     private static Map<String, Object> convertPayloadToMap(EventPayload payload) {
@@ -104,28 +106,32 @@ public class HealthEventsMapper {
     }
     
     private static HealthEventsResponse.EventResult toResponseResult(StoreHealthEventsResult.EventResult commandResult) {
-        HealthEventsResponse.EventStatus status = switch (commandResult.status()) {
+        return HealthEventsResponse.EventResult.builder()
+            .index(commandResult.index())
+            .status(mapStatus(commandResult.status()))
+            .eventId(mapEventId(commandResult.eventId()))
+            .error(mapError(commandResult.error()))
+            .build();
+    }
+
+    private static HealthEventsResponse.EventStatus mapStatus(StoreHealthEventsResult.EventStatus status) {
+        return switch (status) {
             case stored -> HealthEventsResponse.EventStatus.stored;
             case duplicate -> HealthEventsResponse.EventStatus.duplicate;
             case invalid -> HealthEventsResponse.EventStatus.invalid;
         };
-        
-        String eventIdStr = commandResult.eventId() != null 
-            ? commandResult.eventId().value() 
-            : null;
-        
-        HealthEventsResponse.ItemError error = commandResult.error() != null
+    }
+
+    private static String mapEventId(com.healthassistant.domain.event.EventId eventId) {
+        return eventId != null ? eventId.value() : null;
+    }
+
+    private static HealthEventsResponse.ItemError mapError(StoreHealthEventsResult.EventError error) {
+        return error != null
             ? HealthEventsResponse.ItemError.builder()
-                .field(commandResult.error().field())
-                .message(commandResult.error().message())
+                .field(error.field())
+                .message(error.message())
                 .build()
             : null;
-        
-        return HealthEventsResponse.EventResult.builder()
-            .index(commandResult.index())
-            .status(status)
-            .eventId(eventIdStr)
-            .error(error)
-            .build();
     }
 }

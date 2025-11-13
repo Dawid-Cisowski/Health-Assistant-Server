@@ -38,25 +38,30 @@ public class AppProperties {
             log.info("devicesJson: {}", devicesJson);
             log.info("deviceSecrets: {}", deviceSecrets);
 
-            if (devicesJson != null && !devicesJson.isBlank()) {
-                try {
-                    ObjectMapper mapper = new ObjectMapper();
-                    Map<String, String> devices = mapper.readValue(
-                            devicesJson,
-                            new TypeReference<>() {
-                            }
-                    );
-
-                    devices.forEach((deviceId, base64Secret) -> {
-                        byte[] secret = Base64.getDecoder().decode(base64Secret);
-                        deviceSecrets.put(deviceId, secret);
-                        log.info("Loaded HMAC secret for device: {}", deviceId);
-                    });
-                } catch (Exception e) {
-                    log.error("Failed to parse HMAC devices JSON", e);
-                    throw new IllegalStateException("Invalid HMAC_DEVICES_JSON configuration", e);
-                }
+            if (devicesJson == null || devicesJson.isBlank()) {
+                return;
             }
+
+            try {
+                Map<String, String> devices = parseDevicesJson(devicesJson);
+                loadDeviceSecrets(devices);
+            } catch (Exception e) {
+                log.error("Failed to parse HMAC devices JSON", e);
+                throw new IllegalStateException("Invalid HMAC_DEVICES_JSON configuration", e);
+            }
+        }
+
+        private Map<String, String> parseDevicesJson(String json) throws Exception {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(json, new TypeReference<>() {});
+        }
+
+        private void loadDeviceSecrets(Map<String, String> devices) {
+            devices.forEach((deviceId, base64Secret) -> {
+                byte[] secret = Base64.getDecoder().decode(base64Secret);
+                deviceSecrets.put(deviceId, secret);
+                log.info("Loaded HMAC secret for device: {}", deviceId);
+            });
         }
     }
 
