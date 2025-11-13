@@ -49,9 +49,19 @@ class StoreHealthEventsCommandHandler {
                 log.warn("===========================================");
             }
             
+            String eventTypeStr = envelope.eventType();
+            if (eventTypeStr == null || eventTypeStr.isBlank()) {
+                return new StoreHealthEventsResult.EventResult(
+                        index,
+                        StoreHealthEventsResult.EventStatus.invalid,
+                        null,
+                        new StoreHealthEventsResult.EventError("type", "Missing required field: type")
+                );
+            }
+            
             List<EventValidationError> validationErrors = eventValidator.validate(
-                    envelope.eventType(),
-                    envelope.payload()
+                    eventTypeStr,
+                    envelope.payload() != null ? envelope.payload() : java.util.Map.of()
             );
 
             if (!validationErrors.isEmpty()) {
@@ -60,6 +70,15 @@ class StoreHealthEventsCommandHandler {
             }
 
             IdempotencyKey idempotencyKey = envelope.idempotencyKey();
+            if (idempotencyKey.value().equals("temp-key-for-validation")) {
+                return new StoreHealthEventsResult.EventResult(
+                        index,
+                        StoreHealthEventsResult.EventStatus.invalid,
+                        null,
+                        new StoreHealthEventsResult.EventError("idempotencyKey", "Missing required field: idempotencyKey")
+                );
+            }
+            
             if (eventRepository.existsByIdempotencyKey(idempotencyKey)) {
                 log.debug("Duplicate event detected at index {}: {}", index, idempotencyKey.value());
                 return new StoreHealthEventsResult.EventResult(

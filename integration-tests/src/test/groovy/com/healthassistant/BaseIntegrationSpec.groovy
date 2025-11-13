@@ -150,5 +150,32 @@ abstract class BaseIntegrationSpec extends Specification {
         }
         """.stripIndent().trim()
     }
+
+    String createExerciseSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T10:00:00Z") {
+        return """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "${idempotencyKey}",
+                    "type": "ExerciseSessionRecorded.v1",
+                    "occurredAt": "${occurredAt}",
+                    "payload": {
+                        "sessionId": "e4210819-5708-3835-bcbb-2776e037e258",
+                        "type": "other_0",
+                        "start": "2025-11-10T09:03:15Z",
+                        "end": "2025-11-10T10:03:03Z",
+                        "durationMinutes": 59,
+                        "distanceMeters": "5838.7",
+                        "steps": 13812,
+                        "avgSpeedMetersPerSecond": "1.65",
+                        "avgHr": 83,
+                        "maxHr": 123,
+                        "originPackage": "com.heytap.health.international"
+                    }
+                }
+            ]
+        }
+        """.stripIndent().trim()
+    }
 }
 

@@ -32,10 +32,22 @@ public class HealthEventsMapper {
     }
     
     private static StoreHealthEventsCommand.EventEnvelope toCommandEnvelope(EventEnvelope dto) {
-        Map<String, Object> payloadMap = convertPayloadToMap(dto.getPayload());
+        Map<String, Object> payloadMap = dto.getPayload() != null 
+            ? convertPayloadToMap(dto.getPayload())
+            : java.util.Map.of();
+        
+        String idempotencyKeyStr = dto.getIdempotencyKey();
+        IdempotencyKey idempotencyKey;
+        try {
+            idempotencyKey = idempotencyKeyStr != null && !idempotencyKeyStr.isBlank() 
+                ? IdempotencyKey.of(idempotencyKeyStr)
+                : IdempotencyKey.of("temp-key-for-validation");
+        } catch (Exception e) {
+            idempotencyKey = IdempotencyKey.of("temp-key-for-validation");
+        }
         
         return new StoreHealthEventsCommand.EventEnvelope(
-            IdempotencyKey.of(dto.getIdempotencyKey()),
+            idempotencyKey,
             dto.getType(),
             dto.getOccurredAt(),
             payloadMap
@@ -43,6 +55,9 @@ public class HealthEventsMapper {
     }
     
     private static Map<String, Object> convertPayloadToMap(EventPayload payload) {
+        if (payload == null) {
+            return java.util.Map.of();
+        }
         Map<String, Object> map = objectMapper.convertValue(payload, Map.class);
         
         return switch (payload) {
@@ -71,6 +86,8 @@ public class HealthEventsMapper {
             Object value = map.get(fieldName);
             if (value instanceof java.time.Instant instant) {
                 map.put(fieldName, instant.toString());
+            } else if (value == null) {
+                map.put(fieldName, null);
             }
         }
         return map;

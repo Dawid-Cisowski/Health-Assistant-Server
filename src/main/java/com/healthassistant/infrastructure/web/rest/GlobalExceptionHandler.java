@@ -1,5 +1,6 @@
 package com.healthassistant.infrastructure.web.rest;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.healthassistant.dto.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -55,6 +56,20 @@ public class GlobalExceptionHandler {
             WebRequest request
     ) {
         log.warn("Malformed request body: {}", ex.getMessage());
+
+        Throwable cause = ex.getCause();
+        if (cause instanceof InvalidFormatException) {
+            InvalidFormatException ife = (InvalidFormatException) cause;
+            String message = "Invalid data format: " + ife.getMessage();
+            ErrorResponse errorResponse = ErrorResponse.builder()
+                    .code("MALFORMED_REQUEST")
+                    .message(message)
+                    .details(List.of(ife.getMessage() != null ? ife.getMessage() : "Invalid request body"))
+                    .build();
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(errorResponse);
+        }
 
         String message = determineErrorMessage(ex.getMessage());
         String detail = ex.getMessage();

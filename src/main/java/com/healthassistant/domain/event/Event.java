@@ -1,6 +1,7 @@
 package com.healthassistant.domain.event;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 public record Event(IdempotencyKey idempotencyKey,
@@ -21,7 +22,10 @@ public record Event(IdempotencyKey idempotencyKey,
 
     @Override
     public Map<String, Object> payload() {
-        return Map.copyOf(payload);
+        if (payload == null) {
+            return Map.of();
+        }
+        return new HashMap<>(payload);
     }
 }
 

@@ -76,8 +76,6 @@ public class EventEnvelope {
     )
     private Instant occurredAt;
 
-    @Valid
-    @NotNull(message = "payload is required")
     @JsonProperty("payload")
     @Schema(
         description = "Event-specific payload. Structure depends on event type (see anyOf schemas below).",

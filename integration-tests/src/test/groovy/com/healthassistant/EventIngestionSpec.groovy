@@ -606,5 +606,68 @@ class EventIngestionSpec extends BaseIntegrationSpec {
         and: "no events stored"
         eventRepository.findAll().size() == 0
     }
+
+    def "Scenario 2.11: Successfully ingest ExerciseSessionRecorded event"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "exercise session event payload"
+        def idempotencyKey = "user1|exercise|${System.currentTimeMillis()}|test"
+        def body = createExerciseSessionEvent(idempotencyKey)
+
+        when: "I POST exercise session event"
+        def response = authenticatedRequest(deviceId, secretBase64, body)
+                .post("/v1/health-events")
+                .then()
+                .extract()
+
+        then: "response status should be 202 ACCEPTED"
+        response.statusCode() == 202
+
+        and: "event is stored"
+        def responseBody = response.body().jsonPath()
+        responseBody.getString("results[0].status") == "stored"
+
+        and: "event is in database with correct payload"
+        def events = eventRepository.findAll()
+        events.size() == 1
+        def event = events[0]
+        event.eventType == "ExerciseSessionRecorded.v1"
+        event.payload.sessionId == "e4210819-5708-3835-bcbb-2776e037e258"
+        event.payload.type == "WALK"
+        event.payload.durationMinutes == 59
+        event.payload.steps == 13812
+        event.payload.avgHr == 83
+        event.payload.maxHr == 123
+        event.payload.originPackage == "com.heytap.health.international"
+    }
+
+    def "Scenario 2.12: ExerciseSessionRecorded event type other_0 is mapped to WALK in database"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "exercise session event with type other_0"
+        def idempotencyKey = "user1|exercise|walk|${System.currentTimeMillis()}"
+        def body = createExerciseSessionEvent(idempotencyKey)
+
+        when: "I POST exercise session event"
+        def response = authenticatedRequest(deviceId, secretBase64, body)
+                .post("/v1/health-events")
+                .then()
+                .extract()
+
+        then: "response status should be 202 ACCEPTED"
+        response.statusCode() == 202
+
+        and: "event is stored"
+        response.body().jsonPath().getString("results[0].status") == "stored"
+
+        and: "type is mapped from other_0 to WALK in database"
+        def events = eventRepository.findAll()
+        events.size() == 1
+        events[0].payload.type == "WALK"
+    }
 }
 
