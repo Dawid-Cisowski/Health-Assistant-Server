@@ -125,6 +125,6 @@ import org.springframework.context.annotation.Configuration;
         Nonces are cached for 10 minutes (600 seconds) to prevent replay attacks.
         """
 )
-public class OpenApiConfig {
+class OpenApiConfig {
 }
 

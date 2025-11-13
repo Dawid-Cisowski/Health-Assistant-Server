@@ -177,5 +177,65 @@ abstract class BaseIntegrationSpec extends Specification {
         }
         """.stripIndent().trim()
     }
+
+    String createActiveMinutesEvent(String idempotencyKey, String occurredAt = "2025-11-10T14:00:00Z") {
+        return """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "${idempotencyKey}",
+                    "type": "ActiveMinutesRecorded.v1",
+                    "occurredAt": "${occurredAt}",
+                    "payload": {
+                        "bucketStart": "2025-11-10T13:00:00Z",
+                        "bucketEnd": "2025-11-10T14:00:00Z",
+                        "activeMinutes": 25,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                }
+            ]
+        }
+        """.stripIndent().trim()
+    }
+
+    String createActiveCaloriesEvent(String idempotencyKey, String occurredAt = "2025-11-10T16:00:00Z") {
+        return """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "${idempotencyKey}",
+                    "type": "ActiveCaloriesBurnedRecorded.v1",
+                    "occurredAt": "${occurredAt}",
+                    "payload": {
+                        "bucketStart": "2025-11-10T15:00:00Z",
+                        "bucketEnd": "2025-11-10T16:00:00Z",
+                        "energyKcal": 125.5,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                }
+            ]
+        }
+        """.stripIndent().trim()
+    }
+
+    String createSleepSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T08:00:00Z") {
+        return """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "${idempotencyKey}",
+                    "type": "SleepSessionRecorded.v1",
+                    "occurredAt": "${occurredAt}",
+                    "payload": {
+                        "sleepStart": "2025-11-10T00:30:00Z",
+                        "sleepEnd": "2025-11-10T08:00:00Z",
+                        "totalMinutes": 450,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                }
+            ]
+        }
+        """.stripIndent().trim()
+    }
 }
 
