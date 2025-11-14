@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 @Configuration
 @EnableCaching
-class CacheConfig {
+public class CacheConfig {
 
     public static final String NONCE_CACHE = "nonces";
 

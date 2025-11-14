@@ -21,7 +21,7 @@ public class AppProperties {
 
     private final HmacConfig hmac = new HmacConfig();
     private final NonceConfig nonce = new NonceConfig();
-    private final BatchConfig batch = new BatchConfig();
+    private final GoogleFitConfig googleFit = new GoogleFitConfig();
 
     @PostConstruct
     public void init() {
@@ -35,9 +35,6 @@ public class AppProperties {
         private Map<String, byte[]> deviceSecrets = new HashMap<>();
 
         public void init() {
-            log.info("devicesJson: {}", devicesJson);
-            log.info("deviceSecrets: {}", deviceSecrets);
-
             if (devicesJson == null || devicesJson.isBlank()) {
                 return;
             }
@@ -71,8 +68,10 @@ public class AppProperties {
     }
 
     @Data
-    public static class BatchConfig {
-        private int maxEvents = 100;
+    public static class GoogleFitConfig {
+        private String clientId;
+        private String clientSecret;
+        private String refreshToken;
     }
 }
 

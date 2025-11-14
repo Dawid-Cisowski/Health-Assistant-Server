@@ -2,7 +2,6 @@ package com.healthassistant.infrastructure.web.security;
 
 import com.healthassistant.application.authentication.port.DeviceSecretProvider;
 import com.healthassistant.config.AppProperties;
-import com.healthassistant.domain.event.DeviceId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,8 +14,8 @@ class DeviceSecretProviderAdapter implements DeviceSecretProvider {
     private final AppProperties appProperties;
 
     @Override
-    public Optional<byte[]> getSecret(DeviceId deviceId) {
-        byte[] secret = appProperties.getHmac().getDeviceSecrets().get(deviceId.value());
+    public Optional<byte[]> getSecret(String deviceId) {
+        byte[] secret = appProperties.getHmac().getDeviceSecrets().get(deviceId);
         return Optional.ofNullable(secret);
     }
 }

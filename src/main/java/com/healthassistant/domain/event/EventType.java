@@ -4,6 +4,7 @@ import java.util.Objects;
 
 public sealed interface EventType permits
         StepsBucketedRecorded,
+        DistanceBucketRecorded,
         HeartRateSummaryRecorded,
         SleepSessionRecorded,
         ActiveCaloriesBurnedRecorded,
@@ -16,6 +17,7 @@ public sealed interface EventType permits
         Objects.requireNonNull(value, "Event type cannot be null");
         return switch (value) {
             case "StepsBucketedRecorded.v1" -> new StepsBucketedRecorded();
+            case "DistanceBucketRecorded.v1" -> new DistanceBucketRecorded();
             case "HeartRateSummaryRecorded.v1" -> new HeartRateSummaryRecorded();
             case "SleepSessionRecorded.v1" -> new SleepSessionRecorded();
             case "ActiveCaloriesBurnedRecorded.v1" -> new ActiveCaloriesBurnedRecorded();
@@ -31,6 +33,13 @@ record StepsBucketedRecorded() implements EventType {
     @Override
     public String value() {
         return "StepsBucketedRecorded.v1";
+    }
+}
+
+record DistanceBucketRecorded() implements EventType {
+    @Override
+    public String value() {
+        return "DistanceBucketRecorded.v1";
     }
 }
 

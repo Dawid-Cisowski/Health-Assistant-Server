@@ -11,53 +11,20 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
-        title = "Health Assistant – Health Events API",
+        title = "Health Assistant API",
         version = "1.0.0",
         description = """
-            # Health Events Ingestion API
+            # Health Assistant API
             
-            RESTful API for storing normalized health events from mobile applications. 
-            Designed for high-throughput, append-only event storage with HMAC authentication and idempotency guarantees.
+            RESTful API for health data synchronization and daily summaries.
+            Events are automatically synchronized from Google Fit API and aggregated into daily summaries.
             
             ## Features
             
-            - **Batch Processing**: Accept up to 100 events per request
-            - **Idempotency**: Automatic deduplication using client-provided keys
+            - **Google Fit Integration**: Automatic synchronization of health data from Google Fit
+            - **Daily Summaries**: Aggregated health metrics per day
             - **Append-Only Storage**: Events stored in PostgreSQL with JSONB payloads
-            - **Type-Specific Validation**: Each event type has its own payload schema
-            - **HMAC Authentication**: Secure header-based authentication with replay protection
-            
-            ## Supported Event Types
-            
-            1. **StepsBucketedRecorded.v1** - Step count for a time bucket
-               - Tracks steps taken within a specific time window
-               - Fields: `bucketStart`, `bucketEnd`, `count`, `originPackage`
-            
-            2. **HeartRateSummaryRecorded.v1** - Heart rate summary for a time bucket
-               - Provides average, min, max heart rate and sample count
-               - Fields: `bucketStart`, `bucketEnd`, `avg`, `min`, `max`, `samples`, `originPackage`
-            
-            3. **SleepSessionRecorded.v1** - Sleep session with start/end times
-               - Tracks sleep duration and timing
-               - Fields: `sleepStart`, `sleepEnd`, `totalMinutes`, `originPackage`
-            
-            4. **ActiveCaloriesBurnedRecorded.v1** - Active calories burned in a time bucket
-               - Tracks calories burned from physical activity
-               - Fields: `bucketStart`, `bucketEnd`, `energyKcal`, `originPackage`
-            
-            5. **ActiveMinutesRecorded.v1** - Active minutes in a time bucket
-               - Tracks moderate and vigorous activity minutes
-               - Fields: `bucketStart`, `bucketEnd`, `activeMinutes`, `originPackage`
-            
-            ## Authentication
-            
-            All requests require HMAC-SHA256 authentication via custom headers:
-            - **X-Device-Id**: Unique device identifier (string)
-            - **X-Timestamp**: Current time in ISO-8601 UTC format (e.g., `2025-11-09T07:05:12Z`)
-            - **X-Nonce**: Random UUID to prevent replay attacks
-            - **X-Signature**: Base64-encoded HMAC-SHA256 signature
-            
-            See the security scheme below for detailed signature calculation.
+            - **HMAC Authentication**: Secure header-based authentication for mobile app access
             """
     ),
     servers = {
@@ -73,40 +40,31 @@ import org.springframework.context.annotation.Configuration;
     description = """
         ## HMAC-SHA256 Authentication
         
-        All API requests must be authenticated using HMAC-SHA256 signatures calculated over a canonical string.
+        All requests to `/v1/daily-summaries/*` require HMAC-SHA256 authentication.
         
         ### Required Headers
         
         | Header | Type | Description | Example |
         |--------|------|-------------|---------|
-        | `X-Device-Id` | string | Unique device identifier registered with the server | `device-abc123` |
+        | `X-Device-Id` | string | Unique device identifier | `device-abc123` |
         | `X-Timestamp` | string | Current time in ISO-8601 UTC format | `2025-11-09T07:05:12Z` |
-        | `X-Nonce` | string | Random UUID (lowercase) to prevent replay attacks | `550e8400-e29b-41d4-a716-446655440000` |
+        | `X-Nonce` | string | Random UUID (lowercase) | `550e8400-e29b-41d4-a716-446655440000` |
         | `X-Signature` | string | Base64-encoded HMAC-SHA256 signature | `dGVzdC1zaWduYXR1cmU=` |
         
-        ### Signature Calculation
+        ### Signature Calculation (GET requests)
         
-        The signature is calculated over a canonical string constructed as follows:
-        
-        ```
-        METHOD
-        PATH
-        X-Timestamp
-        X-Nonce
-        X-Device-Id
-        REQUEST_BODY
-        ```
-        
-        **Example:**
+        For GET requests, the canonical string is:
         
         ```
-        POST
-        /v1/health-events
+        GET
+        /v1/daily-summaries/2025-11-10
         2025-11-09T07:05:12Z
         550e8400-e29b-41d4-a716-446655440000
         device-abc123
-        {"events":[...]}
+        
         ```
+        
+        Note: Empty body for GET requests.
         
         **Steps:**
         1. Concatenate the above lines with newline characters (`\\n`)
@@ -116,13 +74,11 @@ import org.springframework.context.annotation.Configuration;
         
         ### Timestamp Tolerance
         
-        Timestamps must be within ±10 minutes (600 seconds) of the server's current time. 
-        Requests with timestamps outside this window will be rejected.
+        Timestamps must be within ±10 minutes (600 seconds) of the server's current time.
         
         ### Nonce Replay Protection
         
-        Each nonce can only be used once per device. Reusing a nonce will result in authentication failure.
-        Nonces are cached for 10 minutes (600 seconds) to prevent replay attacks.
+        Each nonce can only be used once per device. Nonces are cached for 10 minutes.
         """
 )
 class OpenApiConfig {

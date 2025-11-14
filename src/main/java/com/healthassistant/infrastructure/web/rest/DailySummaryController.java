@@ -6,11 +6,11 @@ import com.healthassistant.infrastructure.web.rest.mapper.DailySummaryMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,52 +25,15 @@ class DailySummaryController {
 
     private final DailySummaryFacade dailySummaryFacade;
 
-    @PostMapping("/generate")
-    @Operation(
-            summary = "Trigger scheduled daily summary generation",
-            description = """
-                    Triggers the daily summary generation task. This endpoint is intended to be called 
-                    by Google Cloud Scheduler or similar cron services.
-                    """
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Summary generation triggered successfully"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    ResponseEntity<Void> triggerScheduledGeneration() {
-        log.info("Triggering scheduled daily summary generation");
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        dailySummaryFacade.generateDailySummary(yesterday);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/generate/{date}")
-    @Operation(
-            summary = "Manually generate daily summary for a specific date",
-            description = """
-                    Manually generates a daily summary for the specified date. If a summary already exists 
-                    for this date, it will be overwritten.
-                    """
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Summary generated successfully"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    ResponseEntity<DailySummaryResponse> generateForDate(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
-    ) {
-        log.info("Manually generating daily summary for date: {}", date);
-        var summary = dailySummaryFacade.generateDailySummary(date);
-        return ResponseEntity.ok(DailySummaryMapper.toResponse(summary));
-    }
-
     @GetMapping("/{date}")
     @Operation(
             summary = "Get daily summary for a specific date",
-            description = "Retrieves the daily summary for the specified date if it exists."
+            description = "Retrieves the daily summary for the specified date if it exists. Requires HMAC authentication.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Summary found"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed"),
             @ApiResponse(responseCode = "404", description = "Summary not found for the specified date")
     })
     ResponseEntity<DailySummaryResponse> getByDate(

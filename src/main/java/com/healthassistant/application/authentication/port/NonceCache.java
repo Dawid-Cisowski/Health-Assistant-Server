@@ -1,11 +1,6 @@
 package com.healthassistant.application.authentication.port;
 
-import com.healthassistant.domain.event.DeviceId;
-
 public interface NonceCache {
-
-    boolean isUsed(DeviceId deviceId, String nonce);
-
-    void markAsUsed(DeviceId deviceId, String nonce);
+    boolean isUsed(String deviceId, String nonce);
+    void markAsUsed(String deviceId, String nonce);
 }
-

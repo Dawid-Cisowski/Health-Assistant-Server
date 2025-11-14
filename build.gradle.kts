@@ -30,6 +30,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+
+    // Feign client
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.3")
     
     // Database
     implementation("org.postgresql:postgresql:42.7.4")

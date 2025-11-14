@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,11 +18,13 @@ import java.util.Objects;
 @Slf4j
 class DailySummaryAggregator {
 
+    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+
     private final HealthEventsQuery healthEventsQuery;
 
     DailySummary aggregate(LocalDate date) {
-        Instant dayStart = date.atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant dayEnd = date.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+        Instant dayStart = date.atStartOfDay(POLAND_ZONE).toInstant();
+        Instant dayEnd = date.plusDays(1).atStartOfDay(POLAND_ZONE).toInstant();
 
         List<HealthEventsQuery.EventData> events = healthEventsQuery.findEventsByDateRange(dayStart, dayEnd);
 
@@ -83,9 +85,15 @@ class DailySummaryAggregator {
     }
 
     private double extractDistance(String eventType, Map<String, Object> payload) {
-        if (!"ExerciseSessionRecorded.v1".equals(eventType)) return 0.0;
-        Double distance = getDouble(payload, "distanceMeters");
-        return distance != null ? distance : 0.0;
+        if ("DistanceBucketRecorded.v1".equals(eventType)) {
+            Double distance = getDouble(payload, "distanceMeters");
+            return distance != null ? distance : 0.0;
+        }
+        if ("ExerciseSessionRecorded.v1".equals(eventType)) {
+            Double distance = getDouble(payload, "distanceMeters");
+            return distance != null ? distance : 0.0;
+        }
+        return 0.0;
     }
 
     private <T extends Number> T nullIfZero(T value) {

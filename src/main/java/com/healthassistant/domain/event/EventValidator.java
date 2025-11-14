@@ -38,6 +38,7 @@ public class EventValidator {
     private void validatePayload(EventType eventType, Map<String, Object> payload, List<EventValidationError> errors) {
         switch (eventType) {
             case StepsBucketedRecorded steps -> validateStepsBucketed(payload, errors);
+            case DistanceBucketRecorded distance -> validateDistanceBucket(payload, errors);
             case HeartRateSummaryRecorded hr -> validateHeartRateSummary(payload, errors);
             case SleepSessionRecorded sleep -> validateSleepSession(payload, errors);
             case ActiveCaloriesBurnedRecorded calories -> validateActiveCaloriesBurned(payload, errors);
@@ -49,6 +50,11 @@ public class EventValidator {
     private void validateStepsBucketed(Map<String, Object> payload, List<EventValidationError> errors) {
         requireFields(payload, errors, "bucketStart", "bucketEnd", "count", "originPackage");
         validateOptionalNonNegative(payload, errors, "count");
+    }
+
+    private void validateDistanceBucket(Map<String, Object> payload, List<EventValidationError> errors) {
+        requireFields(payload, errors, "bucketStart", "bucketEnd", "distanceMeters", "originPackage");
+        validateOptionalNonNegative(payload, errors, "distanceMeters");
     }
 
     private void validateHeartRateSummary(Map<String, Object> payload, List<EventValidationError> errors) {

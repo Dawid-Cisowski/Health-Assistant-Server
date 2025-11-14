@@ -1,5 +1,6 @@
 package com.healthassistant.application.ingestion;
 
+import com.healthassistant.application.summary.DailySummaryFacade;
 import com.healthassistant.domain.event.DeviceId;
 import com.healthassistant.domain.event.Event;
 import com.healthassistant.domain.event.EventId;
@@ -12,7 +13,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @Component
@@ -20,9 +26,12 @@ import java.util.stream.IntStream;
 @Slf4j
 class StoreHealthEventsCommandHandler {
 
+    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+
     private final EventRepository eventRepository;
     private final EventIdGenerator eventIdGenerator;
     private final EventValidator eventValidator;
+    private final DailySummaryFacade dailySummaryFacade;
 
     @Transactional
     public StoreHealthEventsResult handle(StoreHealthEventsCommand command) {
@@ -30,7 +39,31 @@ class StoreHealthEventsCommandHandler {
                 .mapToObj(index -> processEvent(command.events().get(index), index, command.deviceId()))
                 .toList();
 
+        updateDailySummaries(command, results);
+
         return new StoreHealthEventsResult(results);
+    }
+
+    private void updateDailySummaries(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
+        Set<LocalDate> datesToUpdate = IntStream.range(0, results.size())
+                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
+                .mapToObj(index -> {
+                    var envelope = command.events().get(index);
+                    Instant occurredAt = envelope.occurredAt();
+                    return occurredAt != null ? occurredAt.atZone(POLAND_ZONE).toLocalDate() : null;
+                })
+                .filter(date -> date != null)
+                .collect(Collectors.toSet());
+
+        for (LocalDate date : datesToUpdate) {
+            try {
+                log.debug("Updating daily summary for date: {}", date);
+                dailySummaryFacade.generateDailySummary(date);
+                log.debug("Successfully updated daily summary for date: {}", date);
+            } catch (Exception e) {
+                log.error("Failed to update daily summary for date: {}", date, e);
+            }
+        }
     }
 
     private StoreHealthEventsResult.EventResult processEvent(
