@@ -6,8 +6,10 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.context.annotation.Bean;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -20,6 +22,13 @@ public interface GoogleFitClient {
 
     @PostMapping("/users/me/dataset:aggregate")
     GoogleFitAggregateResponse fetchAggregated(@RequestBody AggregateRequest request);
+
+    @GetMapping("/users/me/sessions")
+    GoogleFitSessionsResponse fetchSessions(
+            @RequestParam("startTime") String startTime,
+            @RequestParam("endTime") String endTime,
+            @RequestParam(value = "includeDeleted", defaultValue = "false") boolean includeDeleted
+    );
 
     @Data
     class AggregateRequest {

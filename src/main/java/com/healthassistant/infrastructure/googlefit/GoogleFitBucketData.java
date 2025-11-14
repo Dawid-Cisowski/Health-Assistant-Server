@@ -9,8 +9,7 @@ public record GoogleFitBucketData(
         Long steps,
         Double distance,
         Double calories,
-        List<Integer> heartRates,
-        List<GoogleFitSleepSegment> sleepSegments
+        List<Integer> heartRates
 ) {
 }
 

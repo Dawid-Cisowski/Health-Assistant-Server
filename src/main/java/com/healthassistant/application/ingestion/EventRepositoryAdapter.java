@@ -24,7 +24,7 @@ class EventRepositoryAdapter implements EventRepository {
                 .deviceId(event.deviceId().value())
                 .createdAt(event.createdAt())
                 .build();
-        jpaRepository.save(entity);
+        jpaRepository.saveAndFlush(entity);
     }
 
     @Override

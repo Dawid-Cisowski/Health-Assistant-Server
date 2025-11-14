@@ -32,6 +32,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime = now.minusSeconds(900).toEpochMilli() // 15 minutes ago
         def endTime = now.toEpochMilli()
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger manual sync"
         def response = RestAssured.given()
@@ -59,6 +60,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime = todayStart.plusSeconds(3600).toEpochMilli() // 1 hour after midnight
         def endTime = todayStart.plusSeconds(4500).toEpochMilli() // 1.25 hours after midnight
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
         RestAssured.given()
@@ -76,6 +78,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     def "Scenario 3: Sync updates lastSyncedAt timestamp"() {
         given: "mock empty Google Fit API response"
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
         RestAssured.given()
@@ -98,6 +101,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime = todayStart.plusSeconds(3600).toEpochMilli()
         def endTime = todayStart.plusSeconds(4500).toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync first time"
         RestAssured.given()
@@ -129,6 +133,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime = todayStart.plusSeconds(3600).toEpochMilli()
         def endTime = todayStart.plusSeconds(4500).toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
         RestAssured.given()
@@ -145,6 +150,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     def "Scenario 6: Sync handles empty response from Google Fit API gracefully"() {
         given: "mock empty Google Fit API response"
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
         def response = RestAssured.given()
@@ -169,6 +175,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime = todayStart.plusSeconds(3600).toEpochMilli()
         def endTime = todayStart.plusSeconds(4500).toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime, endTime, 742, 1000.5, 125.5, 75))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
         RestAssured.given()
@@ -213,6 +220,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime = todayStart.plusSeconds(3600).toEpochMilli()
         def endTime = todayStart.plusSeconds(4500).toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
         RestAssured.given()
@@ -237,6 +245,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime1 = todayStart.plusSeconds(3600).toEpochMilli() // 1 hour after midnight
         def endTime1 = todayStart.plusSeconds(4500).toEpochMilli() // 1.25 hours after midnight
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 500))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         
         RestAssured.given()
                 .contentType(ContentType.JSON)
@@ -250,6 +259,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def startTime2 = todayStart.plusSeconds(7200).toEpochMilli() // 2 hours after midnight
         def endTime2 = todayStart.plusSeconds(8100).toEpochMilli() // 2.25 hours after midnight
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync again"
         RestAssured.given()
@@ -261,6 +271,204 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         then: "new events arrived"
         def finalEventsCount = eventRepository.findAll().size()
         finalEventsCount > initialEventsCount
+    }
+
+    def "Scenario 11: Sync stores sleep session events from Google Fit Sessions API"() {
+        given: "mock Google Fit API responses with sleep session"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+                .toInstant()
+        // Sleep session: 22:00 yesterday to 07:00 today (in Poland timezone)
+        def sleepStart = todayStart.minusSeconds(3600 * 9) // 9 hours before midnight = 15:00 UTC yesterday
+        def sleepEnd = todayStart.plusSeconds(3600 * 5) // 5 hours after midnight = 05:00 UTC today
+        def startTimeMillis = sleepStart.toEpochMilli()
+        def endTimeMillis = sleepEnd.toEpochMilli()
+        
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(startTimeMillis, endTimeMillis, "sleep-123"))
+
+        when: "I trigger sync"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "sleep session event is stored in database"
+        def events = eventRepository.findAll()
+        def sleepEvents = events.findAll { it.eventType == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 1
+        
+        and: "sleep event has correct occurredAt (end time)"
+        def sleepEvent = sleepEvents.first()
+        def occurredAt = Instant.parse(sleepEvent.occurredAt.toString())
+        occurredAt.toEpochMilli() == endTimeMillis
+        
+        and: "sleep event payload contains correct data"
+        def payload = sleepEvent.payload
+        payload.get("sleepStart") != null
+        payload.get("sleepEnd") != null
+        payload.get("totalMinutes") != null
+        payload.get("totalMinutes") == (int) ((endTimeMillis - startTimeMillis) / 60000)
+    }
+
+    def "Scenario 12: Sync handles multiple sleep sessions correctly"() {
+        given: "mock Google Fit API responses with multiple sleep sessions"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+                .toInstant()
+        
+        def sleep1Start = todayStart.minusSeconds(3600 * 9).toEpochMilli()
+        def sleep1End = todayStart.plusSeconds(3600 * 5).toEpochMilli()
+        def sleep2Start = todayStart.plusSeconds(3600 * 14).toEpochMilli() // Nap after lunch
+        def sleep2End = todayStart.plusSeconds(3600 * 15).toEpochMilli()
+        
+        def sessionsResponse = """
+        {
+            "session": [
+                {
+                    "id": "sleep-123",
+                    "activityType": 72,
+                    "startTimeMillis": ${sleep1Start},
+                    "endTimeMillis": ${sleep1End},
+                    "packageName": "com.google.android.apps.fitness"
+                },
+                {
+                    "id": "sleep-456",
+                    "activityType": 72,
+                    "startTimeMillis": ${sleep2Start},
+                    "endTimeMillis": ${sleep2End},
+                    "packageName": "com.google.android.apps.fitness"
+                }
+            ]
+        }
+        """
+        
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(sessionsResponse)
+
+        when: "I trigger sync"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "both sleep sessions are stored"
+        def events = eventRepository.findAll()
+        def sleepEvents = events.findAll { it.eventType == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 2
+        
+        and: "each sleep event has unique idempotency key"
+        def idempotencyKeys = sleepEvents.collect { it.idempotencyKey }
+        idempotencyKeys.unique().size() == 2
+    }
+
+    def "Scenario 13: Sync filters out non-sleep sessions from Google Fit Sessions API"() {
+        given: "mock Google Fit API responses with mixed session types"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+                .toInstant()
+        
+        def sleepStart = todayStart.minusSeconds(3600 * 9).toEpochMilli()
+        def sleepEnd = todayStart.plusSeconds(3600 * 5).toEpochMilli()
+        def workoutStart = todayStart.plusSeconds(3600 * 10).toEpochMilli()
+        def workoutEnd = todayStart.plusSeconds(3600 * 11).toEpochMilli()
+        
+        def sessionsResponse = """
+        {
+            "session": [
+                {
+                    "id": "sleep-123",
+                    "activityType": 72,
+                    "startTimeMillis": ${sleepStart},
+                    "endTimeMillis": ${sleepEnd},
+                    "packageName": "com.google.android.apps.fitness"
+                },
+                {
+                    "id": "workout-456",
+                    "activityType": 8,
+                    "startTimeMillis": ${workoutStart},
+                    "endTimeMillis": ${workoutEnd},
+                    "packageName": "com.google.android.apps.fitness"
+                }
+            ]
+        }
+        """
+        
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(sessionsResponse)
+
+        when: "I trigger sync"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "only sleep session is stored"
+        def events = eventRepository.findAll()
+        def sleepEvents = events.findAll { it.eventType == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 1
+        
+        and: "no workout session events are stored"
+        def workoutEvents = events.findAll { it.eventType == "ExerciseSessionRecorded.v1" }
+        workoutEvents.size() == 0
+    }
+
+    def "Scenario 14: Sync handles empty sleep sessions response gracefully"() {
+        given: "mock Google Fit API responses with no sleep sessions"
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger sync"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "no sleep events are stored"
+        def events = eventRepository.findAll()
+        def sleepEvents = events.findAll { it.eventType == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 0
+    }
+
+    def "Scenario 15: Sync handles idempotency for sleep sessions correctly"() {
+        given: "mock Google Fit API responses with same sleep session"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+                .toInstant()
+        def sleepStart = todayStart.minusSeconds(3600 * 9).toEpochMilli()
+        def sleepEnd = todayStart.plusSeconds(3600 * 5).toEpochMilli()
+        def sessionId = "sleep-123"
+        
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(sleepStart, sleepEnd, sessionId))
+
+        when: "I trigger sync first time"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        def firstSyncEventsCount = eventRepository.findAll().size()
+
+        and: "I trigger sync second time with same sleep session"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "duplicate sleep session is not stored again"
+        def secondSyncEventsCount = eventRepository.findAll().size()
+        secondSyncEventsCount == firstSyncEventsCount
+        
+        and: "only one sleep event exists"
+        def sleepEvents = eventRepository.findAll().findAll { it.eventType == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 1
     }
 }
 

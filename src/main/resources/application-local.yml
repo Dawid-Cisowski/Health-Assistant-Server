@@ -10,5 +10,5 @@ logging:
     root: INFO
     com.healthassistant: DEBUG
     org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate: WARN
 

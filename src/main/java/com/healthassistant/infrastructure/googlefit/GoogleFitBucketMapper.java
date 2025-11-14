@@ -39,8 +39,7 @@ public class GoogleFitBucketMapper {
                 extractor.getSteps(),
                 extractor.getDistance(),
                 extractor.getCalories(),
-                extractor.getHeartRates().isEmpty() ? null : extractor.getHeartRates(),
-                extractor.getSleepSegments().isEmpty() ? null : extractor.getSleepSegments()
+                extractor.getHeartRates().isEmpty() ? null : extractor.getHeartRates()
         );
     }
 
@@ -49,7 +48,6 @@ public class GoogleFitBucketMapper {
         private Double distance;
         private Double calories;
         private final List<Integer> heartRates = new ArrayList<>();
-        private final List<GoogleFitSleepSegment> sleepSegments = new ArrayList<>();
 
         void extractFromDataset(GoogleFitAggregateResponse.GoogleFitBucket.Dataset dataset) {
             String dataSourceId = dataset.getDataSourceId();
@@ -75,11 +73,6 @@ public class GoogleFitBucketMapper {
                     if (hr != null) {
                         heartRates.add(hr.intValue());
                     }
-                } else if (dataSourceId.contains("sleep")) {
-                    GoogleFitSleepSegment segment = extractSleepSegment(point, value);
-                    if (segment != null) {
-                        sleepSegments.add(segment);
-                    }
                 }
             });
         }
@@ -88,7 +81,6 @@ public class GoogleFitBucketMapper {
         Double getDistance() { return distance; }
         Double getCalories() { return calories; }
         List<Integer> getHeartRates() { return heartRates; }
-        List<GoogleFitSleepSegment> getSleepSegments() { return sleepSegments; }
     }
 
     private static Long extractLongValue(GoogleFitAggregateResponse.GoogleFitBucket.Dataset.DataPoint.Value value) {
@@ -110,34 +102,4 @@ public class GoogleFitBucketMapper {
         }
         return null;
     }
-
-    private static GoogleFitSleepSegment extractSleepSegment(
-            GoogleFitAggregateResponse.GoogleFitBucket.Dataset.DataPoint point,
-            GoogleFitAggregateResponse.GoogleFitBucket.Dataset.DataPoint.Value value
-    ) {
-        if (point.getStartTimeNanos() == null || point.getEndTimeNanos() == null) {
-            return null;
-        }
-
-        long startNanos = Long.parseLong(point.getStartTimeNanos());
-        long endNanos = Long.parseLong(point.getEndTimeNanos());
-        Instant start = Instant.ofEpochSecond(startNanos / 1_000_000_000L, startNanos % 1_000_000_000L);
-        Instant end = Instant.ofEpochSecond(endNanos / 1_000_000_000L, endNanos % 1_000_000_000L);
-
-        Long sleepType = extractSleepType(value);
-        return new GoogleFitSleepSegment(start, end, sleepType);
-    }
-
-    private static Long extractSleepType(GoogleFitAggregateResponse.GoogleFitBucket.Dataset.DataPoint.Value value) {
-        if (value.getMapVal() == null || value.getMapVal().isEmpty()) {
-            return null;
-        }
-
-        return value.getMapVal().stream()
-                .filter(entry -> "sleep_type".equals(entry.getKey()) && entry.getValue() != null)
-                .findFirst()
-                .map(entry -> entry.getValue().getIntVal())
-                .orElse(null);
-    }
 }
-

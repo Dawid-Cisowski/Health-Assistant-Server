@@ -3,11 +3,12 @@ package com.healthassistant.application.sync;
 import com.healthassistant.application.ingestion.StoreHealthEventsCommand;
 import com.healthassistant.domain.event.IdempotencyKey;
 import com.healthassistant.infrastructure.googlefit.GoogleFitBucketData;
-import com.healthassistant.infrastructure.googlefit.GoogleFitSleepSegment;
+import com.healthassistant.infrastructure.googlefit.GoogleFitSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -24,6 +25,7 @@ class GoogleFitEventMapper {
     private static final String GOOGLE_FIT_ORIGIN = "google-fit";
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final String DEFAULT_USER_ID = "default";
 
     List<StoreHealthEventsCommand.EventEnvelope> mapToEventEnvelopes(List<GoogleFitBucketData> buckets) {
         return buckets.stream()
@@ -50,13 +52,13 @@ class GoogleFitEventMapper {
             envelopes.add(createHeartRateEnvelope(bucket));
         }
 
-        if (bucket.sleepSegments() != null && !bucket.sleepSegments().isEmpty()) {
-            bucket.sleepSegments().stream()
-                    .map(this::createSleepEnvelope)
-                    .forEach(envelopes::add);
-        }
-
         return envelopes.stream();
+    }
+
+    List<StoreHealthEventsCommand.EventEnvelope> mapSleepSessionsToEnvelopes(List<GoogleFitSession> sessions) {
+        return sessions.stream()
+                .map(this::createSleepSessionEnvelope)
+                .toList();
     }
 
     private StoreHealthEventsCommand.EventEnvelope createStepsEnvelope(GoogleFitBucketData bucket) {
@@ -155,30 +157,33 @@ class GoogleFitEventMapper {
         );
     }
 
-    private StoreHealthEventsCommand.EventEnvelope createSleepEnvelope(GoogleFitSleepSegment segment) {
-        long totalMinutes = java.time.Duration.between(segment.start(), segment.end()).toMinutes();
+    private StoreHealthEventsCommand.EventEnvelope createSleepSessionEnvelope(GoogleFitSession session) {
+        Instant start = session.getStartTime();
+        Instant end = session.getEndTime();
+        
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Sleep session must have start and end times");
+        }
 
-        ZonedDateTime sleepStartPoland = segment.start().atZone(POLAND_ZONE);
-        ZonedDateTime sleepEndPoland = segment.end().atZone(POLAND_ZONE);
+        long totalMinutes = java.time.Duration.between(start, end).toMinutes();
+
+        ZonedDateTime sleepStartPoland = start.atZone(POLAND_ZONE);
+        ZonedDateTime sleepEndPoland = end.atZone(POLAND_ZONE);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("sleepStart", sleepStartPoland.format(ISO_FORMATTER));
         payload.put("sleepEnd", sleepEndPoland.format(ISO_FORMATTER));
         payload.put("totalMinutes", (int) totalMinutes);
-        if (segment.sleepType() != null) {
-            payload.put("sleepType", segment.sleepType());
-        }
-        payload.put("originPackage", GOOGLE_FIT_ORIGIN);
+        payload.put("originPackage", session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN);
 
-        String idempotencyKey = String.format("google-fit|sleep|%d|%d|%s",
-                segment.start().toEpochMilli(),
-                segment.end().toEpochMilli(),
-                segment.sleepType() != null ? segment.sleepType() : "unknown");
+        String idempotencyKey = String.format("google-fit|sleep|%s|%s",
+                DEFAULT_USER_ID,
+                session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "SleepSessionRecorded.v1",
-                segment.start(),
+                end,
                 payload
         );
     }

@@ -48,7 +48,7 @@ public class GoogleFitSyncController {
         log.info("Manual Google Fit synchronization triggered via API");
         
         try {
-            googleFitSyncService.syncGoogleFitData();
+            googleFitSyncService.syncAll();
             
             Map<String, String> response = new HashMap<>();
             response.put("status", "success");

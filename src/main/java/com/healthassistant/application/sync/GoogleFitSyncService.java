@@ -13,8 +13,11 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -24,9 +27,10 @@ public class GoogleFitSyncService {
 
     private static final String DEFAULT_USER_ID = "default";
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final long BUCKET_DURATION_MINUTES = 15;
+    private static final long BUCKET_DURATION_MINUTES = 5;
     private static final long BUFFER_HOURS = 1;
     private static final DeviceId GOOGLE_FIT_DEVICE_ID = DeviceId.of("google-fit");
+    private static final DateTimeFormatter RFC3339_FORMATTER = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC);
 
     private final GoogleFitClient googleFitClient;
     private final GoogleFitBucketMapper bucketMapper;
@@ -36,6 +40,10 @@ public class GoogleFitSyncService {
 
     @Scheduled(cron = "0 */15 * * * *")
     public void syncGoogleFitData() {
+        syncAll();
+    }
+
+    public void syncAll() {
         log.info("Starting Google Fit synchronization");
         
         try {
@@ -45,29 +53,52 @@ public class GoogleFitSyncService {
 
             log.info("Syncing Google Fit data from {} to {}", from, to);
 
-            var request = getAggregateRequest(from, to);
+            var aggregateRequest = getAggregateRequest(from, to);
+            var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
+            List<com.healthassistant.infrastructure.googlefit.GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
 
-            var response = googleFitClient.fetchAggregated(request);
-            List<com.healthassistant.infrastructure.googlefit.GoogleFitBucketData> buckets = bucketMapper.mapBuckets(response);
+            String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
+            String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
+            var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
+            List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> sleepSessions = sessionsResponse.getSessions() != null
+                    ? sessionsResponse.getSessions().stream()
+                            .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isSleepSession)
+                            .toList()
+                    : List.of();
 
-            if (buckets.isEmpty()) {
-                log.info("No buckets to process");
+            log.info("Fetched {} buckets and {} sleep sessions", buckets.size(), sleepSessions.size());
+
+            List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
+            
+            eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
+            eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
+
+            if (eventEnvelopes.isEmpty()) {
+                log.info("No events to process");
                 updateLastSyncedAt(to);
                 return;
             }
 
-            List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = eventMapper.mapToEventEnvelopes(buckets);
             StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, GOOGLE_FIT_DEVICE_ID);
-            
             healthEventsFacade.storeHealthEvents(command);
 
             updateLastSyncedAt(to);
 
-            log.info("Successfully synchronized {} events from Google Fit", eventEnvelopes.size());
+            log.info("Successfully synchronized {} events from Google Fit ({} from aggregate, {} from sessions)",
+                    eventEnvelopes.size(),
+                    buckets.stream().mapToInt(b -> {
+                        int count = 0;
+                        if (b.steps() != null && b.steps() > 0) count++;
+                        if (b.distance() != null && b.distance() > 0) count++;
+                        if (b.calories() != null && b.calories() > 0) count++;
+                        if (b.heartRates() != null && !b.heartRates().isEmpty()) count++;
+                        return count;
+                    }).sum(),
+                    sleepSessions.size());
 
         } catch (Exception e) {
             log.error("Failed to synchronize Google Fit data", e);
-            throw e; // Re-throw to allow controller to handle error response
+            throw e;
         }
     }
 
@@ -77,10 +108,9 @@ public class GoogleFitSyncService {
                 new GoogleFitClient.DataTypeAggregate("com.google.step_count.delta"),
                 new GoogleFitClient.DataTypeAggregate("com.google.distance.delta"),
                 new GoogleFitClient.DataTypeAggregate("com.google.calories.expended"),
-                new GoogleFitClient.DataTypeAggregate("com.google.heart_rate.bpm"),
-                new GoogleFitClient.DataTypeAggregate("com.google.sleep.segment")
+                new GoogleFitClient.DataTypeAggregate("com.google.heart_rate.bpm")
         ));
-        request.setBucketByTime(new GoogleFitClient.BucketByTime(900000L)); // 15 minutes
+        request.setBucketByTime(new GoogleFitClient.BucketByTime(300000L));
         request.setStartTimeMillis(from.toEpochMilli());
         request.setEndTimeMillis(to.toEpochMilli());
         return request;
@@ -91,14 +121,23 @@ public class GoogleFitSyncService {
                 .orElse(null);
 
         if (state == null) {
-            ZonedDateTime startOfDay = LocalDate.now(POLAND_ZONE)
+            ZonedDateTime yesterday = LocalDate.now(POLAND_ZONE)
+                    .minusDays(1)
                     .atStartOfDay(POLAND_ZONE);
-            Instant firstSync = startOfDay.toInstant();
-            log.info("First sync detected, starting from beginning of day: {}", firstSync);
+            Instant firstSync = yesterday.toInstant();
+            log.info("First sync detected, starting from yesterday: {}", firstSync);
             return firstSync;
         }
 
-        return state.getLastSyncedAt().minus(BUFFER_HOURS, ChronoUnit.HOURS);
+        Instant lastSyncedMinusBuffer = state.getLastSyncedAt().minus(BUFFER_HOURS, ChronoUnit.HOURS);
+        ZonedDateTime yesterdayStart = LocalDate.now(POLAND_ZONE)
+                .minusDays(1)
+                .atStartOfDay(POLAND_ZONE);
+        Instant yesterday = yesterdayStart.toInstant();
+        
+        Instant syncFrom = lastSyncedMinusBuffer.isBefore(yesterday) ? lastSyncedMinusBuffer : yesterday;
+        log.info("Sync from time: {} (lastSynced: {}, yesterday: {})", syncFrom, state.getLastSyncedAt(), yesterday);
+        return syncFrom;
     }
 
     private Instant roundToNextBucket(Instant instant) {

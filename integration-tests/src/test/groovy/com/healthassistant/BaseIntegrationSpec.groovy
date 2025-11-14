@@ -104,6 +104,15 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withBody(responseBody)))
     }
     
+    void setupGoogleFitSessionsApiMock(String responseBody) {
+        wireMockServer.stubFor(get(urlPathMatching("/users/me/sessions"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(responseBody)))
+    }
+    
     String createGoogleFitResponseWithSteps(long startTimeMillis, long endTimeMillis, long steps) {
         return """
         {
@@ -172,6 +181,24 @@ abstract class BaseIntegrationSpec extends Specification {
     
     String createEmptyGoogleFitResponse() {
         return '{"bucket": []}'
+    }
+    
+    String createGoogleFitSessionsResponseWithSleep(long startTimeMillis, long endTimeMillis, String sessionId = "sleep-session-123") {
+        return """
+        {
+            "session": [{
+                "id": "${sessionId}",
+                "activityType": 72,
+                "startTimeMillis": ${startTimeMillis},
+                "endTimeMillis": ${endTimeMillis},
+                "packageName": "com.google.android.apps.fitness"
+            }]
+        }
+        """
+    }
+    
+    String createEmptyGoogleFitSessionsResponse() {
+        return '{"session": []}'
     }
     
     void setupGoogleFitApiMockError(int statusCode, String errorBody) {
