@@ -13,7 +13,7 @@ import java.util.List;
 
 @FeignClient(
         name = "googleFitClient",
-        url = "https://www.googleapis.com/fitness/v1",
+        url = "${app.google-fit.api-url:https://www.googleapis.com/fitness/v1}",
         configuration = GoogleFitClient.FeignConfig.class
 )
 public interface GoogleFitClient {

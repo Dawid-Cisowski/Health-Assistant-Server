@@ -43,6 +43,9 @@ dependencies {
     // REST Assured for API testing
     testImplementation("io.rest-assured:rest-assured:5.4.0")
     testImplementation("io.rest-assured:json-path:5.4.0")
+    
+    // WireMock for mocking external APIs
+    testImplementation("com.github.tomakehurst:wiremock-jre8-standalone:2.35.0")
 }
 
 tasks.withType<Test> {

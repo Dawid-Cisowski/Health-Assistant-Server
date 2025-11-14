@@ -12,6 +12,10 @@ public class GoogleFitAggregateResponse {
     @JsonProperty("bucket")
     private List<GoogleFitBucket> buckets;
 
+    public GoogleFitAggregateResponse() {
+        this.buckets = new ArrayList<>();
+    }
+
     public GoogleFitAggregateResponse(List<GoogleFitBucket> buckets) {
         this.buckets = buckets != null ? buckets : new ArrayList<>();
     }

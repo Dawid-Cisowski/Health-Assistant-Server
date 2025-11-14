@@ -67,6 +67,7 @@ public class GoogleFitSyncService {
 
         } catch (Exception e) {
             log.error("Failed to synchronize Google Fit data", e);
+            throw e; // Re-throw to allow controller to handle error response
         }
     }
 

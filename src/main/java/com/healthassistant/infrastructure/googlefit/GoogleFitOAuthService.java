@@ -18,10 +18,14 @@ import java.time.Instant;
 @Slf4j
 class GoogleFitOAuthService {
 
-    private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
     private final AppProperties appProperties;
     private final RestClient restClient = RestClient.create();
     private AccessTokenCache tokenCache;
+    
+    private String getTokenUrl() {
+        String oauthUrl = appProperties.getGoogleFit().getOauthUrl();
+        return oauthUrl != null ? oauthUrl + "/token" : "https://oauth2.googleapis.com/token";
+    }
 
     public String getAccessToken() {
         if (tokenCache != null && tokenCache.isValid()) {
@@ -52,7 +56,7 @@ class GoogleFitOAuthService {
         body.add("refresh_token", config.getRefreshToken());
 
         TokenResponse response = restClient.post()
-                .uri(TOKEN_URL)
+                .uri(getTokenUrl())
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(body)
                 .retrieve()

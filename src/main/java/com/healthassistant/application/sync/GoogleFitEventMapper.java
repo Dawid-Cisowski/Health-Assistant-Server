@@ -165,11 +165,15 @@ class GoogleFitEventMapper {
         payload.put("sleepStart", sleepStartPoland.format(ISO_FORMATTER));
         payload.put("sleepEnd", sleepEndPoland.format(ISO_FORMATTER));
         payload.put("totalMinutes", (int) totalMinutes);
+        if (segment.sleepType() != null) {
+            payload.put("sleepType", segment.sleepType());
+        }
         payload.put("originPackage", GOOGLE_FIT_ORIGIN);
 
-        String idempotencyKey = String.format("google-fit|sleep|%d|%d",
+        String idempotencyKey = String.format("google-fit|sleep|%d|%d|%s",
                 segment.start().toEpochMilli(),
-                segment.end().toEpochMilli());
+                segment.end().toEpochMilli(),
+                segment.sleepType() != null ? segment.sleepType() : "unknown");
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),

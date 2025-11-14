@@ -1,6 +1,9 @@
 package com.healthassistant
 
 import com.healthassistant.application.ingestion.HealthEventJpaRepository
+import com.healthassistant.application.summary.DailySummaryJpaRepository
+import com.github.tomakehurst.wiremock.WireMockServer
+import com.github.tomakehurst.wiremock.client.WireMock
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,6 +21,8 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
+import static com.github.tomakehurst.wiremock.client.WireMock.*
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ContextConfiguration(classes = [com.healthassistant.HealthAssistantApplication])
 @ActiveProfiles("test")
@@ -29,6 +34,7 @@ abstract class BaseIntegrationSpec extends Specification {
     @Autowired
     HealthEventJpaRepository eventRepository
 
+
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("test_db")
@@ -36,9 +42,13 @@ abstract class BaseIntegrationSpec extends Specification {
             .withPassword("test")
             .withReuse(true)
 
+    @Shared
+    static WireMockServer wireMockServer = new WireMockServer(0)
+
     static {
         // Start testcontainers
         postgres.start()
+        wireMockServer.start()
 
         // Configure properties using System.setProperty (works better with Spock)
         System.setProperty("spring.datasource.url", postgres.getJdbcUrl())
@@ -47,6 +57,14 @@ abstract class BaseIntegrationSpec extends Specification {
         System.setProperty("app.hmac.devices-json", '{"test-device":"dGVzdC1zZWNyZXQtMTIz"}')
         System.setProperty("app.hmac.tolerance-seconds", "600")
         System.setProperty("app.nonce.cache-ttl-seconds", "600")
+        
+        // Configure WireMock URLs for Google Fit API and OAuth
+        String wireMockUrl = "http://localhost:${wireMockServer.port()}"
+        System.setProperty("app.google-fit.api-url", wireMockUrl)
+        System.setProperty("app.google-fit.oauth-url", wireMockUrl)
+        System.setProperty("app.google-fit.client-id", "test-client-id")
+        System.setProperty("app.google-fit.client-secret", "test-client-secret")
+        System.setProperty("app.google-fit.refresh-token", "test-refresh-token")
     }
 
     def setupSpec() {
@@ -57,15 +75,118 @@ abstract class BaseIntegrationSpec extends Specification {
         // Runs before each test
         RestAssured.port = port
         RestAssured.baseURI = "http://localhost"
+        
+        // Reset WireMock
+        wireMockServer.resetAll()
+        
+        // Setup default OAuth mock
+        setupOAuthMock()
+        
         if (eventRepository != null) {
             eventRepository.deleteAll() // Clean DB before each test
         }
+    }
+    
+    void setupOAuthMock() {
+        wireMockServer.stubFor(post(urlEqualTo("/token"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody('{"access_token":"test-access-token","expires_in":3600,"token_type":"Bearer"}')))
+    }
+    
+    void setupGoogleFitApiMock(String responseBody) {
+        wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(responseBody)))
+    }
+    
+    String createGoogleFitResponseWithSteps(long startTimeMillis, long endTimeMillis, long steps) {
+        return """
+        {
+            "bucket": [{
+                "startTimeMillis": ${startTimeMillis},
+                "endTimeMillis": ${endTimeMillis},
+                "dataset": [{
+                    "dataSourceId": "derived:com.google.step_count.delta:com.google.android.gms:aggregated",
+                    "point": [{
+                        "startTimeNanos": "${startTimeMillis * 1_000_000}",
+                        "endTimeNanos": "${endTimeMillis * 1_000_000}",
+                        "value": [{
+                            "intVal": ${steps}
+                        }]
+                    }]
+                }]
+            }]
+        }
+        """
+    }
+    
+    String createGoogleFitResponseWithMultipleDataTypes(long startTimeMillis, long endTimeMillis, long steps, double distance, double calories, int heartRate) {
+        return """
+        {
+            "bucket": [{
+                "startTimeMillis": ${startTimeMillis},
+                "endTimeMillis": ${endTimeMillis},
+                "dataset": [
+                    {
+                        "dataSourceId": "derived:com.google.step_count.delta:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${startTimeMillis * 1_000_000}",
+                            "endTimeNanos": "${endTimeMillis * 1_000_000}",
+                            "value": [{"intVal": ${steps}}]
+                        }]
+                    },
+                    {
+                        "dataSourceId": "derived:com.google.distance.delta:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${startTimeMillis * 1_000_000}",
+                            "endTimeNanos": "${endTimeMillis * 1_000_000}",
+                            "value": [{"fpVal": ${distance}}]
+                        }]
+                    },
+                    {
+                        "dataSourceId": "derived:com.google.calories.expended:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${startTimeMillis * 1_000_000}",
+                            "endTimeNanos": "${endTimeMillis * 1_000_000}",
+                            "value": [{"fpVal": ${calories}}]
+                        }]
+                    },
+                    {
+                        "dataSourceId": "derived:com.google.heart_rate.bpm:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${startTimeMillis * 1_000_000}",
+                            "endTimeNanos": "${endTimeMillis * 1_000_000}",
+                            "value": [{"intVal": ${heartRate}}]
+                        }]
+                    }
+                ]
+            }]
+        }
+        """
+    }
+    
+    String createEmptyGoogleFitResponse() {
+        return '{"bucket": []}'
+    }
+    
+    void setupGoogleFitApiMockError(int statusCode, String errorBody) {
+        wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .willReturn(aResponse()
+                        .withStatus(statusCode)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(errorBody)))
     }
 
     def cleanup() {
         // Runs after each test
         if (eventRepository != null) {
-            eventRepository.deleteAll() // Clean DB after each test
+            eventRepository.deleteAll()
         }
     }
 
@@ -94,10 +215,10 @@ abstract class BaseIntegrationSpec extends Specification {
         return UUID.randomUUID().toString().toLowerCase()
     }
 
-    def authenticatedRequest(String deviceId, String secretBase64, String body) {
+    def authenticatedGetRequest(String deviceId, String secretBase64, String path) {
         String timestamp = generateTimestamp()
         String nonce = generateNonce()
-        String signature = generateHmacSignature("POST", "/v1/health-events", timestamp, nonce, deviceId, body, secretBase64)
+        String signature = generateHmacSignature("GET", path, timestamp, nonce, deviceId, "", secretBase64)
 
         return RestAssured.given()
                 .contentType(ContentType.JSON)
@@ -105,8 +226,8 @@ abstract class BaseIntegrationSpec extends Specification {
                 .header("X-Timestamp", timestamp)
                 .header("X-Nonce", nonce)
                 .header("X-Signature", signature)
-                .body(body)
     }
+
 
     String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z") {
         return """
