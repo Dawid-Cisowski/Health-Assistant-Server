@@ -9,7 +9,7 @@ import java.util.List;
 @Repository
 public interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, Long> {
 
-    boolean existsByIdempotencyKey(String idempotencyKey);
+    List<HealthEventJpaEntity> findByIdempotencyKeyIn(List<String> idempotencyKeys);
     
     List<HealthEventJpaEntity> findByOccurredAtBetween(Instant start, Instant end);
 }

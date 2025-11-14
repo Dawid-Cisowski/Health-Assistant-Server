@@ -35,8 +35,84 @@ class StoreHealthEventsCommandHandler {
 
     @Transactional
     public StoreHealthEventsResult handle(StoreHealthEventsCommand command) {
-        List<StoreHealthEventsResult.EventResult> results = IntStream.range(0, command.events().size())
-                .mapToObj(index -> processEvent(command.events().get(index), index, command.deviceId()))
+        List<StoreHealthEventsCommand.EventEnvelope> events = command.events();
+        
+        List<StoreHealthEventsResult.EventResult> validationResults = IntStream.range(0, events.size())
+                .mapToObj(index -> {
+                    var envelope = events.get(index);
+                    return validateEvent(envelope, index);
+                })
+                .toList();
+
+        List<Integer> validIndices = IntStream.range(0, validationResults.size())
+                .filter(index -> validationResults.get(index) == null)
+                .boxed()
+                .toList();
+
+        if (validIndices.isEmpty()) {
+            updateDailySummaries(command, validationResults);
+            return new StoreHealthEventsResult(validationResults);
+        }
+
+        List<IdempotencyKey> idempotencyKeys = validIndices.stream()
+                .map(index -> events.get(index).idempotencyKey())
+                .toList();
+
+        Set<String> existingKeys = eventRepository.findExistingIdempotencyKeys(idempotencyKeys);
+
+        List<Event> eventsToSave = validIndices.stream()
+                .filter(index -> !existingKeys.contains(events.get(index).idempotencyKey().value()))
+                .map(index -> {
+                    var envelope = events.get(index);
+                    EventType eventType = EventType.from(envelope.eventType());
+                    EventId eventId = eventIdGenerator.generate();
+                    return Event.create(
+                            envelope.idempotencyKey(),
+                            eventType,
+                            envelope.occurredAt(),
+                            envelope.payload(),
+                            command.deviceId(),
+                            eventId
+                    );
+                })
+                .toList();
+
+        if (!eventsToSave.isEmpty()) {
+            eventRepository.saveAll(eventsToSave);
+            log.info("Stored {} events in batch", eventsToSave.size());
+        }
+
+        java.util.Map<String, Event> savedEventsByKey = eventsToSave.stream()
+                .collect(Collectors.toMap(
+                        event -> event.idempotencyKey().value(),
+                        event -> event
+                ));
+
+        List<StoreHealthEventsResult.EventResult> results = IntStream.range(0, events.size())
+                .mapToObj(index -> {
+                    StoreHealthEventsResult.EventResult validationResult = validationResults.get(index);
+                    if (validationResult != null) {
+                        return validationResult;
+                    }
+
+                    String idempotencyKey = events.get(index).idempotencyKey().value();
+                    if (existingKeys.contains(idempotencyKey)) {
+                        log.debug("Duplicate event detected at index {}: {}", index, idempotencyKey);
+                        return createDuplicateResult(index);
+                    }
+
+                    Event savedEvent = savedEventsByKey.get(idempotencyKey);
+                    if (savedEvent != null) {
+                        return new StoreHealthEventsResult.EventResult(
+                                index,
+                                StoreHealthEventsResult.EventStatus.stored,
+                                savedEvent.eventId(),
+                                null
+                        );
+                    }
+
+                    return createErrorResult(index, "Event not found after save");
+                })
                 .toList();
 
         updateDailySummaries(command, results);
@@ -66,30 +142,6 @@ class StoreHealthEventsCommandHandler {
         }
     }
 
-    private StoreHealthEventsResult.EventResult processEvent(
-            StoreHealthEventsCommand.EventEnvelope envelope,
-            int index,
-            DeviceId deviceId
-    ) {
-        try {
-            StoreHealthEventsResult.EventResult validationResult = validateEvent(envelope, index);
-            if (validationResult != null) {
-                return validationResult;
-            }
-
-            IdempotencyKey idempotencyKey = envelope.idempotencyKey();
-            if (eventRepository.existsByIdempotencyKey(idempotencyKey)) {
-                log.debug("Duplicate event detected at index {}: {}", index, idempotencyKey.value());
-                return createDuplicateResult(index);
-            }
-
-            return storeEvent(envelope, index, deviceId, idempotencyKey);
-
-        } catch (Exception e) {
-            log.error("Failed to process event at index " + index, e);
-            return createErrorResult(index, e.getMessage());
-        }
-    }
 
     private StoreHealthEventsResult.EventResult validateEvent(
             StoreHealthEventsCommand.EventEnvelope envelope,
@@ -118,37 +170,6 @@ class StoreHealthEventsCommandHandler {
         return null;
     }
 
-    private StoreHealthEventsResult.EventResult storeEvent(
-            StoreHealthEventsCommand.EventEnvelope envelope,
-            int index,
-            DeviceId deviceId,
-            IdempotencyKey idempotencyKey
-    ) {
-        EventType eventType = EventType.from(envelope.eventType());
-        EventId eventId = eventIdGenerator.generate();
-        Event event = Event.create(
-                idempotencyKey,
-                eventType,
-                envelope.occurredAt(),
-                envelope.payload(),
-                deviceId,
-                eventId
-        );
-
-        eventRepository.save(event);
-
-        log.info("Stored event: {} (type: {}, key: {})",
-                eventId.value(),
-                eventType.value(),
-                idempotencyKey.value());
-
-        return new StoreHealthEventsResult.EventResult(
-                index,
-                StoreHealthEventsResult.EventStatus.stored,
-                eventId,
-                null
-        );
-    }
 
     private StoreHealthEventsResult.EventResult createDuplicateResult(int index) {
         return new StoreHealthEventsResult.EventResult(
