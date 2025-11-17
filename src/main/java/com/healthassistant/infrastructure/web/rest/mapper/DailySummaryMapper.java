@@ -39,6 +39,7 @@ public class DailySummaryMapper {
                 .end(exercise.end())
                 .durationMinutes(exercise.durationMinutes())
                 .distanceMeters(exercise.distanceMeters())
+                .steps(exercise.steps())
                 .avgHr(exercise.avgHr())
                 .energyKcal(exercise.energyKcal())
                 .build();

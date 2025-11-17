@@ -129,6 +129,7 @@ class DailySummaryAggregator {
             Integer durationMinutes = getInteger(payload, "durationMinutes");
             Double distanceMetersDouble = getDouble(payload, "totalDistanceMeters");
             Long distanceMeters = distanceMetersDouble != null ? Math.round(distanceMetersDouble) : null;
+            Integer steps = getInteger(payload, "totalSteps");
             Integer avgHr = getInteger(payload, "avgHeartRate");
             Integer energyKcal = getInteger(payload, "totalCalories");
             if (energyKcal == null) {
@@ -145,6 +146,7 @@ class DailySummaryAggregator {
                     end,
                     durationMinutes,
                     distanceMeters,
+                    steps,
                     avgHr,
                     energyKcal
             );

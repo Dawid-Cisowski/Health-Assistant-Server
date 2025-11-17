@@ -87,6 +87,10 @@ public class DailySummaryResponse {
         @Schema(description = "Distance covered in meters", example = "5200", nullable = true)
         private Long distanceMeters;
 
+        @JsonProperty("steps")
+        @Schema(description = "Total steps during exercise", example = "8000", nullable = true)
+        private Integer steps;
+
         @JsonProperty("avgHr")
         @Schema(description = "Average heart rate in BPM", example = "141", nullable = true)
         private Integer avgHr;

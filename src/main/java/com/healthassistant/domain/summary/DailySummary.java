@@ -33,6 +33,7 @@ public record DailySummary(
         java.time.Instant end,
         Integer durationMinutes,
         Long distanceMeters,
+        Integer steps,
         Integer avgHr,
         Integer energyKcal
     ) {

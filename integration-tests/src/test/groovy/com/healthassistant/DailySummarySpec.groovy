@@ -285,6 +285,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         exercises.size() == 1
         exercises[0].get("type") == "WALK"
         exercises[0].get("distanceMeters") == 3000L
+        exercises[0].get("steps") == 5000
         exercises[0].get("energyKcal") == 150
         exercises[0].get("durationMinutes") == 60
     }
