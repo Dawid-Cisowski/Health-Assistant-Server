@@ -58,6 +58,12 @@ class GoogleFitEventMapper {
             envelopes.add(createHeartRateEnvelope(bucket));
         }
 
+        Integer steps = bucket.steps() != null ? bucket.steps().intValue() : null;
+        Double distanceMeters = bucket.distance();
+        if (isActiveMinute(steps, distanceMeters)) {
+            envelopes.add(createActiveMinutesEnvelope(bucket));
+        }
+
         return envelopes.stream();
     }
 
@@ -158,6 +164,28 @@ class GoogleFitEventMapper {
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "HeartRateSummaryRecorded.v1",
+                bucket.bucketEnd(),
+                payload
+        );
+    }
+
+    private StoreHealthEventsCommand.EventEnvelope createActiveMinutesEnvelope(GoogleFitBucketData bucket) {
+        ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
+        ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
+        
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
+        payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
+        payload.put("activeMinutes", 1);
+        payload.put("originPackage", GOOGLE_FIT_ORIGIN);
+
+        String idempotencyKey = String.format("google-fit|active-minutes|%d|%d",
+                bucket.bucketStart().toEpochMilli(),
+                bucket.bucketEnd().toEpochMilli());
+
+        return new StoreHealthEventsCommand.EventEnvelope(
+                IdempotencyKey.of(idempotencyKey),
+                "ActiveMinutesRecorded.v1",
                 bucket.bucketEnd(),
                 payload
         );
@@ -290,6 +318,25 @@ class GoogleFitEventMapper {
                 end,
                 payload
         );
+    }
+
+    private boolean isActiveMinute(Integer steps, Double distanceMeters) {
+        int s = steps != null ? steps : 0;
+        double d = distanceMeters != null ? distanceMeters : 0.0;
+
+        if (s >= 100) {
+            return true;
+        }
+
+        if (s >= 30) {
+            return true;
+        }
+
+        if (d >= 20.0) {
+            return true;
+        }
+
+        return false;
     }
 }
 

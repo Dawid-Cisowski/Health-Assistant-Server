@@ -686,6 +686,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
         def firstSyncEventsCount = eventRepository.findAll().size()
         def firstSyncEvent = eventRepository.findAll().find { it.eventType == "StepsBucketedRecorded.v1" }
+        def firstSyncStepsEventsCount = eventRepository.findAll().findAll { it.eventType == "StepsBucketedRecorded.v1" }.size()
 
         and: "I trigger sync second time with updated first bucket and new second bucket"
         def responseBody = """
@@ -726,8 +727,8 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "first event is overwritten and second event is added"
-        def secondSyncEventsCount = eventRepository.findAll().size()
-        secondSyncEventsCount == firstSyncEventsCount + 1
+        def secondSyncStepsEvents = eventRepository.findAll().findAll { it.eventType == "StepsBucketedRecorded.v1" }
+        secondSyncStepsEvents.size() == firstSyncStepsEventsCount + 1
         
         and: "first event payload is updated"
         def updatedEvent = eventRepository.findAll().find { it.idempotencyKey == firstSyncEvent.idempotencyKey }
