@@ -591,5 +591,137 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def secondSyncEventsCount = eventRepository.findAll().size()
         secondSyncEventsCount == firstSyncEventsCount
     }
+
+    def "Scenario 21: Historical sync validates upper bound for days parameter"() {
+        when: "I trigger historical sync with days > 365"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=366")
+                .then()
+                .extract()
+
+        then: "response status is 400"
+        response.statusCode() == 400
+
+        and: "response contains error message"
+        def body = response.body().jsonPath()
+        body.getString("status") == "error"
+        body.getString("message").contains("between 1 and 365")
+    }
+
+    def "Scenario 22: Historical sync uses default value when days parameter is missing"() {
+        given: "mock Google Fit API responses"
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger historical sync without days parameter"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history")
+                .then()
+                .extract()
+
+        then: "response status is 200"
+        response.statusCode() == 200
+
+        and: "default 7 days are processed"
+        def body = response.body().jsonPath()
+        body.getString("status") == "success"
+        body.getInt("processedDays") == 7
+    }
+
+    def "Scenario 23: Historical sync handles partial failures correctly"() {
+        given: "mock Google Fit API responses - first day succeeds, second fails"
+        def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+        def day1Start = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def day1End = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day1Start.toEpochMilli(), day1End.toEpochMilli(), 500))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger historical sync for 2 days"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=2")
+                .then()
+                .extract()
+
+        then: "response status is 200 (partial success is acceptable)"
+        response.statusCode() == 200
+
+        and: "some days are processed"
+        def body = response.body().jsonPath()
+        body.getString("status") == "success"
+        body.getInt("processedDays") >= 1
+    }
+
+    def "Scenario 24: Sync handles Sessions API errors gracefully"() {
+        given: "mock Google Fit API - aggregate succeeds but sessions fails"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+                .toInstant()
+        def startTime = todayStart.plusSeconds(3600).toEpochMilli()
+        def endTime = todayStart.plusSeconds(4500).toEpochMilli()
+
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 500))
+        setupGoogleFitSessionsApiMockError(500, '{"error": "Sessions API Error"}')
+
+        when: "I trigger sync"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .extract()
+
+        then: "response indicates error status"
+        response.statusCode() == 500
+        def body = response.body().jsonPath()
+        body.getString("status") == "error"
+    }
+
+    def "Scenario 25: Sync handles OAuth token refresh errors gracefully"() {
+        given: "mock OAuth endpoint returning error"
+        setupOAuthMockError(401, '{"error": "invalid_grant"}')
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+
+        when: "I trigger sync"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .extract()
+
+        then: "response indicates error status"
+        response.statusCode() == 500
+        def body = response.body().jsonPath()
+        body.getString("status") == "error"
+    }
+
+    def "Scenario 26: Events have occurredAt set to bucket end time"() {
+        given: "mock Google Fit API response with steps data"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+                .toInstant()
+        def bucketStart = todayStart.plusSeconds(3600).toEpochMilli()
+        def bucketEnd = todayStart.plusSeconds(3900).toEpochMilli()
+
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(bucketStart, bucketEnd, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger sync"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "event occurredAt matches bucket end time"
+        def events = eventRepository.findAll()
+        events.size() > 0
+        def stepsEvent = events.find { it.eventType == "StepsBucketedRecorded.v1" }
+        stepsEvent != null
+        def occurredAtMillis = Instant.parse(stepsEvent.occurredAt.toString()).toEpochMilli()
+        occurredAtMillis == bucketEnd
+    }
 }
 

@@ -220,6 +220,23 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withBody(errorBody)))
     }
 
+    void setupGoogleFitSessionsApiMockError(int statusCode, String errorBody) {
+        wireMockServer.stubFor(get(urlPathMatching("/users/me/sessions"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .willReturn(aResponse()
+                        .withStatus(statusCode)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(errorBody)))
+    }
+
+    void setupOAuthMockError(int statusCode, String errorBody) {
+        wireMockServer.stubFor(post(urlEqualTo("/token"))
+                .willReturn(aResponse()
+                        .withStatus(statusCode)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(errorBody)))
+    }
+
     def cleanup() {
         // Runs after each test
         if (eventRepository != null) {
