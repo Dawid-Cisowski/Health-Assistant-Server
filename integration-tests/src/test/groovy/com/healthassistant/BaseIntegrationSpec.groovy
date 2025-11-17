@@ -101,19 +101,18 @@ abstract class BaseIntegrationSpec extends Specification {
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(responseBody)))
+                        .withBody(responseBody))
+                .atPriority(1))
     }
 
     void setupGoogleFitApiMockMultipleTimes(String responseBody, int times) {
-        for (int i = 0; i < times; i++) {
-            wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
-                    .withHeader("Authorization", matching("Bearer .+"))
-                    .willReturn(aResponse()
-                            .withStatus(200)
-                            .withHeader("Content-Type", "application/json")
-                            .withBody(responseBody))
-                    .atPriority(10))
-        }
+        wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(responseBody))
+                .atPriority(10))
     }
     
     void setupGoogleFitSessionsApiMock(String responseBody) {
@@ -122,7 +121,18 @@ abstract class BaseIntegrationSpec extends Specification {
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(responseBody)))
+                        .withBody(responseBody))
+                .atPriority(1))
+    }
+
+    void setupGoogleFitSessionsApiMockMultipleTimes(String responseBody, int times) {
+        wireMockServer.stubFor(get(urlPathMatching("/users/me/sessions"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(responseBody))
+                .atPriority(10))
     }
     
     String createGoogleFitResponseWithSteps(long startTimeMillis, long endTimeMillis, long steps) {

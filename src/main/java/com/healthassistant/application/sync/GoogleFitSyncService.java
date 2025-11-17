@@ -19,6 +19,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 @RequiredArgsConstructor
@@ -164,39 +168,54 @@ public class GoogleFitSyncService {
         
         log.info("Historical sync range: {} to {} ({} days)", startDate, endDate, days);
         
-        int totalEvents = 0;
-        int processedDays = 0;
-        int failedDays = 0;
-        
+        List<LocalDate> datesToProcess = new ArrayList<>();
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
-            try {
-                ZonedDateTime dayStart = currentDate.atStartOfDay(POLAND_ZONE);
-                ZonedDateTime dayEnd = currentDate.plusDays(1).atStartOfDay(POLAND_ZONE);
-                
-                Instant from = dayStart.toInstant();
-                Instant to = dayEnd.toInstant();
-                
-                log.info("Processing day {}: {} to {}", currentDate, from, to);
-                
-                int dayEvents = syncTimeWindow(from, to);
-                totalEvents += dayEvents;
-                processedDays++;
-                
-                log.info("Day {} processed: {} events", currentDate, dayEvents);
-                
-            } catch (Exception e) {
-                log.error("Failed to process day {}", currentDate, e);
-                failedDays++;
-            }
-            
+            datesToProcess.add(currentDate);
             currentDate = currentDate.plusDays(1);
         }
         
-        log.info("Historical sync completed: {} days processed, {} failed, {} total events", 
-                processedDays, failedDays, totalEvents);
+        AtomicInteger totalEvents = new AtomicInteger(0);
+        AtomicInteger processedDays = new AtomicInteger(0);
+        AtomicInteger failedDays = new AtomicInteger(0);
         
-        return new HistoricalSyncResult(processedDays, failedDays, totalEvents);
+        
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<CompletableFuture<Void>> allFutures = new ArrayList<>();
+            
+            for (LocalDate date : datesToProcess) {
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        ZonedDateTime dayStart = date.atStartOfDay(POLAND_ZONE);
+                        ZonedDateTime dayEnd = date.plusDays(1).atStartOfDay(POLAND_ZONE);
+                        
+                        Instant from = dayStart.toInstant();
+                        Instant to = dayEnd.toInstant();
+                        
+                        log.info("Processing day {}: {} to {}", date, from, to);
+                        
+                        int dayEvents = syncTimeWindow(from, to);
+                        totalEvents.addAndGet(dayEvents);
+                        processedDays.incrementAndGet();
+                        
+                        log.info("Day {} processed: {} events", date, dayEvents);
+                        
+                    } catch (Exception e) {
+                        log.error("Failed to process day {}", date, e);
+                        failedDays.incrementAndGet();
+                    }
+                }, executor);
+                
+                allFutures.add(future);
+            }
+            
+            CompletableFuture.allOf(allFutures.toArray(new CompletableFuture[0])).join();
+        }
+        
+        log.info("Historical sync completed: {} days processed, {} failed, {} total events", 
+                processedDays.get(), failedDays.get(), totalEvents.get());
+        
+        return new HistoricalSyncResult(processedDays.get(), failedDays.get(), totalEvents.get());
     }
     
     private int syncTimeWindow(Instant from, Instant to) {

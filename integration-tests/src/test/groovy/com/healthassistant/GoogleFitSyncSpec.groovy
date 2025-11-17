@@ -486,10 +486,14 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     def "Scenario 16: Historical sync processes multiple days correctly"() {
         given: "mock Google Fit API responses for multiple days (same response for all calls)"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
-        def dayStart = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
-        def dayEnd = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def day1Start = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def day1End = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def day2Start = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def day2End = today.plusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
 
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 1000))
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day1Start.toEpochMilli(), day1End.toEpochMilli(), 1000))
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day2Start.toEpochMilli(), day2End.toEpochMilli(), 1000))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger historical sync for 2 days"
@@ -511,8 +515,8 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 17: Historical sync handles empty days gracefully"() {
         given: "mock Google Fit API responses with no data (will be called multiple times)"
-        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 3)
+        setupGoogleFitSessionsApiMockMultipleTimes(createEmptyGoogleFitSessionsResponse(), 3)
 
         when: "I trigger historical sync for 3 days"
         def response = RestAssured.given()
@@ -555,8 +559,8 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def day1SleepStart = day1Start.minusSeconds(3600 * 9).toEpochMilli()
         def day1SleepEnd = day1Start.plusSeconds(3600 * 5).toEpochMilli()
 
-        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
-        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(day1SleepStart, day1SleepEnd, "sleep-day1"))
+        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 1)
+        setupGoogleFitSessionsApiMockMultipleTimes(createGoogleFitSessionsResponseWithSleep(day1SleepStart, day1SleepEnd, "sleep-day1"), 1)
 
         when: "I trigger historical sync for 1 day"
         def response = RestAssured.given()
@@ -580,8 +584,8 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def dayStart = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
         def dayEnd = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
 
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 500))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+        setupGoogleFitApiMockMultipleTimes(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 500), 1)
+        setupGoogleFitSessionsApiMockMultipleTimes(createEmptyGoogleFitSessionsResponse(), 1)
 
         when: "I trigger historical sync first time"
         RestAssured.given()
@@ -594,7 +598,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def firstSyncEvent = eventRepository.findAll().find { it.eventType == "StepsBucketedRecorded.v1" }
 
         and: "I trigger historical sync second time with updated data"
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 800))
+        setupGoogleFitApiMockMultipleTimes(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 800), 1)
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync/history?days=1")
