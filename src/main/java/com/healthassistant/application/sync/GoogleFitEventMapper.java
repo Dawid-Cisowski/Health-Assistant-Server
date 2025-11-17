@@ -78,7 +78,7 @@ class GoogleFitEventMapper {
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "StepsBucketedRecorded.v1",
-                bucket.bucketStart(),
+                bucket.bucketEnd(),
                 payload
         );
     }
@@ -100,7 +100,7 @@ class GoogleFitEventMapper {
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "DistanceBucketRecorded.v1",
-                bucket.bucketStart(),
+                bucket.bucketEnd(),
                 payload
         );
     }
@@ -122,7 +122,7 @@ class GoogleFitEventMapper {
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "ActiveCaloriesBurnedRecorded.v1",
-                bucket.bucketStart(),
+                bucket.bucketEnd(),
                 payload
         );
     }
@@ -152,7 +152,7 @@ class GoogleFitEventMapper {
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "HeartRateSummaryRecorded.v1",
-                bucket.bucketStart(),
+                bucket.bucketEnd(),
                 payload
         );
     }

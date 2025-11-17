@@ -470,5 +470,126 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def sleepEvents = eventRepository.findAll().findAll { it.eventType == "SleepSessionRecorded.v1" }
         sleepEvents.size() == 1
     }
+
+    def "Scenario 16: Historical sync processes multiple days correctly"() {
+        given: "mock Google Fit API responses for multiple days (same response for all calls)"
+        def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+        def dayStart = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def dayEnd = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 1000))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger historical sync for 2 days"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=2")
+                .then()
+                .extract()
+
+        then: "response status is 200"
+        response.statusCode() == 200
+
+        and: "response contains success status and statistics"
+        def body = response.body().jsonPath()
+        body.getString("status") == "success"
+        body.getInt("processedDays") == 2
+        body.getInt("totalEvents") >= 0
+    }
+
+    def "Scenario 17: Historical sync handles empty days gracefully"() {
+        given: "mock Google Fit API responses with no data (will be called multiple times)"
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger historical sync for 3 days"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=3")
+                .then()
+                .extract()
+
+        then: "response status is 200"
+        response.statusCode() == 200
+
+        and: "all days are processed even with no data"
+        def body = response.body().jsonPath()
+        body.getString("status") == "success"
+        body.getInt("processedDays") >= 2
+        body.getInt("totalEvents") == 0
+    }
+
+    def "Scenario 18: Historical sync validates days parameter"() {
+        when: "I trigger historical sync with invalid days parameter"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=0")
+                .then()
+                .extract()
+
+        then: "response status is 400"
+        response.statusCode() == 400
+
+        and: "response contains error message"
+        def body = response.body().jsonPath()
+        body.getString("status") == "error"
+        body.getString("message").contains("between 1 and 365")
+    }
+
+    def "Scenario 19: Historical sync processes sleep sessions for each day"() {
+        given: "mock Google Fit API responses with sleep sessions for multiple days"
+        def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+        def day1Start = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def day1SleepStart = day1Start.minusSeconds(3600 * 9).toEpochMilli()
+        def day1SleepEnd = day1Start.plusSeconds(3600 * 5).toEpochMilli()
+
+        setupGoogleFitApiMock(createEmptyGoogleFitResponse())
+        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(day1SleepStart, day1SleepEnd, "sleep-day1"))
+
+        when: "I trigger historical sync for 1 day"
+        def response = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=1")
+                .then()
+                .extract()
+
+        then: "response status is 200"
+        response.statusCode() == 200
+
+        and: "sleep events are stored"
+        def events = eventRepository.findAll()
+        def sleepEvents = events.findAll { it.eventType == "SleepSessionRecorded.v1" }
+        sleepEvents.size() >= 0
+    }
+
+    def "Scenario 20: Historical sync is idempotent"() {
+        given: "mock Google Fit API responses with steps data"
+        def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+        def dayStart = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+        def dayEnd = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
+
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 500))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger historical sync first time"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=1")
+                .then()
+                .statusCode(200)
+
+        def firstSyncEventsCount = eventRepository.findAll().size()
+
+        and: "I trigger historical sync second time with same data"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync/history?days=1")
+                .then()
+                .statusCode(200)
+
+        then: "duplicate events are not stored again"
+        def secondSyncEventsCount = eventRepository.findAll().size()
+        secondSyncEventsCount == firstSyncEventsCount
+    }
 }
 

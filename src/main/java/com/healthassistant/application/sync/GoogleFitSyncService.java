@@ -147,6 +147,78 @@ public class GoogleFitSyncService {
         return Instant.ofEpochSecond(nextBucketStart);
     }
 
+    public HistoricalSyncResult syncHistory(int days) {
+        log.info("Starting historical Google Fit synchronization for {} days", days);
+        
+        LocalDate endDate = LocalDate.now(POLAND_ZONE);
+        LocalDate startDate = endDate.minusDays(days - 1);
+        
+        log.info("Historical sync range: {} to {} ({} days)", startDate, endDate, days);
+        
+        int totalEvents = 0;
+        int processedDays = 0;
+        int failedDays = 0;
+        
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            try {
+                ZonedDateTime dayStart = currentDate.atStartOfDay(POLAND_ZONE);
+                ZonedDateTime dayEnd = currentDate.plusDays(1).atStartOfDay(POLAND_ZONE);
+                
+                Instant from = dayStart.toInstant();
+                Instant to = dayEnd.toInstant();
+                
+                log.info("Processing day {}: {} to {}", currentDate, from, to);
+                
+                int dayEvents = syncTimeWindow(from, to);
+                totalEvents += dayEvents;
+                processedDays++;
+                
+                log.info("Day {} processed: {} events", currentDate, dayEvents);
+                
+            } catch (Exception e) {
+                log.error("Failed to process day {}", currentDate, e);
+                failedDays++;
+            }
+            
+            currentDate = currentDate.plusDays(1);
+        }
+        
+        log.info("Historical sync completed: {} days processed, {} failed, {} total events", 
+                processedDays, failedDays, totalEvents);
+        
+        return new HistoricalSyncResult(processedDays, failedDays, totalEvents);
+    }
+    
+    private int syncTimeWindow(Instant from, Instant to) {
+        var aggregateRequest = getAggregateRequest(from, to);
+        var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
+        List<com.healthassistant.infrastructure.googlefit.GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
+        
+        String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
+        String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
+        var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
+        List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> sleepSessions = sessionsResponse.getSessions() != null
+                ? sessionsResponse.getSessions().stream()
+                        .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isSleepSession)
+                        .toList()
+                : List.of();
+        
+        List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
+        
+        eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
+        eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
+        
+        if (eventEnvelopes.isEmpty()) {
+            return 0;
+        }
+        
+        StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, GOOGLE_FIT_DEVICE_ID);
+        healthEventsFacade.storeHealthEvents(command);
+        
+        return eventEnvelopes.size();
+    }
+
     private void updateLastSyncedAt(Instant lastSyncedAt) {
         GoogleFitSyncState state = syncStateRepository.findByUserId(DEFAULT_USER_ID)
                 .orElse(GoogleFitSyncState.builder()
@@ -157,6 +229,9 @@ public class GoogleFitSyncService {
         state.setLastSyncedAt(lastSyncedAt);
         syncStateRepository.save(state);
         log.info("Updated lastSyncedAt to {}", lastSyncedAt);
+    }
+    
+    public record HistoricalSyncResult(int processedDays, int failedDays, int totalEvents) {
     }
 }
 

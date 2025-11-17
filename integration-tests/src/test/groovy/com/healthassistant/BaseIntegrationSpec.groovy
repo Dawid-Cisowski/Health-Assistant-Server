@@ -103,6 +103,16 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withHeader("Content-Type", "application/json")
                         .withBody(responseBody)))
     }
+
+    void setupGoogleFitApiMockMultipleTimes(String responseBody, int times) {
+        wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(responseBody))
+                .atPriority(1))
+    }
     
     void setupGoogleFitSessionsApiMock(String responseBody) {
         wireMockServer.stubFor(get(urlPathMatching("/users/me/sessions"))
