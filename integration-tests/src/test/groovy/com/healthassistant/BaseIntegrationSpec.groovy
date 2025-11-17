@@ -105,13 +105,15 @@ abstract class BaseIntegrationSpec extends Specification {
     }
 
     void setupGoogleFitApiMockMultipleTimes(String responseBody, int times) {
-        wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
-                .withHeader("Authorization", matching("Bearer .+"))
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(responseBody))
-                .atPriority(1))
+        for (int i = 0; i < times; i++) {
+            wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
+                    .withHeader("Authorization", matching("Bearer .+"))
+                    .willReturn(aResponse()
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withBody(responseBody))
+                    .atPriority(10))
+        }
     }
     
     void setupGoogleFitSessionsApiMock(String responseBody) {
@@ -209,6 +211,110 @@ abstract class BaseIntegrationSpec extends Specification {
     
     String createEmptyGoogleFitSessionsResponse() {
         return '{"session": []}'
+    }
+
+    String createGoogleFitSessionsResponseWithWalking(long startTimeMillis, long endTimeMillis, String sessionId = "walk-session-123") {
+        return """
+        {
+            "session": [{
+                "id": "${sessionId}",
+                "name": "Chodzenie",
+                "activityType": 108,
+                "startTimeMillis": ${startTimeMillis},
+                "endTimeMillis": ${endTimeMillis},
+                "application": {
+                    "packageName": "com.heytap.health.international"
+                }
+            }]
+        }
+        """
+    }
+
+    void setupGoogleFitApiMockForSession(long startTimeMillis, long endTimeMillis, long steps, double distance, double calories, List<Integer> heartRates) {
+        // This stub should have higher priority to match first for session-specific requests
+        def bucketCount = (int) ((endTimeMillis - startTimeMillis) / 60000)
+        def buckets = []
+        
+        for (int i = 0; i < bucketCount; i++) {
+            def bucketStart = startTimeMillis + (i * 60000)
+            def bucketEnd = bucketStart + 60000
+            def stepsPerBucket = (int) (steps / bucketCount)
+            def distancePerBucket = distance / bucketCount
+            def caloriesPerBucket = calories / bucketCount
+            
+            def datasets = []
+            if (stepsPerBucket > 0) {
+                datasets.add("""
+                    {
+                        "dataSourceId": "derived:com.google.step_count.delta:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${bucketStart * 1_000_000}",
+                            "endTimeNanos": "${bucketEnd * 1_000_000}",
+                            "value": [{"intVal": ${stepsPerBucket}}]
+                        }]
+                    }
+                """)
+            }
+            if (distancePerBucket > 0) {
+                datasets.add("""
+                    {
+                        "dataSourceId": "derived:com.google.distance.delta:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${bucketStart * 1_000_000}",
+                            "endTimeNanos": "${bucketEnd * 1_000_000}",
+                            "value": [{"fpVal": ${distancePerBucket}}]
+                        }]
+                    }
+                """)
+            }
+            if (caloriesPerBucket > 0) {
+                datasets.add("""
+                    {
+                        "dataSourceId": "derived:com.google.calories.expended:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${bucketStart * 1_000_000}",
+                            "endTimeNanos": "${bucketEnd * 1_000_000}",
+                            "value": [{"fpVal": ${caloriesPerBucket}}]
+                        }]
+                    }
+                """)
+            }
+            if (heartRates != null && !heartRates.isEmpty() && i < heartRates.size()) {
+                datasets.add("""
+                    {
+                        "dataSourceId": "derived:com.google.heart_rate.bpm:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${bucketStart * 1_000_000}",
+                            "endTimeNanos": "${bucketEnd * 1_000_000}",
+                            "value": [{"intVal": ${heartRates[i]}}]
+                        }]
+                    }
+                """)
+            }
+            
+            buckets.add("""
+                {
+                    "startTimeMillis": ${bucketStart},
+                    "endTimeMillis": ${bucketEnd},
+                    "dataset": [${datasets.join(',')}]
+                }
+            """)
+        }
+        
+        def responseBody = """
+        {
+            "bucket": [${buckets.join(',')}]
+        }
+        """
+        
+        wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
+                .withHeader("Authorization", matching("Bearer .+"))
+                .withRequestBody(matching(".*\"startTimeMillis\"\\s*:\\s*${startTimeMillis}.*"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(responseBody))
+                .atPriority(5))
     }
     
     void setupGoogleFitApiMockError(int statusCode, String errorBody) {
@@ -326,25 +432,26 @@ abstract class BaseIntegrationSpec extends Specification {
         """.stripIndent().trim()
     }
 
-    String createExerciseSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T10:00:00Z") {
+    String createWalkingSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T10:00:00Z") {
         return """
         {
             "events": [
                 {
                     "idempotencyKey": "${idempotencyKey}",
-                    "type": "ExerciseSessionRecorded.v1",
+                    "type": "WalkingSessionRecorded.v1",
                     "occurredAt": "${occurredAt}",
                     "payload": {
-                        "sessionId": "e4210819-5708-3835-bcbb-2776e037e258",
-                        "type": "other_0",
+                        "sessionId": "health_platform:888c4cb9-1034-324e-b093-8a260f19e7a5",
+                        "name": "Chodzenie",
                         "start": "2025-11-10T09:03:15Z",
                         "end": "2025-11-10T10:03:03Z",
                         "durationMinutes": 59,
-                        "distanceMeters": "5838.7",
-                        "steps": 13812,
-                        "avgSpeedMetersPerSecond": "1.65",
-                        "avgHr": 83,
-                        "maxHr": 123,
+                        "totalSteps": 13812,
+                        "totalDistanceMeters": 5839,
+                        "totalCalories": 125,
+                        "avgHeartRate": 83,
+                        "maxHeartRate": 123,
+                        "heartRateSamples": [75, 80, 85, 90, 88],
                         "originPackage": "com.heytap.health.international"
                     }
                 }

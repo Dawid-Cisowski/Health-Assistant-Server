@@ -60,18 +60,26 @@ public class GoogleFitSyncService {
             String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
             String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
             var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
-            List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> sleepSessions = sessionsResponse.getSessions() != null
-                    ? sessionsResponse.getSessions().stream()
-                            .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isSleepSession)
-                            .toList()
+            List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> allSessions = sessionsResponse.getSessions() != null
+                    ? sessionsResponse.getSessions()
                     : List.of();
+            
+            List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> sleepSessions = allSessions.stream()
+                    .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isSleepSession)
+                    .toList();
+            
+            List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> walkingSessions = allSessions.stream()
+                    .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isWalkingSession)
+                    .toList();
 
-            log.info("Fetched {} buckets and {} sleep sessions", buckets.size(), sleepSessions.size());
+            log.info("Fetched {} buckets, {} sleep sessions, and {} walking sessions", 
+                    buckets.size(), sleepSessions.size(), walkingSessions.size());
 
             List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
             
             eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
             eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
+            eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, googleFitClient, bucketMapper));
 
             if (eventEnvelopes.isEmpty()) {
                 log.info("No events to process");
@@ -84,7 +92,7 @@ public class GoogleFitSyncService {
 
             updateLastSyncedAt(to);
 
-            log.info("Successfully synchronized {} events from Google Fit ({} from aggregate, {} from sessions)",
+            log.info("Successfully synchronized {} events from Google Fit ({} from aggregate, {} sleep sessions, {} walking sessions)",
                     eventEnvelopes.size(),
                     buckets.stream().mapToInt(b -> {
                         int count = 0;
@@ -94,7 +102,8 @@ public class GoogleFitSyncService {
                         if (b.heartRates() != null && !b.heartRates().isEmpty()) count++;
                         return count;
                     }).sum(),
-                    sleepSessions.size());
+                    sleepSessions.size(),
+                    walkingSessions.size());
 
         } catch (Exception e) {
             log.error("Failed to synchronize Google Fit data", e);
@@ -198,16 +207,23 @@ public class GoogleFitSyncService {
         String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
         String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
         var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
-        List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> sleepSessions = sessionsResponse.getSessions() != null
-                ? sessionsResponse.getSessions().stream()
-                        .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isSleepSession)
-                        .toList()
+        List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> allSessions = sessionsResponse.getSessions() != null
+                ? sessionsResponse.getSessions()
                 : List.of();
+        
+        List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> sleepSessions = allSessions.stream()
+                .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isSleepSession)
+                .toList();
+        
+        List<com.healthassistant.infrastructure.googlefit.GoogleFitSession> walkingSessions = allSessions.stream()
+                .filter(com.healthassistant.infrastructure.googlefit.GoogleFitSession::isWalkingSession)
+                .toList();
         
         List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
         
         eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
         eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
+        eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, googleFitClient, bucketMapper));
         
         if (eventEnvelopes.isEmpty()) {
             return 0;

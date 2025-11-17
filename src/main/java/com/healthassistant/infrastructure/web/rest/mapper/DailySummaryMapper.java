@@ -11,10 +11,9 @@ public class DailySummaryMapper {
         return DailySummaryResponse.builder()
                 .date(summary.date())
                 .activity(toActivityResponse(summary.activity()))
-                .workouts(toWorkoutsResponse(summary.workouts()))
+                .exercises(toExercisesResponse(summary.exercises()))
                 .sleep(toSleepResponse(summary.sleep()))
                 .heart(toHeartResponse(summary.heart()))
-                .score(toScoreResponse(summary.score()))
                 .build();
     }
 
@@ -27,21 +26,21 @@ public class DailySummaryMapper {
                 .build();
     }
 
-    private static List<DailySummaryResponse.Workout> toWorkoutsResponse(List<DailySummary.Workout> workouts) {
-        return workouts.stream()
-                .map(DailySummaryMapper::toWorkoutResponse)
+    private static List<DailySummaryResponse.Exercise> toExercisesResponse(List<DailySummary.Exercise> exercises) {
+        return exercises.stream()
+                .map(DailySummaryMapper::toExerciseResponse)
                 .toList();
     }
 
-    private static DailySummaryResponse.Workout toWorkoutResponse(DailySummary.Workout workout) {
-        return DailySummaryResponse.Workout.builder()
-                .type(workout.type())
-                .start(workout.start())
-                .end(workout.end())
-                .durationMinutes(workout.durationMinutes())
-                .distanceMeters(workout.distanceMeters())
-                .avgHr(workout.avgHr())
-                .energyKcal(workout.energyKcal())
+    private static DailySummaryResponse.Exercise toExerciseResponse(DailySummary.Exercise exercise) {
+        return DailySummaryResponse.Exercise.builder()
+                .type(exercise.type())
+                .start(exercise.start())
+                .end(exercise.end())
+                .durationMinutes(exercise.durationMinutes())
+                .distanceMeters(exercise.distanceMeters())
+                .avgHr(exercise.avgHr())
+                .energyKcal(exercise.energyKcal())
                 .build();
     }
 
@@ -58,15 +57,6 @@ public class DailySummaryMapper {
                 .restingBpm(heart.restingBpm())
                 .avgBpm(heart.avgBpm())
                 .maxBpm(heart.maxBpm())
-                .build();
-    }
-
-    private static DailySummaryResponse.Score toScoreResponse(DailySummary.Score score) {
-        return DailySummaryResponse.Score.builder()
-                .activityScore(score.activityScore())
-                .sleepScore(score.sleepScore())
-                .readinessScore(score.readinessScore())
-                .overallScore(score.overallScore())
                 .build();
     }
 }

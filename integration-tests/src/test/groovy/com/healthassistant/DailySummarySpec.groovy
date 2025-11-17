@@ -35,6 +35,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         
         // First sync with steps, distance, calories
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime1, endTime1, 742, 1000.5, 62.5, 75))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
@@ -43,6 +44,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         
         // Second sync with more steps
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
@@ -51,6 +53,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         
         // Third sync with heart rate
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime3, endTime3, 0, 0, 0, 78))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
@@ -68,16 +71,12 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def summary = getResponse.body().jsonPath()
         summary.getString("date") == dateStr
         summary.getInt("activity.steps") == 1484 // 742 + 742
-        summary.getDouble("activity.distanceMeters") == 1000.5
+        summary.getLong("activity.distanceMeters") == 1001L // rounded from 1000.5
         // Allow for rounding differences in calories
         def activeCalories = summary.getDouble("activity.activeCalories")
         (activeCalories == 62.5 || activeCalories == 62.0 || activeCalories == 63.0)
         
         summary.getInt("heart.avgBpm") != null
-        
-        summary.getInt("score.activityScore") >= 0
-        summary.getInt("score.readinessScore") >= 0
-        summary.getInt("score.overallScore") >= 0
     }
 
     def "Scenario 2: Get daily summary by date"() {
@@ -94,6 +93,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def startTime = summaryZoned.plusHours(9).toInstant().toEpochMilli()
         def endTime = summaryZoned.plusHours(10).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         and: "sync data"
         RestAssured.given()
@@ -149,6 +149,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def startTime1 = summaryZoned.plusHours(9).toInstant().toEpochMilli()
         def endTime1 = summaryZoned.plusHours(10).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         
         RestAssured.given()
                 .contentType(ContentType.JSON)
@@ -160,6 +161,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def startTime2 = summaryZoned.plusHours(13).toInstant().toEpochMilli()
         def endTime2 = summaryZoned.plusHours(14).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync again"
         RestAssured.given()
@@ -216,6 +218,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def startTime1 = summaryZoned.plusHours(7).toInstant().toEpochMilli()
         def endTime1 = summaryZoned.plusHours(8).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 500))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
@@ -226,6 +229,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def startTime2 = summaryZoned.plusHours(13).toInstant().toEpochMilli()
         def endTime2 = summaryZoned.plusHours(14).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
@@ -244,7 +248,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         summary.getInt("activity.steps") == 1242 // 500 + 742
     }
 
-    def "Scenario 7: Summary calculates activity score correctly"() {
+    def "Scenario 7: Summary includes walking exercises"() {
         given: "authenticated device"
         def deviceId = "test-device"
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
@@ -253,63 +257,39 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def summaryDate = LocalDate.of(2025, 11, 18)
         def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
 
-        and: "sync with high activity data (should score well)"
+        and: "mock Google Fit API responses with walking session"
         def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        def startTime = summaryZoned.plusHours(11).toInstant().toEpochMilli()
-        def endTime = summaryZoned.plusHours(12).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime, endTime, 15000, 10000.0, 500.0, 75))
+        def walkStart = summaryZoned.plusHours(10).toInstant().toEpochMilli()
+        def walkEnd = summaryZoned.plusHours(11).toInstant().toEpochMilli()
         
+        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, "walk-123"))
+        
+        // Mock aggregate API - first call for main sync (empty), second call for walking session
+        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 2)
+        setupGoogleFitApiMockForSession(walkStart, walkEnd, 5000, 3000.0, 150.0, [75, 80, 85])
+
+        when: "I trigger sync"
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
 
-        when: "I get summary"
+        and: "I get summary"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
                 .get("/v1/daily-summaries/${dateStr}")
                 .then()
                 .extract()
 
-        then: "activity score is calculated"
+        then: "summary includes walking exercise"
         getResponse.statusCode() == 200
         def summary = getResponse.body().jsonPath()
-        def activityScore = summary.getInt("score.activityScore")
-        activityScore >= 0 // Score is calculated (may vary based on algorithm)
-    }
-
-    def "Scenario 8: Summary calculates readiness score from heart rate"() {
-        given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-
-        and: "date for summary"
-        def summaryDate = LocalDate.of(2025, 11, 19)
-        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
-
-        and: "sync with optimal heart rate data"
-        def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        def startTime = summaryZoned.plusHours(9).toInstant().toEpochMilli()
-        def endTime = summaryZoned.plusHours(10).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime, endTime, 0, 0, 0, 65))
-        
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
-
-        when: "I get summary"
-        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
-                .get("/v1/daily-summaries/${dateStr}")
-                .then()
-                .extract()
-
-        then: "readiness score is calculated"
-        getResponse.statusCode() == 200
-        def summary = getResponse.body().jsonPath()
-        def readinessScore = summary.getInt("score.readinessScore")
-        readinessScore >= 0
+        def exercises = summary.getList("exercises")
+        exercises.size() == 1
+        exercises[0].get("type") == "WALK"
+        exercises[0].get("distanceMeters") == 3000L
+        exercises[0].get("energyKcal") == 150
+        exercises[0].get("durationMinutes") == 60
     }
 
     def "Scenario 9: Summary only includes events from specified date"() {
@@ -326,6 +306,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def startTime = targetZoned.plusHours(11).toInstant().toEpochMilli()
         def endTime = targetZoned.plusHours(12).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         
         RestAssured.given()
                 .contentType(ContentType.JSON)

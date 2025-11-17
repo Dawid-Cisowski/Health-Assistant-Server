@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -58,34 +59,56 @@ class StoreHealthEventsCommandHandler {
                 .map(index -> events.get(index).idempotencyKey())
                 .toList();
 
-        Set<String> existingKeys = eventRepository.findExistingIdempotencyKeys(idempotencyKeys);
+        Map<String, Event> existingEvents = eventRepository.findExistingEventsByIdempotencyKeys(idempotencyKeys);
 
-        List<Event> eventsToSave = validIndices.stream()
-                .filter(index -> !existingKeys.contains(events.get(index).idempotencyKey().value()))
-                .map(index -> {
-                    var envelope = events.get(index);
-                    EventType eventType = EventType.from(envelope.eventType());
-                    EventId eventId = eventIdGenerator.generate();
-                    return Event.create(
-                            envelope.idempotencyKey(),
-                            eventType,
-                            envelope.occurredAt(),
-                            envelope.payload(),
-                            command.deviceId(),
-                            eventId
-                    );
-                })
-                .toList();
+        List<Event> eventsToSave = new java.util.ArrayList<>();
+        List<Event> eventsToUpdate = new java.util.ArrayList<>();
+
+        for (Integer index : validIndices) {
+            var envelope = events.get(index);
+            String idempotencyKeyValue = envelope.idempotencyKey().value();
+            
+            Event existingEvent = existingEvents.get(idempotencyKeyValue);
+            
+            EventType eventType = EventType.from(envelope.eventType());
+            EventId eventId = existingEvent != null ? existingEvent.eventId() : eventIdGenerator.generate();
+            Instant createdAt = existingEvent != null ? existingEvent.createdAt() : Instant.now();
+            
+            Event event = new Event(
+                    envelope.idempotencyKey(),
+                    eventType,
+                    envelope.occurredAt(),
+                    envelope.payload(),
+                    command.deviceId(),
+                    eventId,
+                    createdAt
+            );
+
+            if (existingEvent != null) {
+                eventsToUpdate.add(event);
+            } else {
+                eventsToSave.add(event);
+            }
+        }
 
         if (!eventsToSave.isEmpty()) {
             eventRepository.saveAll(eventsToSave);
-            log.info("Stored {} events in batch", eventsToSave.size());
+            log.info("Stored {} new events in batch", eventsToSave.size());
         }
 
-        java.util.Map<String, Event> savedEventsByKey = eventsToSave.stream()
+        if (!eventsToUpdate.isEmpty()) {
+            eventRepository.updateAll(eventsToUpdate);
+            log.info("Updated {} existing events in batch", eventsToUpdate.size());
+        }
+
+        Map<String, Event> allProcessedEvents = new java.util.HashMap<>();
+        eventsToSave.forEach(e -> allProcessedEvents.put(e.idempotencyKey().value(), e));
+        eventsToUpdate.forEach(e -> allProcessedEvents.put(e.idempotencyKey().value(), e));
+
+        Map<Integer, Event> savedEventsByIndex = validIndices.stream()
                 .collect(Collectors.toMap(
-                        event -> event.idempotencyKey().value(),
-                        event -> event
+                        index -> index,
+                        index -> allProcessedEvents.get(events.get(index).idempotencyKey().value())
                 ));
 
         List<StoreHealthEventsResult.EventResult> results = IntStream.range(0, events.size())
@@ -95,13 +118,7 @@ class StoreHealthEventsCommandHandler {
                         return validationResult;
                     }
 
-                    String idempotencyKey = events.get(index).idempotencyKey().value();
-                    if (existingKeys.contains(idempotencyKey)) {
-                        log.debug("Duplicate event detected at index {}: {}", index, idempotencyKey);
-                        return createDuplicateResult(index);
-                    }
-
-                    Event savedEvent = savedEventsByKey.get(idempotencyKey);
+                    Event savedEvent = savedEventsByIndex.get(index);
                     if (savedEvent != null) {
                         return new StoreHealthEventsResult.EventResult(
                                 index,
@@ -171,14 +188,6 @@ class StoreHealthEventsCommandHandler {
     }
 
 
-    private StoreHealthEventsResult.EventResult createDuplicateResult(int index) {
-        return new StoreHealthEventsResult.EventResult(
-                index,
-                StoreHealthEventsResult.EventStatus.duplicate,
-                null,
-                null
-        );
-    }
 
     private StoreHealthEventsResult.EventResult createInvalidResult(int index, String field, String message) {
         return new StoreHealthEventsResult.EventResult(

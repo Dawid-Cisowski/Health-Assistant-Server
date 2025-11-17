@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -13,12 +14,13 @@ import java.util.Map;
 
 @Entity
 @Table(name = "health_events", indexes = {
-        @Index(name = "idx_idempotency_key", columnList = "idempotency_key", unique = true),
+        @Index(name = "idx_idempotency_key", columnList = "idempotency_key"),
         @Index(name = "idx_occurred_at", columnList = "occurred_at"),
         @Index(name = "idx_event_type", columnList = "event_type"),
         @Index(name = "idx_created_at", columnList = "created_at")
 })
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -31,7 +33,7 @@ public class HealthEventJpaEntity {
     @Column(name = "event_id", nullable = false, unique = true, length = 32)
     private String eventId;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true, length = 512)
+    @Column(name = "idempotency_key", nullable = false, length = 512)
     private String idempotencyKey;
 
     @Column(name = "event_type", nullable = false, length = 64)

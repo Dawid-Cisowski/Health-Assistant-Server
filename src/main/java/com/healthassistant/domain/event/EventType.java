@@ -9,7 +9,7 @@ public sealed interface EventType permits
         SleepSessionRecorded,
         ActiveCaloriesBurnedRecorded,
         ActiveMinutesRecorded,
-        ExerciseSessionRecorded {
+        WalkingSessionRecorded {
 
     String value();
 
@@ -22,7 +22,7 @@ public sealed interface EventType permits
             case "SleepSessionRecorded.v1" -> new SleepSessionRecorded();
             case "ActiveCaloriesBurnedRecorded.v1" -> new ActiveCaloriesBurnedRecorded();
             case "ActiveMinutesRecorded.v1" -> new ActiveMinutesRecorded();
-            case "ExerciseSessionRecorded.v1" -> new ExerciseSessionRecorded();
+            case "WalkingSessionRecorded.v1" -> new WalkingSessionRecorded();
             default -> throw new IllegalArgumentException("Unknown event type: " + value);
         };
     }
@@ -71,10 +71,10 @@ record ActiveMinutesRecorded() implements EventType {
     }
 }
 
-record ExerciseSessionRecorded() implements EventType {
+record WalkingSessionRecorded() implements EventType {
     @Override
     public String value() {
-        return "ExerciseSessionRecorded.v1";
+        return "WalkingSessionRecorded.v1";
     }
 }
 

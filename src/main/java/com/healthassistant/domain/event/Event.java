@@ -27,5 +27,9 @@ public record Event(IdempotencyKey idempotencyKey,
         }
         return new HashMap<>(payload);
     }
+
+    public Event withCreatedAt(Instant createdAt) {
+        return new Event(idempotencyKey, eventType, occurredAt, payload, deviceId, eventId, createdAt);
+    }
 }
 

@@ -10,6 +10,9 @@ public class GoogleFitSession {
     @JsonProperty("id")
     private String id;
 
+    @JsonProperty("name")
+    private String name;
+
     @JsonProperty("activityType")
     private Integer activityType;
 
@@ -22,6 +25,9 @@ public class GoogleFitSession {
     @JsonProperty("packageName")
     private String packageName;
 
+    @JsonProperty("application")
+    private Application application;
+
     public Instant getStartTime() {
         return startTimeMillis != null ? Instant.ofEpochMilli(startTimeMillis) : null;
     }
@@ -30,8 +36,25 @@ public class GoogleFitSession {
         return endTimeMillis != null ? Instant.ofEpochMilli(endTimeMillis) : null;
     }
 
+    public String getPackageName() {
+        if (application != null && application.packageName != null) {
+            return application.packageName;
+        }
+        return packageName;
+    }
+
     public boolean isSleepSession() {
         return activityType != null && activityType == 72;
+    }
+
+    public boolean isWalkingSession() {
+        return activityType != null && activityType == 108;
+    }
+
+    @Getter
+    public static class Application {
+        @JsonProperty("packageName")
+        private String packageName;
     }
 }
 

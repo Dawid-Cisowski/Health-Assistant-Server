@@ -7,34 +7,32 @@ import java.util.Objects;
 public record DailySummary(
     LocalDate date,
     Activity activity,
-    List<Workout> workouts,
+    List<Exercise> exercises,
     Sleep sleep,
-    Heart heart,
-    Score score
+    Heart heart
 ) {
     public DailySummary {
         Objects.requireNonNull(date, "Date cannot be null");
         Objects.requireNonNull(activity, "Activity cannot be null");
-        Objects.requireNonNull(workouts, "Workouts cannot be null");
+        Objects.requireNonNull(exercises, "Exercises cannot be null");
         Objects.requireNonNull(sleep, "Sleep cannot be null");
         Objects.requireNonNull(heart, "Heart cannot be null");
-        Objects.requireNonNull(score, "Score cannot be null");
     }
 
     public record Activity(
         Integer steps,
         Integer activeMinutes,
         Integer activeCalories,
-        Double distanceMeters
+        Long distanceMeters
     ) {
     }
 
-    public record Workout(
+    public record Exercise(
         String type,
         java.time.Instant start,
         java.time.Instant end,
         Integer durationMinutes,
-        Double distanceMeters,
+        Long distanceMeters,
         Integer avgHr,
         Integer energyKcal
     ) {
@@ -51,14 +49,6 @@ public record DailySummary(
         Integer restingBpm,
         Integer avgBpm,
         Integer maxBpm
-    ) {
-    }
-
-    public record Score(
-        Integer activityScore,
-        Integer sleepScore,
-        Integer readinessScore,
-        Integer overallScore
     ) {
     }
 }

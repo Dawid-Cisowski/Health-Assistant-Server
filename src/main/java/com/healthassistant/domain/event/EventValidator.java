@@ -43,7 +43,7 @@ public class EventValidator {
             case SleepSessionRecorded sleep -> validateSleepSession(payload, errors);
             case ActiveCaloriesBurnedRecorded calories -> validateActiveCaloriesBurned(payload, errors);
             case ActiveMinutesRecorded minutes -> validateActiveMinutes(payload, errors);
-            case ExerciseSessionRecorded exercise -> validateExerciseSession(payload, errors);
+            case WalkingSessionRecorded walking -> validateWalkingSession(payload, errors);
         }
     }
 
@@ -78,9 +78,9 @@ public class EventValidator {
         validateNonNegative(payload, errors, "activeMinutes");
     }
 
-    private void validateExerciseSession(Map<String, Object> payload, List<EventValidationError> errors) {
-        requireFields(payload, errors, "sessionId", "type", "start", "end", "durationMinutes", "originPackage");
-        validateOptionalNonNegative(payload, errors, "durationMinutes", "steps", "avgHr", "maxHr");
+    private void validateWalkingSession(Map<String, Object> payload, List<EventValidationError> errors) {
+        requireFields(payload, errors, "sessionId", "start", "end", "durationMinutes", "originPackage");
+        validateOptionalNonNegative(payload, errors, "durationMinutes", "totalSteps", "totalDistanceMeters", "totalCalories", "avgHeartRate", "maxHeartRate");
     }
 
     private void requireFields(Map<String, Object> payload, List<EventValidationError> errors, String... fields) {

@@ -93,7 +93,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         syncState.get().lastSyncedAt != null
     }
 
-    def "Scenario 4: Multiple syncs handle idempotency correctly"() {
+    def "Scenario 4: Multiple syncs overwrite events with same idempotency key"() {
         given: "mock Google Fit API response with steps data"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
@@ -111,17 +111,24 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         def firstSyncEventsCount = eventRepository.findAll().size()
+        def firstSyncEvent = eventRepository.findAll().find { it.eventType == "StepsBucketedRecorded.v1" }
 
         and: "I trigger sync second time with same data"
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 1000))
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
 
-        then: "duplicate events are not stored again"
+        then: "events with same idempotency key are overwritten, not duplicated"
         def secondSyncEventsCount = eventRepository.findAll().size()
         secondSyncEventsCount == firstSyncEventsCount
+        
+        and: "event payload is updated"
+        def updatedEvent = eventRepository.findAll().find { it.idempotencyKey == firstSyncEvent.idempotencyKey }
+        updatedEvent != null
+        updatedEvent.payload.get("count") == 1000
     }
 
     def "Scenario 5: Sync generates daily summary for today"() {
@@ -411,9 +418,9 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def sleepEvents = events.findAll { it.eventType == "SleepSessionRecorded.v1" }
         sleepEvents.size() == 1
         
-        and: "no workout session events are stored"
-        def workoutEvents = events.findAll { it.eventType == "ExerciseSessionRecorded.v1" }
-        workoutEvents.size() == 0
+        and: "no walking session events are stored"
+        def walkingEvents = events.findAll { it.eventType == "WalkingSessionRecorded.v1" }
+        walkingEvents.size() == 0
     }
 
     def "Scenario 14: Sync handles empty sleep sessions response gracefully"() {
@@ -434,7 +441,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         sleepEvents.size() == 0
     }
 
-    def "Scenario 15: Sync handles idempotency for sleep sessions correctly"() {
+    def "Scenario 15: Sync overwrites sleep sessions with same idempotency key"() {
         given: "mock Google Fit API responses with same sleep session"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
@@ -442,7 +449,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def sleepStart = todayStart.minusSeconds(3600 * 9).toEpochMilli()
         def sleepEnd = todayStart.plusSeconds(3600 * 5).toEpochMilli()
         def sessionId = "sleep-123"
-        
+
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(sleepStart, sleepEnd, sessionId))
 
@@ -454,21 +461,26 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         def firstSyncEventsCount = eventRepository.findAll().size()
+        def firstSyncSleepEvent = eventRepository.findAll().find { it.eventType == "SleepSessionRecorded.v1" }
 
-        and: "I trigger sync second time with same sleep session"
+        and: "I trigger sync second time with updated sleep session"
+        def updatedSleepEnd = todayStart.plusSeconds(3600 * 6).toEpochMilli()
+        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(sleepStart, updatedSleepEnd, sessionId))
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
 
-        then: "duplicate sleep session is not stored again"
+        then: "sleep session with same idempotency key is overwritten, not duplicated"
         def secondSyncEventsCount = eventRepository.findAll().size()
         secondSyncEventsCount == firstSyncEventsCount
         
-        and: "only one sleep event exists"
-        def sleepEvents = eventRepository.findAll().findAll { it.eventType == "SleepSessionRecorded.v1" }
-        sleepEvents.size() == 1
+        and: "sleep event payload is updated"
+        def updatedSleepEvent = eventRepository.findAll().find { it.idempotencyKey == firstSyncSleepEvent.idempotencyKey }
+        updatedSleepEvent != null
+        def updatedSleepEndTime = Instant.parse(updatedSleepEvent.payload.get("sleepEnd"))
+        updatedSleepEndTime.toEpochMilli() == updatedSleepEnd
     }
 
     def "Scenario 16: Historical sync processes multiple days correctly"() {
@@ -562,7 +574,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         sleepEvents.size() >= 0
     }
 
-    def "Scenario 20: Historical sync is idempotent"() {
+    def "Scenario 20: Historical sync overwrites events with same idempotency key"() {
         given: "mock Google Fit API responses with steps data"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
         def dayStart = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
@@ -579,17 +591,157 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         def firstSyncEventsCount = eventRepository.findAll().size()
+        def firstSyncEvent = eventRepository.findAll().find { it.eventType == "StepsBucketedRecorded.v1" }
 
-        and: "I trigger historical sync second time with same data"
+        and: "I trigger historical sync second time with updated data"
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 800))
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync/history?days=1")
                 .then()
                 .statusCode(200)
 
-        then: "duplicate events are not stored again"
+        then: "events with same idempotency key are overwritten, not duplicated"
         def secondSyncEventsCount = eventRepository.findAll().size()
         secondSyncEventsCount == firstSyncEventsCount
+        
+        and: "event payload is updated"
+        def updatedEvent = eventRepository.findAll().find { it.idempotencyKey == firstSyncEvent.idempotencyKey }
+        updatedEvent != null
+        updatedEvent.payload.get("count") == 800
+        
+        and: "eventId and createdAt are preserved"
+        updatedEvent.eventId == firstSyncEvent.eventId
+        updatedEvent.createdAt == firstSyncEvent.createdAt
+    }
+
+    def "Scenario 22: Sync overwrites walking sessions with same idempotency key"() {
+        given: "mock Google Fit API responses with walking session"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+        def walkStart = todayStart.plusHours(10).toInstant().toEpochMilli()
+        def walkEnd = todayStart.plusHours(11).toInstant().toEpochMilli()
+        def sessionId = "walk-123"
+
+        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, sessionId))
+        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 2)
+        setupGoogleFitApiMockForSession(walkStart, walkEnd, 5000, 3000.0, 150.0, [75, 80, 85])
+
+        when: "I trigger sync first time"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        def firstSyncEventsCount = eventRepository.findAll().size()
+        def firstSyncWalkingEvent = eventRepository.findAll().find { it.eventType == "WalkingSessionRecorded.v1" }
+        def originalEventId = firstSyncWalkingEvent.eventId
+        def originalCreatedAt = firstSyncWalkingEvent.createdAt
+
+        and: "I trigger sync second time with updated walking session"
+        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, sessionId))
+        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 2)
+        setupGoogleFitApiMockForSession(walkStart, walkEnd, 8000, 5000.0, 250.0, [80, 85, 90])
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "walking session with same idempotency key is overwritten, not duplicated"
+        def secondSyncEventsCount = eventRepository.findAll().size()
+        secondSyncEventsCount == firstSyncEventsCount
+        
+        and: "walking event payload is updated"
+        def updatedWalkingEvent = eventRepository.findAll().find { it.idempotencyKey == firstSyncWalkingEvent.idempotencyKey }
+        updatedWalkingEvent != null
+        updatedWalkingEvent.payload.get("totalSteps") > firstSyncWalkingEvent.payload.get("totalSteps")
+        def distance = updatedWalkingEvent.payload.get("totalDistanceMeters")
+        distance > firstSyncWalkingEvent.payload.get("totalDistanceMeters")
+        updatedWalkingEvent.payload.get("totalCalories") > firstSyncWalkingEvent.payload.get("totalCalories")
+        
+        and: "eventId and createdAt are preserved"
+        updatedWalkingEvent.eventId == originalEventId
+        updatedWalkingEvent.createdAt == originalCreatedAt
+    }
+
+    def "Scenario 23: Mixed batch with some events to overwrite and some new events"() {
+        given: "mock Google Fit API responses with steps data"
+        def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
+                .atStartOfDay(ZoneId.of("Europe/Warsaw"))
+                .toInstant()
+        def firstBucketStart = todayStart.plusSeconds(3600).toEpochMilli()
+        def firstBucketEnd = todayStart.plusSeconds(4500).toEpochMilli()
+        def secondBucketStart = todayStart.plusSeconds(4600).toEpochMilli()
+        def secondBucketEnd = todayStart.plusSeconds(5500).toEpochMilli()
+
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(firstBucketStart, firstBucketEnd, 500))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+
+        when: "I trigger sync first time"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        def firstSyncEventsCount = eventRepository.findAll().size()
+        def firstSyncEvent = eventRepository.findAll().find { it.eventType == "StepsBucketedRecorded.v1" }
+
+        and: "I trigger sync second time with updated first bucket and new second bucket"
+        def responseBody = """
+        {
+            "bucket": [
+                {
+                    "startTimeMillis": ${firstBucketStart},
+                    "endTimeMillis": ${firstBucketEnd},
+                    "dataset": [{
+                        "dataSourceId": "derived:com.google.step_count.delta:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${firstBucketStart * 1_000_000}",
+                            "endTimeNanos": "${firstBucketEnd * 1_000_000}",
+                            "value": [{"intVal": 1000}]
+                        }]
+                    }]
+                },
+                {
+                    "startTimeMillis": ${secondBucketStart},
+                    "endTimeMillis": ${secondBucketEnd},
+                    "dataset": [{
+                        "dataSourceId": "derived:com.google.step_count.delta:com.google.android.gms:aggregated",
+                        "point": [{
+                            "startTimeNanos": "${secondBucketStart * 1_000_000}",
+                            "endTimeNanos": "${secondBucketEnd * 1_000_000}",
+                            "value": [{"intVal": 600}]
+                        }]
+                    }]
+                }
+            ]
+        }
+        """
+        setupGoogleFitApiMock(responseBody)
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        then: "first event is overwritten and second event is added"
+        def secondSyncEventsCount = eventRepository.findAll().size()
+        secondSyncEventsCount == firstSyncEventsCount + 1
+        
+        and: "first event payload is updated"
+        def updatedEvent = eventRepository.findAll().find { it.idempotencyKey == firstSyncEvent.idempotencyKey }
+        updatedEvent != null
+        updatedEvent.payload.get("count") == 1000
+        
+        and: "second event is stored"
+        def secondEvent = eventRepository.findAll().find { 
+            it.eventType == "StepsBucketedRecorded.v1" && it.idempotencyKey != firstSyncEvent.idempotencyKey 
+        }
+        secondEvent != null
+        secondEvent.payload.get("count") == 600
     }
 
     def "Scenario 21: Historical sync validates upper bound for days parameter"() {

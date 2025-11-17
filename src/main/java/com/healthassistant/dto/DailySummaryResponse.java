@@ -26,9 +26,9 @@ public class DailySummaryResponse {
     @Schema(description = "Daily activity metrics")
     private Activity activity;
 
-    @JsonProperty("workouts")
-    @Schema(description = "List of workouts performed during the day")
-    private List<Workout> workouts;
+    @JsonProperty("exercises")
+    @Schema(description = "List of exercises performed during the day")
+    private List<Exercise> exercises;
 
     @JsonProperty("sleep")
     @Schema(description = "Sleep session information")
@@ -37,10 +37,6 @@ public class DailySummaryResponse {
     @JsonProperty("heart")
     @Schema(description = "Heart rate metrics")
     private Heart heart;
-
-    @JsonProperty("score")
-    @Schema(description = "Health scores")
-    private Score score;
 
     @Getter
     @Builder
@@ -61,42 +57,42 @@ public class DailySummaryResponse {
         private Integer activeCalories;
 
         @JsonProperty("distanceMeters")
-        @Schema(description = "Total distance in meters", example = "7100.0", nullable = true)
-        private Double distanceMeters;
+        @Schema(description = "Total distance in meters", example = "7100", nullable = true)
+        private Long distanceMeters;
     }
 
     @Getter
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Schema(description = "Workout session")
-    public static class Workout {
+    @Schema(description = "Exercise session")
+    public static class Exercise {
         @JsonProperty("type")
-        @Schema(description = "Workout type (e.g., WALK, running, cycling)", example = "WALK")
+        @Schema(description = "Exercise type (e.g., WALK, running, cycling)", example = "WALK")
         private String type;
 
         @JsonProperty("start")
-        @Schema(description = "Workout start time (ISO-8601 UTC)", example = "2025-11-12T17:20:00Z")
+        @Schema(description = "Exercise start time (ISO-8601 UTC)", example = "2025-11-12T17:20:00Z")
         private Instant start;
 
         @JsonProperty("end")
-        @Schema(description = "Workout end time (ISO-8601 UTC)", example = "2025-11-12T17:55:00Z")
+        @Schema(description = "Exercise end time (ISO-8601 UTC)", example = "2025-11-12T17:55:00Z")
         private Instant end;
 
         @JsonProperty("durationMinutes")
-        @Schema(description = "Workout duration in minutes", example = "35", nullable = true)
+        @Schema(description = "Exercise duration in minutes", example = "35", nullable = true)
         private Integer durationMinutes;
 
         @JsonProperty("distanceMeters")
-        @Schema(description = "Distance covered in meters", example = "5200.0", nullable = true)
-        private Double distanceMeters;
+        @Schema(description = "Distance covered in meters", example = "5200", nullable = true)
+        private Long distanceMeters;
 
         @JsonProperty("avgHr")
         @Schema(description = "Average heart rate in BPM", example = "141", nullable = true)
         private Integer avgHr;
 
         @JsonProperty("energyKcal")
-        @Schema(description = "Calories burned during workout", example = "320", nullable = true)
+        @Schema(description = "Calories burned during exercise", example = "320", nullable = true)
         private Integer energyKcal;
     }
 
@@ -136,29 +132,6 @@ public class DailySummaryResponse {
         @JsonProperty("maxBpm")
         @Schema(description = "Maximum heart rate in BPM", example = "138", nullable = true)
         private Integer maxBpm;
-    }
-
-    @Getter
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Schema(description = "Health scores")
-    public static class Score {
-        @JsonProperty("activityScore")
-        @Schema(description = "Activity score (0-100)", example = "82")
-        private Integer activityScore;
-
-        @JsonProperty("sleepScore")
-        @Schema(description = "Sleep score (0-100)", example = "76")
-        private Integer sleepScore;
-
-        @JsonProperty("readinessScore")
-        @Schema(description = "Readiness score (0-100)", example = "78")
-        private Integer readinessScore;
-
-        @JsonProperty("overallScore")
-        @Schema(description = "Overall health score (0-100)", example = "79")
-        private Integer overallScore;
     }
 }
 
