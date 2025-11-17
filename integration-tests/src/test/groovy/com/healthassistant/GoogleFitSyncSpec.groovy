@@ -624,8 +624,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         def sessionId = "walk-123"
 
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, sessionId))
-        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 2)
-        setupGoogleFitApiMockForSession(walkStart, walkEnd, 5000, 3000.0, 150.0, [75, 80, 85])
+        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(walkStart, walkEnd, 5000, 3000.0, 150.0, 80))
 
         when: "I trigger sync first time"
         RestAssured.given()
@@ -641,8 +640,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
         and: "I trigger sync second time with updated walking session"
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, sessionId))
-        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 2)
-        setupGoogleFitApiMockForSession(walkStart, walkEnd, 8000, 5000.0, 250.0, [80, 85, 90])
+        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(walkStart, walkEnd, 8000, 5000.0, 250.0, 85))
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .post("/v1/google-fit/sync")

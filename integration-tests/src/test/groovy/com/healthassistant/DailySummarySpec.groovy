@@ -263,10 +263,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def walkEnd = summaryZoned.plusHours(11).toInstant().toEpochMilli()
         
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, "walk-123"))
-        
-        // Mock aggregate API - first call for main sync (empty), second call for walking session
-        setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 2)
-        setupGoogleFitApiMockForSession(walkStart, walkEnd, 5000, 3000.0, 150.0, [75, 80, 85])
+        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(walkStart, walkEnd, 5000, 3000.0, 150.0, 80))
 
         when: "I trigger sync"
         RestAssured.given()

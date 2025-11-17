@@ -27,7 +27,7 @@ public class GoogleFitSyncService {
 
     private static final String DEFAULT_USER_ID = "default";
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final long BUCKET_DURATION_MINUTES = 5;
+    private static final long BUCKET_DURATION_MINUTES = 1;
     private static final long BUFFER_HOURS = 1;
     private static final DeviceId GOOGLE_FIT_DEVICE_ID = DeviceId.of("google-fit");
     private static final DateTimeFormatter RFC3339_FORMATTER = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC);
@@ -79,7 +79,7 @@ public class GoogleFitSyncService {
             
             eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
             eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
-            eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, googleFitClient, bucketMapper));
+            eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, buckets));
 
             if (eventEnvelopes.isEmpty()) {
                 log.info("No events to process");
@@ -119,7 +119,7 @@ public class GoogleFitSyncService {
                 new GoogleFitClient.DataTypeAggregate("com.google.calories.expended"),
                 new GoogleFitClient.DataTypeAggregate("com.google.heart_rate.bpm")
         ));
-        request.setBucketByTime(new GoogleFitClient.BucketByTime(300000L));
+        request.setBucketByTime(new GoogleFitClient.BucketByTime(60000L));
         request.setStartTimeMillis(from.toEpochMilli());
         request.setEndTimeMillis(to.toEpochMilli());
         return request;
@@ -223,7 +223,7 @@ public class GoogleFitSyncService {
         
         eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
         eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
-        eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, googleFitClient, bucketMapper));
+        eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, buckets));
         
         if (eventEnvelopes.isEmpty()) {
             return 0;

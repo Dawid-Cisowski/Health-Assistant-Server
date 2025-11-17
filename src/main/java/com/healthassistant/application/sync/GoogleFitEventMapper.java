@@ -196,19 +196,17 @@ class GoogleFitEventMapper {
 
     List<StoreHealthEventsCommand.EventEnvelope> mapWalkingSessionsToEnvelopes(
             List<GoogleFitSession> sessions,
-            GoogleFitClient googleFitClient,
-            GoogleFitBucketMapper bucketMapper
+            List<GoogleFitBucketData> availableBuckets
     ) {
         return sessions.stream()
-                .map(session -> createWalkingSessionEnvelope(session, googleFitClient, bucketMapper))
+                .map(session -> createWalkingSessionEnvelope(session, availableBuckets))
                 .filter(envelope -> envelope != null)
                 .toList();
     }
 
     private StoreHealthEventsCommand.EventEnvelope createWalkingSessionEnvelope(
             GoogleFitSession session,
-            GoogleFitClient googleFitClient,
-            GoogleFitBucketMapper bucketMapper
+            List<GoogleFitBucketData> availableBuckets
     ) {
         Instant start = session.getStartTime();
         Instant end = session.getEndTime();
@@ -218,97 +216,80 @@ class GoogleFitEventMapper {
             return null;
         }
 
-        try {
-            var aggregateRequest = createAggregateRequestForSession(start, end);
-            var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
-            List<GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
+        List<GoogleFitBucketData> sessionBuckets = availableBuckets.stream()
+                .filter(bucket -> {
+                    Instant bucketStart = bucket.bucketStart();
+                    Instant bucketEnd = bucket.bucketEnd();
+                    return !bucketEnd.isBefore(start) && !bucketStart.isAfter(end);
+                })
+                .toList();
 
-            long totalSteps = buckets.stream()
-                    .filter(b -> b.steps() != null && b.steps() > 0)
-                    .mapToLong(GoogleFitBucketData::steps)
-                    .sum();
+        long totalSteps = sessionBuckets.stream()
+                .filter(b -> b.steps() != null && b.steps() > 0)
+                .mapToLong(GoogleFitBucketData::steps)
+                .sum();
 
-            long totalDistance = Math.round(buckets.stream()
-                    .filter(b -> b.distance() != null && b.distance() > 0)
-                    .mapToDouble(GoogleFitBucketData::distance)
-                    .sum());
+        long totalDistance = Math.round(sessionBuckets.stream()
+                .filter(b -> b.distance() != null && b.distance() > 0)
+                .mapToDouble(GoogleFitBucketData::distance)
+                .sum());
 
-            double totalCalories = buckets.stream()
-                    .filter(b -> b.calories() != null && b.calories() > 0)
-                    .mapToDouble(GoogleFitBucketData::calories)
-                    .sum();
+        double totalCalories = sessionBuckets.stream()
+                .filter(b -> b.calories() != null && b.calories() > 0)
+                .mapToDouble(GoogleFitBucketData::calories)
+                .sum();
 
-            List<Integer> allHeartRates = buckets.stream()
-                    .filter(b -> b.heartRates() != null && !b.heartRates().isEmpty())
-                    .flatMap(b -> b.heartRates().stream())
-                    .collect(Collectors.toList());
+        List<Integer> allHeartRates = sessionBuckets.stream()
+                .filter(b -> b.heartRates() != null && !b.heartRates().isEmpty())
+                .flatMap(b -> b.heartRates().stream())
+                .collect(Collectors.toList());
 
-            Integer avgHeartRate = allHeartRates.isEmpty() ? null :
-                    (int) allHeartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0);
-            Integer maxHeartRate = allHeartRates.isEmpty() ? null :
-                    allHeartRates.stream().mapToInt(Integer::intValue).max().orElse(0);
+        Integer avgHeartRate = allHeartRates.isEmpty() ? null :
+                (int) allHeartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+        Integer maxHeartRate = allHeartRates.isEmpty() ? null :
+                allHeartRates.stream().mapToInt(Integer::intValue).max().orElse(0);
 
-            long durationMinutes = java.time.Duration.between(start, end).toMinutes();
+        long durationMinutes = java.time.Duration.between(start, end).toMinutes();
 
-            ZonedDateTime walkStartPoland = start.atZone(POLAND_ZONE);
-            ZonedDateTime walkEndPoland = end.atZone(POLAND_ZONE);
+        ZonedDateTime walkStartPoland = start.atZone(POLAND_ZONE);
+        ZonedDateTime walkEndPoland = end.atZone(POLAND_ZONE);
 
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("sessionId", session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
-            if (session.getName() != null) {
-                payload.put("name", session.getName());
-            }
-            payload.put("start", walkStartPoland.format(ISO_FORMATTER));
-            payload.put("end", walkEndPoland.format(ISO_FORMATTER));
-            payload.put("durationMinutes", (int) durationMinutes);
-            if (totalSteps > 0) {
-                payload.put("totalSteps", (int) totalSteps);
-            }
-            if (totalDistance > 0) {
-                payload.put("totalDistanceMeters", (long) totalDistance);
-            }
-            if (totalCalories > 0) {
-                payload.put("totalCalories", (int) totalCalories);
-            }
-            if (avgHeartRate != null && avgHeartRate > 0) {
-                payload.put("avgHeartRate", avgHeartRate);
-            }
-            if (maxHeartRate != null && maxHeartRate > 0) {
-                payload.put("maxHeartRate", maxHeartRate);
-            }
-            if (!allHeartRates.isEmpty()) {
-                payload.put("heartRateSamples", allHeartRates);
-            }
-            payload.put("originPackage", session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN);
-
-            String idempotencyKey = String.format("google-fit|walking|%s|%s",
-                    DEFAULT_USER_ID,
-                    session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
-
-            return new StoreHealthEventsCommand.EventEnvelope(
-                    IdempotencyKey.of(idempotencyKey),
-                    "WalkingSessionRecorded.v1",
-                    end,
-                    payload
-            );
-        } catch (Exception e) {
-            log.error("Failed to fetch aggregate data for walking session {}", session.getId(), e);
-            return null;
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("sessionId", session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
+        if (session.getName() != null) {
+            payload.put("name", session.getName());
         }
-    }
+        payload.put("start", walkStartPoland.format(ISO_FORMATTER));
+        payload.put("end", walkEndPoland.format(ISO_FORMATTER));
+        payload.put("durationMinutes", (int) durationMinutes);
+        payload.put("totalSteps", (int) totalSteps);
+        if (totalDistance > 0) {
+            payload.put("totalDistanceMeters", (long) totalDistance);
+        }
+        if (totalCalories > 0) {
+            payload.put("totalCalories", (int) totalCalories);
+        }
+        if (avgHeartRate != null && avgHeartRate > 0) {
+            payload.put("avgHeartRate", avgHeartRate);
+        }
+        if (maxHeartRate != null && maxHeartRate > 0) {
+            payload.put("maxHeartRate", maxHeartRate);
+        }
+        if (!allHeartRates.isEmpty()) {
+            payload.put("heartRateSamples", allHeartRates);
+        }
+        payload.put("originPackage", session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN);
 
-    private GoogleFitClient.AggregateRequest createAggregateRequestForSession(Instant start, Instant end) {
-        var request = new GoogleFitClient.AggregateRequest();
-        request.setAggregateBy(List.of(
-                new GoogleFitClient.DataTypeAggregate("com.google.step_count.delta"),
-                new GoogleFitClient.DataTypeAggregate("com.google.distance.delta"),
-                new GoogleFitClient.DataTypeAggregate("com.google.calories.expended"),
-                new GoogleFitClient.DataTypeAggregate("com.google.heart_rate.bpm")
-        ));
-        request.setBucketByTime(new GoogleFitClient.BucketByTime(ONE_MINUTE_MILLIS));
-        request.setStartTimeMillis(start.toEpochMilli());
-        request.setEndTimeMillis(end.toEpochMilli());
-        return request;
+        String idempotencyKey = String.format("google-fit|walking|%s|%s",
+                DEFAULT_USER_ID,
+                session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
+
+        return new StoreHealthEventsCommand.EventEnvelope(
+                IdempotencyKey.of(idempotencyKey),
+                "WalkingSessionRecorded.v1",
+                end,
+                payload
+        );
     }
 }
 
