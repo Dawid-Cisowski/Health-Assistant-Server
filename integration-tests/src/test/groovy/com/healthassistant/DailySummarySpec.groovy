@@ -290,6 +290,93 @@ class DailySummarySpec extends BaseIntegrationSpec {
         exercises[0].get("durationMinutes") == 60
     }
 
+    def "Scenario 8: Summary includes workout with basic metrics"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 11, 19)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "workout event"
+        def workoutTime = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(18).toInstant()
+        def workoutEvent = [
+            idempotencyKey: "gymrun-2025-11-19-1",
+            type: "WorkoutRecorded.v1",
+            occurredAt: workoutTime.toString(),
+            payload: [
+                workoutId: "gymrun-2025-11-19-1",
+                performedAt: workoutTime.toString(),
+                source: "GYMRUN_SCREENSHOT",
+                note: "Plecy i biceps",
+                exercises: [
+                    [
+                        name: "Podciąganie się nachwytem",
+                        muscleGroup: "Plecy",
+                        orderInWorkout: 1,
+                        sets: [
+                            [setNumber: 1, weightKg: 73.0, reps: 12, isWarmup: false],
+                            [setNumber: 2, weightKg: 73.5, reps: 10, isWarmup: false]
+                        ]
+                    ],
+                    [
+                        name: "Wiosłowanie sztangą",
+                        muscleGroup: "Plecy",
+                        orderInWorkout: 2,
+                        sets: [
+                            [setNumber: 1, weightKg: 60.0, reps: 10, isWarmup: false],
+                            [setNumber: 2, weightKg: 65.0, reps: 8, isWarmup: false],
+                            [setNumber: 3, weightKg: 70.0, reps: 6, isWarmup: false]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        when: "I submit workout event"
+        def submitResponse = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body([
+                    events: [workoutEvent],
+                    deviceId: deviceId
+                ])
+                .post("/v1/health-events")
+                .then()
+                .extract()
+
+        then: "workout is accepted"
+        submitResponse.statusCode() == 200
+        submitResponse.body().jsonPath().getString("status") == "success"
+
+        when: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes workout with calculated metrics"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+        summary.getString("date") == dateStr
+
+        def workouts = summary.getList("workouts")
+        workouts.size() == 1
+
+        def workout = workouts[0]
+        workout.get("workoutId") == "gymrun-2025-11-19-1"
+        workout.get("source") == "GYMRUN_SCREENSHOT"
+        workout.get("note") == "Plecy i biceps"
+        workout.get("totalExercises") == 2
+        workout.get("totalSets") == 5
+
+        // Total volume = (73.0*12 + 73.5*10) + (60.0*10 + 65.0*8 + 70.0*6)
+        //              = (876 + 735) + (600 + 520 + 420)
+        //              = 1611 + 1540 = 3151
+        def totalVolume = workout.get("totalVolume") as Double
+        totalVolume == 3151.0
+    }
+
     def "Scenario 9: Summary only includes events from specified date"() {
         given: "authenticated device"
         def deviceId = "test-device"

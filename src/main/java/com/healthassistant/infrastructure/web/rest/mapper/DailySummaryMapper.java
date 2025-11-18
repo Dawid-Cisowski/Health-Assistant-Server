@@ -12,6 +12,7 @@ public class DailySummaryMapper {
                 .date(summary.date())
                 .activity(toActivityResponse(summary.activity()))
                 .exercises(toExercisesResponse(summary.exercises()))
+                .workouts(toWorkoutsResponse(summary.workouts()))
                 .sleep(toSleepResponse(summary.sleep()))
                 .heart(toHeartResponse(summary.heart()))
                 .build();
@@ -42,6 +43,24 @@ public class DailySummaryMapper {
                 .steps(exercise.steps())
                 .avgHr(exercise.avgHr())
                 .energyKcal(exercise.energyKcal())
+                .build();
+    }
+
+    private static List<DailySummaryResponse.Workout> toWorkoutsResponse(List<DailySummary.Workout> workouts) {
+        return workouts.stream()
+                .map(DailySummaryMapper::toWorkoutResponse)
+                .toList();
+    }
+
+    private static DailySummaryResponse.Workout toWorkoutResponse(DailySummary.Workout workout) {
+        return DailySummaryResponse.Workout.builder()
+                .workoutId(workout.workoutId())
+                .performedAt(workout.performedAt())
+                .source(workout.source())
+                .note(workout.note())
+                .totalExercises(workout.totalExercises())
+                .totalSets(workout.totalSets())
+                .totalVolume(workout.totalVolume())
                 .build();
     }
 

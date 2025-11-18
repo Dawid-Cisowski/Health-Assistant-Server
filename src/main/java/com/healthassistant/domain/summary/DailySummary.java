@@ -8,6 +8,7 @@ public record DailySummary(
     LocalDate date,
     Activity activity,
     List<Exercise> exercises,
+    List<Workout> workouts,
     Sleep sleep,
     Heart heart
 ) {
@@ -15,6 +16,7 @@ public record DailySummary(
         Objects.requireNonNull(date, "Date cannot be null");
         Objects.requireNonNull(activity, "Activity cannot be null");
         Objects.requireNonNull(exercises, "Exercises cannot be null");
+        Objects.requireNonNull(workouts, "Workouts cannot be null");
         Objects.requireNonNull(sleep, "Sleep cannot be null");
         Objects.requireNonNull(heart, "Heart cannot be null");
     }
@@ -50,6 +52,17 @@ public record DailySummary(
         Integer restingBpm,
         Integer avgBpm,
         Integer maxBpm
+    ) {
+    }
+
+    public record Workout(
+        String workoutId,
+        java.time.Instant performedAt,
+        String source,
+        String note,
+        Integer totalExercises,
+        Integer totalSets,
+        Double totalVolume
     ) {
     }
 }
