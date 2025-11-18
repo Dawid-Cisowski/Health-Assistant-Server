@@ -6,12 +6,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Schema(
-    description = """
-        Payload for WorkoutRecorded.v1 - gym workout session from GymRun mobile app.
-
-        Contains workout metadata and detailed exercise data with sets, reps, and weights.
-        Source is a screenshot-based mobile app (GYMRUN_SCREENSHOT).
-        """,
+    description = "Gym workout session with exercises, sets, reps, and weights",
     example = """
         {
           "workoutId": "gymrun-2025-11-17-1",

@@ -8,13 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 @Schema(
-    description = """
-        Request to submit health events from mobile applications.
-
-        Supports multiple event types (workouts, nutrition, custom metrics, etc.)
-        sent in a single batch. Each event must specify its type and provide
-        appropriate payload data.
-        """,
+    description = "Request to submit health events from mobile applications",
     example = """
         {
           "events": [
