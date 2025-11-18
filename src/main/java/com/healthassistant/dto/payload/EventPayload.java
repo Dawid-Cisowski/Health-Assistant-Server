@@ -11,7 +11,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
     @JsonSubTypes.Type(value = SleepSessionPayload.class),
     @JsonSubTypes.Type(value = ActiveCaloriesPayload.class),
     @JsonSubTypes.Type(value = ActiveMinutesPayload.class),
-    @JsonSubTypes.Type(value = WalkingSessionPayload.class)
+    @JsonSubTypes.Type(value = WalkingSessionPayload.class),
+    @JsonSubTypes.Type(value = WorkoutPayload.class)
 })
 @Schema(
     description = "Event payload - structure depends on event type. The payload type is determined by the 'type' field in the parent EventEnvelope.",
@@ -21,7 +22,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
         SleepSessionPayload.class,
         ActiveCaloriesPayload.class,
         ActiveMinutesPayload.class,
-        WalkingSessionPayload.class
+        WalkingSessionPayload.class,
+        WorkoutPayload.class
     }
 )
 public sealed interface EventPayload permits
@@ -30,6 +32,7 @@ public sealed interface EventPayload permits
     SleepSessionPayload,
     ActiveCaloriesPayload,
     ActiveMinutesPayload,
-    WalkingSessionPayload {
+    WalkingSessionPayload,
+    WorkoutPayload {
 }
 

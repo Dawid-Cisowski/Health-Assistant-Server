@@ -105,6 +105,11 @@ class StoreHealthEventsCommandHandler {
         eventsToSave.forEach(e -> allProcessedEvents.put(e.idempotencyKey().value(), e));
         eventsToUpdate.forEach(e -> allProcessedEvents.put(e.idempotencyKey().value(), e));
 
+        // Track which events were updated (duplicates)
+        Set<String> updatedEventKeys = eventsToUpdate.stream()
+                .map(e -> e.idempotencyKey().value())
+                .collect(Collectors.toSet());
+
         Map<Integer, Event> savedEventsByIndex = validIndices.stream()
                 .collect(Collectors.toMap(
                         index -> index,
@@ -120,9 +125,11 @@ class StoreHealthEventsCommandHandler {
 
                     Event savedEvent = savedEventsByIndex.get(index);
                     if (savedEvent != null) {
+                        // Check if this was an update (duplicate) or new insert
+                        boolean isDuplicate = updatedEventKeys.contains(savedEvent.idempotencyKey().value());
                         return new StoreHealthEventsResult.EventResult(
                                 index,
-                                StoreHealthEventsResult.EventStatus.stored,
+                                isDuplicate ? StoreHealthEventsResult.EventStatus.duplicate : StoreHealthEventsResult.EventStatus.stored,
                                 savedEvent.eventId(),
                                 null
                         );
@@ -139,7 +146,11 @@ class StoreHealthEventsCommandHandler {
 
     private void updateDailySummaries(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
         Set<LocalDate> datesToUpdate = IntStream.range(0, results.size())
-                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
+                .filter(index -> {
+                    var status = results.get(index).status();
+                    return status == StoreHealthEventsResult.EventStatus.stored ||
+                           status == StoreHealthEventsResult.EventStatus.duplicate;
+                })
                 .mapToObj(index -> {
                     var envelope = command.events().get(index);
                     Instant occurredAt = envelope.occurredAt();

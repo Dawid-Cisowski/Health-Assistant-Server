@@ -44,6 +44,7 @@ public class EventValidator {
             case ActiveCaloriesBurnedRecorded calories -> validateActiveCaloriesBurned(payload, errors);
             case ActiveMinutesRecorded minutes -> validateActiveMinutes(payload, errors);
             case WalkingSessionRecorded walking -> validateWalkingSession(payload, errors);
+            case WorkoutRecorded workout -> validateWorkout(payload, errors);
         }
     }
 
@@ -126,6 +127,108 @@ public class EventValidator {
             }
         } catch (Exception e) {
             errors.add(EventValidationError.invalidValue(field, "must be a number"));
+        }
+    }
+
+    private void validateWorkout(Map<String, Object> payload, List<EventValidationError> errors) {
+        requireFields(payload, errors, "workoutId", "performedAt", "source");
+
+        // Validate exercises list exists and is not empty
+        Object exercisesObj = payload.get("exercises");
+        if (exercisesObj == null) {
+            errors.add(EventValidationError.missingField("exercises"));
+            return;
+        }
+
+        if (!(exercisesObj instanceof List)) {
+            errors.add(EventValidationError.invalidValue("exercises", "must be a list"));
+            return;
+        }
+
+        List<?> exercises = (List<?>) exercisesObj;
+        if (exercises.isEmpty()) {
+            errors.add(EventValidationError.invalidValue("exercises", "cannot be empty"));
+            return;
+        }
+
+        // Validate each exercise
+        for (int i = 0; i < exercises.size(); i++) {
+            Object exerciseObj = exercises.get(i);
+            if (!(exerciseObj instanceof Map)) {
+                errors.add(EventValidationError.invalidValue("exercises[" + i + "]", "must be an object"));
+                continue;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> exercise = (Map<String, Object>) exerciseObj;
+
+            // Validate exercise fields
+            if (!exercise.containsKey("name") || exercise.get("name") == null) {
+                errors.add(EventValidationError.missingField("exercises[" + i + "].name"));
+            }
+
+            if (!exercise.containsKey("orderInWorkout") || exercise.get("orderInWorkout") == null) {
+                errors.add(EventValidationError.missingField("exercises[" + i + "].orderInWorkout"));
+            } else {
+                validatePositiveNumber(exercise.get("orderInWorkout"), "exercises[" + i + "].orderInWorkout", errors);
+            }
+
+            // Validate sets
+            Object setsObj = exercise.get("sets");
+            if (setsObj == null) {
+                errors.add(EventValidationError.missingField("exercises[" + i + "].sets"));
+                continue;
+            }
+
+            if (!(setsObj instanceof List)) {
+                errors.add(EventValidationError.invalidValue("exercises[" + i + "].sets", "must be a list"));
+                continue;
+            }
+
+            List<?> sets = (List<?>) setsObj;
+            if (sets.isEmpty()) {
+                errors.add(EventValidationError.invalidValue("exercises[" + i + "].sets", "cannot be empty"));
+                continue;
+            }
+
+            // Validate each set
+            for (int j = 0; j < sets.size(); j++) {
+                Object setObj = sets.get(j);
+                if (!(setObj instanceof Map)) {
+                    errors.add(EventValidationError.invalidValue("exercises[" + i + "].sets[" + j + "]", "must be an object"));
+                    continue;
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> set = (Map<String, Object>) setObj;
+
+                String setPrefix = "exercises[" + i + "].sets[" + j + "]";
+
+                // Validate set fields
+                if (!set.containsKey("setNumber") || set.get("setNumber") == null) {
+                    errors.add(EventValidationError.missingField(setPrefix + ".setNumber"));
+                } else {
+                    validatePositiveNumber(set.get("setNumber"), setPrefix + ".setNumber", errors);
+                }
+
+                if (!set.containsKey("weightKg") || set.get("weightKg") == null) {
+                    errors.add(EventValidationError.missingField(setPrefix + ".weightKg"));
+                } else {
+                    validateNonNegativeNumber(set.get("weightKg"), setPrefix + ".weightKg", errors);
+                }
+
+                if (!set.containsKey("reps") || set.get("reps") == null) {
+                    errors.add(EventValidationError.missingField(setPrefix + ".reps"));
+                } else {
+                    validatePositiveNumber(set.get("reps"), setPrefix + ".reps", errors);
+                }
+
+                if (!set.containsKey("isWarmup") || set.get("isWarmup") == null) {
+                    errors.add(EventValidationError.missingField(setPrefix + ".isWarmup"));
+                } else if (!(set.get("isWarmup") instanceof Boolean)) {
+                    errors.add(EventValidationError.invalidValue(setPrefix + ".isWarmup", "must be a boolean"));
+                }
+            }
         }
     }
 }
