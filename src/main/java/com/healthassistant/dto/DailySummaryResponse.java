@@ -108,35 +108,15 @@ public class DailySummaryResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Schema(description = "Gym workout session")
+    @Schema(description = "Gym workout session reference")
     public static class Workout {
         @JsonProperty("workoutId")
         @Schema(description = "Unique workout identifier", example = "gymrun-2025-11-19-1")
         private String workoutId;
 
-        @JsonProperty("performedAt")
-        @Schema(description = "When the workout was performed (ISO-8601 UTC)", example = "2025-11-19T18:00:00Z")
-        private Instant performedAt;
-
-        @JsonProperty("source")
-        @Schema(description = "Source of the workout data", example = "GYMRUN_SCREENSHOT")
-        private String source;
-
         @JsonProperty("note")
         @Schema(description = "Workout note/description", example = "Plecy i biceps", nullable = true)
         private String note;
-
-        @JsonProperty("totalExercises")
-        @Schema(description = "Total number of exercises in the workout", example = "5", nullable = true)
-        private Integer totalExercises;
-
-        @JsonProperty("totalSets")
-        @Schema(description = "Total number of sets across all exercises", example = "15", nullable = true)
-        private Integer totalSets;
-
-        @JsonProperty("totalVolume")
-        @Schema(description = "Total volume (weight × reps) in kg", example = "3151.0", nullable = true)
-        private Double totalVolume;
     }
 
     @Getter

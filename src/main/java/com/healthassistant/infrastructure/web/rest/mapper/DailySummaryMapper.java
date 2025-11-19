@@ -55,12 +55,7 @@ public class DailySummaryMapper {
     private static DailySummaryResponse.Workout toWorkoutResponse(DailySummary.Workout workout) {
         return DailySummaryResponse.Workout.builder()
                 .workoutId(workout.workoutId())
-                .performedAt(workout.performedAt())
-                .source(workout.source())
                 .note(workout.note())
-                .totalExercises(workout.totalExercises())
-                .totalSets(workout.totalSets())
-                .totalVolume(workout.totalVolume())
                 .build();
     }
 

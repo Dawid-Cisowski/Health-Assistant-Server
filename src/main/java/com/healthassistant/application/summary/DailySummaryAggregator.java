@@ -171,57 +171,9 @@ class DailySummaryAggregator {
 
         try {
             String workoutId = getString(payload, "workoutId");
-            Instant performedAt = parseInstant(payload.get("performedAt"));
-            String source = getString(payload, "source");
             String note = getString(payload, "note");
 
-            if (!(payload.get("exercises") instanceof List<?> exercises)) {
-                return null;
-            }
-
-            int totalSets = 0;
-            double totalVolume = 0.0;
-
-            for (Object exerciseObj : exercises) {
-                if (!(exerciseObj instanceof Map<?, ?> exercise)) {
-                    continue;
-                }
-
-                @SuppressWarnings("unchecked")
-                Map<String, Object> exerciseMap = (Map<String, Object>) exercise;
-
-                if (!(exerciseMap.get("sets") instanceof List<?> sets)) {
-                    continue;
-                }
-
-                totalSets += sets.size();
-
-                for (Object setObj : sets) {
-                    if (!(setObj instanceof Map<?, ?> set)) {
-                        continue;
-                    }
-
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> setMap = (Map<String, Object>) set;
-
-                    Double weightKg = getDouble(setMap, "weightKg");
-                    Integer reps = getInteger(setMap, "reps");
-
-                    if (weightKg != null && reps != null) {
-                        totalVolume += weightKg * reps;
-                    }
-                }
-            }
-
-            return new DailySummary.Workout(
-                    workoutId,
-                    performedAt,
-                    source,
-                    note,
-                    exercises.size(),
-                    totalSets,
-                    totalVolume > 0 ? totalVolume : null
-            );
+            return new DailySummary.Workout(workoutId, note);
         } catch (Exception e) {
             log.warn("Failed to convert event to workout: {}", e.getMessage());
             return null;

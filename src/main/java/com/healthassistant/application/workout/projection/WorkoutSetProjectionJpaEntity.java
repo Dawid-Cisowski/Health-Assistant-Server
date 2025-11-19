@@ -1,0 +1,52 @@
+package com.healthassistant.application.workout.projection;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+
+@Entity
+@Table(name = "workout_set_projections")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class WorkoutSetProjectionJpaEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "workout_id", nullable = false)
+    private String workoutId;
+
+    @Column(name = "exercise_name", nullable = false)
+    private String exerciseName;
+
+    @Column(name = "set_number", nullable = false)
+    private Integer setNumber;
+
+    @Column(name = "weight_kg", nullable = false, precision = 10, scale = 2)
+    private BigDecimal weightKg;
+
+    @Column(name = "reps", nullable = false)
+    private Integer reps;
+
+    @Column(name = "is_warmup", nullable = false)
+    private Boolean isWarmup;
+
+    @Column(name = "volume_kg", nullable = false, precision = 10, scale = 2)
+    private BigDecimal volumeKg;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+}

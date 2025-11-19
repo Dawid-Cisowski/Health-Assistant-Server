@@ -365,16 +365,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
         def workout = workouts[0]
         workout.get("workoutId") == "gymrun-2025-11-19-1"
-        workout.get("source") == "GYMRUN_SCREENSHOT"
         workout.get("note") == "Plecy i biceps"
-        workout.get("totalExercises") == 2
-        workout.get("totalSets") == 5
-
-        // Total volume = (73.0*12 + 73.5*10) + (60.0*10 + 65.0*8 + 70.0*6)
-        //              = (876 + 735) + (600 + 520 + 420)
-        //              = 1611 + 1540 = 3151
-        def totalVolume = workout.get("totalVolume") as Double
-        totalVolume == 3151.0
     }
 
     def "Scenario 9: Summary only includes events from specified date"() {

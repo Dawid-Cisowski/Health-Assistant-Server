@@ -1,6 +1,7 @@
 package com.healthassistant.application.ingestion;
 
 import com.healthassistant.application.summary.DailySummaryFacade;
+import com.healthassistant.application.workout.projection.WorkoutProjector;
 import com.healthassistant.domain.event.DeviceId;
 import com.healthassistant.domain.event.Event;
 import com.healthassistant.domain.event.EventId;
@@ -33,6 +34,7 @@ class StoreHealthEventsCommandHandler {
     private final EventIdGenerator eventIdGenerator;
     private final EventValidator eventValidator;
     private final DailySummaryFacade dailySummaryFacade;
+    private final WorkoutProjector workoutProjector;
 
     @Transactional
     public StoreHealthEventsResult handle(StoreHealthEventsCommand command) {
@@ -100,6 +102,19 @@ class StoreHealthEventsCommandHandler {
             eventRepository.updateAll(eventsToUpdate);
             log.info("Updated {} existing events in batch", eventsToUpdate.size());
         }
+
+        // Project workout events
+        List<Event> allEvents = new java.util.ArrayList<>();
+        allEvents.addAll(eventsToSave);
+        allEvents.addAll(eventsToUpdate);
+
+        allEvents.forEach(event -> {
+            try {
+                workoutProjector.projectWorkout(event);
+            } catch (Exception e) {
+                log.error("Failed to project workout for event {}", event.eventId().value(), e);
+            }
+        });
 
         Map<String, Event> allProcessedEvents = new java.util.HashMap<>();
         eventsToSave.forEach(e -> allProcessedEvents.put(e.idempotencyKey().value(), e));
