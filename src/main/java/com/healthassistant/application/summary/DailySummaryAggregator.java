@@ -33,7 +33,7 @@ class DailySummaryAggregator {
         DailySummary.Activity activity = aggregateActivity(events);
         List<DailySummary.Exercise> exercises = aggregateExercises(events);
         List<DailySummary.Workout> workouts = aggregateWorkouts(events);
-        DailySummary.Sleep sleep = aggregateSleep(events);
+        List<DailySummary.Sleep> sleep = aggregateSleep(events);
         DailySummary.Heart heart = aggregateHeart(events);
 
         return new DailySummary(
@@ -180,12 +180,12 @@ class DailySummaryAggregator {
         }
     }
 
-    private DailySummary.Sleep aggregateSleep(List<HealthEventsQuery.EventData> events) {
+    private List<DailySummary.Sleep> aggregateSleep(List<HealthEventsQuery.EventData> events) {
         return events.stream()
                 .filter(e -> "SleepSessionRecorded.v1".equals(e.eventType()))
-                .findFirst()
                 .map(this::toSleep)
-                .orElse(new DailySummary.Sleep(null, null, null));
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private DailySummary.Sleep toSleep(HealthEventsQuery.EventData event) {

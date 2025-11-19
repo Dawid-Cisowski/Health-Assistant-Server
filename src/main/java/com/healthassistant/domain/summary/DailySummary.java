@@ -9,7 +9,7 @@ public record DailySummary(
     Activity activity,
     List<Exercise> exercises,
     List<Workout> workouts,
-    Sleep sleep,
+    List<Sleep> sleep,
     Heart heart
 ) {
     public DailySummary {

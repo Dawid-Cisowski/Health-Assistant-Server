@@ -29,7 +29,6 @@ public class WorkoutProjector {
     @Transactional
     public void projectWorkout(Event event) {
         if (!WORKOUT_RECORDED_V1.equals(event.eventType().value())) {
-            log.debug("Skipping non-workout event: {}", event.eventType().value());
             return;
         }
 

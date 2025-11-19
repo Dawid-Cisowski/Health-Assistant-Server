@@ -133,14 +133,16 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         workouts.every { it.performedDate == LocalDate.parse("2025-11-19") }
 
         and: "daily summary contains both workouts"
-        RestAssured.given()
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def summary = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/2025-11-19")
                 .get("/v1/daily-summaries/2025-11-19")
                 .then()
                 .statusCode(200)
                 .extract()
                 .body()
                 .jsonPath()
-                .getList("workouts").size() == 2
+        summary.getList("workouts").size() == 2
     }
 
     def "Scenario 4: Workout without muscle group creates projection with null"() {
@@ -310,7 +312,9 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         and: "I fetch the daily summary"
-        def summary = RestAssured.given()
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def summary = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/2025-11-17")
                 .get("/v1/daily-summaries/2025-11-17")
                 .then()
                 .statusCode(200)

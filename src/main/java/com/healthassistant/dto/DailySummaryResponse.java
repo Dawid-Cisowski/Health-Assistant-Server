@@ -35,8 +35,8 @@ public class DailySummaryResponse {
     private List<Workout> workouts;
 
     @JsonProperty("sleep")
-    @Schema(description = "Sleep session information")
-    private Sleep sleep;
+    @Schema(description = "Sleep sessions during the day (including naps)")
+    private List<Sleep> sleep;
 
     @JsonProperty("heart")
     @Schema(description = "Heart rate metrics")

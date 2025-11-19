@@ -402,5 +402,181 @@ class DailySummarySpec extends BaseIntegrationSpec {
         summary.getInt("activity.steps") == 742
     }
 
+    def "Scenario 10: Summary includes single sleep session"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 11, 23)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "sleep session event"
+        def sleepStart = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).minusHours(1).toInstant()
+        def sleepEnd = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(7).toInstant()
+        def sleepEvent = [
+            idempotencyKey: "sleep-2025-11-23-1",
+            type: "SleepSessionRecorded.v1",
+            occurredAt: sleepEnd.toString(),
+            payload: [
+                sleepStart: sleepStart.toString(),
+                sleepEnd: sleepEnd.toString(),
+                totalMinutes: 480,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit sleep event"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body([
+                    events: [sleepEvent],
+                    deviceId: deviceId
+                ])
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes single sleep session"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+
+        def sleepSessions = summary.getList("sleep")
+        sleepSessions.size() == 1
+
+        def sleep = sleepSessions[0]
+        sleep.get("totalMinutes") == 480
+        sleep.get("start") != null
+        sleep.get("end") != null
+    }
+
+    def "Scenario 11: Summary includes multiple sleep sessions (night sleep + nap)"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 11, 24)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "night sleep event"
+        def nightSleepStart = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).minusHours(1).toInstant()
+        def nightSleepEnd = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(7).toInstant()
+        def nightSleepEvent = [
+            idempotencyKey: "sleep-2025-11-24-night",
+            type: "SleepSessionRecorded.v1",
+            occurredAt: nightSleepEnd.toString(),
+            payload: [
+                sleepStart: nightSleepStart.toString(),
+                sleepEnd: nightSleepEnd.toString(),
+                totalMinutes: 480,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        and: "afternoon nap event"
+        def napStart = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(14).toInstant()
+        def napEnd = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(15).toInstant()
+        def napEvent = [
+            idempotencyKey: "sleep-2025-11-24-nap",
+            type: "SleepSessionRecorded.v1",
+            occurredAt: napEnd.toString(),
+            payload: [
+                sleepStart: napStart.toString(),
+                sleepEnd: napEnd.toString(),
+                totalMinutes: 60,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit both sleep events"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body([
+                    events: [nightSleepEvent, napEvent],
+                    deviceId: deviceId
+                ])
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes both sleep sessions"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+
+        def sleepSessions = summary.getList("sleep")
+        sleepSessions.size() == 2
+
+        // Night sleep
+        def nightSleep = sleepSessions.find { it.totalMinutes == 480 }
+        nightSleep != null
+        nightSleep.get("totalMinutes") == 480
+
+        // Nap
+        def nap = sleepSessions.find { it.totalMinutes == 60 }
+        nap != null
+        nap.get("totalMinutes") == 60
+    }
+
+    def "Scenario 12: Summary has empty sleep list when no sleep events"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 11, 25)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "only activity event (no sleep)"
+        def activityTime = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(10).toInstant()
+        def stepsEvent = [
+            idempotencyKey: "steps-2025-11-25-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: activityTime.toString(),
+            payload: [
+                bucketStart: activityTime.minusSeconds(3600).toString(),
+                bucketEnd: activityTime.toString(),
+                count: 1000,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit activity event without sleep"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body([
+                    events: [stepsEvent],
+                    deviceId: deviceId
+                ])
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary has empty sleep list"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+
+        def sleepSessions = summary.getList("sleep")
+        sleepSessions.size() == 0
+    }
+
 }
 

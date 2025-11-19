@@ -59,12 +59,14 @@ public class DailySummaryMapper {
                 .build();
     }
 
-    private static DailySummaryResponse.Sleep toSleepResponse(DailySummary.Sleep sleep) {
-        return DailySummaryResponse.Sleep.builder()
-                .start(sleep.start())
-                .end(sleep.end())
-                .totalMinutes(sleep.totalMinutes())
-                .build();
+    private static List<DailySummaryResponse.Sleep> toSleepResponse(List<DailySummary.Sleep> sleepList) {
+        return sleepList.stream()
+                .map(sleep -> DailySummaryResponse.Sleep.builder()
+                        .start(sleep.start())
+                        .end(sleep.end())
+                        .totalMinutes(sleep.totalMinutes())
+                        .build())
+                .toList();
     }
 
     private static DailySummaryResponse.Heart toHeartResponse(DailySummary.Heart heart) {
