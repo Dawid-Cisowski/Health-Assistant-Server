@@ -1,5 +1,6 @@
 package com.healthassistant.application.ingestion;
 
+import com.healthassistant.application.steps.projection.StepsProjector;
 import com.healthassistant.application.summary.DailySummaryFacade;
 import com.healthassistant.application.workout.projection.WorkoutProjector;
 import com.healthassistant.domain.event.DeviceId;
@@ -35,6 +36,7 @@ class StoreHealthEventsCommandHandler {
     private final EventValidator eventValidator;
     private final DailySummaryFacade dailySummaryFacade;
     private final WorkoutProjector workoutProjector;
+    private final StepsProjector stepsProjector;
 
     @Transactional
     public StoreHealthEventsResult handle(StoreHealthEventsCommand command) {
@@ -111,8 +113,9 @@ class StoreHealthEventsCommandHandler {
         allEvents.forEach(event -> {
             try {
                 workoutProjector.projectWorkout(event);
+                stepsProjector.projectSteps(event);
             } catch (Exception e) {
-                log.error("Failed to project workout for event {}", event.eventId().value(), e);
+                log.error("Failed to project event {}", event.eventId().value(), e);
             }
         });
 
