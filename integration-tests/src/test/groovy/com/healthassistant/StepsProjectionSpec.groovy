@@ -1,7 +1,7 @@
 package com.healthassistant
 
-import com.healthassistant.application.steps.projection.StepsDailyProjectionJpaRepository
-import com.healthassistant.application.steps.projection.StepsHourlyProjectionJpaRepository
+import com.healthassistant.steps.StepsDailyProjectionJpaRepository
+import com.healthassistant.steps.StepsHourlyProjectionJpaRepository
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired

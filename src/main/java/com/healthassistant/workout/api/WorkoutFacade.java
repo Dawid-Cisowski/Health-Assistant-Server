@@ -1,0 +1,14 @@
+package com.healthassistant.workout.api;
+
+import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+public interface WorkoutFacade {
+
+    Optional<WorkoutDetailResponse> getWorkoutDetails(String workoutId);
+
+    List<WorkoutDetailResponse> getWorkoutsByDateRange(LocalDate startDate, LocalDate endDate);
+}

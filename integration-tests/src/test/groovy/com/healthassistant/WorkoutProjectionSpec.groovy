@@ -1,9 +1,9 @@
 package com.healthassistant
 
-import com.healthassistant.application.summary.DailySummaryJpaRepository
-import com.healthassistant.application.workout.projection.WorkoutExerciseProjectionJpaRepository
-import com.healthassistant.application.workout.projection.WorkoutProjectionJpaRepository
-import com.healthassistant.application.workout.projection.WorkoutSetProjectionJpaRepository
+import com.healthassistant.dailysummary.DailySummaryJpaRepository
+import com.healthassistant.workout.WorkoutExerciseProjectionJpaRepository
+import com.healthassistant.workout.WorkoutProjectionJpaRepository
+import com.healthassistant.workout.WorkoutSetProjectionJpaRepository
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired

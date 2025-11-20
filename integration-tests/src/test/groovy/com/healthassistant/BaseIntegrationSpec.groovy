@@ -1,7 +1,7 @@
 package com.healthassistant
 
-import com.healthassistant.application.ingestion.HealthEventJpaRepository
-import com.healthassistant.application.summary.DailySummaryJpaRepository
+import com.healthassistant.healthevents.HealthEventJpaRepository
+import com.healthassistant.dailysummary.DailySummaryJpaRepository
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import io.restassured.RestAssured

@@ -1,7 +1,7 @@
 package com.healthassistant
 
-import com.healthassistant.application.summary.DailySummaryJpaRepository
-import com.healthassistant.application.sync.GoogleFitSyncStateRepository
+import com.healthassistant.dailysummary.DailySummaryJpaRepository
+import com.healthassistant.googlefit.GoogleFitSyncStateRepository
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired
