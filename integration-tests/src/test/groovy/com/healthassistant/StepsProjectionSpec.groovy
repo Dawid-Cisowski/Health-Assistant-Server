@@ -464,4 +464,230 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         and: "daysWithData counts only non-zero days"
         response.getInt("daysWithData") == 2
     }
+
+    def "Scenario 9: Idempotent events don't duplicate projections"() {
+        given: "a steps event"
+        def date = "2025-11-27"
+        def bucketStart = "2025-11-27T09:00:00Z"
+        def bucketEnd = "2025-11-27T09:01:00Z"
+        def request = """
+        {
+            "events": [{
+                "idempotencyKey": "test-device|steps|duplicate-test",
+                "type": "StepsBucketedRecorded.v1",
+                "occurredAt": "${bucketEnd}",
+                "payload": {
+                    "bucketStart": "${bucketStart}",
+                    "bucketEnd": "${bucketEnd}",
+                    "count": 500,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "test-device"
+        }
+        """
+
+        when: "I submit the same event twice"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(request)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(request)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "projection is not duplicated"
+        def hourlyData = hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 10)
+        hourlyData.isPresent()
+        hourlyData.get().stepCount == 500  // Still 500, not 1000
+        hourlyData.get().bucketCount == 1   // Still 1, not 2
+
+        and: "daily projection reflects single event"
+        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
+        dailyData.isPresent()
+        dailyData.get().totalSteps == 500  // Still 500, not 1000
+    }
+
+    def "Scenario 10: Multiple buckets update time range correctly"() {
+        given: "two buckets in same hour at different times"
+        def date = "2025-11-28"
+        // First bucket at 14:00
+        def firstBucketStart = "2025-11-28T13:00:00Z"  // 14:00 Warsaw
+        def firstBucketEnd = "2025-11-28T13:01:00Z"
+        // Second bucket at 14:45
+        def secondBucketStart = "2025-11-28T13:45:00Z"  // 14:45 Warsaw
+        def secondBucketEnd = "2025-11-28T13:46:00Z"
+
+        def request = """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "test-device|steps|time-range-1",
+                    "type": "StepsBucketedRecorded.v1",
+                    "occurredAt": "${firstBucketEnd}",
+                    "payload": {
+                        "bucketStart": "${firstBucketStart}",
+                        "bucketEnd": "${firstBucketEnd}",
+                        "count": 100,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                },
+                {
+                    "idempotencyKey": "test-device|steps|time-range-2",
+                    "type": "StepsBucketedRecorded.v1",
+                    "occurredAt": "${secondBucketEnd}",
+                    "payload": {
+                        "bucketStart": "${secondBucketStart}",
+                        "bucketEnd": "${secondBucketEnd}",
+                        "count": 150,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                }
+            ],
+            "deviceId": "test-device"
+        }
+        """
+
+        when: "I submit both events"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(request)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "hourly projection has correct time range"
+        def hourlyData = hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 14)
+        hourlyData.isPresent()
+        hourlyData.get().stepCount == 250
+        hourlyData.get().bucketCount == 2
+
+        and: "first and last bucket times are correct"
+        def firstTime = java.time.Instant.parse(firstBucketStart)
+        def lastTime = java.time.Instant.parse(secondBucketEnd)
+        hourlyData.get().firstBucketTime == firstTime
+        hourlyData.get().lastBucketTime == lastTime
+    }
+
+    def "Scenario 11: Most active hour updates when different hour has more steps"() {
+        given: "steps in two different hours, with different amounts"
+        def date = "2025-11-29"
+        def request1 = """
+        {
+            "events": [{
+                "idempotencyKey": "test-device|steps|hour10",
+                "type": "StepsBucketedRecorded.v1",
+                "occurredAt": "2025-11-29T09:01:00Z",
+                "payload": {
+                    "bucketStart": "2025-11-29T09:00:00Z",
+                    "bucketEnd": "2025-11-29T09:01:00Z",
+                    "count": 300,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "test-device"
+        }
+        """
+
+        when: "I submit first event for hour 10"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(request1)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "hour 10 is most active"
+        def dailyData1 = dailyProjectionRepository.findByDate(LocalDate.parse(date))
+        dailyData1.isPresent()
+        dailyData1.get().mostActiveHour == 10
+        dailyData1.get().mostActiveHourSteps == 300
+
+        when: "I submit event for hour 15 with more steps"
+        def request2 = """
+        {
+            "events": [{
+                "idempotencyKey": "test-device|steps|hour15",
+                "type": "StepsBucketedRecorded.v1",
+                "occurredAt": "2025-11-29T14:01:00Z",
+                "payload": {
+                    "bucketStart": "2025-11-29T14:00:00Z",
+                    "bucketEnd": "2025-11-29T14:01:00Z",
+                    "count": 500,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "test-device"
+        }
+        """
+
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(request2)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "hour 15 becomes most active"
+        def dailyData2 = dailyProjectionRepository.findByDate(LocalDate.parse(date))
+        dailyData2.isPresent()
+        dailyData2.get().mostActiveHour == 15
+        dailyData2.get().mostActiveHourSteps == 500
+        dailyData2.get().totalSteps == 800
+        dailyData2.get().activeHoursCount == 2
+    }
+
+    def "Scenario 12: Range query with invalid dates returns 400"() {
+        when: "I query range with endDate before startDate"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/steps/range?startDate=2025-11-30&endDate=2025-11-28")
+                .get("/v1/steps/range?startDate=2025-11-30&endDate=2025-11-28")
+                .then()
+                .extract()
+
+        then: "400 Bad Request is returned"
+        response.statusCode() == 400
+    }
+
+    def "Scenario 13: Event without bucketStart is ignored in projection"() {
+        given: "an event missing bucketStart"
+        def date = "2025-12-01"
+        def request = """
+        {
+            "events": [{
+                "idempotencyKey": "test-device|steps|missing-bucket-start",
+                "type": "StepsBucketedRecorded.v1",
+                "occurredAt": "2025-12-01T10:01:00Z",
+                "payload": {
+                    "bucketEnd": "2025-12-01T10:01:00Z",
+                    "count": 500,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "test-device"
+        }
+        """
+
+        when: "I submit the event"
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(request)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "no projections are created"
+        def hourlyData = hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 10)
+        !hourlyData.isPresent()
+
+        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
+        !dailyData.isPresent()
+    }
 }

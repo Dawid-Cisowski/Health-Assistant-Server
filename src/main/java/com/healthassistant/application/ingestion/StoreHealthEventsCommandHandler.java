@@ -105,12 +105,9 @@ class StoreHealthEventsCommandHandler {
             log.info("Updated {} existing events in batch", eventsToUpdate.size());
         }
 
-        // Project workout events
-        List<Event> allEvents = new java.util.ArrayList<>();
-        allEvents.addAll(eventsToSave);
-        allEvents.addAll(eventsToUpdate);
-
-        allEvents.forEach(event -> {
+        // Project only NEW events (not duplicates)
+        // Duplicates were already projected when first saved, so skip them to maintain idempotency
+        eventsToSave.forEach(event -> {
             try {
                 workoutProjector.projectWorkout(event);
                 stepsProjector.projectSteps(event);
