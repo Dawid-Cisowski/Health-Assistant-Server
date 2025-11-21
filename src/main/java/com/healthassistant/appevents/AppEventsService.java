@@ -2,8 +2,10 @@ package com.healthassistant.appevents;
 
 import com.healthassistant.appevents.api.AppEventsFacade;
 import com.healthassistant.appevents.api.dto.SubmitHealthEventsRequest;
+import com.healthassistant.appevents.api.dto.SubmitHealthEventsRequest.HealthEventRequest;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand.EventEnvelope;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
@@ -11,9 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -28,50 +29,27 @@ class AppEventsService implements AppEventsFacade {
                 request.deviceId() != null ? request.deviceId() : "mobile-app"
         );
 
-        List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
+        List<EventEnvelope> eventEnvelopes = IntStream.range(0, request.events().size())
+                .mapToObj(i -> {
+                    HealthEventRequest eventRequest = request.events().get(i);
 
-        for (int i = 0; i < request.events().size(); i++) {
-            var eventRequest = request.events().get(i);
+                    IdempotencyKey idempotencyKey = IdempotencyKey.from(
+                            eventRequest.idempotencyKey(),
+                            deviceId.value(),
+                            eventRequest.type(),
+                            eventRequest.payload(),
+                            i
+                    );
 
-            String idempotencyKeyValue = eventRequest.idempotencyKey();
-            if (idempotencyKeyValue == null || idempotencyKeyValue.isBlank()) {
-                idempotencyKeyValue = generateIdempotencyKey(
-                        deviceId.value(),
-                        eventRequest.type(),
-                        eventRequest.payload(),
-                        i
-                );
-            }
+                    return new EventEnvelope(
+                            idempotencyKey,
+                            eventRequest.type(),
+                            eventRequest.occurredAt(),
+                            eventRequest.payload()
+                    );
+                })
+                .toList();
 
-            IdempotencyKey idempotencyKey = new IdempotencyKey(idempotencyKeyValue);
-
-            StoreHealthEventsCommand.EventEnvelope envelope = new StoreHealthEventsCommand.EventEnvelope(
-                    idempotencyKey,
-                    eventRequest.type(),
-                    eventRequest.occurredAt(),
-                    eventRequest.payload()
-            );
-
-            eventEnvelopes.add(envelope);
-        }
-
-        StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, deviceId);
-        return healthEventsFacade.storeHealthEvents(command);
-    }
-
-    private String generateIdempotencyKey(
-            String deviceId,
-            String eventType,
-            Map<String, Object> payload,
-            int index) {
-
-        if ("WorkoutRecorded.v1".equals(eventType)) {
-            Object workoutId = payload.get("workoutId");
-            if (workoutId != null) {
-                return deviceId + "|workout|" + workoutId;
-            }
-        }
-
-        return deviceId + "|" + eventType + "|" + System.currentTimeMillis() + "-" + index;
+        return healthEventsFacade.storeHealthEvents(new StoreHealthEventsCommand(eventEnvelopes, deviceId));
     }
 }

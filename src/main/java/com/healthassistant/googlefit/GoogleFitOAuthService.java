@@ -2,7 +2,6 @@ package com.healthassistant.googlefit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.healthassistant.config.AppProperties;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -70,16 +69,16 @@ class GoogleFitOAuthService {
         return response;
     }
 
-    @Data
-    private static class TokenResponse {
-        @JsonProperty("access_token")
-        private String accessToken;
-        
-        @JsonProperty("expires_in")
-        private Integer expiresIn;
-        
-        @JsonProperty("token_type")
-        private String tokenType;
+    private record TokenResponse(
+            @JsonProperty("access_token")
+            String accessToken,
+
+            @JsonProperty("expires_in")
+            Integer expiresIn,
+
+            @JsonProperty("token_type")
+            String tokenType
+    ) {
     }
 
     private record AccessTokenCache(String accessToken, Instant expiresAt) {

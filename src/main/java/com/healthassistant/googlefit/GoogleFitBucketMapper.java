@@ -14,23 +14,23 @@ import java.util.List;
 class GoogleFitBucketMapper {
 
     public List<GoogleFitBucketData> mapBuckets(GoogleFitAggregateResponse response) {
-        if (response == null || response.getBuckets() == null) {
+        if (response == null || response.buckets() == null) {
             return List.of();
         }
 
-        return response.getBuckets().stream()
+        return response.buckets().stream()
                 .map(this::mapBucket)
                 .toList();
     }
 
     private GoogleFitBucketData mapBucket(GoogleFitAggregateResponse.GoogleFitBucket bucket) {
-        Instant bucketStart = Instant.ofEpochMilli(bucket.getStartTimeMillis());
-        Instant bucketEnd = Instant.ofEpochMilli(bucket.getEndTimeMillis());
+        Instant bucketStart = Instant.ofEpochMilli(bucket.startTimeMillis());
+        Instant bucketEnd = Instant.ofEpochMilli(bucket.endTimeMillis());
 
         BucketDataExtractor extractor = new BucketDataExtractor();
-        
-        if (bucket.getDatasets() != null) {
-            bucket.getDatasets().forEach(dataset -> extractor.extractFromDataset(dataset));
+
+        if (bucket.datasets() != null) {
+            bucket.datasets().forEach(dataset -> extractor.extractFromDataset(dataset));
         }
 
         return new GoogleFitBucketData(
@@ -50,18 +50,18 @@ class GoogleFitBucketMapper {
         private final List<Integer> heartRates = new ArrayList<>();
 
         void extractFromDataset(GoogleFitAggregateResponse.GoogleFitBucket.Dataset dataset) {
-            String dataSourceId = dataset.getDataSourceId();
-            if (dataSourceId == null || dataset.getPoints() == null) {
+            String dataSourceId = dataset.dataSourceId();
+            if (dataSourceId == null || dataset.points() == null) {
                 return;
             }
 
-            dataset.getPoints().stream()
-                    .filter(point -> point.getValues() != null && !point.getValues().isEmpty())
+            dataset.points().stream()
+                    .filter(point -> point.values() != null && !point.values().isEmpty())
                     .forEach(point -> extractFromDataPoint(dataSourceId, point));
         }
 
         private void extractFromDataPoint(String dataSourceId, GoogleFitAggregateResponse.GoogleFitBucket.Dataset.DataPoint point) {
-            point.getValues().forEach(value -> {
+            point.values().forEach(value -> {
                 if (dataSourceId.contains("step_count")) {
                     steps = extractLongValue(value);
                 } else if (dataSourceId.contains("distance")) {
@@ -84,21 +84,21 @@ class GoogleFitBucketMapper {
     }
 
     private static Long extractLongValue(GoogleFitAggregateResponse.GoogleFitBucket.Dataset.DataPoint.Value value) {
-        if (value.getIntVal() != null) {
-            return value.getIntVal();
+        if (value.intVal() != null) {
+            return value.intVal();
         }
-        if (value.getFpVal() != null) {
-            return value.getFpVal().longValue();
+        if (value.fpVal() != null) {
+            return value.fpVal().longValue();
         }
         return null;
     }
 
     private static Double extractDoubleValue(GoogleFitAggregateResponse.GoogleFitBucket.Dataset.DataPoint.Value value) {
-        if (value.getFpVal() != null) {
-            return value.getFpVal();
+        if (value.fpVal() != null) {
+            return value.fpVal();
         }
-        if (value.getIntVal() != null) {
-            return value.getIntVal().doubleValue();
+        if (value.intVal() != null) {
+            return value.intVal().doubleValue();
         }
         return null;
     }

@@ -1,4 +1,4 @@
-package com.healthassistant.dailysummary;
+package com.healthassistant.dailysummary.api;
 
 import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @Slf4j
 class DailySummaryEventsListener {
 
-    private final GenerateDailySummaryCommandHandler commandHandler;
+    private final DailySummaryFacade dailySummaryFacade;
 
     @EventListener
     public void onEventsStored(EventsStoredEvent event) {
@@ -23,7 +23,7 @@ class DailySummaryEventsListener {
         for (LocalDate date : event.affectedDates()) {
             try {
                 log.debug("Regenerating daily summary for date: {}", date);
-                commandHandler.handle(GenerateDailySummaryCommand.forDate(date));
+                dailySummaryFacade.generateDailySummary(date);
                 log.debug("Successfully regenerated daily summary for date: {}", date);
             } catch (Exception e) {
                 log.error("Failed to regenerate daily summary for date: {}", date, e);

@@ -40,7 +40,7 @@ class DailySummaryController {
     ) {
         log.info("Retrieving daily summary for date: {}", date);
         return dailySummaryFacade.getDailySummary(date)
-                .map(summary -> ResponseEntity.ok(DailySummaryMapper.toResponse(summary)))
+                .map(summary -> ResponseEntity.ok(DailySummaryMapper.INSTANCE.toResponse(summary)))
                 .orElse(ResponseEntity.notFound().build());
     }
 }

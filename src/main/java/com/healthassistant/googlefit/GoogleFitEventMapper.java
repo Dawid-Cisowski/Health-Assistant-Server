@@ -25,9 +25,7 @@ class GoogleFitEventMapper {
     private static final String GOOGLE_FIT_ORIGIN = "google-fit";
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-    private static final DateTimeFormatter RFC3339_FORMATTER = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC);
     private static final String DEFAULT_USER_ID = "default";
-    private static final long ONE_MINUTE_MILLIS = 60_000L;
 
     List<StoreHealthEventsCommand.EventEnvelope> mapToEventEnvelopes(List<GoogleFitBucketData> buckets) {
         return buckets.stream()
@@ -208,7 +206,7 @@ class GoogleFitEventMapper {
 
         String idempotencyKey = String.format("google-fit|sleep|%s|%s",
                 DEFAULT_USER_ID,
-                session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
+                session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
@@ -236,7 +234,7 @@ class GoogleFitEventMapper {
         Instant end = session.getEndTime();
         
         if (start == null || end == null) {
-            log.warn("Walking session {} has missing start or end time", session.getId());
+            log.warn("Walking session {} has missing start or end time", session.id());
             return null;
         }
 
@@ -279,9 +277,9 @@ class GoogleFitEventMapper {
         ZonedDateTime walkEndPoland = end.atZone(POLAND_ZONE);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("sessionId", session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
-        if (session.getName() != null) {
-            payload.put("name", session.getName());
+        payload.put("sessionId", session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
+        if (session.name() != null) {
+            payload.put("name", session.name());
         }
         payload.put("start", walkStartPoland.format(ISO_FORMATTER));
         payload.put("end", walkEndPoland.format(ISO_FORMATTER));
@@ -306,7 +304,7 @@ class GoogleFitEventMapper {
 
         String idempotencyKey = String.format("google-fit|walking|%s|%s",
                 DEFAULT_USER_ID,
-                session.getId() != null ? session.getId() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
+                session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
@@ -328,11 +326,7 @@ class GoogleFitEventMapper {
             return true;
         }
 
-        if (d >= 20.0) {
-            return true;
-        }
-
-        return false;
+        return d >= 20.0;
     }
 }
 

@@ -1,7 +1,6 @@
 package com.healthassistant.security;
 
 import com.healthassistant.security.api.NonceCache;
-import com.healthassistant.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;

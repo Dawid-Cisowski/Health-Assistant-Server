@@ -1,5 +1,6 @@
 package com.healthassistant.dailysummary;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,8 @@ import java.util.Optional;
 public class DailySummaryService implements DailySummaryFacade {
 
     private final GenerateDailySummaryCommandHandler commandHandler;
-    private final DailySummaryRepository repository;
+    private final DailySummaryJpaRepository jpaRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     public DailySummary generateDailySummary(LocalDate date) {
@@ -22,6 +24,7 @@ public class DailySummaryService implements DailySummaryFacade {
 
     @Override
     public Optional<DailySummary> getDailySummary(LocalDate date) {
-        return repository.findByDate(date);
+        return jpaRepository.findByDate(date)
+                .map(entity -> objectMapper.convertValue(entity.getSummary(), DailySummary.class));
     }
 }

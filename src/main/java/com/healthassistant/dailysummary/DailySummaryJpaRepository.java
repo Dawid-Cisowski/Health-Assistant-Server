@@ -10,5 +10,4 @@ import java.util.Optional;
 public interface DailySummaryJpaRepository extends JpaRepository<DailySummaryJpaEntity, Long> {
     Optional<DailySummaryJpaEntity> findByDate(LocalDate date);
 
-    boolean existsByDate(LocalDate date);
 }

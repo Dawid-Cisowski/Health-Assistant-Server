@@ -9,8 +9,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-// TODO: FAZA 4/5 - Make package-private when projectors become listeners
-public record Event(IdempotencyKey idempotencyKey,
+record Event(IdempotencyKey idempotencyKey,
              EventType eventType,
              Instant occurredAt,
              Map<String, Object> payload,

@@ -1,33 +1,31 @@
 package com.healthassistant.googlefit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Getter;
 
 import java.time.Instant;
 
-@Getter
-public class GoogleFitSession {
-    @JsonProperty("id")
-    private String id;
+public record GoogleFitSession(
+        @JsonProperty("id")
+        String id,
 
-    @JsonProperty("name")
-    private String name;
+        @JsonProperty("name")
+        String name,
 
-    @JsonProperty("activityType")
-    private Integer activityType;
+        @JsonProperty("activityType")
+        Integer activityType,
 
-    @JsonProperty("startTimeMillis")
-    private Long startTimeMillis;
+        @JsonProperty("startTimeMillis")
+        Long startTimeMillis,
 
-    @JsonProperty("endTimeMillis")
-    private Long endTimeMillis;
+        @JsonProperty("endTimeMillis")
+        Long endTimeMillis,
 
-    @JsonProperty("packageName")
-    private String packageName;
+        @JsonProperty("packageName")
+        String packageName,
 
-    @JsonProperty("application")
-    private Application application;
-
+        @JsonProperty("application")
+        Application application
+) {
     public Instant getStartTime() {
         return startTimeMillis != null ? Instant.ofEpochMilli(startTimeMillis) : null;
     }
@@ -37,8 +35,8 @@ public class GoogleFitSession {
     }
 
     public String getPackageName() {
-        if (application != null && application.packageName != null) {
-            return application.packageName;
+        if (application != null && application.packageName() != null) {
+            return application.packageName();
         }
         return packageName;
     }
@@ -51,10 +49,10 @@ public class GoogleFitSession {
         return activityType != null && activityType == 108;
     }
 
-    @Getter
-    public static class Application {
-        @JsonProperty("packageName")
-        private String packageName;
+    public record Application(
+            @JsonProperty("packageName")
+            String packageName
+    ) {
     }
 }
 

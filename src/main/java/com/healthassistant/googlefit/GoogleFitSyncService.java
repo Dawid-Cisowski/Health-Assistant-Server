@@ -65,8 +65,8 @@ class GoogleFitSyncService implements GoogleFitFacade {
             String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
             String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
             var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
-            List<GoogleFitSession> allSessions = sessionsResponse.getSessions() != null
-                    ? sessionsResponse.getSessions()
+            List<GoogleFitSession> allSessions = sessionsResponse.sessions() != null
+                    ? sessionsResponse.sessions()
                     : List.of();
 
             List<GoogleFitSession> sleepSessions = allSessions.stream()
@@ -117,17 +117,17 @@ class GoogleFitSyncService implements GoogleFitFacade {
     }
 
     private static GoogleFitClient.AggregateRequest getAggregateRequest(Instant from, Instant to) {
-        var request = new GoogleFitClient.AggregateRequest();
-        request.setAggregateBy(List.of(
-                new GoogleFitClient.DataTypeAggregate("com.google.step_count.delta"),
-                new GoogleFitClient.DataTypeAggregate("com.google.distance.delta"),
-                new GoogleFitClient.DataTypeAggregate("com.google.calories.expended"),
-                new GoogleFitClient.DataTypeAggregate("com.google.heart_rate.bpm")
-        ));
-        request.setBucketByTime(new GoogleFitClient.BucketByTime(60000L));
-        request.setStartTimeMillis(from.toEpochMilli());
-        request.setEndTimeMillis(to.toEpochMilli());
-        return request;
+        return new GoogleFitClient.AggregateRequest(
+                List.of(
+                        new GoogleFitClient.DataTypeAggregate("com.google.step_count.delta"),
+                        new GoogleFitClient.DataTypeAggregate("com.google.distance.delta"),
+                        new GoogleFitClient.DataTypeAggregate("com.google.calories.expended"),
+                        new GoogleFitClient.DataTypeAggregate("com.google.heart_rate.bpm")
+                ),
+                new GoogleFitClient.BucketByTime(60000L),
+                from.toEpochMilli(),
+                to.toEpochMilli()
+        );
     }
 
     private Instant getSyncFromTime(Instant now) {
@@ -228,8 +228,8 @@ class GoogleFitSyncService implements GoogleFitFacade {
         String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
         String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
         var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
-        List<GoogleFitSession> allSessions = sessionsResponse.getSessions() != null
-                ? sessionsResponse.getSessions()
+        List<GoogleFitSession> allSessions = sessionsResponse.sessions() != null
+                ? sessionsResponse.sessions()
                 : List.of();
 
         List<GoogleFitSession> sleepSessions = allSessions.stream()

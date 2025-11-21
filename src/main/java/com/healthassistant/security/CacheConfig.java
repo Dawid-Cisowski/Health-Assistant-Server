@@ -1,6 +1,7 @@
-package com.healthassistant.config;
+package com.healthassistant.security;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.healthassistant.config.AppProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -11,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 
 @Configuration
 @EnableCaching
-public class CacheConfig {
+class CacheConfig {
 
     public static final String NONCE_CACHE = "nonces";
 

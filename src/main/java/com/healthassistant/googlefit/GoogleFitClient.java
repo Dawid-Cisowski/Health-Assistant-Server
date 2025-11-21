@@ -2,10 +2,9 @@ package com.healthassistant.googlefit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import feign.RequestInterceptor;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,43 +29,35 @@ public interface GoogleFitClient {
             @RequestParam(value = "includeDeleted", defaultValue = "false") boolean includeDeleted
     );
 
-    @Data
-    class AggregateRequest {
-        @JsonProperty("aggregateBy")
-        private List<DataTypeAggregate> aggregateBy;
+    record AggregateRequest(
+            @JsonProperty("aggregateBy")
+            List<DataTypeAggregate> aggregateBy,
 
-        @JsonProperty("bucketByTime")
-        private BucketByTime bucketByTime;
+            @JsonProperty("bucketByTime")
+            BucketByTime bucketByTime,
 
-        @JsonProperty("startTimeMillis")
-        private Long startTimeMillis;
+            @JsonProperty("startTimeMillis")
+            Long startTimeMillis,
 
-        @JsonProperty("endTimeMillis")
-        private Long endTimeMillis;
+            @JsonProperty("endTimeMillis")
+            Long endTimeMillis
+    ) {
     }
 
-    @Data
-    class DataTypeAggregate {
-        @JsonProperty("dataTypeName")
-        private String dataTypeName;
-
-        public DataTypeAggregate(String dataTypeName) {
-            this.dataTypeName = dataTypeName;
-        }
+    record DataTypeAggregate(
+            @JsonProperty("dataTypeName")
+            String dataTypeName
+    ) {
     }
 
-    @Data
-    class BucketByTime {
-        @JsonProperty("durationMillis")
-        private Long durationMillis;
-
-        public BucketByTime(Long durationMillis) {
-            this.durationMillis = durationMillis;
-        }
+    record BucketByTime(
+            @JsonProperty("durationMillis")
+            Long durationMillis
+    ) {
     }
 
-    @org.springframework.context.annotation.Configuration
-    static class FeignConfig {
+    @Configuration
+    class FeignConfig {
         private final GoogleFitOAuthService oAuthService;
 
         FeignConfig(GoogleFitOAuthService oAuthService) {
