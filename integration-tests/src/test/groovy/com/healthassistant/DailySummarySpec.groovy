@@ -15,6 +15,9 @@ import java.time.format.DateTimeFormatter
 @Title("Feature: Daily Summary")
 class DailySummarySpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-device"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     def "Scenario 1: Get daily summary after sync with multiple event types"() {
         given: "authenticated device"
         def deviceId = "test-device"
@@ -36,8 +39,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         // First sync with steps, distance, calories
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime1, endTime1, 742, 1000.5, 62.5, 75))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -45,8 +47,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         // Second sync with more steps
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -54,8 +55,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         // Third sync with heart rate
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime3, endTime3, 0, 0, 0, 78))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -96,8 +96,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         and: "sync data"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -151,8 +150,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 742))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -164,8 +162,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync again"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -219,8 +216,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def endTime1 = summaryZoned.plusHours(8).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 500))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -230,8 +226,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def endTime2 = summaryZoned.plusHours(14).toInstant().toEpochMilli()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -266,8 +261,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(walkStart, walkEnd, 5000, 3000.0, 150.0, 80))
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -335,12 +329,10 @@ class DailySummarySpec extends BaseIntegrationSpec {
         ]
 
         when: "I submit workout event"
-        def submitResponse = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body([
+        def submitResponse = authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
                     events: [workoutEvent],
                     deviceId: deviceId
-                ])
+                ]))
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -384,8 +376,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -427,12 +418,10 @@ class DailySummarySpec extends BaseIntegrationSpec {
         ]
 
         when: "I submit sleep event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body([
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
                     events: [sleepEvent],
                     deviceId: deviceId
-                ])
+                ]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -496,12 +485,10 @@ class DailySummarySpec extends BaseIntegrationSpec {
         ]
 
         when: "I submit both sleep events"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body([
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
                     events: [nightSleepEvent, napEvent],
                     deviceId: deviceId
-                ])
+                ]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -554,12 +541,10 @@ class DailySummarySpec extends BaseIntegrationSpec {
         ]
 
         when: "I submit activity event without sleep"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body([
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
                     events: [stepsEvent],
                     deviceId: deviceId
-                ])
+                ]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -592,8 +577,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def day1Time = startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(10).toInstant()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day1Time.toEpochMilli(), day1Time.plusSeconds(3600).toEpochMilli(), 5000))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -609,9 +593,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
                 originPackage: "com.google.android.apps.fitness"
             ]
         ]
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body([events: [sleepEvent1], deviceId: deviceId])
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [sleepEvent1], deviceId: deviceId]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -620,8 +602,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def day2Time = midDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(14).toInstant()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day2Time.toEpochMilli(), day2Time.plusSeconds(3600).toEpochMilli(), 8000))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -640,9 +621,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
                 healthRating: "HEALTHY"
             ]
         ]
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body([events: [mealEvent1], deviceId: deviceId])
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [mealEvent1], deviceId: deviceId]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -651,8 +630,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def day3Time = endDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(9).toInstant()
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day3Time.toEpochMilli(), day3Time.plusSeconds(3600).toEpochMilli(), 3000))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -678,9 +656,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
                 ]
             ]
         ]
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body([events: [workoutEvent], deviceId: deviceId])
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [workoutEvent], deviceId: deviceId]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)

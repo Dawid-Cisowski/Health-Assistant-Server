@@ -7,6 +7,7 @@ import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,11 +33,13 @@ class HealthEventsController {
     @PostMapping
     @Operation(
             summary = "Submit health events",
-            description = "Accepts health events from mobile applications (workouts, nutrition, custom metrics, etc.)"
+            description = "Accepts health events from mobile applications (workouts, nutrition, custom metrics, etc.). Requires HMAC authentication.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Events processed"),
             @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed"),
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     public ResponseEntity<SubmitHealthEventsResponse> submitHealthEvents(

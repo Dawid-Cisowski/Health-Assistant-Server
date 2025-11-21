@@ -15,6 +15,9 @@ import java.time.LocalDate
 @Title("Feature: Sleep Projections and Query API")
 class SleepProjectionSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-device"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     @Autowired
     SleepDailyProjectionJpaRepository dailyProjectionRepository
 
@@ -52,9 +55,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the sleep event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -118,9 +119,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit both sleep events"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -177,9 +176,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "events are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -257,9 +254,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "events are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -337,9 +332,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "events are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -384,9 +377,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit zero-duration event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -444,9 +435,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "events are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -496,16 +485,12 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the same event twice"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -555,9 +540,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -615,9 +598,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit all three events"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -665,9 +646,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)

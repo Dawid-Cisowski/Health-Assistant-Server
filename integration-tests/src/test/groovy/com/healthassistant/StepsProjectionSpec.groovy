@@ -16,6 +16,9 @@ import java.time.ZoneId
 @Title("Feature: Steps Projections and Query API")
 class StepsProjectionSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-device"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     @Autowired
     StepsDailyProjectionJpaRepository dailyProjectionRepository
 
@@ -52,9 +55,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the steps event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -109,9 +110,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit multiple events"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -174,9 +173,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit steps for different hours"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -235,9 +232,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "events are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -317,9 +312,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "events are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -373,9 +366,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit zero-step event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -434,9 +425,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "events are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -488,16 +477,12 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the same event twice"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -555,9 +540,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit both events"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -596,9 +579,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit first event for hour 10"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request1)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request1)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -627,9 +608,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         }
         """
 
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request2)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request2)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -676,9 +655,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)

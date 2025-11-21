@@ -39,7 +39,8 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String path = request.getRequestURI();
 
-        if (!path.startsWith("/v1/daily-summaries")) {
+        // Check if path requires HMAC authentication
+        if (!requiresAuthentication(path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -49,9 +50,19 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             request.setAttribute("deviceId", deviceId.value());
             filterChain.doFilter(request, response);
         } catch (HmacAuthenticationException e) {
-            log.warn("HMAC authentication failed: {}", e.getMessage());
+            log.warn("HMAC authentication failed for path {}: {}", path, e.getMessage());
             sendErrorResponse(response, e.getMessage());
         }
+    }
+
+    private boolean requiresAuthentication(String path) {
+        // All mobile app endpoints require HMAC authentication
+        return path.startsWith("/v1/health-events")
+            || path.startsWith("/v1/daily-summaries")
+            || path.startsWith("/v1/google-fit/sync")
+            || path.startsWith("/v1/steps")
+            || path.startsWith("/v1/workouts")
+            || path.startsWith("/v1/sleep");
     }
 
     private DeviceId validateHmacAuthentication(HttpServletRequest request)

@@ -17,6 +17,9 @@ import java.time.LocalDate
 @Title("Feature: Workout Projections and Query API")
 class WorkoutProjectionSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-device"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     @Autowired
     WorkoutProjectionJpaRepository workoutProjectionRepository
 
@@ -43,9 +46,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent(workoutId))
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -80,17 +81,13 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent(workoutId))
 
         and: "I submit the workout event first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
         when: "I submit the same workout event again"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -120,9 +117,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit both workout events"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -171,9 +166,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(event)
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -212,9 +205,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(event)
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -259,9 +250,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(event)
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -282,9 +271,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent(workoutId))
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -304,9 +291,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent(workoutId))
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -343,15 +328,13 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent(workoutId))
 
         and: "workout is submitted and projected"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
         when: "I query workout details via API"
-        def response = RestAssured.given()
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/workouts/${workoutId}")
                 .get("/v1/workouts/${workoutId}")
                 .then()
                 .statusCode(200)
@@ -385,15 +368,13 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         """
 
         and: "all workouts are submitted"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
         when: "I query workouts in date range"
-        def response = RestAssured.given()
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/workouts?from=2025-11-16&to=2025-11-19")
                 .param("from", "2025-11-16")
                 .param("to", "2025-11-19")
                 .get("/v1/workouts")
@@ -435,9 +416,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(event)
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -449,7 +428,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
 
     def "Scenario 12: Query API returns 404 for non-existent workout"() {
         when: "I query non-existent workout"
-        RestAssured.given()
+        authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/workouts/nonexistent-id")
                 .get("/v1/workouts/nonexistent-id")
                 .then()
                 .statusCode(404)

@@ -27,7 +27,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 1: Manual sync trigger returns success response"() {
-        given: "mock Google Fit API response"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API response"
         def now = Instant.now()
         def startTime = now.minusSeconds(900).toEpochMilli() // 15 minutes ago
         def endTime = now.toEpochMilli()
@@ -35,8 +39,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger manual sync"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .extract()
@@ -51,7 +54,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 2: Sync stores events in database"() {
-        given: "mock Google Fit API response with steps data"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API response with steps data"
         def now = Instant.now()
         // Use time from beginning of today (Poland timezone) to ensure sync picks it up
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
@@ -63,8 +70,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -76,13 +82,16 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 3: Sync updates lastSyncedAt timestamp"() {
-        given: "mock empty Google Fit API response"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock empty Google Fit API response"
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -94,7 +103,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 4: Multiple syncs overwrite events with same idempotency key"() {
-        given: "mock Google Fit API response with steps data"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API response with steps data"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -104,8 +117,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -115,8 +127,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
         and: "I trigger sync second time with same data"
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 1000))
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -132,7 +143,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 5: Sync generates daily summary for today"() {
-        given: "today's date"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "today's date"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
 
         and: "mock Google Fit API response with steps data for today"
@@ -143,8 +158,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -155,13 +169,16 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 6: Sync handles empty response from Google Fit API gracefully"() {
-        given: "mock empty Google Fit API response"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock empty Google Fit API response"
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .extract()
@@ -175,7 +192,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 7: Sync processes different event types correctly"() {
-        given: "mock Google Fit API response with multiple data types"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API response with multiple data types"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -185,8 +206,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -202,12 +222,15 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 8: Sync handles errors gracefully"() {
-        given: "mock Google Fit API returning 500 error"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API returning 500 error"
         setupGoogleFitApiMockError(500, '{"error": "Internal Server Error"}')
 
         when: "I trigger sync"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .extract()
@@ -220,7 +243,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 9: Events stored via sync have correct device ID"() {
-        given: "mock Google Fit API response with steps data"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API response with steps data"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -230,8 +257,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -244,7 +270,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 10: Sync updates daily summary when new events arrive"() {
-        given: "today's date"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "today's date"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
 
         and: "initial sync with steps data"
@@ -254,8 +284,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 500))
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
         
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -269,8 +298,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync again"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -281,7 +309,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 11: Sync stores sleep session events from Google Fit Sessions API"() {
-        given: "mock Google Fit API responses with sleep session"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with sleep session"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -295,8 +327,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(startTimeMillis, endTimeMillis, "sleep-123"))
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -320,7 +351,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 12: Sync handles multiple sleep sessions correctly"() {
-        given: "mock Google Fit API responses with multiple sleep sessions"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with multiple sleep sessions"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -355,8 +390,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(sessionsResponse)
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -372,7 +406,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 13: Sync filters out non-sleep sessions from Google Fit Sessions API"() {
-        given: "mock Google Fit API responses with mixed session types"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with mixed session types"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -407,8 +445,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(sessionsResponse)
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -424,13 +461,16 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 14: Sync handles empty sleep sessions response gracefully"() {
-        given: "mock Google Fit API responses with no sleep sessions"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with no sleep sessions"
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -442,7 +482,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 15: Sync overwrites sleep sessions with same idempotency key"() {
-        given: "mock Google Fit API responses with same sleep session"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with same sleep session"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -454,8 +498,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(sleepStart, sleepEnd, sessionId))
 
         when: "I trigger sync first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -466,8 +509,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         and: "I trigger sync second time with updated sleep session"
         def updatedSleepEnd = todayStart.plusSeconds(3600 * 6).toEpochMilli()
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithSleep(sleepStart, updatedSleepEnd, sessionId))
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -484,7 +526,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 16: Historical sync processes multiple days correctly"() {
-        given: "mock Google Fit API responses for multiple days (same response for all calls)"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses for multiple days (same response for all calls)"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
         def day1Start = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
         def day1End = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
@@ -495,8 +541,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMockMultipleTimes(createEmptyGoogleFitSessionsResponse(), 2)
 
         when: "I trigger historical sync for 2 days"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=2")
                 .post("/v1/google-fit/sync/history?days=2")
                 .then()
                 .extract()
@@ -512,13 +557,16 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 17: Historical sync handles empty days gracefully"() {
-        given: "mock Google Fit API responses with no data (will be called multiple times)"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with no data (will be called multiple times)"
         setupGoogleFitApiMockMultipleTimes(createEmptyGoogleFitResponse(), 3)
         setupGoogleFitSessionsApiMockMultipleTimes(createEmptyGoogleFitSessionsResponse(), 3)
 
         when: "I trigger historical sync for 3 days"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=3")
                 .post("/v1/google-fit/sync/history?days=3")
                 .then()
                 .extract()
@@ -534,9 +582,12 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 18: Historical sync validates days parameter"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
         when: "I trigger historical sync with invalid days parameter"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=0")
                 .post("/v1/google-fit/sync/history?days=0")
                 .then()
                 .extract()
@@ -551,7 +602,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 19: Historical sync processes sleep sessions for each day"() {
-        given: "mock Google Fit API responses with sleep sessions for multiple days"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with sleep sessions for multiple days"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
         def day1Start = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
         def day1SleepStart = day1Start.minusSeconds(3600 * 9).toEpochMilli()
@@ -561,8 +616,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMockMultipleTimes(createGoogleFitSessionsResponseWithSleep(day1SleepStart, day1SleepEnd, "sleep-day1"), 1)
 
         when: "I trigger historical sync for 1 day"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=1")
                 .post("/v1/google-fit/sync/history?days=1")
                 .then()
                 .extract()
@@ -577,7 +631,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 20: Historical sync overwrites events with same idempotency key"() {
-        given: "mock Google Fit API responses with steps data"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with steps data"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
         def dayStart = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
         def dayEnd = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
@@ -586,8 +644,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMockMultipleTimes(createEmptyGoogleFitSessionsResponse(), 1)
 
         when: "I trigger historical sync first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=1")
                 .post("/v1/google-fit/sync/history?days=1")
                 .then()
                 .statusCode(200)
@@ -597,8 +654,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
         and: "I trigger historical sync second time with updated data"
         setupGoogleFitApiMockMultipleTimes(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 800), 1)
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=1")
                 .post("/v1/google-fit/sync/history?days=1")
                 .then()
                 .statusCode(200)
@@ -618,7 +674,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 22: Sync overwrites walking sessions with same idempotency key"() {
-        given: "mock Google Fit API responses with walking session"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with walking session"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
         def walkStart = todayStart.plusHours(10).toInstant().toEpochMilli()
@@ -629,8 +689,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(walkStart, walkEnd, 5000, 3000.0, 150.0, 80))
 
         when: "I trigger sync first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -643,8 +702,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         and: "I trigger sync second time with updated walking session"
         setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, sessionId))
         setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(walkStart, walkEnd, 8000, 5000.0, 250.0, 85))
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -667,7 +725,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 23: Mixed batch with some events to overwrite and some new events"() {
-        given: "mock Google Fit API responses with steps data"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses with steps data"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -680,8 +742,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -722,8 +783,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         }
         """
         setupGoogleFitApiMock(responseBody)
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)
@@ -746,9 +806,12 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 21: Historical sync validates upper bound for days parameter"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
         when: "I trigger historical sync with days > 365"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=366")
                 .post("/v1/google-fit/sync/history?days=366")
                 .then()
                 .extract()
@@ -763,13 +826,16 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 22: Historical sync uses default value when days parameter is missing"() {
-        given: "mock Google Fit API responses"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses"
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger historical sync without days parameter"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history")
                 .post("/v1/google-fit/sync/history")
                 .then()
                 .extract()
@@ -784,7 +850,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 23: Historical sync handles partial failures correctly"() {
-        given: "mock Google Fit API responses - first day succeeds, second fails"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API responses - first day succeeds, second fails"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
         def day1Start = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
         def day1End = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
@@ -793,8 +863,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger historical sync for 2 days"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=2")
                 .post("/v1/google-fit/sync/history?days=2")
                 .then()
                 .extract()
@@ -809,7 +878,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 24: Sync handles Sessions API errors gracefully"() {
-        given: "mock Google Fit API - aggregate succeeds but sessions fails"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API - aggregate succeeds but sessions fails"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -820,8 +893,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMockError(500, '{"error": "Sessions API Error"}')
 
         when: "I trigger sync"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .extract()
@@ -833,13 +905,16 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 25: Sync handles OAuth token refresh errors gracefully"() {
-        given: "mock OAuth endpoint returning error"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock OAuth endpoint returning error"
         setupOAuthMockError(401, '{"error": "invalid_grant"}')
         setupGoogleFitApiMock(createEmptyGoogleFitResponse())
 
         when: "I trigger sync"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .extract()
@@ -851,7 +926,11 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 26: Events have occurredAt set to bucket end time"() {
-        given: "mock Google Fit API response with steps data"
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "mock Google Fit API response with steps data"
         def todayStart = LocalDate.now(ZoneId.of("Europe/Warsaw"))
                 .atStartOfDay(ZoneId.of("Europe/Warsaw"))
                 .toInstant()
@@ -862,8 +941,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
 
         when: "I trigger sync"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
+        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
                 .post("/v1/google-fit/sync")
                 .then()
                 .statusCode(200)

@@ -12,14 +12,15 @@ import java.time.Instant
 @Title("Feature: Meal Event Ingestion via Health Events API")
 class MealEventSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-device"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     def "Scenario 1: Submit valid meal event returns success"() {
         given: "a valid meal event request"
         def request = createHealthEventsRequest(createMealEvent("Grilled chicken with rice", "LUNCH"))
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -44,9 +45,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createMealEvent("Oatmeal with berries", "BREAKFAST"))
 
         when: "I submit the meal event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -74,21 +73,33 @@ class MealEventSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 3: Duplicate meal event returns duplicate status"() {
-        given: "a valid meal event request"
-        def request = createHealthEventsRequest(createMealEvent("Salmon salad", "DINNER"))
+        given: "a valid meal event request with explicit idempotency key"
+        def event = """
+        {
+            "idempotencyKey": "meal-test-2025-11-21-1",
+            "type": "MealRecorded.v1",
+            "occurredAt": "2025-11-21T12:00:00Z",
+            "payload": {
+                "title": "Salmon salad",
+                "mealType": "DINNER",
+                "caloriesKcal": 350,
+                "proteinGrams": 12,
+                "fatGrams": 8,
+                "carbohydratesGrams": 55,
+                "healthRating": "HEALTHY"
+            }
+        }
+        """
+        def request = createHealthEventsRequest(event)
 
         and: "I submit the meal event first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
         when: "I submit the same meal event again"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -100,7 +111,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def body = response.body().jsonPath()
         body.getString("status") == "success"
         def events = body.getList("events")
-        events[0].status == "duplicate"
+        events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
         def dbEvents = eventRepository.findAll()
@@ -131,9 +142,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -172,9 +181,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -213,9 +220,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -255,9 +260,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -297,9 +300,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -339,9 +340,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -371,9 +370,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit all meal events"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -406,9 +403,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit all meal types"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -440,9 +435,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit all health ratings"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -484,9 +477,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -528,9 +519,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the meal event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)

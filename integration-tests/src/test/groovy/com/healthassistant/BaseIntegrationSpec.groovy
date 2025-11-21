@@ -398,6 +398,34 @@ abstract class BaseIntegrationSpec extends Specification {
                 .header("X-Signature", signature)
     }
 
+    def authenticatedPostRequest(String deviceId, String secretBase64, String path) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, "", secretBase64)
+
+        return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+    }
+
+    def authenticatedPostRequestWithBody(String deviceId, String secretBase64, String path, String body) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        // Note: body is not included in signature as per server implementation
+        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, "", secretBase64)
+
+        return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+                .body(body)
+    }
+
 
     String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z") {
         return """

@@ -12,14 +12,15 @@ import java.time.Instant
 @Title("Feature: Workout Event Ingestion via Health Events API")
 class WorkoutSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-device"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     def "Scenario 1: Submit valid workout event returns success"() {
         given: "a valid workout event request"
         def request = createHealthEventsRequest(createWorkoutEvent("gymrun-2025-11-17-1"))
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -44,9 +45,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent("gymrun-2025-11-17-2"))
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -76,17 +75,13 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent("gymrun-2025-11-17-3"))
 
         and: "I submit the workout event first time"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
         when: "I submit the same workout event again"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -136,9 +131,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -159,9 +152,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequestFromMap([event])
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -206,9 +197,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -253,9 +242,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -301,9 +288,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -324,9 +309,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createWorkoutEvent(workoutId))
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -352,9 +335,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit all workout events"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -402,9 +383,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -425,9 +404,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = createHealthEventsRequest(createComplexWorkoutEvent("gymrun-2025-11-17-12"))
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -483,9 +460,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
@@ -533,9 +508,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
@@ -589,9 +562,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the workout event"
-        def response = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(request)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .extract()
