@@ -44,6 +44,7 @@ class EventValidator {
             case "ActiveMinutesRecorded.v1" -> validateActiveMinutes(payload, errors);
             case "WalkingSessionRecorded.v1" -> validateWalkingSession(payload, errors);
             case "WorkoutRecorded.v1" -> validateWorkout(payload, errors);
+            case "MealRecorded.v1" -> validateMeal(payload, errors);
         }
     }
 
@@ -100,6 +101,29 @@ class EventValidator {
 
         IntStream.range(0, exercises.size())
                 .forEach(i -> validateExercise(exercises.get(i), i, errors));
+    }
+
+    private void validateMeal(Map<String, Object> payload, List<EventValidationError> errors) {
+        requireFields(payload, errors, "title", "mealType", "caloriesKcal", "proteinGrams", "fatGrams", "carbohydratesGrams", "healthRating");
+        validateNonNegative(payload, errors, "caloriesKcal", "proteinGrams", "fatGrams", "carbohydratesGrams");
+
+        // Validate mealType enum
+        if (payload.containsKey("mealType") && payload.get("mealType") != null) {
+            String mealType = payload.get("mealType").toString();
+            List<String> validMealTypes = List.of("BREAKFAST", "BRUNCH", "LUNCH", "DINNER", "SNACK", "DESSERT", "DRINK");
+            if (!validMealTypes.contains(mealType)) {
+                errors.add(EventValidationError.invalidValue("mealType", "must be one of: " + String.join(", ", validMealTypes)));
+            }
+        }
+
+        // Validate healthRating enum
+        if (payload.containsKey("healthRating") && payload.get("healthRating") != null) {
+            String healthRating = payload.get("healthRating").toString();
+            List<String> validHealthRatings = List.of("VERY_HEALTHY", "HEALTHY", "NEUTRAL", "UNHEALTHY", "VERY_UNHEALTHY");
+            if (!validHealthRatings.contains(healthRating)) {
+                errors.add(EventValidationError.invalidValue("healthRating", "must be one of: " + String.join(", ", validHealthRatings)));
+            }
+        }
     }
 
     private void validateExercise(Object exerciseObj, int index, List<EventValidationError> errors) {

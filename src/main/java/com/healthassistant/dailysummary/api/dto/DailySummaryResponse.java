@@ -42,6 +42,14 @@ public class DailySummaryResponse {
     @Schema(description = "Heart rate metrics")
     private Heart heart;
 
+    @JsonProperty("nutrition")
+    @Schema(description = "Daily nutrition summary")
+    private Nutrition nutrition;
+
+    @JsonProperty("meals")
+    @Schema(description = "List of meals consumed during the day")
+    private List<Meal> meals;
+
     @Getter
     @Builder
     @NoArgsConstructor
@@ -155,5 +163,71 @@ public class DailySummaryResponse {
         @JsonProperty("maxBpm")
         @Schema(description = "Maximum heart rate in BPM", example = "138", nullable = true)
         private Integer maxBpm;
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "Daily nutrition summary")
+    public static class Nutrition {
+        @JsonProperty("totalCalories")
+        @Schema(description = "Total calories consumed in kcal", example = "2400", nullable = true)
+        private Integer totalCalories;
+
+        @JsonProperty("totalProtein")
+        @Schema(description = "Total protein consumed in grams", example = "120", nullable = true)
+        private Integer totalProtein;
+
+        @JsonProperty("totalFat")
+        @Schema(description = "Total fat consumed in grams", example = "80", nullable = true)
+        private Integer totalFat;
+
+        @JsonProperty("totalCarbs")
+        @Schema(description = "Total carbohydrates consumed in grams", example = "250", nullable = true)
+        private Integer totalCarbs;
+
+        @JsonProperty("mealCount")
+        @Schema(description = "Number of meals consumed", example = "5", nullable = true)
+        private Integer mealCount;
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "Meal information")
+    public static class Meal {
+        @JsonProperty("title")
+        @Schema(description = "Meal title/name", example = "Grilled chicken with rice", nullable = true)
+        private String title;
+
+        @JsonProperty("mealType")
+        @Schema(description = "Type of meal", example = "LUNCH", nullable = true)
+        private String mealType;
+
+        @JsonProperty("caloriesKcal")
+        @Schema(description = "Calories in kcal", example = "650", nullable = true)
+        private Integer caloriesKcal;
+
+        @JsonProperty("proteinGrams")
+        @Schema(description = "Protein in grams", example = "45", nullable = true)
+        private Integer proteinGrams;
+
+        @JsonProperty("fatGrams")
+        @Schema(description = "Fat in grams", example = "20", nullable = true)
+        private Integer fatGrams;
+
+        @JsonProperty("carbohydratesGrams")
+        @Schema(description = "Carbohydrates in grams", example = "60", nullable = true)
+        private Integer carbohydratesGrams;
+
+        @JsonProperty("healthRating")
+        @Schema(description = "Health rating of the meal", example = "HEALTHY", nullable = true)
+        private String healthRating;
+
+        @JsonProperty("occurredAt")
+        @Schema(description = "Time when the meal was consumed (ISO-8601 UTC)", example = "2025-11-12T12:30:00Z", nullable = true)
+        private Instant occurredAt;
     }
 }

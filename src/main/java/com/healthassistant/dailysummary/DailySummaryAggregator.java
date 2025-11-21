@@ -37,6 +37,8 @@ class DailySummaryAggregator {
         List<DailySummary.Workout> workouts = aggregateWorkouts(events);
         List<DailySummary.Sleep> sleep = aggregateSleep(events);
         DailySummary.Heart heart = aggregateHeart(events);
+        DailySummary.Nutrition nutrition = aggregateNutrition(events);
+        List<DailySummary.Meal> meals = aggregateMeals(events);
 
         return new DailySummary(
                 date,
@@ -44,7 +46,9 @@ class DailySummaryAggregator {
                 exercises,
                 workouts,
                 sleep,
-                heart
+                heart,
+                nutrition,
+                meals
         );
     }
 
@@ -225,6 +229,71 @@ class DailySummaryAggregator {
                 heartRates.stream().mapToInt(Integer::intValue).min().orElse(0);
 
         return new DailySummary.Heart(restingBpm, avgBpm, maxHr);
+    }
+
+    private DailySummary.Nutrition aggregateNutrition(List<HealthEventJpaEntity> events) {
+        int totalCalories = 0;
+        int totalProtein = 0;
+        int totalFat = 0;
+        int totalCarbs = 0;
+        int mealCount = 0;
+
+        for (HealthEventJpaEntity event : events) {
+            if ("MealRecorded.v1".equals(event.getEventType())) {
+                Map<String, Object> payload = event.getPayload();
+
+                totalCalories += getInteger(payload, "caloriesKcal", 0);
+                totalProtein += getInteger(payload, "proteinGrams", 0);
+                totalFat += getInteger(payload, "fatGrams", 0);
+                totalCarbs += getInteger(payload, "carbohydratesGrams", 0);
+                mealCount++;
+            }
+        }
+
+        return new DailySummary.Nutrition(
+                nullIfZero(totalCalories),
+                nullIfZero(totalProtein),
+                nullIfZero(totalFat),
+                nullIfZero(totalCarbs),
+                nullIfZero(mealCount)
+        );
+    }
+
+    private List<DailySummary.Meal> aggregateMeals(List<HealthEventJpaEntity> events) {
+        return events.stream()
+                .filter(e -> "MealRecorded.v1".equals(e.getEventType()))
+                .map(this::toMeal)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private DailySummary.Meal toMeal(HealthEventJpaEntity event) {
+        Map<String, Object> payload = event.getPayload();
+
+        try {
+            String title = getString(payload, "title");
+            String mealType = getString(payload, "mealType");
+            Integer caloriesKcal = getInteger(payload, "caloriesKcal");
+            Integer proteinGrams = getInteger(payload, "proteinGrams");
+            Integer fatGrams = getInteger(payload, "fatGrams");
+            Integer carbohydratesGrams = getInteger(payload, "carbohydratesGrams");
+            String healthRating = getString(payload, "healthRating");
+            Instant occurredAt = event.getOccurredAt();
+
+            return new DailySummary.Meal(
+                    title,
+                    mealType,
+                    caloriesKcal,
+                    proteinGrams,
+                    fatGrams,
+                    carbohydratesGrams,
+                    healthRating,
+                    occurredAt
+            );
+        } catch (Exception e) {
+            log.warn("Failed to convert event to meal: {}", e.getMessage());
+            return null;
+        }
     }
 
 

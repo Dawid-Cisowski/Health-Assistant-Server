@@ -56,25 +56,23 @@ docker rm postgres-dev
 
 ## Architecture Overview
 
-### Layered Architecture
-The codebase follows a clean architecture with clear separation:
-
-```
-Infrastructure Layer (web, security, external APIs)
-    ↓
-Application Layer (facades, command handlers, services)
-    ↓
-Domain Layer (events, validators, value objects)
-    ↓
-Data Layer (JPA entities, repositories)
-```
+### Modular Architecture by Feature
+The codebase follows a modular architecture organized by feature/bounded context:
 
 **Package Structure**:
-- `infrastructure/` - REST controllers, security filters, Google Fit client
-- `application/` - Business logic orchestration (ingestion, summary, sync)
-- `domain/` - Core domain model (event, summary)
-- `config/` - Spring configuration
-- `dto/` - Data transfer objects for API
+- `appevents/` - App-facing health events submission API
+- `healthevents/` - Core event storage and management (event log, validation)
+- `dailysummary/` - Daily aggregated summaries from health events
+- `steps/` - Steps tracking projections and queries
+- `workout/` - Workout projections and queries
+- `googlefit/` - Google Fit synchronization and OAuth
+- `security/` - HMAC authentication filters
+- `config/` - Spring configuration and global exception handling
+
+**Key Pattern**: Each module has:
+- Internal implementation classes (package-private)
+- Public `api/` subpackage with facade interfaces and DTOs
+- Modules communicate only through facades (dependency inversion)
 
 ### Event-Driven Design
 
@@ -217,6 +215,11 @@ All events have:
 | `DistanceBucketedRecorded.v1` | `bucketStart`, `bucketEnd`, `distanceMeters` | distanceMeters ≥ 0 |
 | `WalkingSessionRecorded.v1` | `sessionId`, `start`, `end`, `durationMinutes` | duration ≥ 0 |
 | `WorkoutRecorded.v1` | `workoutId`, `performedAt`, `exercises[]` | exercises non-empty |
+| `MealRecorded.v1` | `title`, `mealType`, `caloriesKcal`, `proteinGrams`, `fatGrams`, `carbohydratesGrams`, `healthRating` | macros ≥ 0, valid enums |
+
+**Meal Types**: `BREAKFAST`, `BRUNCH`, `LUNCH`, `DINNER`, `SNACK`, `DESSERT`, `DRINK`
+
+**Health Ratings**: `VERY_HEALTHY`, `HEALTHY`, `NEUTRAL`, `UNHEALTHY`, `VERY_UNHEALTHY`
 
 See `EventValidator.java` for detailed validation rules.
 
@@ -258,6 +261,8 @@ open integration-tests/build/reports/tests/test/index.html
 ### Optional Environment Variables
 - `HMAC_TOLERANCE_SEC` - Timestamp tolerance (default: 600)
 - `NONCE_CACHE_TTL_SEC` - Nonce cache TTL (default: 600)
+- `GOOGLE_FIT_API_URL` - Google Fit API base URL (default: https://www.googleapis.com/fitness/v1)
+- `GOOGLE_FIT_OAUTH_URL` - Google OAuth base URL (default: https://oauth2.googleapis.com)
 - `GOOGLE_FIT_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_FIT_CLIENT_SECRET` - Google OAuth client secret
 - `GOOGLE_FIT_REFRESH_TOKEN` - Google OAuth refresh token

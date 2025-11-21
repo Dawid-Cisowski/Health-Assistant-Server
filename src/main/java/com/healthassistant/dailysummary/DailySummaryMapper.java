@@ -21,5 +21,9 @@ interface DailySummaryMapper {
     DailySummaryResponse.Sleep toSleepResponse(DailySummary.Sleep sleep);
 
     DailySummaryResponse.Heart toHeartResponse(DailySummary.Heart heart);
+
+    DailySummaryResponse.Nutrition toNutritionResponse(DailySummary.Nutrition nutrition);
+
+    DailySummaryResponse.Meal toMealResponse(DailySummary.Meal meal);
 }
 

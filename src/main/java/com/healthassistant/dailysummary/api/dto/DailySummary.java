@@ -10,7 +10,9 @@ public record DailySummary(
     List<Exercise> exercises,
     List<Workout> workouts,
     List<Sleep> sleep,
-    Heart heart
+    Heart heart,
+    Nutrition nutrition,
+    List<Meal> meals
 ) {
     public DailySummary {
         Objects.requireNonNull(date, "Date cannot be null");
@@ -19,6 +21,8 @@ public record DailySummary(
         Objects.requireNonNull(workouts, "Workouts cannot be null");
         Objects.requireNonNull(sleep, "Sleep cannot be null");
         Objects.requireNonNull(heart, "Heart cannot be null");
+        Objects.requireNonNull(nutrition, "Nutrition cannot be null");
+        Objects.requireNonNull(meals, "Meals cannot be null");
     }
 
     public record Activity(
@@ -58,6 +62,27 @@ public record DailySummary(
     public record Workout(
         String workoutId,
         String note
+    ) {
+    }
+
+    public record Nutrition(
+        Integer totalCalories,
+        Integer totalProtein,
+        Integer totalFat,
+        Integer totalCarbs,
+        Integer mealCount
+    ) {
+    }
+
+    public record Meal(
+        String title,
+        String mealType,
+        Integer caloriesKcal,
+        Integer proteinGrams,
+        Integer fatGrams,
+        Integer carbohydratesGrams,
+        String healthRating,
+        java.time.Instant occurredAt
     ) {
     }
 }
