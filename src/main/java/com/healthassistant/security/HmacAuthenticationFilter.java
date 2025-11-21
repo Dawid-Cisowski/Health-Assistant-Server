@@ -62,7 +62,8 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/v1/google-fit/sync")
             || path.startsWith("/v1/steps")
             || path.startsWith("/v1/workouts")
-            || path.startsWith("/v1/sleep");
+            || path.startsWith("/v1/sleep")
+            || path.startsWith("/v1/admin");
     }
 
     private DeviceId validateHmacAuthentication(HttpServletRequest request)

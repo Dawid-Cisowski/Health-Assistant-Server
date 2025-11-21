@@ -426,6 +426,19 @@ abstract class BaseIntegrationSpec extends Specification {
                 .body(body)
     }
 
+    def authenticatedDeleteRequest(String deviceId, String secretBase64, String path) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String signature = generateHmacSignature("DELETE", path, timestamp, nonce, deviceId, "", secretBase64)
+
+        return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+    }
+
 
     String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z") {
         return """
