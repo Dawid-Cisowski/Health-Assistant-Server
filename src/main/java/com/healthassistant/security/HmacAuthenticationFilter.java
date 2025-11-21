@@ -74,6 +74,10 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
 
         String method = request.getMethod();
         String path = request.getRequestURI();
+        String queryString = request.getQueryString();
+        if (queryString != null && !queryString.isEmpty()) {
+            path = path + "?" + queryString;
+        }
         String body = getRequestBody(request);
 
         String canonicalString = buildCanonicalString(method, path, timestampStr, nonce, deviceId.value(), body);

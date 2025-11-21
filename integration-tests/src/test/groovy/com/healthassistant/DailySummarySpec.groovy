@@ -578,5 +578,197 @@ class DailySummarySpec extends BaseIntegrationSpec {
         sleepSessions.size() == 0
     }
 
+    def "Scenario 13: Get range summary for multiple days with various activities"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "multiple days with different activities"
+        def startDate = LocalDate.of(2025, 11, 26)
+        def midDate = LocalDate.of(2025, 11, 27)
+        def endDate = LocalDate.of(2025, 11, 28)
+
+        and: "first day with steps and sleep"
+        def day1Time = startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(10).toInstant()
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day1Time.toEpochMilli(), day1Time.plusSeconds(3600).toEpochMilli(), 5000))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        def sleepEvent1 = [
+            idempotencyKey: "sleep-2025-11-26-1",
+            type: "SleepSessionRecorded.v1",
+            occurredAt: startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(7).toInstant().toString(),
+            payload: [
+                sleepStart: startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).minusHours(1).toInstant().toString(),
+                sleepEnd: startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(7).toInstant().toString(),
+                totalMinutes: 480,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body([events: [sleepEvent1], deviceId: deviceId])
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "second day with more steps and meals"
+        def day2Time = midDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(14).toInstant()
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day2Time.toEpochMilli(), day2Time.plusSeconds(3600).toEpochMilli(), 8000))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        def mealEvent1 = [
+            idempotencyKey: "meal-2025-11-27-1",
+            type: "MealRecorded.v1",
+            occurredAt: midDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(12).toInstant().toString(),
+            payload: [
+                title: "Grilled Chicken",
+                mealType: "LUNCH",
+                caloriesKcal: 500,
+                proteinGrams: 45,
+                fatGrams: 15,
+                carbohydratesGrams: 30,
+                healthRating: "HEALTHY"
+            ]
+        ]
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body([events: [mealEvent1], deviceId: deviceId])
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "third day with workout and fewer steps"
+        def day3Time = endDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(9).toInstant()
+        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day3Time.toEpochMilli(), day3Time.plusSeconds(3600).toEpochMilli(), 3000))
+        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .post("/v1/google-fit/sync")
+                .then()
+                .statusCode(200)
+
+        def workoutEvent = [
+            idempotencyKey: "gymrun-2025-11-28-1",
+            type: "WorkoutRecorded.v1",
+            occurredAt: endDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(18).toInstant().toString(),
+            payload: [
+                workoutId: "gymrun-2025-11-28-1",
+                performedAt: endDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(18).toInstant().toString(),
+                source: "GYMRUN_SCREENSHOT",
+                note: "Legs day",
+                exercises: [
+                    [
+                        name: "Squat",
+                        muscleGroup: "Legs",
+                        orderInWorkout: 1,
+                        sets: [
+                            [setNumber: 1, weightKg: 100.0, reps: 10, isWarmup: false]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body([events: [workoutEvent], deviceId: deviceId])
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        when: "I get range summary for the 3 days"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/range?startDate=2025-11-26&endDate=2025-11-28")
+                .get("/v1/daily-summaries/range?startDate=2025-11-26&endDate=2025-11-28")
+                .then()
+                .extract()
+
+        then: "range summary is returned with aggregated metrics"
+        getResponse.statusCode() == 200
+        def rangeSummary = getResponse.body().jsonPath()
+
+        rangeSummary.getString("startDate") == "2025-11-26"
+        rangeSummary.getString("endDate") == "2025-11-28"
+        rangeSummary.getInt("daysWithData") == 3
+
+        and: "activity summary shows totals and averages"
+        rangeSummary.getInt("activity.totalSteps") == 16000 // 5000 + 8000 + 3000
+        rangeSummary.getInt("activity.averageSteps") == 5333 // 16000 / 3
+
+        and: "sleep summary shows correct aggregation"
+        rangeSummary.getInt("sleep.totalSleepMinutes") == 480
+        rangeSummary.getInt("sleep.averageSleepMinutes") == 480
+        rangeSummary.getInt("sleep.daysWithSleep") == 1
+
+        and: "nutrition summary shows meal data"
+        rangeSummary.getInt("nutrition.totalCalories") == 500
+        rangeSummary.getInt("nutrition.totalProtein") == 45
+        rangeSummary.getInt("nutrition.totalMeals") == 1
+        rangeSummary.getInt("nutrition.daysWithData") == 1
+
+        and: "workout summary shows workout count"
+        rangeSummary.getInt("workouts.totalWorkouts") == 1
+        rangeSummary.getInt("workouts.daysWithWorkouts") == 1
+
+        and: "daily stats include all 3 days"
+        def dailyStats = rangeSummary.getList("dailyStats")
+        dailyStats.size() == 3
+        dailyStats[0].date == "2025-11-26"
+        dailyStats[1].date == "2025-11-27"
+        dailyStats[2].date == "2025-11-28"
+    }
+
+    def "Scenario 14: Range summary with invalid dates returns 400"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        when: "I request range with endDate before startDate"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/range?startDate=2025-11-30&endDate=2025-11-28")
+                .get("/v1/daily-summaries/range?startDate=2025-11-30&endDate=2025-11-28")
+                .then()
+                .extract()
+
+        then: "400 Bad Request is returned"
+        getResponse.statusCode() == 400
+    }
+
+    def "Scenario 15: Range summary returns empty stats for dates with no data"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        when: "I request range for dates with no summaries"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/range?startDate=2025-12-01&endDate=2025-12-03")
+                .get("/v1/daily-summaries/range?startDate=2025-12-01&endDate=2025-12-03")
+                .then()
+                .extract()
+
+        then: "range summary is returned with zero values"
+        getResponse.statusCode() == 200
+        def rangeSummary = getResponse.body().jsonPath()
+
+        rangeSummary.getString("startDate") == "2025-12-01"
+        rangeSummary.getString("endDate") == "2025-12-03"
+        rangeSummary.getInt("daysWithData") == 0
+
+        rangeSummary.getInt("activity.totalSteps") == 0
+        rangeSummary.getInt("activity.averageSteps") == 0
+        rangeSummary.getInt("sleep.totalSleepMinutes") == 0
+        rangeSummary.getInt("nutrition.totalCalories") == 0
+        rangeSummary.getInt("workouts.totalWorkouts") == 0
+
+        def dailyStats = rangeSummary.getList("dailyStats")
+        dailyStats.size() == 0
+    }
+
 }
 
