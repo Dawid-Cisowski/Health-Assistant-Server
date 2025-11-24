@@ -21,15 +21,29 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://maven.google.com")
+    }
+    maven {
+        url = uri("https://repo.spring.io/milestone")
+    }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:1.1.0")
+    }
 }
 
 dependencies {
-    // Spring Boot starters
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+
+    // Spring AI
+    implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
 
     // Feign client
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.3")

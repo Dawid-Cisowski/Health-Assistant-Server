@@ -4,6 +4,14 @@ A Spring Boot 3.3 backend service for health data ingestion, synchronization wit
 
 ## 🚀 Features
 
+### 🤖 AI Health Assistant (NEW!)
+- **Natural Language Interface**: Ask questions in Polish about your health data
+- **Smart Date Recognition**: Understands "dzisiaj", "wczoraj", "ostatni tydzień", "ostatni miesiąc"
+- **Real-time Streaming**: SSE-based responses that stream word-by-word
+- **Intelligent Tool Selection**: AI automatically chooses which data to fetch
+- **4 Health Tools**: Sleep data, steps, workouts, and daily summaries
+- **Gemini 2.0 Flash**: Fast and accurate responses powered by Google's latest model
+
 ### Core Event Ingestion
 - **Batch Event Ingestion**: Accept up to 100 events per request
 - **HMAC Authentication**: Secure header-based authentication with replay protection
@@ -83,6 +91,8 @@ Configure via environment variables:
 | `GOOGLE_FIT_CLIENT_ID` | Google OAuth client ID | - |
 | `GOOGLE_FIT_CLIENT_SECRET` | Google OAuth client secret | - |
 | `GOOGLE_FIT_REFRESH_TOKEN` | Google OAuth refresh token | - |
+| `GOOGLE_GEMINI_API_KEY` | Google Gemini API key for AI Assistant | - |
+| `GOOGLE_GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash-exp` |
 
 ## 🚀 Quick Start
 
@@ -137,8 +147,13 @@ Configure via environment variables:
 
 ## 📡 API Endpoints
 
+### AI Assistant
+- `POST /v1/assistant/chat` - Chat with AI health assistant (SSE streaming, HMAC auth required)
+  - **Request**: `{"message": "Ile kroków zrobiłem dzisiaj?"}`
+  - **Response**: Server-Sent Events stream with real-time answers
+
 ### Event Ingestion
-- `POST /v1/ingest/events` - Batch event ingestion (HMAC auth required)
+- `POST /v1/health-events` - Batch event ingestion (no auth required)
 
 ### Google Fit Sync
 - `POST /v1/google-fit/sync` - Manually trigger sync
@@ -146,6 +161,14 @@ Configure via environment variables:
 
 ### Daily Summaries
 - `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
+- `GET /v1/daily-summaries/range?from={date}&to={date}` - Get daily summary range
+
+### Query APIs
+- `GET /v1/steps/daily/{date}` - Daily step breakdown
+- `GET /v1/steps/daily/range?from={date}&to={date}` - Step range summary
+- `GET /v1/workouts/{workoutId}` - Workout details
+- `GET /v1/workouts/date/{date}` - Workouts on date
+- `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
 
 See [Swagger UI](http://localhost:8080/swagger-ui.html) for detailed documentation.
 
@@ -160,6 +183,8 @@ See [Swagger UI](http://localhost:8080/swagger-ui.html) for detailed documentati
 | `ActiveMinutesRecorded.v1` | Active minutes in a time bucket | ✅ Active |
 | `DistanceBucketedRecorded.v1` | Distance traveled in bucketed intervals | ✅ Active |
 | `WalkingSessionRecorded.v1` | Walking session with steps, distance, calories | ✅ Active |
+| `WorkoutRecorded.v1` | Strength workout with exercises, sets, and reps | ✅ Active |
+| `MealRecorded.v1` | Meal with nutrition info and health rating | ✅ Active |
 
 ## 🗄️ Database Schema
 
@@ -267,11 +292,14 @@ curl http://localhost:8080/actuator/prometheus
 
 ## 🚧 Recent Updates
 
+- ✅ **AI Health Assistant** - Natural language chat interface with Gemini 2.0 Flash
+- ✅ **Smart Date Recognition** - Automatic interpretation of "dzisiaj", "ostatni tydzień", etc.
+- ✅ **Real-time SSE Streaming** - Word-by-word AI responses via Server-Sent Events
+- ✅ **Meal Tracking** - MealRecorded events with nutrition and health ratings
+- ✅ **Workout Projections** - Pre-calculated workout metrics and volumes
 - ✅ Historical sync with parallel processing
 - ✅ Walking session tracking with step attribution
 - ✅ Activity time calculation from step patterns
-- ✅ 1-minute bucket storage for granular data
-- ✅ Daily summary generation and updates
 
 ## 📝 License
 

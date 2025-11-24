@@ -1,12 +1,20 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration
+
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: false
-  
+
   flyway:
     enabled: true
     clean-disabled: false
+
+app:
+  assistant:
+    enabled: false
 
 logging:
   level:

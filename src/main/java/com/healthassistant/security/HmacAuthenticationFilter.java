@@ -45,14 +45,25 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Wrap request to cache body for HMAC validation (only for methods with body)
+        HttpServletRequest wrappedRequest = request;
+        String method = request.getMethod();
+        if (hasRequestBody(method)) {
+            wrappedRequest = new CachedBodyHttpServletRequest(request);
+        }
+
         try {
-            DeviceId deviceId = validateHmacAuthentication(request);
-            request.setAttribute("deviceId", deviceId.value());
-            filterChain.doFilter(request, response);
+            DeviceId deviceId = validateHmacAuthentication(wrappedRequest);
+            wrappedRequest.setAttribute("deviceId", deviceId.value());
+            filterChain.doFilter(wrappedRequest, response);
         } catch (HmacAuthenticationException e) {
             log.warn("HMAC authentication failed for path {}: {}", path, e.getMessage());
             sendErrorResponse(response, e.getMessage());
         }
+    }
+
+    private boolean hasRequestBody(String method) {
+        return "POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method);
     }
 
     private boolean requiresAuthentication(String path) {
@@ -63,7 +74,8 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/v1/steps")
             || path.startsWith("/v1/workouts")
             || path.startsWith("/v1/sleep")
-            || path.startsWith("/v1/admin");
+            || path.startsWith("/v1/admin")
+            || path.startsWith("/v1/assistant");
     }
 
     private DeviceId validateHmacAuthentication(HttpServletRequest request)
@@ -135,6 +147,10 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private String getRequestBody(HttpServletRequest request) {
+        if (request instanceof CachedBodyHttpServletRequest cachedRequest) {
+            String body = cachedRequest.getBody();
+            return body != null ? body : "";
+        }
         return "";
     }
 

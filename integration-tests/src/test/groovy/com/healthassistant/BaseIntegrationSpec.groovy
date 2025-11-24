@@ -65,6 +65,11 @@ abstract class BaseIntegrationSpec extends Specification {
         System.setProperty("app.google-fit.client-id", "test-client-id")
         System.setProperty("app.google-fit.client-secret", "test-client-secret")
         System.setProperty("app.google-fit.refresh-token", "test-refresh-token")
+
+        // Configure Gemini API to use WireMock
+        System.setProperty("app.gemini.api-url", wireMockUrl)
+        System.setProperty("app.gemini.api-key", "test-gemini-key")
+        System.setProperty("app.gemini.model", "gemini-2.0-flash-exp")
     }
 
     def setupSpec() {
@@ -353,6 +358,18 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withBody(errorBody)))
     }
 
+    void setupGeminiApiMock(String responseText) {
+        // Gemini API returns SSE stream with data: prefixed JSON chunks
+        String sseResponse = """data: {"candidates":[{"content":{"parts":[{"text":"${responseText}"}],"role":"model"},"finishReason":"STOP"}]}
+
+"""
+        wireMockServer.stubFor(post(urlPathMatching("/gemini-2.0-flash-exp:streamGenerateContent.*"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody(sseResponse)))
+    }
+
     def cleanup() {
         // Runs after each test
         if (eventRepository != null) {
@@ -414,8 +431,8 @@ abstract class BaseIntegrationSpec extends Specification {
     def authenticatedPostRequestWithBody(String deviceId, String secretBase64, String path, String body) {
         String timestamp = generateTimestamp()
         String nonce = generateNonce()
-        // Note: body is not included in signature as per server implementation
-        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, "", secretBase64)
+        // Include body in signature calculation for HMAC validation
+        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, body, secretBase64)
 
         return RestAssured.given()
                 .contentType(ContentType.JSON)
