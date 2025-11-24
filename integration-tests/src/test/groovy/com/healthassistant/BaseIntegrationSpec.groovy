@@ -9,6 +9,7 @@ import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.ContextConfiguration
 import org.testcontainers.containers.PostgreSQLContainer
@@ -25,6 +26,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ContextConfiguration(classes = [com.healthassistant.HealthAssistantApplication])
+@Import(TestChatModelConfiguration)
 @ActiveProfiles("test")
 abstract class BaseIntegrationSpec extends Specification {
 
@@ -362,14 +364,13 @@ abstract class BaseIntegrationSpec extends Specification {
     }
 
     void setupGeminiApiMock(String responseText) {
-        // Gemini API returns SSE stream with data: prefixed JSON chunks
         String sseResponse = """data: {"candidates":[{"content":{"parts":[{"text":"${responseText}"}],"role":"model"},"finishReason":"STOP"}]}
 
 """
-        wireMockServer.stubFor(post(urlPathMatching("/gemini-2.0-flash-exp:streamGenerateContent.*"))
+        wireMockServer.stubFor(post(urlPathMatching(".*streamGenerateContent.*"))
                 .willReturn(aResponse()
                         .withStatus(200)
-                        .withHeader("Content-Type", "text/event-stream")
+                        .withHeader("Content-Type", "text/event-stream; charset=utf-8")
                         .withBody(sseResponse)))
     }
 
@@ -595,6 +596,23 @@ abstract class BaseIntegrationSpec extends Specification {
         String timestamp = generateTimestamp()
         String nonce = generateNonce()
         String body = groovy.json.JsonOutput.toJson(request)
+
+        // Select the correct secret based on device ID
+        String secretBase64 = deviceId == "different-device-id" ? DIFFERENT_DEVICE_SECRET_BASE64 : TEST_SECRET_BASE64
+
+        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, body, secretBase64)
+
+        return [
+            "X-Device-Id": deviceId,
+            "X-Timestamp": timestamp,
+            "X-Nonce": nonce,
+            "X-Signature": signature
+        ]
+    }
+
+    Map<String, String> createHmacHeadersFromString(String deviceId, String path, String body) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
 
         // Select the correct secret based on device ID
         String secretBase64 = deviceId == "different-device-id" ? DIFFERENT_DEVICE_SECRET_BASE64 : TEST_SECRET_BASE64

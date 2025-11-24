@@ -1,13 +1,11 @@
 package com.healthassistant
 
 import io.restassured.http.ContentType
-import spock.lang.Ignore
 
 import static io.restassured.RestAssured.given
 
 class ConversationHistorySpec extends BaseIntegrationSpec {
 
-    @Ignore("Requires proper WireMock stubbing for Spring AI Google GenAI client")
     def "should create new conversation when conversationId not provided"() {
         given: "a valid chat request without conversationId"
         def request = [
@@ -26,7 +24,6 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
         doneEvent.conversationId != null
     }
 
-    @Ignore("Requires proper WireMock stubbing for Spring AI Google GenAI client")
     def "should continue conversation when conversationId provided"() {
         given: "first message creates conversation"
         def firstRequest = [
@@ -92,7 +89,6 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
                  response2.body().asString().contains("error"))
     }
 
-    @Ignore("Requires proper WireMock stubbing for Spring AI Google GenAI client")
     def "should maintain conversation context across messages"() {
         given: "setup test data"
         setupTestData(TEST_DEVICE_ID)
@@ -118,7 +114,6 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
         doneEvent.conversationId == conversationId
     }
 
-    @Ignore("Requires proper WireMock stubbing for Spring AI Google GenAI client")
     def "should limit history to last 20 messages"() {
         given: "setup test data"
         setupTestData(TEST_DEVICE_ID)
@@ -153,7 +148,6 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
         !contentEvents.isEmpty()
     }
 
-    @Ignore("Requires proper WireMock stubbing for Spring AI Google GenAI client")
     def "should handle empty conversation history"() {
         given: "a new conversation with first message"
         def request = [
@@ -174,20 +168,35 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
     }
 
     private List<Map> sendAuthenticatedSseRequest(String path, Map request, String deviceId) {
-        def response = given()
-                .contentType(ContentType.JSON)
-                .accept("text/event-stream")
-                .headers(createHmacHeaders(deviceId, path, request))
-                .body(request)
-                .post(path)
+        def requestJson = groovy.json.JsonOutput.toJson(request)
+
+        // Use a custom HTTP client to read the SSE stream fully
+        def url = "http://localhost:${port}${path}"
+        def connection = new URL(url).openConnection()
+        connection.setRequestMethod("POST")
+        connection.setDoOutput(true)
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.setRequestProperty("Accept", "text/event-stream")
+
+        createHmacHeadersFromString(deviceId, path, requestJson).each { key, value ->
+            connection.setRequestProperty(key, value)
+        }
+
+        connection.outputStream.write(requestJson.getBytes("UTF-8"))
+        connection.outputStream.flush()
+
+        def responseBody = connection.inputStream.text
 
         // Parse SSE events
         def events = []
-        response.body().asString().split("\n\n").each { eventBlock ->
-            if (eventBlock.startsWith("data: ")) {
-                def jsonData = eventBlock.substring(6).trim()
-                if (!jsonData.isEmpty()) {
-                    events << parseJson(jsonData)
+        responseBody.split("\n\n").each { eventBlock ->
+            def lines = eventBlock.split("\n")
+            lines.each { line ->
+                if (line.startsWith("data:")) {
+                    def jsonData = line.substring(5).trim()
+                    if (!jsonData.isEmpty()) {
+                        events << parseJson(jsonData)
+                    }
                 }
             }
         }

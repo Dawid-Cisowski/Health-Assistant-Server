@@ -33,14 +33,18 @@ dependencies {
     // Reference to main application (including all its dependencies)
     testImplementation(project(":"))
     testRuntimeOnly(project(":"))
-    
+
     // Spring Boot Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    
+
     // Need explicit dependency for compilation
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    
+
+    // Spring AI for ChatModel mock (compile time)
+    testCompileOnly("org.springframework.ai:spring-ai-model:1.1.0")
+    testCompileOnly("io.projectreactor:reactor-core")
+
     // Testcontainers
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

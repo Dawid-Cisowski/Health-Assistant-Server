@@ -2,7 +2,6 @@ package com.healthassistant
 
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
-import spock.lang.Ignore
 
 class AssistantSpec extends BaseIntegrationSpec {
 
@@ -21,7 +20,6 @@ class AssistantSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("code") == "HMAC_AUTH_FAILED"
     }
 
-    @Ignore("Requires Spring AI configuration with Vertex AI credentials")
     def "POST /v1/assistant/chat should accept valid authenticated request and return SSE stream"() {
         given: "user has some health data"
         def sleepEvent = createSleepSessionEvent("sleep-key-1", "2025-11-22T08:00:00Z")
@@ -30,9 +28,6 @@ class AssistantSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-
-        and: "Gemini API is mocked"
-        setupGeminiApiMock("Spałeś wczoraj 7.5 godziny 😴")
 
         when: "authenticated chat request is sent"
         def chatRequest = '{"message": "Ile spałem wczoraj?"}'
@@ -50,7 +45,6 @@ class AssistantSpec extends BaseIntegrationSpec {
         response.body().asString().length() > 0
     }
 
-    @Ignore("Requires Spring AI configuration with Vertex AI credentials")
     def "POST /v1/assistant/chat should reject empty message"() {
         when: "authenticated request with empty message is sent"
         def chatRequest = '{"message": ""}'
@@ -62,7 +56,6 @@ class AssistantSpec extends BaseIntegrationSpec {
         response.statusCode() == 400
     }
 
-    @Ignore("Requires Spring AI configuration with Vertex AI credentials")
     def "POST /v1/assistant/chat should reject message that is too long"() {
         when: "authenticated request with very long message is sent"
         String longMessage = "a" * 1001  // Max is 1000
