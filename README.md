@@ -6,6 +6,7 @@ A Spring Boot 3.3 backend service for health data ingestion, synchronization wit
 
 ### 🤖 AI Health Assistant (NEW!)
 - **Natural Language Interface**: Ask questions in Polish about your health data
+- **Conversation History**: Multi-turn conversations with context retention (last 20 messages)
 - **Smart Date Recognition**: Understands "dzisiaj", "wczoraj", "ostatni tydzień", "ostatni miesiąc"
 - **Real-time Streaming**: SSE-based responses that stream word-by-word
 - **Intelligent Tool Selection**: AI automatically chooses which data to fetch
@@ -292,6 +293,7 @@ curl http://localhost:8080/actuator/prometheus
 
 ## 🚧 Recent Updates
 
+- ✅ **Conversation History** - Multi-turn AI conversations with context retention
 - ✅ **AI Health Assistant** - Natural language chat interface with Gemini 2.0 Flash
 - ✅ **Smart Date Recognition** - Automatic interpretation of "dzisiaj", "ostatni tydzień", etc.
 - ✅ **Real-time SSE Streaming** - Word-by-word AI responses via Server-Sent Events

@@ -15,6 +15,18 @@ java {
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://maven.google.com")
+    }
+    maven {
+        url = uri("https://repo.spring.io/milestone")
+    }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:1.1.0")
+    }
 }
 
 dependencies {

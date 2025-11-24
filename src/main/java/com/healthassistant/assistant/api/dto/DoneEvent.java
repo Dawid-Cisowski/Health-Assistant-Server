@@ -1,6 +1,8 @@
 package com.healthassistant.assistant.api.dto;
 
-public record DoneEvent() implements AssistantEvent {
+import java.util.UUID;
+
+public record DoneEvent(UUID conversationId) implements AssistantEvent {
     @Override
     public String type() {
         return "done";

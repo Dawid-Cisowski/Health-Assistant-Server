@@ -47,32 +47,18 @@ class AssistantController {
         log.info("SSE chat request from device {}: {}", deviceId, request.message());
 
         return assistantFacade.streamChat(request, deviceId)
-                .map(this::toServerSentEvent)
-                .doOnComplete(() -> logStreamCompleted(deviceId))
-                .doOnError(error -> logStreamError(deviceId, error));
-    }
-
-    private ServerSentEvent<String> toServerSentEvent(AssistantEvent event) {
-        try {
-            return ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data(serializeEvent(event))
-                    .build();
-        } catch (Exception e) {
-            log.error("Failed to serialize event", e);
-            throw new RuntimeException("Event serialization failed", e);
-        }
-    }
-
-    private String serializeEvent(AssistantEvent event) throws Exception {
-        return objectMapper.writeValueAsString(event);
-    }
-
-    private void logStreamCompleted(String deviceId) {
-        log.info("SSE stream completed for device {}", deviceId);
-    }
-
-    private void logStreamError(String deviceId, Throwable error) {
-        log.error("SSE stream failed for device {}", deviceId, error);
+                .map(event -> {
+                    try {
+                        return ServerSentEvent.<String>builder()
+                                .event("message")
+                                .data(objectMapper.writeValueAsString(event))
+                                .build();
+                    } catch (Exception e) {
+                        log.error("Failed to serialize event", e);
+                        throw new RuntimeException("Event serialization failed", e);
+                    }
+                })
+                .doOnComplete(() -> log.info("SSE stream completed for device {}", deviceId))
+                .doOnError(error -> log.error("SSE stream failed for device {}", deviceId, error));
     }
 }

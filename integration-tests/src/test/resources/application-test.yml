@@ -14,7 +14,7 @@ spring:
 
 app:
   assistant:
-    enabled: false
+    enabled: true
 
 logging:
   level:

@@ -5,11 +5,16 @@ import com.healthassistant.assistant.api.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 class AssistantService implements AssistantFacade {
 
     private final ChatClient chatClient;
+    private final ConversationService conversationService;
 
     private String buildSystemInstruction(LocalDate currentDate) {
         return """
@@ -75,23 +81,47 @@ class AssistantService implements AssistantFacade {
     }
 
     public Flux<AssistantEvent> streamChat(ChatRequest request, String deviceId) {
-        log.info("Processing streaming chat request for device {}: {}", deviceId, request.message());
+        log.info("Processing streaming chat request for device {}: {} (conversationId: {})",
+                deviceId, request.message(), request.conversationId());
 
         AssistantContext.setDeviceId(deviceId);
-        var currentDate = LocalDate.now();
-        var systemInstruction = buildSystemInstruction(currentDate);
 
-        return chatClient.prompt()
-                .system(systemInstruction)
-                .user(request.message())
-                .stream()
-                .chatResponse()
-                .flatMap(this::mapToAssistantEvents)
-                .concatWith(Flux.just(new DoneEvent()))
-                .doOnError(error -> log.error("Error in stream chat", error))
-                .onErrorResume(error -> Flux.just(createErrorEvent(error)))
-                .doFinally(signal -> AssistantContext.clear());
+        return Mono.fromCallable(() -> {
+                    var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
+                    var history = conversationService.loadConversationHistory(conversationId);
+                    var currentDate = LocalDate.now();
+                    var systemInstruction = buildSystemInstruction(currentDate);
+                    var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
+                    conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
+                    return new ConversationContext(conversationId, messages);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMapMany(ctx -> {
+                    var assistantResponse = new StringBuilder();
+                    return chatClient.prompt()
+                            .messages(ctx.messages())
+                            .stream()
+                            .chatResponse()
+                            .flatMap(this::mapToAssistantEvents)
+                            .doOnNext(event -> {
+                                if (event instanceof ContentEvent(String content)) {
+                                    assistantResponse.append(content);
+                                }
+                            })
+                            .concatWith(Flux.just(new DoneEvent(ctx.conversationId())))
+                            .doOnError(error -> log.error("Error in stream chat", error))
+                            .onErrorResume(error -> Flux.just(createErrorEvent(error)))
+                            .doFinally(signal -> Schedulers.boundedElastic().schedule(() -> {
+                                if (!assistantResponse.isEmpty()) {
+                                    conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, assistantResponse.toString());
+                                    log.info("Saved assistant response ({} chars) to conversation {}", assistantResponse.length(), ctx.conversationId());
+                                }
+                                AssistantContext.clear();
+                            }));
+                });
     }
+
+    private record ConversationContext(UUID conversationId, List<Message> messages) {}
 
     private Flux<AssistantEvent> mapToAssistantEvents(org.springframework.ai.chat.model.ChatResponse response) {
         var content = response.getResult().getOutput().getText();

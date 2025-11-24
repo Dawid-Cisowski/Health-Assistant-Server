@@ -65,7 +65,9 @@ The codebase follows a modular architecture organized by feature/bounded context
 - `dailysummary/` - Daily aggregated summaries from health events
 - `steps/` - Steps tracking projections and queries
 - `workout/` - Workout projections and queries
+- `sleep/` - Sleep data projections and queries
 - `googlefit/` - Google Fit synchronization and OAuth
+- `assistant/` - AI health assistant with Gemini integration (SSE streaming)
 - `security/` - HMAC authentication filters
 - `config/` - Spring configuration and global exception handling
 
@@ -108,6 +110,63 @@ Events are projected into query-optimized views:
 - Purpose: Pre-calculated workout metrics (volume, max weights)
 
 **Important**: Projections are eventually consistent. Projection failures don't block event ingestion.
+
+### AI Health Assistant (Spring AI + Gemini)
+
+**Architecture**: Natural language interface for querying health data using Gemini 2.0 Flash with SSE streaming.
+
+**Flow**:
+1. POST /v1/assistant/chat → `AssistantController` (SSE endpoint)
+2. → `AssistantService.streamChat()` builds dynamic system instruction with current date
+3. → `ChatClient` (Spring AI) streams to Gemini with function calling enabled
+4. → AI decides which tools to call based on user question
+5. → `HealthTools` executes tool calls (delegates to facades)
+6. → Results streamed back as SSE events: `ContentEvent`, `ToolCallEvent`, `ToolResultEvent`, `DoneEvent`
+
+**Key Features**:
+- **Conversation History**: Multi-turn conversations with context retention (last 20 messages)
+- **Smart Date Recognition**: AI automatically converts natural language ("dzisiaj", "ostatni tydzień", "ostatni miesiąc") to ISO-8601 dates
+- **Dynamic System Prompt**: Current date injected into prompt so AI can calculate relative dates
+- **4 Tools Available**: `getStepsData`, `getSleepData`, `getWorkoutData`, `getDailySummary`
+- **SSE Streaming**: Real-time word-by-word responses via Server-Sent Events
+- **Context Management**: `AssistantContext` uses ThreadLocal to pass deviceId to tools
+
+**Key Files**:
+- `AssistantService.java` - Main orchestrator, builds dynamic system instruction with `LocalDate.now()`, manages conversation flow
+- `AssistantController.java` - SSE endpoint returning `Flux<ServerSentEvent<String>>`
+- `ConversationService.java` - Manages conversation history, loads/saves messages, builds message lists
+- `HealthTools.java` - Spring AI `@Tool` annotated methods for function calling
+- `AssistantConfiguration.java` - ChatClient bean configuration
+- `Conversation.java`, `ConversationMessage.java` - JPA entities for conversation storage
+
+**Important Implementation Details**:
+- System instruction must include "BIEŻĄCA DATA: {date}" at the top for date recognition to work
+- All tool parameter descriptions specify ISO-8601 format requirement (YYYY-MM-DD)
+- Tools retrieve deviceId from `AssistantContext.getDeviceId()` (set by controller)
+- Errors are caught and returned as `ErrorEvent` to keep SSE stream alive
+
+**Conversation History**:
+- **Storage**: PostgreSQL tables `conversations` and `conversation_messages`
+- **History Limit**: Last 20 messages (10 user/assistant exchanges) sent to Gemini
+- **Message Flow**:
+  1. Get/create conversation via `ConversationService.getOrCreateConversation()`
+  2. Load history: `ConversationService.loadConversationHistory(conversationId, 20)`
+  3. Build message list: `ConversationService.buildMessageList(history, systemPrompt, userMessage)`
+  4. Save user message before streaming
+  5. Collect assistant response during stream (StringBuilder in doOnNext)
+  6. Save assistant response in doFinally after stream completes
+  7. Return conversationId in DoneEvent
+- **Security**: Conversations verified to belong to deviceId (prevents cross-device access)
+- **Tool Calls**: NOT saved in history (only user/assistant text)
+- **Backward Compatibility**: ChatRequest.conversationId is optional (null = new conversation)
+
+**Configuration**:
+```bash
+export GOOGLE_GEMINI_API_KEY="your-api-key"
+export GOOGLE_GEMINI_MODEL="gemini-2.0-flash-exp"  # optional, this is default
+```
+
+See `AI_ASSISTANT_README.md` for detailed documentation on date recognition patterns and conversation history.
 
 ### Google Fit Synchronization
 
@@ -188,10 +247,13 @@ export NONCE_CACHE_TTL_SEC=600
 - `health_events` - Append-only event log (JSONB payload, GIN indexed)
 - `daily_summaries` - Aggregated daily metrics (JSONB summary)
 - `google_fit_sync_state` - Sync cursor (last_synced_at timestamp)
+- `conversations` - AI assistant conversation tracking (V8)
+- `conversation_messages` - Message history per conversation (V8)
 
-**Projection Tables** (V5, V6):
+**Projection Tables** (V5, V6, V7):
 - `steps_hourly_projections`, `steps_daily_projections`
 - `workout_projections`, `workout_exercise_projections`, `workout_set_projections`
+- `sleep_projection_tables` (V7)
 
 **Migrations**: Flyway versioned in `src/main/resources/db/migration/`
 
@@ -266,20 +328,29 @@ open integration-tests/build/reports/tests/test/index.html
 - `GOOGLE_FIT_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_FIT_CLIENT_SECRET` - Google OAuth client secret
 - `GOOGLE_FIT_REFRESH_TOKEN` - Google OAuth refresh token
+- `GOOGLE_GEMINI_API_KEY` - Gemini API key for AI Assistant (required for /v1/assistant/chat)
+- `GOOGLE_GEMINI_MODEL` - Gemini model name (default: gemini-2.0-flash-exp)
 
 ### Spring Features
 - `@EnableScheduling` - Google Fit sync scheduled tasks
 - `@EnableCaching` - Caffeine cache for nonce replay protection
 - `@EnableFeignClients` - Google Fit API client
 - `@EnableJpaRepositories` - Spring Data JPA
+- Spring AI with Google Gemini - AI assistant with function calling
 
 ## API Endpoints
+
+### AI Assistant
+- `POST /v1/assistant/chat` - Chat with AI assistant (SSE streaming, HMAC auth required)
+  - Request: `{"message": "Ile kroków zrobiłem dzisiaj?"}`
+  - Response: SSE stream with `ContentEvent`, `ToolCallEvent`, `ToolResultEvent`, `DoneEvent`
 
 ### Event Ingestion
 - `POST /v1/health-events` - Batch event ingestion (no auth)
 
 ### Daily Summaries
 - `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
+- `GET /v1/daily-summaries/range?from={date}&to={date}` - Get daily summary range (HMAC auth required)
 
 ### Google Fit Sync
 - `POST /v1/google-fit/sync` - Manual sync trigger
@@ -290,6 +361,7 @@ open integration-tests/build/reports/tests/test/index.html
 - `GET /v1/steps/daily/range?from={date}&to={date}` - Step range summary
 - `GET /v1/workouts/{workoutId}` - Workout details
 - `GET /v1/workouts/date/{date}` - Workouts on date
+- `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
 
 ### Monitoring
 - `GET /actuator/health` - Health check
@@ -355,6 +427,7 @@ SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 
 - **Java 21** with virtual threads (Project Loom)
 - **Spring Boot 3.3.5** (Web, Data JPA, Actuator, Validation)
+- **Spring AI 1.1.0** with Google Gemini integration
 - **PostgreSQL 16** with JSONB
 - **Gradle 8.5+** with Kotlin DSL
 - **Flyway** for database migrations
@@ -363,3 +436,9 @@ SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 - **Testcontainers** for integration testing
 - **Spock** for test specifications
 - **Docker & Docker Compose** for containerization
+
+## Additional Documentation
+
+- **AI_ASSISTANT_README.md** - Detailed documentation on AI Assistant architecture, date recognition patterns, SSE events, and example questions
+- **AI_ASSISTANT_SSE.md** - Technical details on SSE streaming implementation
+- **README.md** - Overview, quick start guide, and API documentation

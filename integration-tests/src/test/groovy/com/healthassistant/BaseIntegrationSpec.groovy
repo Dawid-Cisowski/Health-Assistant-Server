@@ -28,6 +28,10 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*
 @ActiveProfiles("test")
 abstract class BaseIntegrationSpec extends Specification {
 
+    static final String TEST_DEVICE_ID = "test-device"
+    static final String TEST_SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+    static final String DIFFERENT_DEVICE_SECRET_BASE64 = "ZGlmZmVyZW50LXNlY3JldC0xMjM="
+
     @LocalServerPort
     int port
 
@@ -54,7 +58,7 @@ abstract class BaseIntegrationSpec extends Specification {
         System.setProperty("spring.datasource.url", postgres.getJdbcUrl())
         System.setProperty("spring.datasource.username", postgres.getUsername())
         System.setProperty("spring.datasource.password", postgres.getPassword())
-        System.setProperty("app.hmac.devices-json", '{"test-device":"dGVzdC1zZWNyZXQtMTIz"}')
+        System.setProperty("app.hmac.devices-json", '{"test-device":"dGVzdC1zZWNyZXQtMTIz","different-device-id":"ZGlmZmVyZW50LXNlY3JldC0xMjM="}')
         System.setProperty("app.hmac.tolerance-seconds", "600")
         System.setProperty("app.nonce.cache-ttl-seconds", "600")
         
@@ -66,10 +70,9 @@ abstract class BaseIntegrationSpec extends Specification {
         System.setProperty("app.google-fit.client-secret", "test-client-secret")
         System.setProperty("app.google-fit.refresh-token", "test-refresh-token")
 
-        // Configure Gemini API to use WireMock
-        System.setProperty("app.gemini.api-url", wireMockUrl)
-        System.setProperty("app.gemini.api-key", "test-gemini-key")
-        System.setProperty("app.gemini.model", "gemini-2.0-flash-exp")
+        // Configure Spring AI Google GenAI to use WireMock
+        System.setProperty("spring.ai.google.genai.base-url", wireMockUrl)
+        System.setProperty("spring.ai.google.genai.api-key", "test-gemini-key")
     }
 
     def setupSpec() {
@@ -586,6 +589,81 @@ abstract class BaseIntegrationSpec extends Specification {
             ]
         }
         """.stripIndent().trim()
+    }
+
+    Map<String, String> createHmacHeaders(String deviceId, String path, Map request) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String body = groovy.json.JsonOutput.toJson(request)
+
+        // Select the correct secret based on device ID
+        String secretBase64 = deviceId == "different-device-id" ? DIFFERENT_DEVICE_SECRET_BASE64 : TEST_SECRET_BASE64
+
+        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, body, secretBase64)
+
+        return [
+            "X-Device-Id": deviceId,
+            "X-Timestamp": timestamp,
+            "X-Nonce": nonce,
+            "X-Signature": signature
+        ]
+    }
+
+    Map parseJson(String jsonData) {
+        return new groovy.json.JsonSlurper().parseText(jsonData) as Map
+    }
+
+    void setupTestData(String deviceId) {
+        // Setup Gemini API mock for assistant responses
+        setupGeminiApiMock("Na podstawie danych widzę następujące informacje o Twoich krokach.")
+
+        // Create some test health events via API
+        def todayStepsEvent = """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "${UUID.randomUUID()}",
+                    "type": "StepsBucketedRecorded.v1",
+                    "occurredAt": "${Instant.now().toString()}",
+                    "payload": {
+                        "bucketStart": "${Instant.now().minus(java.time.Duration.ofHours(1)).toString()}",
+                        "bucketEnd": "${Instant.now().toString()}",
+                        "count": 5000,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                }
+            ]
+        }
+        """
+
+        def yesterdayStepsEvent = """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "${UUID.randomUUID()}",
+                    "type": "StepsBucketedRecorded.v1",
+                    "occurredAt": "${Instant.now().minus(java.time.Duration.ofDays(1)).toString()}",
+                    "payload": {
+                        "bucketStart": "${Instant.now().minus(java.time.Duration.ofDays(1)).minus(java.time.Duration.ofHours(1)).toString()}",
+                        "bucketEnd": "${Instant.now().minus(java.time.Duration.ofDays(1)).toString()}",
+                        "count": 3000,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                }
+            ]
+        }
+        """
+
+        // Submit events
+        RestAssured.given()
+            .contentType(ContentType.JSON)
+            .body(todayStepsEvent)
+            .post("/v1/health-events")
+
+        RestAssured.given()
+            .contentType(ContentType.JSON)
+            .body(yesterdayStepsEvent)
+            .post("/v1/health-events")
     }
 }
 
