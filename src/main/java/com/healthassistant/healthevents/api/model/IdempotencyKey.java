@@ -34,8 +34,11 @@ public record IdempotencyKey(String value) {
             String workoutId = Optional.ofNullable(payload.get("workoutId"))
                     .map(Object::toString)
                     .orElse(null);
+            String sleepId = Optional.ofNullable(payload.get("sleepId"))
+                    .map(Object::toString)
+                    .orElse(null);
 
-            keyValue = generate(deviceId, eventType, workoutId, index);
+            keyValue = generate(deviceId, eventType, workoutId, sleepId, index);
         }
 
         return new IdempotencyKey(keyValue);
@@ -45,12 +48,15 @@ public record IdempotencyKey(String value) {
             String deviceId,
             String eventType,
             String workoutId,
+            String sleepId,
             int index) {
 
-        if ("WorkoutRecorded.v1".equals(eventType)) {
-            if (workoutId != null) {
-                return deviceId + "|workout|" + workoutId;
-            }
+        if ("WorkoutRecorded.v1".equals(eventType) && workoutId != null) {
+            return deviceId + "|workout|" + workoutId;
+        }
+
+        if ("SleepSessionRecorded.v1".equals(eventType) && sleepId != null) {
+            return deviceId + "|sleep|" + sleepId;
         }
 
         return deviceId + "|" + eventType + "|" + System.currentTimeMillis() + "-" + index;

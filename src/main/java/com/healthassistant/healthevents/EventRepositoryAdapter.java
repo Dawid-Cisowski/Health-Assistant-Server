@@ -52,7 +52,8 @@ class EventRepositoryAdapter implements EventRepository {
                                 entity.getPayload(),
                                 DeviceId.of(entity.getDeviceId()),
                                 EventId.of(entity.getEventId())
-                        ).withCreatedAt(entity.getCreatedAt())
+                        ).withCreatedAt(entity.getCreatedAt()),
+                        (existing, replacement) -> existing.createdAt().isAfter(replacement.createdAt()) ? existing : replacement
                 ));
     }
 
@@ -67,7 +68,8 @@ class EventRepositoryAdapter implements EventRepository {
                 .stream()
                 .collect(Collectors.toMap(
                         HealthEventJpaEntity::getIdempotencyKey,
-                        entity -> entity
+                        entity -> entity,
+                        (existing, replacement) -> existing.getCreatedAt().isAfter(replacement.getCreatedAt()) ? existing : replacement
                 ));
 
         List<HealthEventJpaEntity> entitiesToUpdate = events.stream()

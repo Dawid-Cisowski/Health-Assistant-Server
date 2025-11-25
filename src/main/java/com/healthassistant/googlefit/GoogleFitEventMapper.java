@@ -198,15 +198,16 @@ class GoogleFitEventMapper {
         ZonedDateTime sleepStartPoland = start.atZone(POLAND_ZONE);
         ZonedDateTime sleepEndPoland = end.atZone(POLAND_ZONE);
 
+        String sleepId = session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli());
+
         Map<String, Object> payload = new HashMap<>();
+        payload.put("sleepId", sleepId);
         payload.put("sleepStart", sleepStartPoland.format(ISO_FORMATTER));
         payload.put("sleepEnd", sleepEndPoland.format(ISO_FORMATTER));
         payload.put("totalMinutes", (int) totalMinutes);
         payload.put("originPackage", session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN);
 
-        String idempotencyKey = String.format("google-fit|sleep|%s|%s",
-                DEFAULT_USER_ID,
-                session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
+        String idempotencyKey = String.format("google-fit|sleep|%s|%s", DEFAULT_USER_ID, sleepId);
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),

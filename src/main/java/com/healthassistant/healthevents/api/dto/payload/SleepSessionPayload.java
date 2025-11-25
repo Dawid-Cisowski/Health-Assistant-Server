@@ -11,6 +11,7 @@ import java.time.Instant;
     description = "Payload for SleepSessionRecorded.v1 - sleep session with start/end times",
     example = """
         {
+          "sleepId": "sleep-2025-11-10-session-1",
           "sleepStart": "2025-11-10T00:30:00Z",
           "sleepEnd": "2025-11-10T08:00:00Z",
           "totalMinutes": 450,
@@ -19,6 +20,11 @@ import java.time.Instant;
         """
 )
 public record SleepSessionPayload(
+    @NotBlank(message = "sleepId is required")
+    @JsonProperty("sleepId")
+    @Schema(description = "Unique identifier for this sleep session (used for idempotency)", example = "sleep-2025-11-10-session-1")
+    String sleepId,
+
     @NotNull(message = "sleepStart is required")
     @JsonProperty("sleepStart")
     @Schema(description = "Sleep session start time (ISO-8601 UTC)", example = "2025-11-10T00:30:00Z")

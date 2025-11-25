@@ -410,6 +410,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
             type: "SleepSessionRecorded.v1",
             occurredAt: sleepEnd.toString(),
             payload: [
+                sleepId: "sleep-2025-11-23-1",
                 sleepStart: sleepStart.toString(),
                 sleepEnd: sleepEnd.toString(),
                 totalMinutes: 480,
@@ -462,6 +463,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
             type: "SleepSessionRecorded.v1",
             occurredAt: nightSleepEnd.toString(),
             payload: [
+                sleepId: "sleep-2025-11-24-night",
                 sleepStart: nightSleepStart.toString(),
                 sleepEnd: nightSleepEnd.toString(),
                 totalMinutes: 480,
@@ -477,6 +479,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
             type: "SleepSessionRecorded.v1",
             occurredAt: napEnd.toString(),
             payload: [
+                sleepId: "sleep-2025-11-24-nap",
                 sleepStart: napStart.toString(),
                 sleepEnd: napEnd.toString(),
                 totalMinutes: 60,
@@ -587,6 +590,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
             type: "SleepSessionRecorded.v1",
             occurredAt: startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(7).toInstant().toString(),
             payload: [
+                sleepId: "sleep-2025-11-26-1",
                 sleepStart: startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).minusHours(1).toInstant().toString(),
                 sleepEnd: startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(7).toInstant().toString(),
                 totalMinutes: 480,

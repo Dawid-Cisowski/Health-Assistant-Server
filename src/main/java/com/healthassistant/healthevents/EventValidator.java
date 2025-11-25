@@ -65,7 +65,7 @@ class EventValidator {
     }
 
     private void validateSleepSession(Map<String, Object> payload, List<EventValidationError> errors) {
-        requireFields(payload, errors, "sleepStart", "sleepEnd", "totalMinutes", "originPackage");
+        requireFields(payload, errors, "sleepId", "sleepStart", "sleepEnd", "totalMinutes", "originPackage");
         validateNonNegative(payload, errors, "totalMinutes");
     }
 

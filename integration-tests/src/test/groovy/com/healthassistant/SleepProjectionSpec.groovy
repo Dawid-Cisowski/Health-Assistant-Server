@@ -44,6 +44,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "${sleepEnd}",
                 "payload": {
+                    "sleepId": "sleep-2025-11-20",
                     "sleepStart": "${sleepStart}",
                     "sleepEnd": "${sleepEnd}",
                     "totalMinutes": ${totalMinutes},
@@ -96,6 +97,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "${mainSleepEnd}",
                     "payload": {
+                        "sleepId": "sleep-main-2025-11-21",
                         "sleepStart": "${mainSleepStart}",
                         "sleepEnd": "${mainSleepEnd}",
                         "totalMinutes": 480,
@@ -107,6 +109,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "${napEnd}",
                     "payload": {
+                        "sleepId": "sleep-nap-2025-11-21",
                         "sleepStart": "${napStart}",
                         "sleepEnd": "${napEnd}",
                         "totalMinutes": 60,
@@ -153,6 +156,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-22T06:00:00Z",
                     "payload": {
+                        "sleepId": "night-2025-11-22",
                         "sleepStart": "2025-11-21T22:00:00Z",
                         "sleepEnd": "2025-11-22T06:00:00Z",
                         "totalMinutes": 420,
@@ -164,6 +168,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-22T15:00:00Z",
                     "payload": {
+                        "sleepId": "nap-2025-11-22",
                         "sleepStart": "2025-11-22T14:00:00Z",
                         "sleepEnd": "2025-11-22T15:00:00Z",
                         "totalMinutes": 60,
@@ -220,6 +225,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-18T06:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-18",
                         "sleepStart": "2025-11-17T22:00:00Z",
                         "sleepEnd": "2025-11-18T06:00:00Z",
                         "totalMinutes": 480,
@@ -231,6 +237,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-19T07:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-19",
                         "sleepStart": "2025-11-18T23:00:00Z",
                         "sleepEnd": "2025-11-19T07:00:00Z",
                         "totalMinutes": 420,
@@ -242,6 +249,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-20T08:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-20",
                         "sleepStart": "2025-11-20T00:00:00Z",
                         "sleepEnd": "2025-11-20T08:00:00Z",
                         "totalMinutes": 540,
@@ -298,6 +306,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-23T06:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-23",
                         "sleepStart": "2025-11-22T22:00:00Z",
                         "sleepEnd": "2025-11-23T06:00:00Z",
                         "totalMinutes": 300,
@@ -309,6 +318,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-24T08:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-24",
                         "sleepStart": "2025-11-23T22:00:00Z",
                         "sleepEnd": "2025-11-24T08:00:00Z",
                         "totalMinutes": 600,
@@ -320,6 +330,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-25T07:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-25",
                         "sleepStart": "2025-11-24T23:00:00Z",
                         "sleepEnd": "2025-11-25T07:00:00Z",
                         "totalMinutes": 450,
@@ -366,6 +377,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "2025-11-26T06:00:00Z",
                 "payload": {
+                    "sleepId": "zero-duration-sleep",
                     "sleepStart": "2025-11-26T06:00:00Z",
                     "sleepEnd": "2025-11-26T06:00:00Z",
                     "totalMinutes": 0,
@@ -412,6 +424,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-27T06:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-27",
                         "sleepStart": "2025-11-26T22:00:00Z",
                         "sleepEnd": "2025-11-27T06:00:00Z",
                         "totalMinutes": 480,
@@ -423,6 +436,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-29T06:00:00Z",
                     "payload": {
+                        "sleepId": "sleep-2025-11-29",
                         "sleepStart": "2025-11-28T22:00:00Z",
                         "sleepEnd": "2025-11-29T06:00:00Z",
                         "totalMinutes": 480,
@@ -474,6 +488,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "2025-11-30T06:00:00Z",
                 "payload": {
+                    "sleepId": "duplicate-test",
                     "sleepStart": "2025-11-29T22:00:00Z",
                     "sleepEnd": "2025-11-30T06:00:00Z",
                     "totalMinutes": 480,
@@ -564,6 +579,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-12-02T06:00:00Z",
                     "payload": {
+                        "sleepId": "session1-2025-12-02",
                         "sleepStart": "2025-12-01T22:00:00Z",
                         "sleepEnd": "2025-12-02T06:00:00Z",
                         "totalMinutes": 480,
@@ -575,6 +591,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-12-02T13:00:00Z",
                     "payload": {
+                        "sleepId": "session2-2025-12-02",
                         "sleepStart": "2025-12-02T12:00:00Z",
                         "sleepEnd": "2025-12-02T13:00:00Z",
                         "totalMinutes": 60,
@@ -586,6 +603,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-12-02T17:00:00Z",
                     "payload": {
+                        "sleepId": "session3-2025-12-02",
                         "sleepStart": "2025-12-02T16:00:00Z",
                         "sleepEnd": "2025-12-02T17:00:00Z",
                         "totalMinutes": 30,
@@ -635,6 +653,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "${sleepEnd}",
                 "payload": {
+                    "sleepId": "midnight-span-sleep",
                     "sleepStart": "${sleepStart}",
                     "sleepEnd": "${sleepEnd}",
                     "totalMinutes": 660,

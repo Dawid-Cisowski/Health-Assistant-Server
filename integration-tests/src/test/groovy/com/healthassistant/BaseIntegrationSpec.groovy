@@ -572,7 +572,7 @@ abstract class BaseIntegrationSpec extends Specification {
         """.stripIndent().trim()
     }
 
-    String createSleepSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T08:00:00Z") {
+    String createSleepSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T08:00:00Z", String sleepId = "sleep-session-default") {
         return """
         {
             "events": [
@@ -581,6 +581,7 @@ abstract class BaseIntegrationSpec extends Specification {
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "${occurredAt}",
                     "payload": {
+                        "sleepId": "${sleepId}",
                         "sleepStart": "2025-11-10T00:30:00Z",
                         "sleepEnd": "2025-11-10T08:00:00Z",
                         "totalMinutes": 450,
