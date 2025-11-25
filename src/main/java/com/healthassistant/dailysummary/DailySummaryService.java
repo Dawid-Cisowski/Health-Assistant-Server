@@ -22,8 +22,8 @@ public class DailySummaryService implements DailySummaryFacade {
     private final ObjectMapper objectMapper;
 
     @Override
-    public DailySummary generateDailySummary(LocalDate date) {
-        return commandHandler.handle(GenerateDailySummaryCommand.forDate(date));
+    public void generateDailySummary(LocalDate date) {
+        commandHandler.handle(GenerateDailySummaryCommand.forDate(date));
     }
 
     @Override
@@ -38,11 +38,10 @@ public class DailySummaryService implements DailySummaryFacade {
 
         List<DailySummary> summaries = entities.stream()
                 .map(entity -> objectMapper.convertValue(entity.getSummary(), DailySummary.class))
-                .collect(Collectors.toList());
+                .toList();
 
         int daysWithData = summaries.size();
 
-        // Activity aggregation
         int totalSteps = summaries.stream()
                 .map(s -> s.activity().steps())
                 .filter(steps -> steps != null)

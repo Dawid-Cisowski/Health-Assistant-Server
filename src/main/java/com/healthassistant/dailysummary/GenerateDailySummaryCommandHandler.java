@@ -19,7 +19,7 @@ class GenerateDailySummaryCommandHandler {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public DailySummary handle(GenerateDailySummaryCommand command) {
+    public void handle(GenerateDailySummaryCommand command) {
         log.info("Generating daily summary for date: {}", command.date());
 
         DailySummary summary = aggregator.aggregate(command.date());
@@ -39,6 +39,5 @@ class GenerateDailySummaryCommandHandler {
         jpaRepository.save(entity);
 
         log.info("Daily summary generated and saved for date: {}", command.date());
-        return summary;
     }
 }

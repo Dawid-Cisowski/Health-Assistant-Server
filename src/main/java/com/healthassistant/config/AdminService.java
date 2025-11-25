@@ -1,5 +1,7 @@
 package com.healthassistant.config;
 
+import com.healthassistant.assistant.ConversationMessageRepository;
+import com.healthassistant.assistant.ConversationRepository;
 import com.healthassistant.dailysummary.DailySummaryJpaRepository;
 import com.healthassistant.googlefit.GoogleFitSyncStateRepository;
 import com.healthassistant.healthevents.HealthEventJpaRepository;
@@ -30,6 +32,8 @@ public class AdminService {
     private final DailySummaryJpaRepository dailySummaryRepository;
     private final HealthEventJpaRepository healthEventRepository;
     private final GoogleFitSyncStateRepository googleFitSyncStateRepository;
+    private final ConversationMessageRepository conversationMessageRepository;
+    private final ConversationRepository conversationRepository;
 
     @Transactional
     public void deleteAllData() {
@@ -60,6 +64,13 @@ public class AdminService {
         // Delete sync state
         log.info("Deleting Google Fit sync state");
         googleFitSyncStateRepository.deleteAll();
+
+        // Delete AI conversation data
+        log.info("Deleting conversation messages");
+        conversationMessageRepository.deleteAll();
+
+        log.info("Deleting conversations");
+        conversationRepository.deleteAll();
 
         log.warn("All data has been deleted successfully");
     }

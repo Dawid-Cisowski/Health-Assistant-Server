@@ -53,7 +53,7 @@ class GoogleFitSyncService implements GoogleFitFacade {
         
         try {
             Instant now = Instant.now();
-            Instant from = getSyncFromTime(now);
+            Instant from = getSyncFromTime();
             Instant to = roundToNextBucket(now);
 
             log.info("Syncing Google Fit data from {} to {}", from, to);
@@ -130,7 +130,7 @@ class GoogleFitSyncService implements GoogleFitFacade {
         );
     }
 
-    private Instant getSyncFromTime(Instant now) {
+    private Instant getSyncFromTime() {
         GoogleFitSyncState state = syncStateRepository.findByUserId(DEFAULT_USER_ID)
                 .orElse(null);
 

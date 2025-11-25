@@ -24,7 +24,7 @@ class AdminController {
     @DeleteMapping("/all-data")
     @Operation(
             summary = "Delete all data from database",
-            description = "Deletes all data from the database including health events, projections, summaries, and sync state. This operation is irreversible and intended for testing/development purposes only. Requires HMAC authentication.",
+            description = "Deletes all data from the database including health events, projections, summaries, sync state, and AI conversation history. This operation is irreversible and intended for testing/development purposes only. Requires HMAC authentication.",
             security = @SecurityRequirement(name = "HmacHeaderAuth")
     )
     @ApiResponses(value = {

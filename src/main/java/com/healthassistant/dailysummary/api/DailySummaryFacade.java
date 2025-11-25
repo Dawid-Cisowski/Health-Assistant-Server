@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface DailySummaryFacade {
 
-    DailySummary generateDailySummary(LocalDate date);
+    void generateDailySummary(LocalDate date);
 
     Optional<DailySummary> getDailySummary(LocalDate date);
 
