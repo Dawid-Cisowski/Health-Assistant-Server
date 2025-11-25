@@ -66,7 +66,7 @@ gcloud run deploy "$SERVICE" \
   --platform managed \
   --allow-unauthenticated \
   --port "$PORT" \
-  --cpu=1 --memory=512Mi --min-instances=1 --max-instances=10 \
+  --cpu=1 --memory=1GiB --min-instances=1 --max-instances=10 \
   --add-cloudsql-instances "$INSTANCE_CONN" \
   --set-env-vars "SPRING_PROFILES_ACTIVE=production" \
   --set-env-vars "SPRING_DATASOURCE_URL=jdbc:postgresql:///$DB_NAME?cloudSqlInstance=$INSTANCE_CONN&socketFactory=com.google.cloud.sql.postgres.SocketFactory" \
