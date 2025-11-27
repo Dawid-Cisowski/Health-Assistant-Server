@@ -47,23 +47,52 @@ class GoogleFitSyncService implements GoogleFitFacade {
         syncAll();
     }
 
+    @Scheduled(cron = "0 0 0 * * *")  // 00:00 UTC = 01:00 CET / 02:00 CEST
+    public void syncPreviousDay() {
+        log.info("Starting previous day sync (safety net)");
+
+        try {
+            LocalDate yesterday = LocalDate.now(POLAND_ZONE).minusDays(1);
+            ZonedDateTime dayStart = yesterday.atStartOfDay(POLAND_ZONE);
+            ZonedDateTime dayEnd = yesterday.plusDays(1).atStartOfDay(POLAND_ZONE);
+
+            Instant from = dayStart.toInstant();
+            Instant to = dayEnd.toInstant();
+
+            log.info("Syncing previous day {}: {} to {}", yesterday, from, to);
+
+            int events = syncTimeWindow(from, to);
+
+            log.info("Previous day sync completed: {} events", events);
+        } catch (Exception e) {
+            log.error("Failed to sync previous day", e);
+        }
+    }
+
     @Override
     public void syncAll() {
         log.info("Starting Google Fit synchronization");
-        
+
         try {
             Instant now = Instant.now();
-            Instant from = getSyncFromTime();
-            Instant to = roundToNextBucket(now);
+            Instant aggregateFrom = getSyncFromTime();
+            Instant aggregateTo = roundToNextBucket(now);
 
-            log.info("Syncing Google Fit data from {} to {}", from, to);
+            // Dla sesji (sleep, workout) - cały bieżący dzień (mogą pojawić się z opóźnieniem)
+            ZonedDateTime todayStart = LocalDate.now(POLAND_ZONE).atStartOfDay(POLAND_ZONE);
+            Instant sessionsFrom = todayStart.toInstant();
+            Instant sessionsTo = aggregateTo;
 
-            var aggregateRequest = getAggregateRequest(from, to);
+            // 1. Pobierz dane agregowane (inkrementalnie)
+            log.info("Syncing aggregate data from {} to {}", aggregateFrom, aggregateTo);
+            var aggregateRequest = getAggregateRequest(aggregateFrom, aggregateTo);
             var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
             List<GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
 
-            String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
-            String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
+            // 2. Pobierz sesje (cały dzień)
+            log.info("Syncing sessions from {} to {}", sessionsFrom, sessionsTo);
+            String startTimeRfc3339 = RFC3339_FORMATTER.format(sessionsFrom);
+            String endTimeRfc3339 = RFC3339_FORMATTER.format(sessionsTo);
             var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
             List<GoogleFitSession> allSessions = sessionsResponse.sessions() != null
                     ? sessionsResponse.sessions()
@@ -88,14 +117,14 @@ class GoogleFitSyncService implements GoogleFitFacade {
 
             if (eventEnvelopes.isEmpty()) {
                 log.info("No events to process");
-                updateLastSyncedAt(to);
+                updateLastSyncedAt(aggregateTo);
                 return;
             }
 
             StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, GOOGLE_FIT_DEVICE_ID);
             healthEventsFacade.storeHealthEvents(command);
 
-            updateLastSyncedAt(to);
+            updateLastSyncedAt(aggregateTo);
 
             log.info("Successfully synchronized {} events from Google Fit ({} from aggregate, {} sleep sessions, {} walking sessions)",
                     eventEnvelopes.size(),
@@ -135,22 +164,16 @@ class GoogleFitSyncService implements GoogleFitFacade {
                 .orElse(null);
 
         if (state == null) {
-            ZonedDateTime yesterday = LocalDate.now(POLAND_ZONE)
-                    .minusDays(1)
-                    .atStartOfDay(POLAND_ZONE);
-            Instant firstSync = yesterday.toInstant();
-            log.info("First sync detected, starting from yesterday: {}", firstSync);
+            // Pierwszy sync - od początku dzisiejszego dnia
+            ZonedDateTime todayStart = LocalDate.now(POLAND_ZONE).atStartOfDay(POLAND_ZONE);
+            Instant firstSync = todayStart.toInstant();
+            log.info("First sync detected, starting from today: {}", firstSync);
             return firstSync;
         }
 
-        Instant lastSyncedMinusBuffer = state.getLastSyncedAt().minus(BUFFER_HOURS, ChronoUnit.HOURS);
-        ZonedDateTime yesterdayStart = LocalDate.now(POLAND_ZONE)
-                .minusDays(1)
-                .atStartOfDay(POLAND_ZONE);
-        Instant yesterday = yesterdayStart.toInstant();
-        
-        Instant syncFrom = lastSyncedMinusBuffer.isBefore(yesterday) ? lastSyncedMinusBuffer : yesterday;
-        log.info("Sync from time: {} (lastSynced: {}, yesterday: {})", syncFrom, state.getLastSyncedAt(), yesterday);
+        // Dodaj 1h buffer na wszelki wypadek (opóźnione dane z zegarka)
+        Instant syncFrom = state.getLastSyncedAt().minus(BUFFER_HOURS, ChronoUnit.HOURS);
+        log.info("Sync from time: {} (lastSynced: {})", syncFrom, state.getLastSyncedAt());
         return syncFrom;
     }
 
