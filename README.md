@@ -1,6 +1,6 @@
 # Health Assistant Server
 
-A Spring Boot 3.3 backend service for health data ingestion, synchronization with Google Fit, and daily health summaries with HMAC authentication and idempotency guarantees.
+A Spring Boot 3.3 backend service for health data ingestion, synchronization with Google Fit, and daily health summaries with HMAC authentication and idempotency guarantees
 
 ## 🚀 Features
 
