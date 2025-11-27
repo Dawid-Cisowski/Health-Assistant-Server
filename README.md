@@ -218,12 +218,16 @@ See [Swagger UI](http://localhost:8080/swagger-ui.html) for detailed documentati
 
 ## 🔄 Google Fit Synchronization
 
-### Automatic Sync
-Runs every 15 minutes via `@Scheduled` task:
-- Fetches data from last sync time (with 1-hour buffer)
-- Processes 1-minute buckets for steps, distance, calories, heart rate
-- Imports sleep sessions and walking sessions
+### Automatic Sync (every 15 minutes)
+Runs via `@Scheduled` task with smart data fetching:
+- **Aggregate data** (steps, distance, calories, HR): fetched incrementally from last sync time (with 1-hour buffer)
+- **Sessions** (sleep, workouts): fetched for the entire current day (handles delayed data from wearables)
 - Updates daily summaries
+
+### Daily Safety Net Sync (01:00 CET)
+Runs at midnight UTC (01:00 CET / 02:00 CEST):
+- Full sync of the previous day's data
+- Ensures no data is missed due to delayed uploads from wearables
 
 ### Historical Sync
 Parallel processing of historical data:
