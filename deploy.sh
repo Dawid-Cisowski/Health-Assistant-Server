@@ -73,7 +73,7 @@ gcloud run deploy "$SERVICE" \
   --set-env-vars "SPRING_DATASOURCE_USERNAME=$DB_USER" \
   --set-env-vars "HMAC_TOLERANCE_SEC=600" \
   --set-env-vars "NONCE_CACHE_TTL_SEC=600" \
-  --set-env-vars "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5" \
+  --set-env-vars "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=20" \
   --set-env-vars "SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=0" \
   --set-env-vars "SPRING_JPA_HIBERNATE_DDL_AUTO=none" \
   --set-secrets "SPRING_DATASOURCE_PASSWORD=db-password:latest" \
