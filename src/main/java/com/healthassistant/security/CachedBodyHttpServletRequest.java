@@ -15,13 +15,18 @@ import java.nio.charset.StandardCharsets;
  * Wrapper for HttpServletRequest that caches the request body so it can be read multiple times.
  * This is necessary for HMAC signature validation which needs to read the body before the controller.
  */
-class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
+final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 
     private final byte[] cachedBody;
 
-    CachedBodyHttpServletRequest(HttpServletRequest request) throws IOException {
+    private CachedBodyHttpServletRequest(HttpServletRequest request, byte[] cachedBody) {
         super(request);
-        this.cachedBody = request.getInputStream().readAllBytes();
+        this.cachedBody = cachedBody;
+    }
+
+    static CachedBodyHttpServletRequest of(HttpServletRequest request) throws IOException {
+        byte[] body = request.getInputStream().readAllBytes();
+        return new CachedBodyHttpServletRequest(request, body);
     }
 
     @Override

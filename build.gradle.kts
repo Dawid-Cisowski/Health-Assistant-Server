@@ -2,6 +2,8 @@ plugins {
     java
     id("org.springframework.boot") version "3.3.5"
     id("io.spring.dependency-management") version "1.1.6"
+    id("com.github.spotbugs") version "6.0.26"
+    pmd
 }
 
 group = "com.healthassistant"
@@ -91,5 +93,28 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// SpotBugs configuration
+spotbugs {
+    ignoreFailures = false
+    showStackTraces = true
+    showProgress = true
+    effort = com.github.spotbugs.snom.Effort.MAX
+    reportLevel = com.github.spotbugs.snom.Confidence.LOW
+    excludeFilter = file("config/spotbugs/exclude.xml")
+}
+
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    reports.create("html") { required = true }
+    reports.create("xml") { required = false }
+}
+
+// PMD configuration
+pmd {
+    isConsoleOutput = true
+    toolVersion = "7.8.0"
+    rulesMinimumPriority = 5
+    ruleSets = listOf("category/java/bestpractices.xml", "category/java/errorprone.xml")
 }
 

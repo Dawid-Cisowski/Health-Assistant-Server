@@ -174,10 +174,6 @@ class StepsProjector {
         return null;
     }
 
-    private Integer getInteger(Map<String, Object> map, String key) {
-        return getInteger(map, key, null);
-    }
-
     private Integer getInteger(Map<String, Object> map, String key, Integer defaultValue) {
         Object value = map.get(key);
         if (value == null) return defaultValue;

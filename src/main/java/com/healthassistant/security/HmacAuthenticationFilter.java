@@ -49,7 +49,7 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
         HttpServletRequest wrappedRequest = request;
         String method = request.getMethod();
         if (hasRequestBody(method)) {
-            wrappedRequest = new CachedBodyHttpServletRequest(request);
+            wrappedRequest = CachedBodyHttpServletRequest.of(request);
         }
 
         try {
@@ -148,8 +148,7 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
 
     private String getRequestBody(HttpServletRequest request) {
         if (request instanceof CachedBodyHttpServletRequest cachedRequest) {
-            String body = cachedRequest.getBody();
-            return body != null ? body : "";
+            return cachedRequest.getBody();
         }
         return "";
     }

@@ -45,6 +45,7 @@ class EventValidator {
             case "WalkingSessionRecorded.v1" -> validateWalkingSession(payload, errors);
             case "WorkoutRecorded.v1" -> validateWorkout(payload, errors);
             case "MealRecorded.v1" -> validateMeal(payload, errors);
+            default -> { /* Unknown event types are validated only for required fields */ }
         }
     }
 
@@ -230,7 +231,7 @@ class EventValidator {
             if (num < 0) {
                 errors.add(EventValidationError.invalidValue(field, "must be non-negative"));
             }
-        } catch (Exception e) {
+        } catch (ClassCastException e) {
             errors.add(EventValidationError.invalidValue(field, "must be a number"));
         }
     }
@@ -243,7 +244,7 @@ class EventValidator {
             if (num < 1) {
                 errors.add(EventValidationError.invalidValue(field, "must be positive (>= 1)"));
             }
-        } catch (Exception e) {
+        } catch (ClassCastException e) {
             errors.add(EventValidationError.invalidValue(field, "must be a number"));
         }
     }

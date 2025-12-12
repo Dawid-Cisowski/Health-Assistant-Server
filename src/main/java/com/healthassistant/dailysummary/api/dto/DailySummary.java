@@ -23,6 +23,10 @@ public record DailySummary(
         Objects.requireNonNull(heart, "Heart cannot be null");
         Objects.requireNonNull(nutrition, "Nutrition cannot be null");
         Objects.requireNonNull(meals, "Meals cannot be null");
+        exercises = List.copyOf(exercises);
+        workouts = List.copyOf(workouts);
+        sleep = List.copyOf(sleep);
+        meals = List.copyOf(meals);
     }
 
     public record Activity(

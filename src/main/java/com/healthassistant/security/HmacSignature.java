@@ -3,6 +3,8 @@ package com.healthassistant.security;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
 class HmacSignature {
@@ -16,7 +18,7 @@ class HmacSignature {
             mac.init(keySpec);
             byte[] hmacBytes = mac.doFinal(canonicalString.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hmacBytes);
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalArgumentException("Failed to compute HMAC: " + e.getMessage(), e);
         }
     }
