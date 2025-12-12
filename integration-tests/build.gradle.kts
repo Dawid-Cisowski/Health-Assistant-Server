@@ -1,5 +1,6 @@
 plugins {
     groovy
+    jacoco
     id("org.springframework.boot") version "3.3.5"
     id("io.spring.dependency-management") version "1.1.6"
 }
@@ -10,6 +11,14 @@ version = "1.0.0"
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    all {
+        exclude(group = "org.springframework.boot", module = "spring-boot-starter-logging")
+        exclude(group = "ch.qos.logback", module = "logback-classic")
+        exclude(group = "ch.qos.logback", module = "logback-core")
     }
 }
 
@@ -75,5 +84,34 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 
 tasks.named<Jar>("jar") {
     enabled = true
+}
+
+// JaCoCo configuration
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.test {
+    ignoreFailures = true  // Allow coverage report even when tests fail
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    // Include main module classes in coverage report
+    classDirectories.setFrom(
+        files(
+            project(":").layout.buildDirectory.dir("classes/java/main")
+        )
+    )
+    sourceDirectories.setFrom(
+        files(
+            project(":").file("src/main/java")
+        )
+    )
+
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 

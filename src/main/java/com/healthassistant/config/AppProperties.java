@@ -73,8 +73,8 @@ public class AppProperties {
         private String clientId;
         private String clientSecret;
         private String refreshToken;
-        private String apiUrl = "https://www.googleapis.com/fitness/v1";
-        private String oauthUrl = "https://oauth2.googleapis.com";
+        private String apiUrl;
+        private String oauthUrl;
     }
 }
 
