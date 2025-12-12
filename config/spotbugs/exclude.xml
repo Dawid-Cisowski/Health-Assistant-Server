@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Exclude MapStruct generated code -->
+    <Match>
+        <Source name="~.*MapperImpl\.java"/>
+    </Match>
+
+    <!-- Exclude EI_EXPOSE_REP for DTO packages - DTOs are immutable by design in web APIs -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Or>
+            <Package name="~com\.healthassistant\..*\.api\.dto"/>
+            <Package name="~com\.healthassistant\.googlefit"/>
+            <Package name="~com\.healthassistant\.healthevents\.api\.dto\.payload"/>
+            <Class name="~.*Builder"/>
+            <Class name="~.*\$.*Builder"/>
+        </Or>
+    </Match>
+
+    <!-- Exclude Lombok @Data/@Getter returning mutable objects -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Text blocks use literal newlines which is idiomatic Java - false positive -->
+    <Match>
+        <Class name="com.healthassistant.assistant.AssistantService"/>
+        <Method name="buildSystemInstruction"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+
+    <!-- Spring Boot config classes need mutable nested objects for property binding -->
+    <Match>
+        <Class name="com.healthassistant.config.AppProperties"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="com.healthassistant.config.AppProperties$HmacConfig"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Class name="com.healthassistant.config.api.dto.ErrorResponse"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- JPA entities need mutable collections for Hibernate -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Or>
+            <Class name="~com\.healthassistant\..*JpaEntity"/>
+            <Class name="~com\.healthassistant\.healthevents\.HealthEventJpaEntity"/>
+        </Or>
+    </Match>
+
+    <!-- Scheduled job needs catch-all for synchronization errors -->
+    <Match>
+        <Class name="com.healthassistant.googlefit.GoogleFitSyncService"/>
+        <Method name="syncAll"/>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+    </Match>
+</FindBugsFilter>

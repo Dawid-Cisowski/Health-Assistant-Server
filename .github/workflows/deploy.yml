@@ -1,0 +1,59 @@
+name: Build, Test & Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main, master]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-central2
+  SERVICE_NAME: health-assistant
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build and Test
+        run: ./gradlew build
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push Docker image
+        run: |
+          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated
