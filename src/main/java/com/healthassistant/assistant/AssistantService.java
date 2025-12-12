@@ -80,6 +80,7 @@ class AssistantService implements AssistantFacade {
            """.formatted(currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
     }
 
+    @Override
     public Flux<AssistantEvent> streamChat(ChatRequest request, String deviceId) {
         log.info("Processing streaming chat request for device {}: {} (conversationId: {})",
                 deviceId, request.message(), request.conversationId());

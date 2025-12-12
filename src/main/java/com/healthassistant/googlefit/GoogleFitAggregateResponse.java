@@ -9,8 +9,8 @@ public record GoogleFitAggregateResponse(
         @JsonProperty("bucket")
         List<GoogleFitBucket> buckets
 ) {
-    public GoogleFitAggregateResponse {
-        buckets = buckets != null ? buckets : new ArrayList<>();
+    public GoogleFitAggregateResponse(List<GoogleFitBucket> buckets) {
+        this.buckets = buckets != null ? buckets : new ArrayList<>();
     }
 
     public record GoogleFitBucket(

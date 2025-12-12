@@ -116,7 +116,8 @@ pmd {
     isConsoleOutput = true
     toolVersion = "7.8.0"
     rulesMinimumPriority = 5
-    ruleSets = listOf("category/java/bestpractices.xml", "category/java/errorprone.xml")
+    ruleSets = emptyList()  // Clear default rulesets
+    ruleSetFiles = files("config/pmd/ruleset.xml")
 }
 
 // JaCoCo configuration

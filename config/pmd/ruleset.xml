@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<ruleset name="Health Assistant Custom Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>Custom PMD ruleset for Health Assistant project</description>
+
+    <!-- Best Practices -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- GuardLogStatement is not needed with SLF4J/Log4j2 parameterized logging -->
+        <exclude name="GuardLogStatement"/>
+        <!-- AvoidLiteralsInIfCondition is too strict for simple comparisons like > 0 -->
+        <exclude name="LiteralsFirstInComparisons"/>
+    </rule>
+
+    <!-- Error Prone -->
+    <rule ref="category/java/errorprone.xml">
+        <!-- Allow simple literals in conditions like size > 0 -->
+        <exclude name="AvoidLiteralsInIfCondition"/>
+        <!-- Allow duplicate literals - extracting constants for everything leads to over-engineering -->
+        <exclude name="AvoidDuplicateLiterals"/>
+    </rule>
+
+</ruleset>

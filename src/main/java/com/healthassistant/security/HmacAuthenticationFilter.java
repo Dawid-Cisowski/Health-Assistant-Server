@@ -128,7 +128,7 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
         try {
             return Instant.parse(timestampStr);
         } catch (DateTimeParseException e) {
-            throw new HmacAuthenticationException("Invalid timestamp format (expected ISO-8601 UTC)");
+            throw new HmacAuthenticationException("Invalid timestamp format (expected ISO-8601 UTC)", e);
         }
     }
 
@@ -167,8 +167,14 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
     }
 
     static class HmacAuthenticationException extends Exception {
+        private static final long serialVersionUID = 1L;
+
         HmacAuthenticationException(String message) {
             super(message);
+        }
+
+        HmacAuthenticationException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }
