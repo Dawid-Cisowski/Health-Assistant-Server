@@ -12,7 +12,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class GoogleFitSyncState {
+class GoogleFitSyncState {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

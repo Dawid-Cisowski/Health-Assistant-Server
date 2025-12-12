@@ -3,7 +3,7 @@ package com.healthassistant.googlefit;
 import java.time.Instant;
 import java.util.List;
 
-public record GoogleFitBucketData(
+record GoogleFitBucketData(
         Instant bucketStart,
         Instant bucketEnd,
         Long steps,

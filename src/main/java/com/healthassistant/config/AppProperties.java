@@ -3,6 +3,7 @@ package com.healthassistant.config;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -15,8 +16,8 @@ import java.util.Map;
 
 @Configuration
 @ConfigurationProperties(prefix = "app")
-@Data
 @Slf4j
+@Getter
 public class AppProperties {
 
     private final HmacConfig hmac = new HmacConfig();
