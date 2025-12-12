@@ -17,6 +17,9 @@ configurations {
     compileOnly {
         extendsFrom(configurations.annotationProcessor.get())
     }
+    all {
+        exclude(group = "org.springframework.boot", module = "spring-boot-starter-logging")
+    }
 }
 
 repositories {
@@ -41,6 +44,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+
+    // Log4j2 with JSON logging
+    implementation("org.springframework.boot:spring-boot-starter-log4j2")
+    implementation("com.lmax:disruptor:3.4.4") // Async logging support
+    implementation("org.apache.logging.log4j:log4j-layout-template-json:2.23.1")
 
     // Spring AI
     implementation("org.springframework.ai:spring-ai-starter-model-google-genai")

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Properties>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</Property>
+        <Property name="APP_NAME">health-assistant</Property>
+    </Properties>
+
+    <Appenders>
+        <!-- Console appender with JSON layout for production -->
+        <Console name="JsonConsole" target="SYSTEM_OUT">
+            <JsonTemplateLayout eventTemplateUri="classpath:JsonLayout.json"/>
+        </Console>
+
+        <!-- Console appender with pattern layout for local development -->
+        <Console name="PatternConsole" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <!-- Application loggers -->
+        <Logger name="com.healthassistant" level="INFO" additivity="false">
+            <AppenderRef ref="JsonConsole"/>
+        </Logger>
+
+        <!-- Spring framework -->
+        <Logger name="org.springframework" level="INFO" additivity="false">
+            <AppenderRef ref="JsonConsole"/>
+        </Logger>
+
+        <!-- Hibernate SQL logging (set to DEBUG to see queries) -->
+        <Logger name="org.hibernate.SQL" level="WARN" additivity="false">
+            <AppenderRef ref="JsonConsole"/>
+        </Logger>
+
+        <!-- Hibernate parameter binding (set to TRACE to see bound params) -->
+        <Logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="WARN" additivity="false">
+            <AppenderRef ref="JsonConsole"/>
+        </Logger>
+
+        <!-- HikariCP -->
+        <Logger name="com.zaxxer.hikari" level="INFO" additivity="false">
+            <AppenderRef ref="JsonConsole"/>
+        </Logger>
+
+        <!-- Flyway -->
+        <Logger name="org.flywaydb" level="INFO" additivity="false">
+            <AppenderRef ref="JsonConsole"/>
+        </Logger>
+
+        <!-- Root logger -->
+        <Root level="INFO">
+            <AppenderRef ref="JsonConsole"/>
+        </Root>
+    </Loggers>
+</Configuration>
