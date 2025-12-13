@@ -71,7 +71,7 @@ health-assistant-server/
 ├── src/main/resources/
 │   ├── application.yml
 │   └── db/migration/           # Flyway migrations
-├── integration-tests/          # Integration tests (46 tests)
+├── integration-tests/          # Integration tests (228 Spock tests)
 ├── docker-compose.yml
 ├── Dockerfile
 └── README.md
@@ -256,11 +256,23 @@ curl -X POST http://localhost:8080/v1/google-fit/sync/history?days=30
 open integration-tests/build/reports/tests/test/index.html
 ```
 
-**Test Coverage**: 46 integration tests covering:
+**Test Coverage**: 228 integration tests covering:
 - HMAC authentication (11 tests)
-- Event validation (13 tests)
-- Batch processing (13 tests)
+- Batch event processing (13 tests)
 - Error handling (9 tests)
+- Daily summaries (20 tests)
+- Meal event validation (14 tests)
+- Workout event validation (15 tests)
+- Steps event validation (10 tests)
+- Distance event validation (11 tests)
+- Heart rate event validation (16 tests)
+- Sleep event validation (9 tests)
+- Walking session validation (13 tests)
+- Active minutes validation (9 tests)
+- Active calories validation (9 tests)
+- Steps projections (17 tests)
+- Sleep projections (17 tests)
+- Workout projections (35 tests)
 
 ## 📈 Monitoring
 
@@ -297,6 +309,7 @@ curl http://localhost:8080/actuator/prometheus
 
 ## 🚧 Recent Updates
 
+- ✅ **Comprehensive Test Coverage** - 228 integration tests covering all 9 event types with validation
 - ✅ **Conversation History** - Multi-turn AI conversations with context retention
 - ✅ **AI Health Assistant** - Natural language chat interface with Gemini 2.0 Flash
 - ✅ **Smart Date Recognition** - Automatic interpretation of "dzisiaj", "ostatni tydzień", etc.

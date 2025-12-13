@@ -750,5 +750,296 @@ class DailySummarySpec extends BaseIntegrationSpec {
         dailyStats.size() == 0
     }
 
+    def "Scenario 16: Summary includes distance data from DistanceBucketRecorded events"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 12, 5)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "distance event"
+        def bucketTime = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(10).toInstant()
+        def distanceEvent = [
+            idempotencyKey: "distance-2025-12-05-1",
+            type: "DistanceBucketRecorded.v1",
+            occurredAt: bucketTime.toString(),
+            payload: [
+                bucketStart: bucketTime.minusSeconds(3600).toString(),
+                bucketEnd: bucketTime.toString(),
+                distanceMeters: 2500.5,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit distance event"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+                    events: [distanceEvent],
+                    deviceId: deviceId
+                ]))
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes distance data"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+        summary.getString("date") == dateStr
+        summary.getLong("activity.distanceMeters") == 2501L // rounded from 2500.5
+    }
+
+    def "Scenario 17: Summary includes heart rate data from HeartRateSummaryRecorded events"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 12, 6)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "heart rate summary event"
+        def bucketTime = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(9).toInstant()
+        def heartRateEvent = [
+            idempotencyKey: "hr-2025-12-06-1",
+            type: "HeartRateSummaryRecorded.v1",
+            occurredAt: bucketTime.toString(),
+            payload: [
+                bucketStart: bucketTime.minusSeconds(900).toString(),
+                bucketEnd: bucketTime.toString(),
+                avg: 78.5,
+                min: 62,
+                max: 115,
+                samples: 50,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit heart rate event"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+                    events: [heartRateEvent],
+                    deviceId: deviceId
+                ]))
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes heart rate data"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+        summary.getString("date") == dateStr
+        def avgBpm = summary.getInt("heart.avgBpm")
+        (avgBpm == 78 || avgBpm == 79) // Allow for rounding differences
+        summary.getInt("heart.maxBpm") == 115
+    }
+
+    def "Scenario 18: Summary includes active minutes data"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 12, 7)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "active minutes event"
+        def bucketTime = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(14).toInstant()
+        def activeMinutesEvent = [
+            idempotencyKey: "active-minutes-2025-12-07-1",
+            type: "ActiveMinutesRecorded.v1",
+            occurredAt: bucketTime.toString(),
+            payload: [
+                bucketStart: bucketTime.minusSeconds(3600).toString(),
+                bucketEnd: bucketTime.toString(),
+                activeMinutes: 45,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit active minutes event"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+                    events: [activeMinutesEvent],
+                    deviceId: deviceId
+                ]))
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes active minutes data"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+        summary.getString("date") == dateStr
+        summary.getInt("activity.activeMinutes") == 45
+    }
+
+    def "Scenario 19: Summary includes active calories data"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 12, 8)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "active calories event"
+        def bucketTime = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(16).toInstant()
+        def activeCaloriesEvent = [
+            idempotencyKey: "active-calories-2025-12-08-1",
+            type: "ActiveCaloriesBurnedRecorded.v1",
+            occurredAt: bucketTime.toString(),
+            payload: [
+                bucketStart: bucketTime.minusSeconds(3600).toString(),
+                bucketEnd: bucketTime.toString(),
+                energyKcal: 320.5,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit active calories event"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+                    events: [activeCaloriesEvent],
+                    deviceId: deviceId
+                ]))
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes active calories data"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+        summary.getString("date") == dateStr
+        def activeCalories = summary.getDouble("activity.activeCalories")
+        (activeCalories == 320.5 || activeCalories == 320.0 || activeCalories == 321.0) // Allow rounding
+    }
+
+    def "Scenario 20: Summary aggregates multiple event types from the same day correctly"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 12, 9)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "multiple event types for the same day"
+        def baseTime = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
+
+        def stepsEvent = [
+            idempotencyKey: "steps-2025-12-09-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: baseTime.plusHours(10).toInstant().toString(),
+            payload: [
+                bucketStart: baseTime.plusHours(9).toInstant().toString(),
+                bucketEnd: baseTime.plusHours(10).toInstant().toString(),
+                count: 3500,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        def distanceEvent = [
+            idempotencyKey: "distance-2025-12-09-1",
+            type: "DistanceBucketRecorded.v1",
+            occurredAt: baseTime.plusHours(10).toInstant().toString(),
+            payload: [
+                bucketStart: baseTime.plusHours(9).toInstant().toString(),
+                bucketEnd: baseTime.plusHours(10).toInstant().toString(),
+                distanceMeters: 2800.0,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        def caloriesEvent = [
+            idempotencyKey: "calories-2025-12-09-1",
+            type: "ActiveCaloriesBurnedRecorded.v1",
+            occurredAt: baseTime.plusHours(10).toInstant().toString(),
+            payload: [
+                bucketStart: baseTime.plusHours(9).toInstant().toString(),
+                bucketEnd: baseTime.plusHours(10).toInstant().toString(),
+                energyKcal: 150.0,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        def activeMinutesEvent = [
+            idempotencyKey: "active-2025-12-09-1",
+            type: "ActiveMinutesRecorded.v1",
+            occurredAt: baseTime.plusHours(10).toInstant().toString(),
+            payload: [
+                bucketStart: baseTime.plusHours(9).toInstant().toString(),
+                bucketEnd: baseTime.plusHours(10).toInstant().toString(),
+                activeMinutes: 35,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        def heartRateEvent = [
+            idempotencyKey: "hr-2025-12-09-1",
+            type: "HeartRateSummaryRecorded.v1",
+            occurredAt: baseTime.plusHours(10).toInstant().toString(),
+            payload: [
+                bucketStart: baseTime.plusHours(9).toInstant().toString(),
+                bucketEnd: baseTime.plusHours(10).toInstant().toString(),
+                avg: 85.0,
+                min: 70,
+                max: 120,
+                samples: 60,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit all events"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+                    events: [stepsEvent, distanceEvent, caloriesEvent, activeMinutesEvent, heartRateEvent],
+                    deviceId: deviceId
+                ]))
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        and: "I get summary for the date"
+        def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+                .get("/v1/daily-summaries/${dateStr}")
+                .then()
+                .extract()
+
+        then: "summary includes all activity data"
+        getResponse.statusCode() == 200
+        def summary = getResponse.body().jsonPath()
+        summary.getString("date") == dateStr
+        summary.getInt("activity.steps") == 3500
+        summary.getLong("activity.distanceMeters") == 2800L
+        summary.getInt("activity.activeMinutes") == 35
+        def activeCalories = summary.getDouble("activity.activeCalories")
+        (activeCalories == 150.0 || activeCalories == 150)
+
+        and: "summary includes heart rate data"
+        summary.getInt("heart.avgBpm") == 85
+        summary.get("heart.maxBpm") == 120
+    }
+
 }
 

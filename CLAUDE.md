@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run only main module tests (if any exist)
 ./gradlew test
 
-# Run only integration tests (46 Spock tests)
+# Run only integration tests (228 Spock tests)
 ./gradlew :integration-tests:test
 
 # Clean build
@@ -290,16 +290,28 @@ See `EventValidator.java` for detailed validation rules.
 **Test Framework**: Spock (Groovy) with Spring Boot Test + Testcontainers
 
 **Integration Tests** (`integration-tests/` module):
-- 46 Spock specifications
+- 228 Spock specifications
 - PostgreSQL via Testcontainers
 - REST Assured for API testing
 - WireMock for mocking Google Fit API
 
 **Test Categories**:
 - HMAC authentication (11 tests)
-- Event validation (13 tests)
-- Batch processing (13 tests)
+- Batch event processing (13 tests)
 - Error handling (9 tests)
+- Daily summaries (20 tests)
+- Meal event validation (14 tests)
+- Workout event validation (15 tests)
+- Steps event validation (10 tests)
+- Distance event validation (11 tests)
+- Heart rate event validation (16 tests)
+- Sleep event validation (9 tests)
+- Walking session validation (13 tests)
+- Active minutes validation (9 tests)
+- Active calories validation (9 tests)
+- Steps projections (17 tests)
+- Sleep projections (17 tests)
+- Workout projections (35 tests)
 
 **Running Tests**:
 ```bash
