@@ -10,4 +10,6 @@ public interface SleepFacade {
     SleepDailyDetailResponse getDailyDetail(LocalDate date);
 
     SleepRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate);
+
+    void deleteAllProjections();
 }

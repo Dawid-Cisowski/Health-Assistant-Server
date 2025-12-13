@@ -179,4 +179,12 @@ public class SleepService implements SleepFacade {
             .dailyStats(dailyStats)
             .build();
     }
+
+    @Override
+    @Transactional
+    public void deleteAllProjections() {
+        log.warn("Deleting all sleep projections");
+        sessionRepository.deleteAll();
+        dailyRepository.deleteAll();
+    }
 }

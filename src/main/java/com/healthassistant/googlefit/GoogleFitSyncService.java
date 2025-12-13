@@ -290,5 +290,11 @@ class GoogleFitSyncService implements GoogleFitFacade {
         syncStateRepository.save(state);
         log.info("Updated lastSyncedAt to {}", lastSyncedAt);
     }
+
+    @Override
+    public void deleteAllSyncState() {
+        log.warn("Deleting all Google Fit sync state");
+        syncStateRepository.deleteAll();
+    }
 }
 

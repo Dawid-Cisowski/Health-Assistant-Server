@@ -10,4 +10,6 @@ public interface StepsFacade {
     StepsDailyBreakdownResponse getDailyBreakdown(LocalDate date);
 
     StepsRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate);
+
+    void deleteAllProjections();
 }

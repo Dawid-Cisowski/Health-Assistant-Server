@@ -138,4 +138,9 @@ class AssistantService implements AssistantFacade {
         log.error("Chat processing error", error);
         return new ErrorEvent("Przepraszam, wystąpił błąd podczas przetwarzania Twojego pytania.");
     }
+
+    @Override
+    public void deleteAllConversations() {
+        conversationService.deleteAllConversations();
+    }
 }

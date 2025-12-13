@@ -1,8 +1,8 @@
 package com.healthassistant.dailysummary;
 
 import com.healthassistant.dailysummary.api.dto.DailySummary;
-import com.healthassistant.healthevents.HealthEventJpaEntity;
-import com.healthassistant.healthevents.HealthEventJpaRepository;
+import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.healthevents.api.dto.EventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,13 +22,13 @@ class DailySummaryAggregator {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
-    private final HealthEventJpaRepository healthEventJpaRepository;
+    private final HealthEventsFacade healthEventsFacade;
 
     DailySummary aggregate(LocalDate date) {
         Instant dayStart = date.atStartOfDay(POLAND_ZONE).toInstant();
         Instant dayEnd = date.plusDays(1).atStartOfDay(POLAND_ZONE).toInstant();
 
-        List<HealthEventJpaEntity> events = healthEventJpaRepository.findByOccurredAtBetween(dayStart, dayEnd);
+        List<EventData> events = healthEventsFacade.findEventsByOccurredAtBetween(dayStart, dayEnd);
 
         log.info("Aggregating {} events for date {}", events.size(), date);
 
@@ -52,19 +52,19 @@ class DailySummaryAggregator {
         );
     }
 
-    private DailySummary.Activity aggregateActivity(List<HealthEventJpaEntity> events) {
+    private DailySummary.Activity aggregateActivity(List<EventData> events) {
         int totalSteps = 0;
         int totalActiveMinutes = 0;
         int totalActiveCalories = 0;
         long totalDistanceMeters = 0L;
 
-        for (HealthEventJpaEntity event : events) {
-            Map<String, Object> payload = event.getPayload();
+        for (EventData event : events) {
+            Map<String, Object> payload = event.payload();
 
-            totalSteps += extractSteps(event.getEventType(), payload);
-            totalActiveMinutes += extractActiveMinutes(event.getEventType(), payload);
-            totalActiveCalories += extractActiveCalories(event.getEventType(), payload);
-            totalDistanceMeters += extractDistance(event.getEventType(), payload);
+            totalSteps += extractSteps(event.eventType(), payload);
+            totalActiveMinutes += extractActiveMinutes(event.eventType(), payload);
+            totalActiveCalories += extractActiveCalories(event.eventType(), payload);
+            totalDistanceMeters += extractDistance(event.eventType(), payload);
         }
 
         return new DailySummary.Activity(
@@ -110,16 +110,16 @@ class DailySummaryAggregator {
         return value.doubleValue() == 0.0 ? null : value;
     }
 
-    private List<DailySummary.Exercise> aggregateExercises(List<HealthEventJpaEntity> events) {
+    private List<DailySummary.Exercise> aggregateExercises(List<EventData> events) {
         return events.stream()
-                .filter(e -> "WalkingSessionRecorded.v1".equals(e.getEventType()))
+                .filter(e -> "WalkingSessionRecorded.v1".equals(e.eventType()))
                 .map(this::toExercise)
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    private DailySummary.Exercise toExercise(HealthEventJpaEntity event) {
-        Map<String, Object> payload = event.getPayload();
+    private DailySummary.Exercise toExercise(EventData event) {
+        Map<String, Object> payload = event.payload();
 
         try {
             Instant start = parseInstant(payload.get("start"));
@@ -154,16 +154,16 @@ class DailySummaryAggregator {
         }
     }
 
-    private List<DailySummary.Workout> aggregateWorkouts(List<HealthEventJpaEntity> events) {
+    private List<DailySummary.Workout> aggregateWorkouts(List<EventData> events) {
         return events.stream()
-                .filter(e -> "WorkoutRecorded.v1".equals(e.getEventType()))
+                .filter(e -> "WorkoutRecorded.v1".equals(e.eventType()))
                 .map(this::toWorkout)
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    private DailySummary.Workout toWorkout(HealthEventJpaEntity event) {
-        Map<String, Object> payload = event.getPayload();
+    private DailySummary.Workout toWorkout(EventData event) {
+        Map<String, Object> payload = event.payload();
 
         try {
             String workoutId = getString(payload, "workoutId");
@@ -176,15 +176,15 @@ class DailySummaryAggregator {
         }
     }
 
-    private List<DailySummary.Sleep> aggregateSleep(List<HealthEventJpaEntity> events) {
+    private List<DailySummary.Sleep> aggregateSleep(List<EventData> events) {
         return events.stream()
-                .filter(e -> "SleepSessionRecorded.v1".equals(e.getEventType()))
+                .filter(e -> "SleepSessionRecorded.v1".equals(e.eventType()))
                 .map(this::toSleep)
                 .toList();
     }
 
-    private DailySummary.Sleep toSleep(HealthEventJpaEntity event) {
-        Map<String, Object> payload = event.getPayload();
+    private DailySummary.Sleep toSleep(EventData event) {
+        Map<String, Object> payload = event.payload();
 
         Instant sleepStart = parseInstant(payload.get("sleepStart"));
         Instant sleepEnd = parseInstant(payload.get("sleepEnd"));
@@ -193,14 +193,14 @@ class DailySummaryAggregator {
         return new DailySummary.Sleep(sleepStart, sleepEnd, totalMinutes);
     }
 
-    private DailySummary.Heart aggregateHeart(List<HealthEventJpaEntity> events) {
+    private DailySummary.Heart aggregateHeart(List<EventData> events) {
         List<Integer> heartRates = new ArrayList<>();
         Integer maxHr = null;
 
-        for (HealthEventJpaEntity event : events) {
-            Map<String, Object> payload = event.getPayload();
+        for (EventData event : events) {
+            Map<String, Object> payload = event.payload();
 
-            if ("HeartRateSummaryRecorded.v1".equals(event.getEventType())) {
+            if ("HeartRateSummaryRecorded.v1".equals(event.eventType())) {
                 Integer avg = getInteger(payload, "avg");
                 Integer max = getInteger(payload, "max");
 
@@ -210,7 +210,7 @@ class DailySummaryAggregator {
                 if (max != null && (maxHr == null || max > maxHr)) {
                     maxHr = max;
                 }
-            } else if ("WalkingSessionRecorded.v1".equals(event.getEventType())) {
+            } else if ("WalkingSessionRecorded.v1".equals(event.eventType())) {
                 Integer avg = getInteger(payload, "avgHeartRate");
                 Integer max = getInteger(payload, "maxHeartRate");
 
@@ -231,16 +231,16 @@ class DailySummaryAggregator {
         return new DailySummary.Heart(restingBpm, avgBpm, maxHr);
     }
 
-    private DailySummary.Nutrition aggregateNutrition(List<HealthEventJpaEntity> events) {
+    private DailySummary.Nutrition aggregateNutrition(List<EventData> events) {
         int totalCalories = 0;
         int totalProtein = 0;
         int totalFat = 0;
         int totalCarbs = 0;
         int mealCount = 0;
 
-        for (HealthEventJpaEntity event : events) {
-            if ("MealRecorded.v1".equals(event.getEventType())) {
-                Map<String, Object> payload = event.getPayload();
+        for (EventData event : events) {
+            if ("MealRecorded.v1".equals(event.eventType())) {
+                Map<String, Object> payload = event.payload();
 
                 totalCalories += getInteger(payload, "caloriesKcal", 0);
                 totalProtein += getInteger(payload, "proteinGrams", 0);
@@ -259,16 +259,16 @@ class DailySummaryAggregator {
         );
     }
 
-    private List<DailySummary.Meal> aggregateMeals(List<HealthEventJpaEntity> events) {
+    private List<DailySummary.Meal> aggregateMeals(List<EventData> events) {
         return events.stream()
-                .filter(e -> "MealRecorded.v1".equals(e.getEventType()))
+                .filter(e -> "MealRecorded.v1".equals(e.eventType()))
                 .map(this::toMeal)
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    private DailySummary.Meal toMeal(HealthEventJpaEntity event) {
-        Map<String, Object> payload = event.getPayload();
+    private DailySummary.Meal toMeal(EventData event) {
+        Map<String, Object> payload = event.payload();
 
         try {
             String title = getString(payload, "title");
@@ -278,7 +278,7 @@ class DailySummaryAggregator {
             Integer fatGrams = getInteger(payload, "fatGrams");
             Integer carbohydratesGrams = getInteger(payload, "carbohydratesGrams");
             String healthRating = getString(payload, "healthRating");
-            Instant occurredAt = event.getOccurredAt();
+            Instant occurredAt = event.occurredAt();
 
             return new DailySummary.Meal(
                     title,

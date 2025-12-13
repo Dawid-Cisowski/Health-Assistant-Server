@@ -6,7 +6,9 @@ import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.dailysummary.api.dto.DailySummaryRangeSummaryResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummaryResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DailySummaryService implements DailySummaryFacade {
 
     private final GenerateDailySummaryCommandHandler commandHandler;
@@ -236,5 +239,12 @@ public class DailySummaryService implements DailySummaryFacade {
                 .workouts(workoutSummary)
                 .dailyStats(dailyStats)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllSummaries() {
+        log.warn("Deleting all daily summaries");
+        jpaRepository.deleteAll();
     }
 }

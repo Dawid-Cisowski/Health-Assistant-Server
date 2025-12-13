@@ -1,17 +1,12 @@
 package com.healthassistant.config;
 
-import com.healthassistant.assistant.ConversationMessageRepository;
-import com.healthassistant.assistant.ConversationRepository;
-import com.healthassistant.dailysummary.DailySummaryJpaRepository;
-import com.healthassistant.googlefit.GoogleFitSyncStateRepository;
-import com.healthassistant.healthevents.HealthEventJpaRepository;
-import com.healthassistant.sleep.SleepDailyProjectionJpaRepository;
-import com.healthassistant.sleep.SleepSessionProjectionJpaRepository;
-import com.healthassistant.steps.StepsDailyProjectionJpaRepository;
-import com.healthassistant.steps.StepsHourlyProjectionJpaRepository;
-import com.healthassistant.workout.WorkoutExerciseProjectionJpaRepository;
-import com.healthassistant.workout.WorkoutProjectionJpaRepository;
-import com.healthassistant.workout.WorkoutSetProjectionJpaRepository;
+import com.healthassistant.assistant.api.AssistantFacade;
+import com.healthassistant.dailysummary.api.DailySummaryFacade;
+import com.healthassistant.googlefit.api.GoogleFitFacade;
+import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.sleep.api.SleepFacade;
+import com.healthassistant.steps.api.StepsFacade;
+import com.healthassistant.workout.api.WorkoutFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,18 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class AdminService {
 
-    private final WorkoutSetProjectionJpaRepository workoutSetProjectionRepository;
-    private final WorkoutExerciseProjectionJpaRepository workoutExerciseProjectionRepository;
-    private final WorkoutProjectionJpaRepository workoutProjectionRepository;
-    private final StepsHourlyProjectionJpaRepository stepsHourlyProjectionRepository;
-    private final StepsDailyProjectionJpaRepository stepsDailyProjectionRepository;
-    private final SleepSessionProjectionJpaRepository sleepSessionProjectionRepository;
-    private final SleepDailyProjectionJpaRepository sleepDailyProjectionRepository;
-    private final DailySummaryJpaRepository dailySummaryRepository;
-    private final HealthEventJpaRepository healthEventRepository;
-    private final GoogleFitSyncStateRepository googleFitSyncStateRepository;
-    private final ConversationMessageRepository conversationMessageRepository;
-    private final ConversationRepository conversationRepository;
+    private final StepsFacade stepsFacade;
+    private final WorkoutFacade workoutFacade;
+    private final SleepFacade sleepFacade;
+    private final DailySummaryFacade dailySummaryFacade;
+    private final HealthEventsFacade healthEventsFacade;
+    private final GoogleFitFacade googleFitFacade;
+    private final AssistantFacade assistantFacade;
 
     @Transactional
     public void deleteAllData() {
@@ -41,36 +31,29 @@ public class AdminService {
 
         // Delete projection data first (child tables)
         log.info("Deleting workout projection data");
-        workoutSetProjectionRepository.deleteAll();
-        workoutExerciseProjectionRepository.deleteAll();
-        workoutProjectionRepository.deleteAll();
+        workoutFacade.deleteAllProjections();
 
         log.info("Deleting steps projection data");
-        stepsHourlyProjectionRepository.deleteAll();
-        stepsDailyProjectionRepository.deleteAll();
+        stepsFacade.deleteAllProjections();
 
         log.info("Deleting sleep projection data");
-        sleepSessionProjectionRepository.deleteAll();
-        sleepDailyProjectionRepository.deleteAll();
+        sleepFacade.deleteAllProjections();
 
         // Delete aggregated data
         log.info("Deleting daily summaries");
-        dailySummaryRepository.deleteAll();
+        dailySummaryFacade.deleteAllSummaries();
 
         // Delete source events
         log.info("Deleting all health events");
-        healthEventRepository.deleteAll();
+        healthEventsFacade.deleteAllEvents();
 
         // Delete sync state
         log.info("Deleting Google Fit sync state");
-        googleFitSyncStateRepository.deleteAll();
+        googleFitFacade.deleteAllSyncState();
 
         // Delete AI conversation data
-        log.info("Deleting conversation messages");
-        conversationMessageRepository.deleteAll();
-
         log.info("Deleting conversations");
-        conversationRepository.deleteAll();
+        assistantFacade.deleteAllConversations();
 
         log.warn("All data has been deleted successfully");
     }

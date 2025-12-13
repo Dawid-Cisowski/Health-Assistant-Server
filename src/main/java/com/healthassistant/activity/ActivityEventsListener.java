@@ -4,7 +4,7 @@ import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,7 +14,7 @@ class ActivityEventsListener {
 
     private final ActivityProjector activityProjector;
 
-    @EventListener
+    @ApplicationModuleListener
     public void onEventsStored(EventsStoredEvent event) {
         log.info("Activity listener received EventsStoredEvent with {} events", event.events().size());
 

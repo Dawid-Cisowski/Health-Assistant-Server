@@ -8,4 +8,5 @@ public interface AssistantFacade {
 
     Flux<AssistantEvent> streamChat(ChatRequest request, String deviceId);
 
+    void deleteAllConversations();
 }

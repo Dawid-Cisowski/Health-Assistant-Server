@@ -16,17 +16,21 @@ import org.testcontainers.containers.PostgreSQLContainer
 import spock.lang.Shared
 import spock.lang.Specification
 
+import org.awaitility.Awaitility
+
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.Callable
+import java.util.concurrent.TimeUnit
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ContextConfiguration(classes = [com.healthassistant.HealthAssistantApplication])
-@Import(TestChatModelConfiguration)
+@Import([TestChatModelConfiguration, TestAsyncConfiguration])
 @ActiveProfiles("test")
 abstract class BaseIntegrationSpec extends Specification {
 
@@ -630,6 +634,59 @@ abstract class BaseIntegrationSpec extends Specification {
 
     Map parseJson(String jsonData) {
         return new groovy.json.JsonSlurper().parseText(jsonData) as Map
+    }
+
+    /**
+     * Wait for async event processing to complete.
+     * Uses Awaitility to poll until the condition is satisfied or timeout occurs.
+     *
+     * @param timeoutSeconds max time to wait
+     * @param condition closure that returns true when ready
+     */
+    void waitForEventProcessing(int timeoutSeconds = 5, Closure<Boolean> condition) {
+        Awaitility.await()
+                .atMost(timeoutSeconds, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(condition as Callable<Boolean>)
+    }
+
+    /**
+     * Wait for a repository to contain at least one record matching the condition.
+     * Useful for waiting on projections to be created after async event processing.
+     */
+    def <T> T waitForProjection(int timeoutSeconds = 5, Closure<Optional<T>> finder) {
+        def result = null
+        Awaitility.await()
+                .atMost(timeoutSeconds, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until({
+                    def found = finder.call()
+                    if (found.isPresent()) {
+                        result = found.get()
+                        return true
+                    }
+                    return false
+                } as Callable<Boolean>)
+        return result
+    }
+
+    /**
+     * Wait for a list query to return non-empty results.
+     */
+    def <T> List<T> waitForProjections(int timeoutSeconds = 5, Closure<List<T>> finder) {
+        def result = []
+        Awaitility.await()
+                .atMost(timeoutSeconds, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until({
+                    def found = finder.call()
+                    if (found != null && !found.isEmpty()) {
+                        result = found
+                        return true
+                    }
+                    return false
+                } as Callable<Boolean>)
+        return result
     }
 
     void setupTestData(String deviceId) {

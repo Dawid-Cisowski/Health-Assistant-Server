@@ -12,6 +12,9 @@
         <exclude name="GuardLogStatement"/>
         <!-- AvoidLiteralsInIfCondition is too strict for simple comparisons like > 0 -->
         <exclude name="LiteralsFirstInComparisons"/>
+        <!-- Exclude strict test assertion rules - Spring Modulith tests use verify() as assertion -->
+        <exclude name="UnitTestContainsTooManyAsserts"/>
+        <exclude name="UnitTestAssertionsShouldIncludeMessage"/>
     </rule>
 
     <!-- Error Prone -->

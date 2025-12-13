@@ -38,6 +38,7 @@ repositories {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.ai:spring-ai-bom:1.1.0")
+        mavenBom("org.springframework.modulith:spring-modulith-bom:1.3.1")
     }
 }
 
@@ -88,8 +89,14 @@ dependencies {
     implementation("org.mapstruct:mapstruct:1.5.5.Final")
     annotationProcessor("org.mapstruct:mapstruct-processor:1.5.5.Final")
 
+    // Spring Modulith
+    implementation("org.springframework.modulith:spring-modulith-starter-core")
+    implementation("org.springframework.modulith:spring-modulith-starter-jdbc")
+    implementation("org.springframework.modulith:spring-modulith-actuator")
+
     // Testing (basic unit test support only)
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.modulith:spring-modulith-starter-test")
 }
 
 tasks.withType<Test> {

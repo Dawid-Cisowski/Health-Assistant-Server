@@ -13,4 +13,6 @@ public interface DailySummaryFacade {
     Optional<DailySummary> getDailySummary(LocalDate date);
 
     DailySummaryRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate);
+
+    void deleteAllSummaries();
 }

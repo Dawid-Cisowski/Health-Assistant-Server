@@ -5,4 +5,6 @@ public interface GoogleFitFacade {
     void syncAll();
 
     HistoricalSyncResult syncHistory(int days);
+
+    void deleteAllSyncState();
 }

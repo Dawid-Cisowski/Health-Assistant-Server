@@ -78,4 +78,11 @@ class ConversationService {
         log.info("Built message list: 1 system + {} history + 1 current = {} total", history.size(), messages.size());
         return messages;
     }
+
+    @Transactional
+    public void deleteAllConversations() {
+        log.warn("Deleting all conversations and messages");
+        messageRepository.deleteAll();
+        conversationRepository.deleteAll();
+    }
 }

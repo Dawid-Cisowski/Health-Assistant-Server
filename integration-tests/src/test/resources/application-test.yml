@@ -12,6 +12,15 @@ spring:
     enabled: true
     clean-disabled: false
 
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: true
+      # Disable async completion for testing - events process synchronously
+      externalization:
+        enabled: false
+
 app:
   assistant:
     enabled: true

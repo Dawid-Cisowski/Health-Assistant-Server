@@ -122,4 +122,13 @@ public class WorkoutService implements WorkoutFacade {
                 })
                 .toList();
     }
+
+    @Override
+    @Transactional
+    public void deleteAllProjections() {
+        log.warn("Deleting all workout projections");
+        setRepository.deleteAll();
+        exerciseRepository.deleteAll();
+        workoutRepository.deleteAll();
+    }
 }

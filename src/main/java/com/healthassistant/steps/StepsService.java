@@ -132,4 +132,12 @@ public class StepsService implements StepsFacade {
             .dailyStats(dailyStats)
             .build();
     }
+
+    @Override
+    @Transactional
+    public void deleteAllProjections() {
+        log.warn("Deleting all steps projections");
+        hourlyRepository.deleteAll();
+        dailyRepository.deleteAll();
+    }
 }

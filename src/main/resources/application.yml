@@ -34,6 +34,13 @@ spring:
     locations: classpath:db/migration
     validate-on-migrate: true
 
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: true
+      republish-outstanding-events-on-restart: true
+
   cache:
     type: caffeine
     caffeine:

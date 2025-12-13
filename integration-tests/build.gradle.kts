@@ -35,6 +35,7 @@ repositories {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.ai:spring-ai-bom:1.1.0")
+        mavenBom("org.springframework.modulith:spring-modulith-bom:1.3.1")
     }
 }
 
@@ -68,6 +69,10 @@ dependencies {
     // REST Assured for API testing
     testImplementation("io.rest-assured:rest-assured:5.4.0")
     testImplementation("io.rest-assured:json-path:5.4.0")
+
+    // Awaitility for async testing
+    testImplementation("org.awaitility:awaitility:4.2.0")
+    testImplementation("org.awaitility:awaitility-groovy:4.2.0")
     
     // WireMock for mocking external APIs
     testImplementation("com.github.tomakehurst:wiremock-jre8-standalone:2.35.0")
