@@ -546,14 +546,13 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202 (accepted for processing)"
+        response.statusCode() == 202
 
-        and: "response contains success status and statistics"
+        and: "response contains scheduled status"
         def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getInt("processedDays") >= 1  // At least 1 day should be processed
-        body.getInt("totalEvents") >= 0
+        body.getString("status") == "scheduled"
+        body.getInt("scheduledDays") >= 1  // At least 1 day should be scheduled
     }
 
     def "Scenario 17: Historical sync handles empty days gracefully"() {
@@ -571,14 +570,13 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202 (accepted for processing)"
+        response.statusCode() == 202
 
-        and: "all days are processed even with no data"
+        and: "all days are scheduled"
         def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getInt("processedDays") >= 2
-        body.getInt("totalEvents") == 0
+        body.getString("status") == "scheduled"
+        body.getInt("scheduledDays") >= 2
     }
 
     def "Scenario 18: Historical sync validates days parameter"() {
@@ -601,7 +599,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         body.getString("message").contains("between 1 and 365")
     }
 
-    def "Scenario 19: Historical sync processes sleep sessions for each day"() {
+    def "Scenario 19: Historical sync schedules sleep sessions processing for each day"() {
         given: "authenticated device"
         def deviceId = "test-device"
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
@@ -621,16 +619,16 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202 (accepted for processing)"
+        response.statusCode() == 202
 
-        and: "sleep events are stored"
-        def events = eventRepository.findAll()
-        def sleepEvents = events.findAll { it.eventType == "SleepSessionRecorded.v1" }
-        sleepEvents.size() >= 0
+        and: "task is scheduled"
+        def body = response.body().jsonPath()
+        body.getString("status") == "scheduled"
+        body.getInt("scheduledDays") == 1
     }
 
-    def "Scenario 20: Historical sync overwrites events with same idempotency key"() {
+    def "Scenario 20: Historical sync schedules tasks for processing (async)"() {
         given: "authenticated device"
         def deviceId = "test-device"
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
@@ -643,34 +641,19 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         setupGoogleFitApiMockMultipleTimes(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 500), 1)
         setupGoogleFitSessionsApiMockMultipleTimes(createEmptyGoogleFitSessionsResponse(), 1)
 
-        when: "I trigger historical sync first time"
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=1")
+        when: "I trigger historical sync"
+        def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=1")
                 .post("/v1/google-fit/sync/history?days=1")
                 .then()
-                .statusCode(200)
+                .extract()
 
-        def firstSyncEventsCount = eventRepository.findAll().size()
-        def firstSyncEvent = eventRepository.findAll().find { it.eventType == "StepsBucketedRecorded.v1" }
+        then: "response status is 202 (accepted for async processing)"
+        response.statusCode() == 202
 
-        and: "I trigger historical sync second time with updated data"
-        setupGoogleFitApiMockMultipleTimes(createGoogleFitResponseWithSteps(dayStart.toEpochMilli(), dayEnd.toEpochMilli(), 800), 1)
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/history?days=1")
-                .post("/v1/google-fit/sync/history?days=1")
-                .then()
-                .statusCode(200)
-
-        then: "events with same idempotency key are overwritten, not duplicated"
-        def secondSyncEventsCount = eventRepository.findAll().size()
-        secondSyncEventsCount == firstSyncEventsCount
-        
-        and: "event payload is updated"
-        def updatedEvent = eventRepository.findAll().find { it.idempotencyKey == firstSyncEvent.idempotencyKey }
-        updatedEvent != null
-        updatedEvent.payload.get("count") == 800
-        
-        and: "eventId and createdAt are preserved"
-        updatedEvent.eventId == firstSyncEvent.eventId
-        updatedEvent.createdAt == firstSyncEvent.createdAt
+        and: "task is scheduled"
+        def body = response.body().jsonPath()
+        body.getString("status") == "scheduled"
+        body.getInt("scheduledDays") == 1
     }
 
     def "Scenario 22: Sync overwrites walking sessions with same idempotency key"() {
@@ -840,21 +823,21 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202 (accepted for processing)"
+        response.statusCode() == 202
 
-        and: "default 7 days are processed"
+        and: "default 7 days are scheduled"
         def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getInt("processedDays") == 7
+        body.getString("status") == "scheduled"
+        body.getInt("scheduledDays") == 7
     }
 
-    def "Scenario 23: Historical sync handles partial failures correctly"() {
+    def "Scenario 23: Historical sync schedules all days for processing"() {
         given: "authenticated device"
         def deviceId = "test-device"
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
-        and: "mock Google Fit API responses - first day succeeds, second fails"
+        and: "mock Google Fit API responses"
         def today = LocalDate.now(ZoneId.of("Europe/Warsaw"))
         def day1Start = today.minusDays(1).atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
         def day1End = today.atStartOfDay(ZoneId.of("Europe/Warsaw")).toInstant()
@@ -868,13 +851,13 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "response status is 200 (partial success is acceptable)"
-        response.statusCode() == 200
+        then: "response status is 202 (accepted for async processing)"
+        response.statusCode() == 202
 
-        and: "some days are processed"
+        and: "all days are scheduled"
         def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getInt("processedDays") >= 1
+        body.getString("status") == "scheduled"
+        body.getInt("scheduledDays") == 2
     }
 
     def "Scenario 24: Sync handles Sessions API errors gracefully"() {

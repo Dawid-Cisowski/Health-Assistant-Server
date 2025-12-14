@@ -19,10 +19,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 @RequiredArgsConstructor
@@ -41,6 +37,8 @@ class GoogleFitSyncService implements GoogleFitFacade {
     private final GoogleFitEventMapper eventMapper;
     private final GoogleFitSyncStateRepository syncStateRepository;
     private final HealthEventsFacade healthEventsFacade;
+    private final HistoricalSyncTaskRepository historicalSyncTaskRepository;
+    private final org.springframework.context.ApplicationContext applicationContext;
 
     @Scheduled(cron = "0 */15 * * * *")
     public void syncGoogleFitData() {
@@ -186,64 +184,43 @@ class GoogleFitSyncService implements GoogleFitFacade {
 
     @Override
     public HistoricalSyncResult syncHistory(int days) {
-        log.info("Starting historical Google Fit synchronization for {} days", days);
-        
+        log.info("Scheduling historical Google Fit synchronization for {} days", days);
+
         LocalDate endDate = LocalDate.now(POLAND_ZONE);
         LocalDate startDate = endDate.minusDays(days - 1);
-        
+
         log.info("Historical sync range: {} to {} ({} days)", startDate, endDate, days);
-        
-        List<LocalDate> datesToProcess = new ArrayList<>();
+
+        int scheduledCount = 0;
         LocalDate currentDate = startDate;
+
         while (!currentDate.isAfter(endDate)) {
-            datesToProcess.add(currentDate);
+            boolean alreadyExists = historicalSyncTaskRepository.existsBySyncDateAndStatusIn(
+                    currentDate,
+                    List.of(HistoricalSyncTask.SyncTaskStatus.PENDING, HistoricalSyncTask.SyncTaskStatus.IN_PROGRESS)
+            );
+
+            if (!alreadyExists) {
+                HistoricalSyncTask task = new HistoricalSyncTask(currentDate);
+                historicalSyncTaskRepository.save(task);
+                scheduledCount++;
+                log.debug("Scheduled sync task for date: {}", currentDate);
+            } else {
+                log.debug("Skipping date {} - task already exists", currentDate);
+            }
+
             currentDate = currentDate.plusDays(1);
         }
-        
-        AtomicInteger totalEvents = new AtomicInteger(0);
-        AtomicInteger processedDays = new AtomicInteger(0);
-        AtomicInteger failedDays = new AtomicInteger(0);
-        
-        
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<CompletableFuture<Void>> allFutures = new ArrayList<>();
-            
-            for (LocalDate date : datesToProcess) {
-                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                    try {
-                        ZonedDateTime dayStart = date.atStartOfDay(POLAND_ZONE);
-                        ZonedDateTime dayEnd = date.plusDays(1).atStartOfDay(POLAND_ZONE);
-                        
-                        Instant from = dayStart.toInstant();
-                        Instant to = dayEnd.toInstant();
-                        
-                        log.info("Processing day {}: {} to {}", date, from, to);
-                        
-                        int dayEvents = syncTimeWindow(from, to);
-                        totalEvents.addAndGet(dayEvents);
-                        processedDays.incrementAndGet();
-                        
-                        log.info("Day {} processed: {} events", date, dayEvents);
-                        
-                    } catch (Exception e) {
-                        log.error("Failed to process day {}", date, e);
-                        failedDays.incrementAndGet();
-                    }
-                }, executor);
-                
-                allFutures.add(future);
-            }
-            
-            CompletableFuture.allOf(allFutures.toArray(new CompletableFuture[0])).join();
-        }
-        
-        log.info("Historical sync completed: {} days processed, {} failed, {} total events", 
-                processedDays.get(), failedDays.get(), totalEvents.get());
-        
-        return new HistoricalSyncResult(processedDays.get(), failedDays.get(), totalEvents.get());
+
+        log.info("Scheduled {} historical sync tasks", scheduledCount);
+
+        // Trigger immediate processing (get from context to avoid circular dependency)
+        applicationContext.getBean(HistoricalSyncTaskProcessor.class).triggerImmediately();
+
+        return new HistoricalSyncResult(scheduledCount, 0, 0);
     }
     
-    private int syncTimeWindow(Instant from, Instant to) {
+    int syncTimeWindow(Instant from, Instant to) {
         var aggregateRequest = getAggregateRequest(from, to);
         var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
         List<GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
