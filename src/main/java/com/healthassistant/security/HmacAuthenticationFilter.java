@@ -147,6 +147,11 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private String getRequestBody(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        if (contentType != null && contentType.contains("multipart/form-data")) {
+            return "";
+        }
+
         if (request instanceof CachedBodyHttpServletRequest cachedRequest) {
             return cachedRequest.getBody();
         }

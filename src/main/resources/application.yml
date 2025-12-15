@@ -41,6 +41,11 @@ spring:
           enabled: true
       republish-outstanding-events-on-restart: true
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   cache:
     type: caffeine
     caffeine:
