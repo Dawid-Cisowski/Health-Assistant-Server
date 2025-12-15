@@ -45,10 +45,12 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Wrap request to cache body for HMAC validation (only for methods with body)
+        // Wrap request to cache body for HMAC validation (only for methods with body, skip multipart)
         HttpServletRequest wrappedRequest = request;
         String method = request.getMethod();
-        if (hasRequestBody(method)) {
+        String contentType = request.getContentType();
+        boolean isMultipart = contentType != null && contentType.contains("multipart/form-data");
+        if (hasRequestBody(method) && !isMultipart) {
             wrappedRequest = CachedBodyHttpServletRequest.of(request);
         }
 

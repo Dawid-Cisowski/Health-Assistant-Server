@@ -20,8 +20,8 @@ class ModularityTests {
     @Test
     void shouldDetectAllModules() {
         long moduleCount = modules.stream().count();
-        assertEquals(12, moduleCount,
-                "Expected 12 modules but found " + moduleCount + ": " + modules.stream().toList());
+        assertEquals(13, moduleCount,
+                "Expected 13 modules but found " + moduleCount + ": " + modules.stream().toList());
     }
 
     @Test
