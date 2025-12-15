@@ -104,11 +104,11 @@ class GoogleFitSyncService implements GoogleFitFacade {
                     .filter(GoogleFitSession::isWalkingSession)
                     .toList();
 
-            log.info("Fetched {} buckets, {} sleep sessions, and {} walking sessions", 
+            log.info("Fetched {} buckets, {} sleep sessions, and {} walking sessions",
                     buckets.size(), sleepSessions.size(), walkingSessions.size());
 
             List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
-            
+
             eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
             eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
             eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, buckets));
@@ -151,7 +151,7 @@ class GoogleFitSyncService implements GoogleFitFacade {
                         new GoogleFitClient.DataTypeAggregate("com.google.calories.expended"),
                         new GoogleFitClient.DataTypeAggregate("com.google.heart_rate.bpm")
                 ),
-                new GoogleFitClient.BucketByTime(60000L),
+                new GoogleFitClient.BucketByTime(900000L),
                 from.toEpochMilli(),
                 to.toEpochMilli()
         );
@@ -219,12 +219,12 @@ class GoogleFitSyncService implements GoogleFitFacade {
 
         return new HistoricalSyncResult(scheduledCount, 0, 0);
     }
-    
+
     int syncTimeWindow(Instant from, Instant to) {
         var aggregateRequest = getAggregateRequest(from, to);
         var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
         List<GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
-        
+
         String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
         String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
         var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
@@ -239,20 +239,20 @@ class GoogleFitSyncService implements GoogleFitFacade {
         List<GoogleFitSession> walkingSessions = allSessions.stream()
                 .filter(GoogleFitSession::isWalkingSession)
                 .toList();
-        
+
         List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
-        
+
         eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
         eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
         eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, buckets));
-        
+
         if (eventEnvelopes.isEmpty()) {
             return 0;
         }
-        
+
         StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, GOOGLE_FIT_DEVICE_ID);
         healthEventsFacade.storeHealthEvents(command);
-        
+
         return eventEnvelopes.size();
     }
 

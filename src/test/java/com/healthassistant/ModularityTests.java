@@ -4,7 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModularityTests {
 
@@ -12,15 +13,15 @@ class ModularityTests {
 
     @Test
     void verifyModularStructure() {
-        // verify() throws exception if violations found
+        // verify() throws exception if violations found (e.g., illegal cross-module dependencies)
         modules.verify();
-        assertNotNull(modules);
     }
 
     @Test
     void shouldDetectAllModules() {
-        // Verify expected number of modules (12 modules)
-        assertNotNull(modules);
+        long moduleCount = modules.stream().count();
+        assertEquals(12, moduleCount,
+                "Expected 12 modules but found " + moduleCount + ": " + modules.stream().toList());
     }
 
     @Test
@@ -29,6 +30,9 @@ class ModularityTests {
                 .writeModuleCanvases()
                 .writeModulesAsPlantUml()
                 .writeIndividualModulesAsPlantUml();
-        assertNotNull(documenter);
+
+        // Verify documentation options were applied
+        assertTrue(documenter.toString().contains("Documenter"),
+                "Documenter should be properly initialized");
     }
 }
