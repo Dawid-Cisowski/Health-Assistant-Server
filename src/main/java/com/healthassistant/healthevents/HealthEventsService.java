@@ -4,6 +4,7 @@ import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.EventData;
 import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.model.EventType;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,8 +38,11 @@ class HealthEventsService implements HealthEventsFacade {
                     result.eventTypes().size(),
                     result.storedEvents().size());
 
+            var eventTypeStrings = result.eventTypes().stream()
+                    .map(EventType::value)
+                    .collect(Collectors.toSet());
             eventPublisher.publishEvent(
-                    new EventsStoredEvent(result.affectedDates(), result.eventTypes(), result.storedEvents())
+                    new EventsStoredEvent(result.affectedDates(), eventTypeStrings, result.storedEvents())
             );
         }
 

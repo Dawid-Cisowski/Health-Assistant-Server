@@ -45,6 +45,7 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
+      file-size-threshold: 0
 
   cache:
     type: caffeine
@@ -59,6 +60,8 @@ spring:
 server:
   port: 8080
   shutdown: graceful
+  tomcat:
+    max-http-form-post-size: 10MB
   error:
     include-message: always
     include-binding-errors: always
