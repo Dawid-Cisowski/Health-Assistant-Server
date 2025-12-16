@@ -2,6 +2,8 @@ package com.healthassistant.assistant;
 
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
+import com.healthassistant.meals.api.MealsFacade;
+import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
 import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.sleep.api.dto.SleepRangeSummaryResponse;
 import com.healthassistant.steps.api.StepsFacade;
@@ -27,6 +29,7 @@ public class HealthTools {
     private final SleepFacade sleepFacade;
     private final WorkoutFacade workoutFacade;
     private final DailySummaryFacade dailySummaryFacade;
+    private final MealsFacade mealsFacade;
 
     @Tool(name = "getStepsData",
           description = "Pobiera dane o krokach użytkownika dla podanego zakresu dat. Zwraca liczbę kroków, dystans, aktywne godziny i minuty. " +
@@ -84,6 +87,21 @@ public class HealthTools {
         var result = dailySummaryFacade.getDailySummary(localDate);
 
         log.info("Daily summary fetched: {}", result.isPresent() ? "found" : "not found");
+        return result;
+    }
+
+    @Tool(name = "getMealsData",
+          description = "Pobiera dane o posiłkach użytkownika dla podanego zakresu dat. Zwraca informacje o kaloriach, makroskładnikach (białko, tłuszcze, węglowodany), typach posiłków i ocenach zdrowotnych. " +
+                        "PARAMETRY: startDate i endDate muszą być w formacie ISO-8601 (YYYY-MM-DD), np. '2025-11-24'.")
+    public MealsRangeSummaryResponse getMealsData(String startDate, String endDate) {
+        var deviceId = AssistantContext.getDeviceId();
+        log.info("Fetching meals data for device {} from {} to {}", deviceId, startDate, endDate);
+
+        var start = LocalDate.parse(startDate);
+        var end = LocalDate.parse(endDate);
+        var result = mealsFacade.getRangeSummary(start, end);
+
+        log.info("Meals data fetched: {} total meals over {} days", result.totalMealCount(), result.daysWithData());
         return result;
     }
 }
