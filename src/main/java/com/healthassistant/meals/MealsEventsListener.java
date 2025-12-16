@@ -1,7 +1,7 @@
 package com.healthassistant.meals;
 
-import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.events.MealsEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -15,18 +15,16 @@ class MealsEventsListener {
     private final MealsProjector mealsProjector;
 
     @ApplicationModuleListener
-    public void onEventsStored(EventsStoredEvent event) {
-        log.info("Meals listener received EventsStoredEvent with {} events", event.events().size());
+    public void onMealsEventsStored(MealsEventsStoredEvent event) {
+        log.info("Meals listener received MealsEventsStoredEvent with {} events for {} dates",
+                event.events().size(), event.affectedDates().size());
 
         for (StoredEventData eventData : event.events()) {
-            String eventType = eventData.eventType().value();
-            if ("MealRecorded.v1".equals(eventType)) {
-                try {
-                    log.debug("Processing MealRecorded event: {}", eventData.eventId().value());
-                    mealsProjector.projectMeal(eventData);
-                } catch (Exception e) {
-                    log.error("Failed to project meal for event: {}", eventData.eventId().value(), e);
-                }
+            try {
+                log.debug("Processing MealRecorded event: {}", eventData.eventId().value());
+                mealsProjector.projectMeal(eventData);
+            } catch (Exception e) {
+                log.error("Failed to project meal for event: {}", eventData.eventId().value(), e);
             }
         }
 

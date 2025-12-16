@@ -1,7 +1,7 @@
 package com.healthassistant.calories;
 
-import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.events.CaloriesEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -15,18 +15,16 @@ class CaloriesEventsListener {
     private final CaloriesProjector caloriesProjector;
 
     @ApplicationModuleListener
-    public void onEventsStored(EventsStoredEvent event) {
-        log.info("Calories listener received EventsStoredEvent with {} events", event.events().size());
+    public void onCaloriesEventsStored(CaloriesEventsStoredEvent event) {
+        log.info("Calories listener received CaloriesEventsStoredEvent with {} events for {} dates",
+                event.events().size(), event.affectedDates().size());
 
         for (StoredEventData eventData : event.events()) {
-            String eventType = eventData.eventType().value();
-            if ("ActiveCaloriesBurnedRecorded.v1".equals(eventType)) {
-                try {
-                    log.debug("Processing ActiveCaloriesBurnedRecorded event: {}", eventData.eventId().value());
-                    caloriesProjector.projectCalories(eventData);
-                } catch (Exception e) {
-                    log.error("Failed to project calories for event: {}", eventData.eventId().value(), e);
-                }
+            try {
+                log.debug("Processing ActiveCaloriesBurnedRecorded event: {}", eventData.eventId().value());
+                caloriesProjector.projectCalories(eventData);
+            } catch (Exception e) {
+                log.error("Failed to project calories for event: {}", eventData.eventId().value(), e);
             }
         }
 

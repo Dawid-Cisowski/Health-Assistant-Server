@@ -10,6 +10,7 @@
         <Bug pattern="EI_EXPOSE_REP"/>
         <Or>
             <Package name="~com\.healthassistant\..*\.api\.dto"/>
+            <Package name="~com\.healthassistant\..*\.api\.dto\..*"/>
             <Package name="~com\.healthassistant\.googlefit"/>
             <Package name="~com\.healthassistant\.healthevents\.api\.dto\.payload"/>
             <Class name="~.*Builder"/>

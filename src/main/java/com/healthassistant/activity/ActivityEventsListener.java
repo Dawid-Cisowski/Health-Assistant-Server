@@ -1,7 +1,7 @@
 package com.healthassistant.activity;
 
-import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.events.ActivityEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -15,8 +15,9 @@ class ActivityEventsListener {
     private final ActivityProjector activityProjector;
 
     @ApplicationModuleListener
-    public void onEventsStored(EventsStoredEvent event) {
-        log.info("Activity listener received EventsStoredEvent with {} events", event.events().size());
+    public void onActivityEventsStored(ActivityEventsStoredEvent event) {
+        log.info("Activity listener received ActivityEventsStoredEvent with {} events for {} dates",
+                event.events().size(), event.affectedDates().size());
 
         for (StoredEventData eventData : event.events()) {
             String eventType = eventData.eventType().value();

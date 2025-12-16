@@ -1,7 +1,7 @@
 package com.healthassistant.steps;
 
-import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -15,18 +15,16 @@ class StepsEventsListener {
     private final StepsProjector stepsProjector;
 
     @ApplicationModuleListener
-    public void onEventsStored(EventsStoredEvent event) {
-        log.info("Steps listener received EventsStoredEvent with {} events", event.events().size());
+    public void onStepsEventsStored(StepsEventsStoredEvent event) {
+        log.info("Steps listener received StepsEventsStoredEvent with {} events for {} dates",
+                event.events().size(), event.affectedDates().size());
 
         for (StoredEventData eventData : event.events()) {
-            String eventType = eventData.eventType().value();
-            if ("StepsBucketedRecorded.v1".equals(eventType)) {
-                try {
-                    log.debug("Processing StepsBucketedRecorded event: {}", eventData.eventId().value());
-                    stepsProjector.projectSteps(eventData);
-                } catch (Exception e) {
-                    log.error("Failed to project steps for event: {}", eventData.eventId().value(), e);
-                }
+            try {
+                log.debug("Processing StepsBucketedRecorded event: {}", eventData.eventId().value());
+                stepsProjector.projectSteps(eventData);
+            } catch (Exception e) {
+                log.error("Failed to project steps for event: {}", eventData.eventId().value(), e);
             }
         }
 

@@ -1,6 +1,6 @@
 package com.healthassistant.dailysummary.api;
 
-import com.healthassistant.healthevents.api.dto.EventsStoredEvent;
+import com.healthassistant.healthevents.api.dto.events.AllEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -16,9 +16,9 @@ class DailySummaryEventsListener {
     private final DailySummaryFacade dailySummaryFacade;
 
     @ApplicationModuleListener
-    public void onEventsStored(EventsStoredEvent event) {
-        log.info("DailySummary listener received EventsStoredEvent for {} affected dates",
-                event.affectedDates().size());
+    public void onAllEventsStored(AllEventsStoredEvent event) {
+        log.info("DailySummary listener received AllEventsStoredEvent for {} affected dates, {} event types",
+                event.affectedDates().size(), event.eventTypes().size());
 
         for (LocalDate date : event.affectedDates()) {
             try {
@@ -30,7 +30,6 @@ class DailySummaryEventsListener {
             }
         }
 
-        log.info("DailySummary listener completed processing {} dates",
-                event.affectedDates().size());
+        log.info("DailySummary listener completed processing {} dates", event.affectedDates().size());
     }
 }
