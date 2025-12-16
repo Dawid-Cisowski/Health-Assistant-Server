@@ -24,6 +24,7 @@ import java.time.LocalDate;
 class ActivityController {
 
     private final ActivityFacade activityFacade;
+    public static final String DEVICE_ID_HEADER = "X-Device-Id";
 
     @GetMapping("/daily/{date}")
     @Operation(
@@ -37,7 +38,7 @@ class ActivityController {
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
     ResponseEntity<ActivityDailyBreakdownResponse> getDailyBreakdown(
-            @RequestHeader("X-Device-Id") String deviceId,
+            @RequestHeader(DEVICE_ID_HEADER) String deviceId,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
         log.info("Retrieving daily activity breakdown for device: {} date: {}", deviceId, date);
@@ -62,7 +63,7 @@ class ActivityController {
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
     ResponseEntity<ActivityRangeSummaryResponse> getRangeSummary(
-            @RequestHeader("X-Device-Id") String deviceId,
+            @RequestHeader(DEVICE_ID_HEADER) String deviceId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
