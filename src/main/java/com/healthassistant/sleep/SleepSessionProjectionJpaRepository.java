@@ -8,11 +8,10 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface SleepSessionProjectionJpaRepository extends JpaRepository<SleepSessionProjectionJpaEntity, Long> {
+interface SleepSessionProjectionJpaRepository extends JpaRepository<SleepSessionProjectionJpaEntity, Long> {
 
     Optional<SleepSessionProjectionJpaEntity> findByEventId(String eventId);
 
     List<SleepSessionProjectionJpaEntity> findByDateOrderBySessionNumberAsc(LocalDate date);
 
-    List<SleepSessionProjectionJpaEntity> findByDateBetweenOrderByDateAscSessionNumberAsc(LocalDate startDate, LocalDate endDate);
 }

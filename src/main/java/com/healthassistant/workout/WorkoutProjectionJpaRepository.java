@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjectionJpaEntity, Long> {
+interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjectionJpaEntity, Long> {
 
     Optional<WorkoutProjectionJpaEntity> findByWorkoutId(String workoutId);
 

@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class DailySummaryService implements DailySummaryFacade {
+class DailySummaryService implements DailySummaryFacade {
 
     private final GenerateDailySummaryCommandHandler commandHandler;
     private final DailySummaryJpaRepository jpaRepository;
@@ -86,7 +86,6 @@ public class DailySummaryService implements DailySummaryFacade {
                 .averageDistanceMeters(daysWithData > 0 ? totalDistanceMeters / daysWithData : 0L)
                 .build();
 
-        // Sleep aggregation
         int totalSleepMinutes = summaries.stream()
                 .flatMap(s -> s.sleep().stream())
                 .map(DailySummary.Sleep::totalMinutes)
@@ -146,7 +145,6 @@ public class DailySummaryService implements DailySummaryFacade {
                 .daysWithData(daysWithHeartData)
                 .build();
 
-        // Nutrition aggregation
         int totalCalories = summaries.stream()
                 .map(s -> s.nutrition().totalCalories())
                 .filter(cal -> cal != null)
@@ -197,7 +195,6 @@ public class DailySummaryService implements DailySummaryFacade {
                 .daysWithData(daysWithNutrition)
                 .build();
 
-        // Workout aggregation
         int totalWorkouts = summaries.stream()
                 .map(s -> s.workouts().size())
                 .mapToInt(Integer::intValue)
@@ -223,7 +220,6 @@ public class DailySummaryService implements DailySummaryFacade {
                 .workoutList(workoutList)
                 .build();
 
-        // Convert summaries to responses
         List<DailySummaryResponse> dailyStats = summaries.stream()
                 .map(DailySummaryMapper.INSTANCE::toResponse)
                 .collect(Collectors.toList());

@@ -2,6 +2,7 @@ package com.healthassistant.healthevents;
 
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
+import com.healthassistant.healthevents.api.model.EventId;
 import com.healthassistant.healthevents.api.model.EventType;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.RequiredArgsConstructor;
@@ -59,32 +60,29 @@ class StoreHealthEventsCommandHandler {
         List<Event> eventsToSave = new java.util.ArrayList<>();
         List<Event> eventsToUpdate = new java.util.ArrayList<>();
 
-        for (Integer index : validIndices) {
-            var envelope = events.get(index);
-            String idempotencyKeyValue = envelope.idempotencyKey().value();
-
-            Event existingEvent = existingEvents.get(idempotencyKeyValue);
-
-            EventType eventType = EventType.from(envelope.eventType());
-            com.healthassistant.healthevents.api.model.EventId eventId = existingEvent != null ? existingEvent.eventId() : eventIdGenerator.generate();
-            Instant createdAt = existingEvent != null ? existingEvent.createdAt() : Instant.now();
-
-            Event event = new Event(
-                    envelope.idempotencyKey(),
-                    eventType,
-                    envelope.occurredAt(),
-                    envelope.payload(),
-                    command.deviceId(),
-                    eventId,
-                    createdAt
-            );
-
-            if (existingEvent != null) {
-                eventsToUpdate.add(event);
-            } else {
-                eventsToSave.add(event);
-            }
-        }
+        validIndices.stream()
+                .map(events::get)
+                .forEach(envelope -> {
+                    String idempotencyKeyValue = envelope.idempotencyKey().value();
+                    Event existingEvent = existingEvents.get(idempotencyKeyValue);
+                    EventType eventType = EventType.from(envelope.eventType());
+                    EventId eventId = existingEvent != null ? existingEvent.eventId() : eventIdGenerator.generate();
+                    Instant createdAt = existingEvent != null ? existingEvent.createdAt() : Instant.now();
+                    Event event = new Event(
+                            envelope.idempotencyKey(),
+                            eventType,
+                            envelope.occurredAt(),
+                            envelope.payload(),
+                            command.deviceId(),
+                            eventId,
+                            createdAt
+                    );
+                    if (existingEvent != null) {
+                        eventsToUpdate.add(event);
+                    } else {
+                        eventsToSave.add(event);
+                    }
+                });
 
         if (!eventsToSave.isEmpty()) {
             eventRepository.saveAll(eventsToSave);
@@ -163,7 +161,7 @@ class StoreHealthEventsCommandHandler {
                 .filter(index -> {
                     var status = results.get(index).status();
                     return status == StoreHealthEventsResult.EventStatus.stored ||
-                           status == StoreHealthEventsResult.EventStatus.duplicate;
+                            status == StoreHealthEventsResult.EventStatus.duplicate;
                 })
                 .mapToObj(index -> {
                     var envelope = command.events().get(index);
@@ -179,7 +177,7 @@ class StoreHealthEventsCommandHandler {
                 .filter(index -> {
                     var status = results.get(index).status();
                     return status == StoreHealthEventsResult.EventStatus.stored ||
-                           status == StoreHealthEventsResult.EventStatus.duplicate;
+                            status == StoreHealthEventsResult.EventStatus.duplicate;
                 })
                 .mapToObj(index -> {
                     var envelope = command.events().get(index);

@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SleepDailyProjectionJpaEntity {
+class SleepDailyProjectionJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

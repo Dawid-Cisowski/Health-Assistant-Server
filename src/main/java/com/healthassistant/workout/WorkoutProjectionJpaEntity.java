@@ -16,7 +16,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WorkoutProjectionJpaEntity {
+class WorkoutProjectionJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

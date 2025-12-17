@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface WorkoutSetProjectionJpaRepository extends JpaRepository<WorkoutSetProjectionJpaEntity, Long> {
+interface WorkoutSetProjectionJpaRepository extends JpaRepository<WorkoutSetProjectionJpaEntity, Long> {
 
     List<WorkoutSetProjectionJpaEntity> findByWorkoutIdOrderByExerciseNameAscSetNumberAsc(String workoutId);
 }

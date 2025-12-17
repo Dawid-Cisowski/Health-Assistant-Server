@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface SleepDailyProjectionJpaRepository extends JpaRepository<SleepDailyProjectionJpaEntity, Long> {
+interface SleepDailyProjectionJpaRepository extends JpaRepository<SleepDailyProjectionJpaEntity, Long> {
 
     Optional<SleepDailyProjectionJpaEntity> findByDate(LocalDate date);
 

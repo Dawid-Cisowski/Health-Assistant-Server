@@ -11,10 +11,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
@@ -70,7 +67,7 @@ class GoogleFitEventMapper {
     private StoreHealthEventsCommand.EventEnvelope createStepsEnvelope(GoogleFitBucketData bucket) {
         ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
         ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
-        
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
         payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
@@ -92,7 +89,7 @@ class GoogleFitEventMapper {
     private StoreHealthEventsCommand.EventEnvelope createDistanceEnvelope(GoogleFitBucketData bucket) {
         ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
         ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
-        
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
         payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
@@ -114,7 +111,7 @@ class GoogleFitEventMapper {
     private StoreHealthEventsCommand.EventEnvelope createCaloriesEnvelope(GoogleFitBucketData bucket) {
         ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
         ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
-        
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
         payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
@@ -166,7 +163,7 @@ class GoogleFitEventMapper {
     private StoreHealthEventsCommand.EventEnvelope createActiveMinutesEnvelope(GoogleFitBucketData bucket) {
         ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
         ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
-        
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
         payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
@@ -188,7 +185,7 @@ class GoogleFitEventMapper {
     private StoreHealthEventsCommand.EventEnvelope createSleepSessionEnvelope(GoogleFitSession session) {
         Instant start = session.getStartTime();
         Instant end = session.getEndTime();
-        
+
         if (start == null || end == null) {
             throw new IllegalArgumentException("Sleep session must have start and end times");
         }
@@ -223,7 +220,7 @@ class GoogleFitEventMapper {
     ) {
         return sessions.stream()
                 .map(session -> createWalkingSessionEnvelope(session, availableBuckets))
-                .filter(envelope -> envelope != null)
+                .filter(Objects::nonNull)
                 .toList();
     }
 
@@ -233,7 +230,7 @@ class GoogleFitEventMapper {
     ) {
         Instant start = session.getStartTime();
         Instant end = session.getEndTime();
-        
+
         if (start == null || end == null) {
             log.warn("Walking session {} has missing start or end time", session.id());
             return null;

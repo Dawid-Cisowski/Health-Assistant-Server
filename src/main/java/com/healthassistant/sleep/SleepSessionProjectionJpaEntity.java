@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SleepSessionProjectionJpaEntity {
+class SleepSessionProjectionJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,7 +37,6 @@ public class SleepSessionProjectionJpaEntity {
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
-    // Future: Sleep phases support
     @Column(name = "light_sleep_minutes")
     private Integer lightSleepMinutes;
 

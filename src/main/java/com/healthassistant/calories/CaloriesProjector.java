@@ -21,21 +21,16 @@ import java.util.Optional;
 class CaloriesProjector {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final String ACTIVE_CALORIES_V1 = "ActiveCaloriesBurnedRecorded.v1";
 
     private final CaloriesDailyProjectionJpaRepository dailyRepository;
     private final CaloriesHourlyProjectionJpaRepository hourlyRepository;
 
     @Transactional
     public void projectCalories(StoredEventData eventData) {
-        String eventType = eventData.eventType().value();
-
-        if (ACTIVE_CALORIES_V1.equals(eventType)) {
-            try {
-                projectActiveCalories(eventData);
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                log.warn("Race condition during calories projection for event {}, skipping", eventData.eventId().value());
-            }
+        try {
+            projectActiveCalories(eventData);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Race condition during calories projection for event {}, skipping", eventData.eventId().value());
         }
     }
 

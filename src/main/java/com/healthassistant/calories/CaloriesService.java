@@ -14,12 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class CaloriesService implements CaloriesFacade {
+class CaloriesService implements CaloriesFacade {
 
     private final CaloriesDailyProjectionJpaRepository dailyRepository;
     private final CaloriesHourlyProjectionJpaRepository hourlyRepository;
@@ -47,13 +48,12 @@ public class CaloriesService implements CaloriesFacade {
                 CaloriesHourlyProjectionJpaEntity::getCaloriesKcal
             ));
 
-        List<CaloriesDailyBreakdownResponse.HourlyCalories> hourlyBreakdown = new ArrayList<>();
-        for (int hour = 0; hour < 24; hour++) {
-            hourlyBreakdown.add(new CaloriesDailyBreakdownResponse.HourlyCalories(
+        List<CaloriesDailyBreakdownResponse.HourlyCalories> hourlyBreakdown = IntStream.range(0, 24)
+            .mapToObj(hour -> new CaloriesDailyBreakdownResponse.HourlyCalories(
                 hour,
                 hourlyCalories.getOrDefault(hour, 0.0)
-            ));
-        }
+            ))
+            .toList();
 
         return Optional.of(CaloriesDailyBreakdownResponse.builder()
             .date(daily.getDate())
@@ -68,10 +68,9 @@ public class CaloriesService implements CaloriesFacade {
     }
 
     private CaloriesDailyBreakdownResponse createEmptyBreakdown(LocalDate date) {
-        List<CaloriesDailyBreakdownResponse.HourlyCalories> hourlyBreakdown = new ArrayList<>();
-        for (int hour = 0; hour < 24; hour++) {
-            hourlyBreakdown.add(new CaloriesDailyBreakdownResponse.HourlyCalories(hour, 0.0));
-        }
+        List<CaloriesDailyBreakdownResponse.HourlyCalories> hourlyBreakdown = IntStream.range(0, 24)
+            .mapToObj(hour -> new CaloriesDailyBreakdownResponse.HourlyCalories(hour, 0.0))
+            .toList();
 
         return CaloriesDailyBreakdownResponse.builder()
             .date(date)

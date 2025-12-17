@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface StepsDailyProjectionJpaRepository extends JpaRepository<StepsDailyProjectionJpaEntity, Long> {
+interface StepsDailyProjectionJpaRepository extends JpaRepository<StepsDailyProjectionJpaEntity, Long> {
 
     Optional<StepsDailyProjectionJpaEntity> findByDate(LocalDate date);
 

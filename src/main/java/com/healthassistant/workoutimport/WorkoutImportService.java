@@ -8,7 +8,6 @@ import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import com.healthassistant.workoutimport.api.WorkoutImportFacade;
 import com.healthassistant.workoutimport.api.dto.WorkoutImportResponse;
-import com.healthassistant.workoutimport.dto.ExtractedWorkoutData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -46,10 +45,8 @@ class WorkoutImportService implements WorkoutImportFacade {
         validateImage(image);
 
         try {
-            // Extract workout data using AI
             ExtractedWorkoutData extractedData = imageExtractor.extract(image);
 
-            // Validate extraction result
             if (!extractedData.isValid()) {
                 log.warn("Workout extraction invalid for device {}: {}",
                     deviceId.value(), extractedData.validationError());
@@ -58,22 +55,18 @@ class WorkoutImportService implements WorkoutImportFacade {
                 );
             }
 
-            // Generate idempotency key based on image hash + extracted date
             String workoutId = generateWorkoutId(image, extractedData);
 
-            // Map to event envelope
             StoreHealthEventsCommand.EventEnvelope envelope = eventMapper.mapToEventEnvelope(
                 extractedData, workoutId, deviceId
             );
 
-            // Store event via HealthEventsFacade
             StoreHealthEventsCommand command = new StoreHealthEventsCommand(
                 List.of(envelope), deviceId
             );
             StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-            // Check result
-            var eventResult = result.results().get(0);
+            var eventResult = result.results().getFirst();
             if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
                 String errorMessage = eventResult.error() != null
                     ? eventResult.error().message()
@@ -82,18 +75,15 @@ class WorkoutImportService implements WorkoutImportFacade {
                 return WorkoutImportResponse.failure("Validation error: " + errorMessage);
             }
 
-            // Calculate totals
             int exerciseCount = extractedData.exercises().size();
             int totalSets = extractedData.exercises().stream()
                 .mapToInt(e -> e.sets().size())
                 .sum();
 
-            // Get event ID
             String eventId = eventResult.eventId() != null
                 ? eventResult.eventId().value()
                 : null;
 
-            // Fetch workout details for response (after projection)
             WorkoutDetailResponse workoutDetails = workoutFacade.getWorkoutDetails(workoutId)
                 .orElse(null);
 
@@ -128,15 +118,14 @@ class WorkoutImportService implements WorkoutImportFacade {
 
         String contentType = image.getContentType();
         if (contentType != null && ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            return; // Valid content type
+            return;
         }
 
-        // For generic types like image/*, detect from magic bytes
         if (contentType != null && GENERIC_IMAGE_TYPES.contains(contentType)) {
             String detectedType = detectImageType(image);
             if (detectedType != null && ALLOWED_CONTENT_TYPES.contains(detectedType)) {
                 log.debug("Detected image type {} from magic bytes (client sent {})", detectedType, contentType);
-                return; // Valid detected type
+                return;
             }
         }
 
@@ -153,17 +142,14 @@ class WorkoutImportService implements WorkoutImportFacade {
                 return null;
             }
 
-            // JPEG: FF D8 FF
             if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8 && header[2] == (byte) 0xFF) {
                 return "image/jpeg";
             }
 
-            // PNG: 89 50 4E 47 0D 0A 1A 0A
             if (header[0] == (byte) 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
                 return "image/png";
             }
 
-            // WebP: RIFF....WEBP
             if (read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
                 && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) {
                 return "image/webp";

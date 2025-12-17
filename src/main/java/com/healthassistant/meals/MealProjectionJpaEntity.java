@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MealProjectionJpaEntity {
+class MealProjectionJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

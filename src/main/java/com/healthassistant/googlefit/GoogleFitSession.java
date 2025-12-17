@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
 
-public record GoogleFitSession(
+record GoogleFitSession(
         @JsonProperty("id")
         String id,
 

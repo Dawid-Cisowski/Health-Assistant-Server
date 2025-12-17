@@ -29,14 +29,10 @@ class MealsProjector {
 
     @Transactional
     public void projectMeal(StoredEventData eventData) {
-        String eventType = eventData.eventType().value();
-
-        if (MEAL_RECORDED_V1.equals(eventType)) {
-            try {
-                projectMealRecorded(eventData);
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                log.warn("Race condition during meal projection for event {}, skipping", eventData.eventId().value());
-            }
+        try {
+            projectMealRecorded(eventData);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Race condition during meal projection for event {}, skipping", eventData.eventId().value());
         }
     }
 

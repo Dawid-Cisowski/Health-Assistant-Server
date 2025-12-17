@@ -6,7 +6,6 @@ import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.mealimport.api.MealImportFacade;
 import com.healthassistant.mealimport.api.dto.MealImportResponse;
-import com.healthassistant.mealimport.dto.ExtractedMealData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,10 +36,8 @@ class MealImportService implements MealImportFacade {
 
     @Override
     public MealImportResponse importMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
-        // Validate input - need at least description or images
         validateInput(description, images);
 
-        // Validate images if present
         if (images != null && !images.isEmpty()) {
             for (MultipartFile image : images) {
                 validateImage(image);
@@ -48,10 +45,7 @@ class MealImportService implements MealImportFacade {
         }
 
         try {
-            // Extract meal data using AI
             ExtractedMealData extractedData = contentExtractor.extract(description, images);
-
-            // Validate extraction result
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
                     deviceId.value(), extractedData.validationError());
@@ -60,26 +54,21 @@ class MealImportService implements MealImportFacade {
                 );
             }
 
-            // Determine timestamp - use extracted or fallback to now
             Instant occurredAt = extractedData.occurredAt() != null
                 ? extractedData.occurredAt()
                 : Instant.now();
 
-            // Generate unique meal ID (no idempotency - each upload is a new meal)
             String mealId = generateMealId();
 
-            // Map to event envelope
             StoreHealthEventsCommand.EventEnvelope envelope = eventMapper.mapToEventEnvelope(
                 extractedData, mealId, deviceId, occurredAt
             );
 
-            // Store event via HealthEventsFacade
             StoreHealthEventsCommand command = new StoreHealthEventsCommand(
                 List.of(envelope), deviceId
             );
             StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-            // Check result
             var eventResult = result.results().get(0);
             if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
                 String errorMessage = eventResult.error() != null
@@ -89,7 +78,6 @@ class MealImportService implements MealImportFacade {
                 return MealImportResponse.failure("Validation error: " + errorMessage);
             }
 
-            // Get event ID
             String eventId = eventResult.eventId() != null
                 ? eventResult.eventId().value()
                 : null;
@@ -138,15 +126,14 @@ class MealImportService implements MealImportFacade {
 
         String contentType = image.getContentType();
         if (contentType != null && ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            return; // Valid content type
+            return;
         }
 
-        // For generic types like image/*, detect from magic bytes
         if (contentType != null && GENERIC_IMAGE_TYPES.contains(contentType)) {
             String detectedType = detectImageType(image);
             if (detectedType != null && ALLOWED_CONTENT_TYPES.contains(detectedType)) {
                 log.debug("Detected image type {} from magic bytes (client sent {})", detectedType, contentType);
-                return; // Valid detected type
+                return;
             }
         }
 
@@ -163,17 +150,14 @@ class MealImportService implements MealImportFacade {
                 return null;
             }
 
-            // JPEG: FF D8 FF
             if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8 && header[2] == (byte) 0xFF) {
                 return "image/jpeg";
             }
 
-            // PNG: 89 50 4E 47 0D 0A 1A 0A
             if (header[0] == (byte) 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
                 return "image/png";
             }
 
-            // WebP: RIFF....WEBP
             if (read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
                 && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) {
                 return "image/webp";

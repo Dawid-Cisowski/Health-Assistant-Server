@@ -20,17 +20,12 @@ import java.util.Map;
 class WorkoutProjector {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final String WORKOUT_RECORDED_V1 = "WorkoutRecorded.v1";
-
     private final WorkoutProjectionJpaRepository workoutRepository;
     private final WorkoutExerciseProjectionJpaRepository exerciseRepository;
     private final WorkoutSetProjectionJpaRepository setRepository;
 
     @Transactional
     public void projectWorkout(StoredEventData eventData) {
-        if (!WORKOUT_RECORDED_V1.equals(eventData.eventType().value())) {
-            return;
-        }
 
         Map<String, Object> payload = eventData.payload();
         String workoutId = getString(payload, "workoutId");
@@ -105,7 +100,6 @@ class WorkoutProjector {
             totalSets += exerciseProjection.getTotalSets();
             totalVolume = totalVolume.add(exerciseProjection.getTotalVolumeKg());
 
-            // Add working volume (non-warmup sets only)
             for (WorkoutSetProjectionJpaEntity set : result.sets) {
                 if (!set.getIsWarmup()) {
                     totalWorkingVolume = totalWorkingVolume.add(set.getVolumeKg());
@@ -118,10 +112,8 @@ class WorkoutProjector {
         workout.setTotalVolumeKg(totalVolume);
         workout.setTotalWorkingVolumeKg(totalWorkingVolume);
 
-        // Save workout first (cascades to exercises)
         workoutRepository.save(workout);
 
-        // Save all sets
         if (!allSets.isEmpty()) {
             setRepository.saveAll(allSets);
         }
@@ -210,7 +202,6 @@ class WorkoutProjector {
                 .build();
     }
 
-    // Helper methods
 
     private String getString(Map<String, Object> map, String key) {
         Object value = map.get(key);

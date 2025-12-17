@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -47,13 +48,12 @@ public class ActivityService implements ActivityFacade {
                 ActivityHourlyProjectionJpaEntity::getActiveMinutes
             ));
 
-        List<ActivityDailyBreakdownResponse.HourlyActivity> hourlyBreakdown = new ArrayList<>();
-        for (int hour = 0; hour < 24; hour++) {
-            hourlyBreakdown.add(new ActivityDailyBreakdownResponse.HourlyActivity(
+        List<ActivityDailyBreakdownResponse.HourlyActivity> hourlyBreakdown = IntStream.range(0, 24)
+            .mapToObj(hour -> new ActivityDailyBreakdownResponse.HourlyActivity(
                 hour,
                 hourlyMinutes.getOrDefault(hour, 0)
-            ));
-        }
+            ))
+            .toList();
 
         return Optional.of(ActivityDailyBreakdownResponse.builder()
             .date(daily.getDate())
@@ -68,10 +68,9 @@ public class ActivityService implements ActivityFacade {
     }
 
     private ActivityDailyBreakdownResponse createEmptyBreakdown(LocalDate date) {
-        List<ActivityDailyBreakdownResponse.HourlyActivity> hourlyBreakdown = new ArrayList<>();
-        for (int hour = 0; hour < 24; hour++) {
-            hourlyBreakdown.add(new ActivityDailyBreakdownResponse.HourlyActivity(hour, 0));
-        }
+        List<ActivityDailyBreakdownResponse.HourlyActivity> hourlyBreakdown = IntStream.range(0, 24)
+            .mapToObj(hour -> new ActivityDailyBreakdownResponse.HourlyActivity(hour, 0))
+            .toList();
 
         return ActivityDailyBreakdownResponse.builder()
             .date(date)

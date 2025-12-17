@@ -76,18 +76,15 @@ class GoogleFitSyncService implements GoogleFitFacade {
             Instant aggregateFrom = getSyncFromTime();
             Instant aggregateTo = roundToNextBucket(now);
 
-            // Dla sesji (sleep, workout) - cały bieżący dzień (mogą pojawić się z opóźnieniem)
             ZonedDateTime todayStart = LocalDate.now(POLAND_ZONE).atStartOfDay(POLAND_ZONE);
             Instant sessionsFrom = todayStart.toInstant();
             Instant sessionsTo = aggregateTo;
 
-            // 1. Pobierz dane agregowane (inkrementalnie)
             log.info("Syncing aggregate data from {} to {}", aggregateFrom, aggregateTo);
             var aggregateRequest = getAggregateRequest(aggregateFrom, aggregateTo);
             var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
             List<GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
 
-            // 2. Pobierz sesje (cały dzień)
             log.info("Syncing sessions from {} to {}", sessionsFrom, sessionsTo);
             String startTimeRfc3339 = RFC3339_FORMATTER.format(sessionsFrom);
             String endTimeRfc3339 = RFC3339_FORMATTER.format(sessionsTo);
@@ -162,14 +159,12 @@ class GoogleFitSyncService implements GoogleFitFacade {
                 .orElse(null);
 
         if (state == null) {
-            // Pierwszy sync - od początku dzisiejszego dnia
             ZonedDateTime todayStart = LocalDate.now(POLAND_ZONE).atStartOfDay(POLAND_ZONE);
             Instant firstSync = todayStart.toInstant();
             log.info("First sync detected, starting from today: {}", firstSync);
             return firstSync;
         }
 
-        // Dodaj 1h buffer na wszelki wypadek (opóźnione dane z zegarka)
         Instant syncFrom = state.getLastSyncedAt().minus(BUFFER_HOURS, ChronoUnit.HOURS);
         log.info("Sync from time: {} (lastSynced: {})", syncFrom, state.getLastSyncedAt());
         return syncFrom;
@@ -214,7 +209,6 @@ class GoogleFitSyncService implements GoogleFitFacade {
 
         log.info("Scheduled {} historical sync tasks", scheduledCount);
 
-        // Trigger immediate processing (get from context to avoid circular dependency)
         applicationContext.getBean(HistoricalSyncTaskProcessor.class).triggerImmediately();
 
         return new HistoricalSyncResult(scheduledCount, 0, 0);

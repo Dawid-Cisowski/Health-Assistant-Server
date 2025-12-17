@@ -23,7 +23,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
-public class HealthTools {
+class HealthTools {
 
     private final StepsFacade stepsFacade;
     private final SleepFacade sleepFacade;
@@ -32,8 +32,8 @@ public class HealthTools {
     private final MealsFacade mealsFacade;
 
     @Tool(name = "getStepsData",
-          description = "Pobiera dane o krokach użytkownika dla podanego zakresu dat. Zwraca liczbę kroków, dystans, aktywne godziny i minuty. " +
-                        "PARAMETRY: startDate i endDate muszą być w formacie ISO-8601 (YYYY-MM-DD), np. '2025-11-24'.")
+          description = "Retrieves user's step data for the given date range. Returns step count, distance, active hours and minutes. " +
+                        "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public StepsRangeSummaryResponse getStepsData(String startDate, String endDate) {
         var deviceId = AssistantContext.getDeviceId();
         log.info("Fetching steps data for device {} from {} to {}", deviceId, startDate, endDate);
@@ -47,8 +47,8 @@ public class HealthTools {
     }
 
     @Tool(name = "getSleepData",
-          description = "Pobiera dane o śnie użytkownika dla podanego zakresu dat. Zwraca informacje o czasie snu, jakości i sesjach snu. " +
-                        "PARAMETRY: startDate i endDate muszą być w formacie ISO-8601 (YYYY-MM-DD), np. '2025-11-24'.")
+          description = "Retrieves user's sleep data for the given date range. Returns information about sleep duration, quality and sleep sessions. " +
+                        "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public SleepRangeSummaryResponse getSleepData(String startDate, String endDate) {
         var deviceId = AssistantContext.getDeviceId();
         log.info("Fetching sleep data for device {} from {} to {}", deviceId, startDate, endDate);
@@ -62,8 +62,8 @@ public class HealthTools {
     }
 
     @Tool(name = "getWorkoutData",
-          description = "Pobiera dane o treningach siłowych użytkownika dla podanego zakresu dat. Zwraca listę treningów z ćwiczeniami, seriami i objętością. " +
-                        "PARAMETRY: startDate i endDate muszą być w formacie ISO-8601 (YYYY-MM-DD), np. '2025-11-24'.")
+          description = "Retrieves user's strength training data for the given date range. Returns a list of workouts with exercises, sets and volume. " +
+                        "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public List<WorkoutDetailResponse> getWorkoutData(String startDate, String endDate) {
         var deviceId = AssistantContext.getDeviceId();
         log.info("Fetching workout data for device {} from {} to {}", deviceId, startDate, endDate);
@@ -77,8 +77,8 @@ public class HealthTools {
     }
 
     @Tool(name = "getDailySummary",
-          description = "Pobiera kompletne podsumowanie dnia użytkownika. Zawiera wszystkie dane: aktywność (kroki, kalorie), sen, tętno, posiłki i treningi. " +
-                        "PARAMETR: date musi być w formacie ISO-8601 (YYYY-MM-DD), np. '2025-11-24'.")
+          description = "Retrieves complete daily summary for the user. Contains all data: activity (steps, calories), sleep, heart rate, meals and workouts. " +
+                        "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Optional<DailySummary> getDailySummary(String date) {
         var deviceId = AssistantContext.getDeviceId();
         log.info("Fetching daily summary for device {} for date {}", deviceId, date);
@@ -91,8 +91,8 @@ public class HealthTools {
     }
 
     @Tool(name = "getMealsData",
-          description = "Pobiera dane o posiłkach użytkownika dla podanego zakresu dat. Zwraca informacje o kaloriach, makroskładnikach (białko, tłuszcze, węglowodany), typach posiłków i ocenach zdrowotnych. " +
-                        "PARAMETRY: startDate i endDate muszą być w formacie ISO-8601 (YYYY-MM-DD), np. '2025-11-24'.")
+          description = "Retrieves user's meal data for the given date range. Returns information about calories, macronutrients (protein, fat, carbohydrates), meal types and health ratings. " +
+                        "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public MealsRangeSummaryResponse getMealsData(String startDate, String endDate) {
         var deviceId = AssistantContext.getDeviceId();
         log.info("Fetching meals data for device {} from {} to {}", deviceId, startDate, endDate);

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface StepsHourlyProjectionJpaRepository extends JpaRepository<StepsHourlyProjectionJpaEntity, Long> {
+interface StepsHourlyProjectionJpaRepository extends JpaRepository<StepsHourlyProjectionJpaEntity, Long> {
 
     Optional<StepsHourlyProjectionJpaEntity> findByDateAndHour(LocalDate date, Integer hour);
 

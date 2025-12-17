@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class MealsService implements MealsFacade {
+class MealsService implements MealsFacade {
 
     private final MealDailyProjectionJpaRepository dailyRepository;
     private final MealProjectionJpaRepository mealRepository;

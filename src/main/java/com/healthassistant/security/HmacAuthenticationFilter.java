@@ -39,13 +39,11 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String path = request.getRequestURI();
 
-        // Check if path requires HMAC authentication
         if (!requiresAuthentication(path)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Wrap request to cache body for HMAC validation (only for methods with body, skip multipart)
         HttpServletRequest wrappedRequest = request;
         String method = request.getMethod();
         String contentType = request.getContentType();

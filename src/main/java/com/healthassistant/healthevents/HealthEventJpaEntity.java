@@ -24,7 +24,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class HealthEventJpaEntity {
+class HealthEventJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -23,23 +23,17 @@ import java.util.Optional;
 class StepsProjector {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final String STEPS_BUCKETED_V1 = "StepsBucketedRecorded.v1";
 
     private final StepsDailyProjectionJpaRepository dailyRepository;
     private final StepsHourlyProjectionJpaRepository hourlyRepository;
-    private final EntityManager entityManager;
 
     @Transactional
     public void projectSteps(StoredEventData eventData) {
-        String eventType = eventData.eventType().value();
-
-        if (STEPS_BUCKETED_V1.equals(eventType)) {
-            try {
+         try {
                 projectStepsBucketed(eventData);
             } catch (org.springframework.dao.DataIntegrityViolationException e) {
                 log.warn("Race condition during steps projection for event {}, skipping", eventData.eventId().value());
             }
-        }
     }
 
     private void projectStepsBucketed(StoredEventData eventData) {

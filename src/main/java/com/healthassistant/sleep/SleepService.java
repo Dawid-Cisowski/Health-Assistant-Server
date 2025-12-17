@@ -126,7 +126,6 @@ public class SleepService implements SleepFacade {
         int totalDays = dailyStats.size();
         int averageSleepMinutes = totalDays > 0 ? totalSleepMinutes / totalDays : 0;
 
-        // Find day with most/least sleep
         SleepRangeSummaryResponse.DayExtreme dayWithMostSleep = dailyStats.stream()
             .filter(d -> d.totalSleepMinutes() > 0)
             .max((d1, d2) -> Integer.compare(d1.totalSleepMinutes(), d2.totalSleepMinutes()))
@@ -145,7 +144,6 @@ public class SleepService implements SleepFacade {
                 .build())
             .orElse(null);
 
-        // Sleep phase totals and averages
         int totalLightSleep = dailyStats.stream()
             .mapToInt(d -> d.lightSleepMinutes() != null ? d.lightSleepMinutes() : 0)
             .sum();

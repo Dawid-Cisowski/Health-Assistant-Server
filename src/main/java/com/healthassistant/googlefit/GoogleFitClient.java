@@ -17,7 +17,7 @@ import java.util.List;
         url = "${app.google-fit.api-url:https://www.googleapis.com/fitness/v1}",
         configuration = GoogleFitClient.FeignConfig.class
 )
-public interface GoogleFitClient {
+ interface GoogleFitClient {
 
     @PostMapping("/users/me/dataset:aggregate")
     GoogleFitAggregateResponse fetchAggregated(@RequestBody AggregateRequest request);

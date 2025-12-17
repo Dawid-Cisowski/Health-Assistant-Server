@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface DailySummaryJpaRepository extends JpaRepository<DailySummaryJpaEntity, Long> {
+interface DailySummaryJpaRepository extends JpaRepository<DailySummaryJpaEntity, Long> {
     Optional<DailySummaryJpaEntity> findByDate(LocalDate date);
 
     List<DailySummaryJpaEntity> findByDateBetweenOrderByDateAsc(LocalDate startDate, LocalDate endDate);

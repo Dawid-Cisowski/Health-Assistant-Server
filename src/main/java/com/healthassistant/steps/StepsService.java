@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -47,13 +48,10 @@ public class StepsService implements StepsFacade {
                 StepsHourlyProjectionJpaEntity::getStepCount
             ));
 
-        List<StepsDailyBreakdownResponse.HourlySteps> hourlyBreakdown = new ArrayList<>();
-        for (int hour = 0; hour < 24; hour++) {
-            hourlyBreakdown.add(new StepsDailyBreakdownResponse.HourlySteps(
+        List<StepsDailyBreakdownResponse.HourlySteps> hourlyBreakdown = IntStream.range(0, 24).mapToObj(hour -> new StepsDailyBreakdownResponse.HourlySteps(
                 hour,
                 hourlySteps.getOrDefault(hour, 0)
-            ));
-        }
+        )).collect(Collectors.toList());
 
         return Optional.of(StepsDailyBreakdownResponse.builder()
             .date(daily.getDate())
@@ -68,10 +66,7 @@ public class StepsService implements StepsFacade {
     }
 
     private StepsDailyBreakdownResponse createEmptyBreakdown(LocalDate date) {
-        List<StepsDailyBreakdownResponse.HourlySteps> hourlyBreakdown = new ArrayList<>();
-        for (int hour = 0; hour < 24; hour++) {
-            hourlyBreakdown.add(new StepsDailyBreakdownResponse.HourlySteps(hour, 0));
-        }
+        List<StepsDailyBreakdownResponse.HourlySteps> hourlyBreakdown = IntStream.range(0, 24).mapToObj(hour -> new StepsDailyBreakdownResponse.HourlySteps(hour, 0)).collect(Collectors.toList());
 
         return StepsDailyBreakdownResponse.builder()
             .date(date)
@@ -84,11 +79,6 @@ public class StepsService implements StepsFacade {
             .hourlyBreakdown(hourlyBreakdown)
             .build();
     }
-
-    /**
-     * Get range summary (daily totals for specified date range)
-     * Client decides if it's week (7 days), month (~30 days), or year (365 days)
-     */
     @Override
     public StepsRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate) {
         List<StepsDailyProjectionJpaEntity> dailyData =

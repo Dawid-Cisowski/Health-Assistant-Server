@@ -117,7 +117,6 @@ class EventValidator {
             }
         }
 
-        // Validate healthRating enum
         if (payload.containsKey("healthRating") && payload.get("healthRating") != null) {
             String healthRating = payload.get("healthRating").toString();
             List<String> validHealthRatings = List.of("VERY_HEALTHY", "HEALTHY", "NEUTRAL", "UNHEALTHY", "VERY_UNHEALTHY");

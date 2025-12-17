@@ -28,14 +28,10 @@ class SleepProjector {
 
     @Transactional
     public void projectSleep(StoredEventData eventData) {
-        String eventType = eventData.eventType().value();
-
-        if (SLEEP_SESSION_V1.equals(eventType)) {
-            try {
-                projectSleepSession(eventData);
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                log.warn("Race condition during sleep projection for event {}, skipping", eventData.eventId().value());
-            }
+        try {
+            projectSleepSession(eventData);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Race condition during sleep projection for event {}, skipping", eventData.eventId().value());
         }
     }
 
@@ -57,7 +53,6 @@ class SleepProjector {
             return;
         }
 
-        // Use sleepEnd to determine the date (day when you woke up)
         ZonedDateTime endZoned = sleepEnd.atZone(POLAND_ZONE);
         LocalDate date = endZoned.toLocalDate();
 
@@ -77,7 +72,6 @@ class SleepProjector {
         SleepSessionProjectionJpaEntity session;
 
         if (existingOpt.isPresent()) {
-            // Update existing session
             session = existingOpt.get();
             session.setSleepStart(sleepStart);
             session.setSleepEnd(sleepEnd);
@@ -85,7 +79,6 @@ class SleepProjector {
             session.setOriginPackage(originPackage);
             log.debug("Updating existing sleep session for event {}", eventId);
         } else {
-            // Create new session
             List<SleepSessionProjectionJpaEntity> existingSessions =
                 sessionRepository.findByDateOrderBySessionNumberAsc(date);
 
@@ -150,7 +143,6 @@ class SleepProjector {
 
         int averageSessionMinutes = sleepCount > 0 ? totalSleepMinutes / sleepCount : 0;
 
-        // Future: Aggregate sleep phases
         int totalLightSleep = sessions.stream()
             .mapToInt(s -> s.getLightSleepMinutes() != null ? s.getLightSleepMinutes() : 0)
             .sum();
@@ -190,7 +182,6 @@ class SleepProjector {
         dailyRepository.save(daily);
     }
 
-    // Helper methods
 
     private Instant parseInstant(Object value) {
         if (value == null) return null;

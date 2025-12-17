@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AdminService {
+class AdminService {
 
     private final StepsFacade stepsFacade;
     private final WorkoutFacade workoutFacade;
@@ -29,7 +29,6 @@ public class AdminService {
     public void deleteAllData() {
         log.warn("Deleting all data from database - this operation is irreversible");
 
-        // Delete projection data first (child tables)
         log.info("Deleting workout projection data");
         workoutFacade.deleteAllProjections();
 
@@ -39,19 +38,15 @@ public class AdminService {
         log.info("Deleting sleep projection data");
         sleepFacade.deleteAllProjections();
 
-        // Delete aggregated data
         log.info("Deleting daily summaries");
         dailySummaryFacade.deleteAllSummaries();
 
-        // Delete source events
         log.info("Deleting all health events");
         healthEventsFacade.deleteAllEvents();
 
-        // Delete sync state
         log.info("Deleting Google Fit sync state");
         googleFitFacade.deleteAllSyncState();
 
-        // Delete AI conversation data
         log.info("Deleting conversations");
         assistantFacade.deleteAllConversations();
 

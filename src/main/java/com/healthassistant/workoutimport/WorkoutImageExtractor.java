@@ -3,7 +3,6 @@ package com.healthassistant.workoutimport;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.healthassistant.workoutimport.dto.ExtractedWorkoutData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -170,10 +169,8 @@ class WorkoutImageExtractor {
         }
 
         try {
-            // Try ISO-8601 instant format first
             return Instant.parse(performedAtStr);
         } catch (DateTimeParseException e) {
-            // Try parsing as local datetime and convert to UTC
             try {
                 LocalDateTime localDateTime = LocalDateTime.parse(performedAtStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 return localDateTime.atZone(POLAND_ZONE).toInstant();

@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Repository
-public interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, Long> {
+interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, Long> {
 
     List<HealthEventJpaEntity> findByIdempotencyKeyIn(List<String> idempotencyKeys);
 

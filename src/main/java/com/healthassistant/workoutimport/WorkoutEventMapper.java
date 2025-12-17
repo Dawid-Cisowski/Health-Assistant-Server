@@ -3,7 +3,6 @@ package com.healthassistant.workoutimport;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
-import com.healthassistant.workoutimport.dto.ExtractedWorkoutData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

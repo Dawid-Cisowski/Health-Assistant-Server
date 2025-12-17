@@ -29,7 +29,7 @@ import java.util.Map;
 )
 public record SubmitHealthEventsRequest(
     @JsonProperty("events")
-    @Schema(description = "List of health events to submit", required = true)
+    @Schema(description = "List of health events to submit")
     List<HealthEventRequest> events,
 
     @JsonProperty("deviceId")
@@ -49,19 +49,16 @@ public record SubmitHealthEventsRequest(
 
         @JsonProperty("type")
         @Schema(description = "Event type identifier",
-                example = "WorkoutRecorded.v1",
-                required = true)
+                example = "WorkoutRecorded.v1")
         String type,
 
         @JsonProperty("occurredAt")
         @Schema(description = "When the event occurred (ISO-8601 UTC)",
-                example = "2025-11-17T18:00:00Z",
-                required = true)
+                example = "2025-11-17T18:00:00Z")
         Instant occurredAt,
 
         @JsonProperty("payload")
-        @Schema(description = "Event-specific data (structure depends on event type)",
-                required = true)
+        @Schema(description = "Event-specific data (structure depends on event type)")
         Map<String, Object> payload
     ) {}
 }

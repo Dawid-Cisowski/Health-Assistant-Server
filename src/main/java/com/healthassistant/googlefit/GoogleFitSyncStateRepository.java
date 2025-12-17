@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface GoogleFitSyncStateRepository extends JpaRepository<GoogleFitSyncState, Long> {
+interface GoogleFitSyncStateRepository extends JpaRepository<GoogleFitSyncState, Long> {
     Optional<GoogleFitSyncState> findByUserId(String userId);
 }
 

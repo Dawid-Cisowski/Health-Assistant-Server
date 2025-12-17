@@ -3,7 +3,6 @@ package com.healthassistant.mealimport;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.healthassistant.mealimport.dto.ExtractedMealData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -41,11 +40,9 @@ class MealContentExtractor {
         var promptBuilder = chatClient.prompt()
             .system(buildSystemPrompt());
 
-        // Build user message with optional text and images
         return promptBuilder.user(userSpec -> {
             userSpec.text(buildUserPrompt(description, images));
 
-            // Add images if present
             if (images != null && !images.isEmpty()) {
                 for (MultipartFile image : images) {
                     try {
@@ -63,10 +60,8 @@ class MealContentExtractor {
     private String getMimeType(MultipartFile image) {
         String contentType = image.getContentType();
         if (contentType == null || contentType.equals("image/*") || contentType.equals("application/octet-stream")) {
-            // Default to JPEG if unknown
             return "image/jpeg";
         }
-        // Normalize image/jpg to image/jpeg
         if (contentType.equals("image/jpg")) {
             return "image/jpeg";
         }
@@ -170,7 +165,6 @@ class MealContentExtractor {
             Integer carbohydratesGrams = getIntOrNull(root, "carbohydratesGrams");
             String healthRating = getTextOrNull(root, "healthRating");
 
-            // Validate required fields
             if (title == null || mealType == null) {
                 return ExtractedMealData.invalid("Missing required fields (title or mealType)", confidence);
             }
@@ -180,7 +174,7 @@ class MealContentExtractor {
             }
 
             if (healthRating == null) {
-                healthRating = "NEUTRAL"; // Default if not provided
+                healthRating = "NEUTRAL";
             }
 
             return ExtractedMealData.valid(
@@ -201,7 +195,6 @@ class MealContentExtractor {
             return "{}";
         }
         String cleaned = response.trim();
-        // Remove markdown code block wrappers if present
         if (cleaned.startsWith("```json")) {
             cleaned = cleaned.substring(7);
         } else if (cleaned.startsWith("```")) {

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
-public record GoogleFitSessionsResponse(
+record GoogleFitSessionsResponse(
         @JsonProperty("session")
         List<GoogleFitSession> sessions
 ) {

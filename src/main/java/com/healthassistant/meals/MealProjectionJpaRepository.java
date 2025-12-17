@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface MealProjectionJpaRepository extends JpaRepository<MealProjectionJpaEntity, Long> {
+interface MealProjectionJpaRepository extends JpaRepository<MealProjectionJpaEntity, Long> {
 
     Optional<MealProjectionJpaEntity> findByEventId(String eventId);
 
