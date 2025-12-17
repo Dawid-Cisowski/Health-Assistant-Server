@@ -2,7 +2,6 @@ package com.healthassistant.config;
 
 import com.healthassistant.assistant.api.AssistantFacade;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
-import com.healthassistant.googlefit.api.GoogleFitFacade;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.steps.api.StepsFacade;
@@ -22,7 +21,6 @@ class AdminService {
     private final SleepFacade sleepFacade;
     private final DailySummaryFacade dailySummaryFacade;
     private final HealthEventsFacade healthEventsFacade;
-    private final GoogleFitFacade googleFitFacade;
     private final AssistantFacade assistantFacade;
 
     @Transactional
@@ -43,9 +41,6 @@ class AdminService {
 
         log.info("Deleting all health events");
         healthEventsFacade.deleteAllEvents();
-
-        log.info("Deleting Google Fit sync state");
-        googleFitFacade.deleteAllSyncState();
 
         log.info("Deleting conversations");
         assistantFacade.deleteAllConversations();

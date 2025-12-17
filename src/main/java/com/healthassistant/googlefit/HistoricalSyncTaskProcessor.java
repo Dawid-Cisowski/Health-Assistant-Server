@@ -1,9 +1,8 @@
 package com.healthassistant.googlefit;
 
 import com.healthassistant.googlefit.HistoricalSyncTask.SyncTaskStatus;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +16,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 class HistoricalSyncTaskProcessor {
 
@@ -27,7 +25,16 @@ class HistoricalSyncTaskProcessor {
     private final HistoricalSyncTaskRepository taskRepository;
     private final GoogleFitSyncService googleFitSyncService;
 
-    @Scheduled(cron = "0 * * * * *")
+    HistoricalSyncTaskProcessor(HistoricalSyncTaskRepository taskRepository,
+                                @Lazy GoogleFitSyncService googleFitSyncService) {
+        this.taskRepository = taskRepository;
+        this.googleFitSyncService = googleFitSyncService;
+    }
+
+    /**
+     * Process pending historical sync tasks.
+     * Called on-demand when historical sync is requested.
+     */
     public void processNextBatch() {
         log.debug("Checking for pending historical sync tasks");
 
@@ -39,20 +46,6 @@ class HistoricalSyncTaskProcessor {
         }
 
         log.info("Processing {} pending historical sync tasks", pendingTasks.size());
-        processTasks(pendingTasks);
-    }
-
-    public void triggerImmediately() {
-        log.info("Triggering immediate historical sync processing");
-
-        List<HistoricalSyncTask> pendingTasks = taskRepository.findTop10ByStatusOrderByCreatedAtAsc(SyncTaskStatus.PENDING);
-
-        if (pendingTasks.isEmpty()) {
-            log.info("No pending tasks to process immediately");
-            return;
-        }
-
-        log.info("Immediately processing {} pending tasks", pendingTasks.size());
         processTasks(pendingTasks);
     }
 

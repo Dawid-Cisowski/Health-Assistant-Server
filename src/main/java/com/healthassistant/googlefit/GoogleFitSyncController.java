@@ -27,52 +27,6 @@ class GoogleFitSyncController {
 
     private final GoogleFitFacade googleFitFacade;
 
-    @PostMapping("/sync")
-    @Operation(
-            summary = "Manually trigger Google Fit synchronization",
-            description = """
-                    Manually triggers the Google Fit data synchronization. This endpoint is useful for testing
-                    and manual synchronization without waiting for the scheduled task (runs every 15 minutes).
-                    Requires HMAC authentication.
-
-                    The synchronization will:
-                    1. Fetch aggregated data from Google Fit API
-                    2. Map buckets to domain events
-                    3. Store events in the database (with idempotency check)
-                    4. Recalculate daily summary for today
-                    5. Update last sync timestamp
-                    """,
-            security = @SecurityRequirement(name = "HmacHeaderAuth")
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Synchronization triggered successfully"),
-            @ApiResponse(responseCode = "401", description = "HMAC authentication failed"),
-            @ApiResponse(responseCode = "500", description = "Synchronization failed - check logs for details")
-    })
-    public ResponseEntity<Map<String, String>> triggerSync() {
-        log.info("Manual Google Fit synchronization triggered via API");
-        
-        try {
-            googleFitFacade.syncAll();
-            
-            Map<String, String> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("message", "Google Fit synchronization completed successfully");
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to synchronize Google Fit data via API", e);
-            
-            Map<String, String> response = new HashMap<>();
-            response.put("status", "error");
-            response.put("message", "Synchronization failed: " + e.getMessage());
-            
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(response);
-        }
-    }
-
     @PostMapping("/sync/history")
     @Operation(
             summary = "Schedule historical Google Fit synchronization",

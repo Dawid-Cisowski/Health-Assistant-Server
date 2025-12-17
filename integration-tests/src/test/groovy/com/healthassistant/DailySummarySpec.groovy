@@ -27,38 +27,100 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def summaryDate = LocalDate.of(2025, 11, 12)
         def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
 
-        and: "mock Google Fit API response with multiple data types for the date"
+        and: "multiple health events for the date"
         def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        def startTime1 = summaryZoned.plusHours(7).toInstant().toEpochMilli() // 07:00
-        def endTime1 = summaryZoned.plusHours(8).toInstant().toEpochMilli() // 08:00
-        def startTime2 = summaryZoned.plusHours(11).toInstant().toEpochMilli() // 11:00
-        def endTime2 = summaryZoned.plusHours(12).toInstant().toEpochMilli() // 12:00
-        def startTime3 = summaryZoned.plusHours(14).toInstant().toEpochMilli() // 14:00
-        def endTime3 = summaryZoned.plusHours(15).toInstant().toEpochMilli() // 15:00
-        
-        // First sync with steps, distance, calories
-        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime1, endTime1, 742, 1000.5, 62.5, 75))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
-        
-        // Second sync with more steps
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
-        
-        // Third sync with heart rate
-        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(startTime3, endTime3, 0, 0, 0, 78))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def startTime1 = summaryZoned.plusHours(7).toInstant()
+        def endTime1 = summaryZoned.plusHours(8).toInstant()
+        def startTime2 = summaryZoned.plusHours(11).toInstant()
+        def endTime2 = summaryZoned.plusHours(12).toInstant()
+        def startTime3 = summaryZoned.plusHours(14).toInstant()
+        def endTime3 = summaryZoned.plusHours(15).toInstant()
+
+        def events = [
+            // First batch: steps, distance, calories
+            [
+                idempotencyKey: "steps-2025-11-12-1",
+                type: "StepsBucketedRecorded.v1",
+                occurredAt: endTime1.toString(),
+                payload: [
+                    bucketStart: startTime1.toString(),
+                    bucketEnd: endTime1.toString(),
+                    count: 742,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ],
+            [
+                idempotencyKey: "distance-2025-11-12-1",
+                type: "DistanceBucketRecorded.v1",
+                occurredAt: endTime1.toString(),
+                payload: [
+                    bucketStart: startTime1.toString(),
+                    bucketEnd: endTime1.toString(),
+                    distanceMeters: 1000.5,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ],
+            [
+                idempotencyKey: "calories-2025-11-12-1",
+                type: "ActiveCaloriesBurnedRecorded.v1",
+                occurredAt: endTime1.toString(),
+                payload: [
+                    bucketStart: startTime1.toString(),
+                    bucketEnd: endTime1.toString(),
+                    energyKcal: 62.5,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ],
+            [
+                idempotencyKey: "heartrate-2025-11-12-1",
+                type: "HeartRateSummaryRecorded.v1",
+                occurredAt: endTime1.toString(),
+                payload: [
+                    bucketStart: startTime1.toString(),
+                    bucketEnd: endTime1.toString(),
+                    avg: 75,
+                    min: 70,
+                    max: 80,
+                    samples: 60,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ],
+            // Second batch: more steps
+            [
+                idempotencyKey: "steps-2025-11-12-2",
+                type: "StepsBucketedRecorded.v1",
+                occurredAt: endTime2.toString(),
+                payload: [
+                    bucketStart: startTime2.toString(),
+                    bucketEnd: endTime2.toString(),
+                    count: 742,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ],
+            // Third batch: heart rate
+            [
+                idempotencyKey: "heartrate-2025-11-12-2",
+                type: "HeartRateSummaryRecorded.v1",
+                occurredAt: endTime3.toString(),
+                payload: [
+                    bucketStart: startTime3.toString(),
+                    bucketEnd: endTime3.toString(),
+                    avg: 78,
+                    min: 72,
+                    max: 85,
+                    samples: 60,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ]
+        ]
+
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: events,
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
 
         when: "I get summary for the date"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
@@ -75,7 +137,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         // Allow for rounding differences in calories
         def activeCalories = summary.getDouble("activity.activeCalories")
         (activeCalories == 62.5 || activeCalories == 62.0 || activeCalories == 63.0)
-        
+
         summary.getInt("heart.avgBpm") != null
     }
 
@@ -88,18 +150,30 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def summaryDate = LocalDate.of(2025, 11, 13)
         def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
 
-        and: "mock Google Fit API response with steps data"
+        and: "steps event for the date"
         def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        def startTime = summaryZoned.plusHours(9).toInstant().toEpochMilli()
-        def endTime = summaryZoned.plusHours(10).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+        def startTime = summaryZoned.plusHours(9).toInstant()
+        def endTime = summaryZoned.plusHours(10).toInstant()
 
-        and: "sync data"
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def stepsEvent = [
+            idempotencyKey: "steps-2025-11-13-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: endTime.toString(),
+            payload: [
+                bucketStart: startTime.toString(),
+                bucketEnd: endTime.toString(),
+                count: 742,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: [stepsEvent],
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
 
         when: "I get summary for the date"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
@@ -109,7 +183,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
         then: "summary is returned"
         getResponse.statusCode() == 200
-        
+
         def summary = getResponse.body().jsonPath()
         summary.getString("date") == dateStr
         summary.getInt("activity.steps") == 742
@@ -134,7 +208,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         getResponse.statusCode() == 404
     }
 
-    def "Scenario 4: Summary updates when new events arrive via sync"() {
+    def "Scenario 4: Summary updates when new events arrive"() {
         given: "authenticated device"
         def deviceId = "test-device"
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
@@ -143,29 +217,55 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def summaryDate = LocalDate.of(2025, 11, 15)
         def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
 
-        and: "first sync with steps data"
+        and: "first batch of steps data"
         def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        def startTime1 = summaryZoned.plusHours(9).toInstant().toEpochMilli()
-        def endTime1 = summaryZoned.plusHours(10).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 742))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def startTime1 = summaryZoned.plusHours(9).toInstant()
+        def endTime1 = summaryZoned.plusHours(10).toInstant()
 
-        and: "second sync with additional steps data"
-        def startTime2 = summaryZoned.plusHours(13).toInstant().toEpochMilli()
-        def endTime2 = summaryZoned.plusHours(14).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
+        def stepsEvent1 = [
+            idempotencyKey: "steps-2025-11-15-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: endTime1.toString(),
+            payload: [
+                bucketStart: startTime1.toString(),
+                bucketEnd: endTime1.toString(),
+                count: 742,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
 
-        when: "I trigger sync again"
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: [stepsEvent1],
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
+
+        and: "second batch with additional steps data"
+        def startTime2 = summaryZoned.plusHours(13).toInstant()
+        def endTime2 = summaryZoned.plusHours(14).toInstant()
+
+        def stepsEvent2 = [
+            idempotencyKey: "steps-2025-11-15-2",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: endTime2.toString(),
+            payload: [
+                bucketStart: startTime2.toString(),
+                bucketEnd: endTime2.toString(),
+                count: 742,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit second batch of events"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: [stepsEvent2],
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
 
         and: "I get summary"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
@@ -199,7 +299,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
         getResponse.statusCode() == 404
     }
 
-    def "Scenario 6: Summary aggregates multiple syncs correctly"() {
+    def "Scenario 6: Summary aggregates multiple events correctly"() {
         given: "authenticated device"
         def deviceId = "test-device"
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
@@ -208,28 +308,49 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def summaryDate = LocalDate.of(2025, 11, 17)
         def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
 
-        and: "multiple syncs with different data"
+        and: "multiple events with different data"
         def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        
-        // First sync with steps
-        def startTime1 = summaryZoned.plusHours(7).toInstant().toEpochMilli()
-        def endTime1 = summaryZoned.plusHours(8).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime1, endTime1, 500))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
-        
-        // Second sync with more steps
-        def startTime2 = summaryZoned.plusHours(13).toInstant().toEpochMilli()
-        def endTime2 = summaryZoned.plusHours(14).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime2, endTime2, 742))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+
+        // First batch with steps
+        def startTime1 = summaryZoned.plusHours(7).toInstant()
+        def endTime1 = summaryZoned.plusHours(8).toInstant()
+
+        // Second batch with more steps
+        def startTime2 = summaryZoned.plusHours(13).toInstant()
+        def endTime2 = summaryZoned.plusHours(14).toInstant()
+
+        def events = [
+            [
+                idempotencyKey: "steps-2025-11-17-1",
+                type: "StepsBucketedRecorded.v1",
+                occurredAt: endTime1.toString(),
+                payload: [
+                    bucketStart: startTime1.toString(),
+                    bucketEnd: endTime1.toString(),
+                    count: 500,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ],
+            [
+                idempotencyKey: "steps-2025-11-17-2",
+                type: "StepsBucketedRecorded.v1",
+                occurredAt: endTime2.toString(),
+                payload: [
+                    bucketStart: startTime2.toString(),
+                    bucketEnd: endTime2.toString(),
+                    count: 742,
+                    originPackage: "com.google.android.apps.fitness"
+                ]
+            ]
+        ]
+
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: events,
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
 
         when: "I get summary"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
@@ -252,19 +373,35 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def summaryDate = LocalDate.of(2025, 11, 18)
         def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
 
-        and: "mock Google Fit API responses with walking session"
+        and: "walking session event"
         def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        def walkStart = summaryZoned.plusHours(10).toInstant().toEpochMilli()
-        def walkEnd = summaryZoned.plusHours(11).toInstant().toEpochMilli()
-        
-        setupGoogleFitSessionsApiMock(createGoogleFitSessionsResponseWithWalking(walkStart, walkEnd, "walk-123"))
-        setupGoogleFitApiMock(createGoogleFitResponseWithMultipleDataTypes(walkStart, walkEnd, 5000, 3000.0, 150.0, 80))
+        def walkStart = summaryZoned.plusHours(10).toInstant()
+        def walkEnd = summaryZoned.plusHours(11).toInstant()
 
-        when: "I trigger sync"
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def walkingEvent = [
+            idempotencyKey: "walk-2025-11-18-1",
+            type: "WalkingSessionRecorded.v1",
+            occurredAt: walkEnd.toString(),
+            payload: [
+                sessionId: "walk-123",
+                start: walkStart.toString(),
+                end: walkEnd.toString(),
+                durationMinutes: 60,
+                totalSteps: 5000,
+                totalDistanceMeters: 3000.0,
+                totalCalories: 150.0,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit walking event"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: [walkingEvent],
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
 
         and: "I get summary"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
@@ -365,21 +502,33 @@ class DailySummarySpec extends BaseIntegrationSpec {
         def deviceId = "test-device"
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
-        and: "sync with events from different dates"
+        and: "events from target date"
         def targetDate = LocalDate.of(2025, 11, 22)
         def targetDateStr = targetDate.format(DateTimeFormatter.ISO_DATE)
-        
-        // Sync with event from target date
+
         def targetZoned = targetDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-        def startTime = targetZoned.plusHours(11).toInstant().toEpochMilli()
-        def endTime = targetZoned.plusHours(12).toInstant().toEpochMilli()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(startTime, endTime, 742))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def startTime = targetZoned.plusHours(11).toInstant()
+        def endTime = targetZoned.plusHours(12).toInstant()
+
+        def stepsEvent = [
+            idempotencyKey: "steps-2025-11-22-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: endTime.toString(),
+            payload: [
+                bucketStart: startTime.toString(),
+                bucketEnd: endTime.toString(),
+                count: 742,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: [stepsEvent],
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
 
         when: "I get summary for target date"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${targetDateStr}")
@@ -578,12 +727,19 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
         and: "first day with steps and sleep"
         def day1Time = startDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(10).toInstant()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day1Time.toEpochMilli(), day1Time.plusSeconds(3600).toEpochMilli(), 5000))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def day1End = day1Time.plusSeconds(3600)
+
+        def stepsEvent1 = [
+            idempotencyKey: "steps-2025-11-26-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: day1End.toString(),
+            payload: [
+                bucketStart: day1Time.toString(),
+                bucketEnd: day1End.toString(),
+                count: 5000,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
 
         def sleepEvent1 = [
             idempotencyKey: "sleep-2025-11-26-1",
@@ -597,19 +753,27 @@ class DailySummarySpec extends BaseIntegrationSpec {
                 originPackage: "com.google.android.apps.fitness"
             ]
         ]
-        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [sleepEvent1], deviceId: deviceId]))
+
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [stepsEvent1, sleepEvent1], deviceId: deviceId]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
         and: "second day with more steps and meals"
         def day2Time = midDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(14).toInstant()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day2Time.toEpochMilli(), day2Time.plusSeconds(3600).toEpochMilli(), 8000))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def day2End = day2Time.plusSeconds(3600)
+
+        def stepsEvent2 = [
+            idempotencyKey: "steps-2025-11-27-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: day2End.toString(),
+            payload: [
+                bucketStart: day2Time.toString(),
+                bucketEnd: day2End.toString(),
+                count: 8000,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
 
         def mealEvent1 = [
             idempotencyKey: "meal-2025-11-27-1",
@@ -625,19 +789,27 @@ class DailySummarySpec extends BaseIntegrationSpec {
                 healthRating: "HEALTHY"
             ]
         ]
-        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [mealEvent1], deviceId: deviceId]))
+
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [stepsEvent2, mealEvent1], deviceId: deviceId]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
         and: "third day with workout and fewer steps"
         def day3Time = endDate.atStartOfDay(ZoneId.of("Europe/Warsaw")).plusHours(9).toInstant()
-        setupGoogleFitApiMock(createGoogleFitResponseWithSteps(day3Time.toEpochMilli(), day3Time.plusSeconds(3600).toEpochMilli(), 3000))
-        setupGoogleFitSessionsApiMock(createEmptyGoogleFitSessionsResponse())
-        authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync")
-                .post("/v1/google-fit/sync")
-                .then()
-                .statusCode(200)
+        def day3End = day3Time.plusSeconds(3600)
+
+        def stepsEvent3 = [
+            idempotencyKey: "steps-2025-11-28-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: day3End.toString(),
+            payload: [
+                bucketStart: day3Time.toString(),
+                bucketEnd: day3End.toString(),
+                count: 3000,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
 
         def workoutEvent = [
             idempotencyKey: "gymrun-2025-11-28-1",
@@ -660,7 +832,7 @@ class DailySummarySpec extends BaseIntegrationSpec {
                 ]
             ]
         ]
-        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [workoutEvent], deviceId: deviceId]))
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([events: [stepsEvent3, workoutEvent], deviceId: deviceId]))
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
