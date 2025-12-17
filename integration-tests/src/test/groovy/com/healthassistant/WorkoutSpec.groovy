@@ -51,18 +51,18 @@ class WorkoutSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def workoutEvent = events.first()
-        workoutEvent.eventType == "WorkoutRecorded.v1"
+        workoutEvent.eventType() == "WorkoutRecorded.v1"
 
         and: "event has correct device ID"
-        workoutEvent.deviceId == "gymrun-app"
+        workoutEvent.deviceId() == "gymrun-app"
 
         and: "event has correct payload"
-        def payload = workoutEvent.payload
+        def payload = workoutEvent.payload()
         payload.get("workoutId") == "gymrun-2025-11-17-2"
         payload.get("source") == "GYMRUN_SCREENSHOT"
         payload.get("note") == "Plecy i biceps"
@@ -96,7 +96,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         events[0].status == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
     }
 
@@ -315,10 +315,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event has correct idempotency key"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
         def workoutEvent = events.first()
-        workoutEvent.idempotencyKey == "gymrun-app|workout|${workoutId}"
+        workoutEvent.idempotencyKey() == "gymrun-app|workout|${workoutId}"
     }
 
     def "Scenario 10: Multiple workout events are stored correctly"() {
@@ -347,10 +347,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 3
 
         and: "all events are stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 3
-        dbEvents.every { it.eventType == "WorkoutRecorded.v1" }
-        dbEvents.every { it.deviceId == "gymrun-app" }
+        dbEvents.every { it.eventType() == "WorkoutRecorded.v1" }
+        dbEvents.every { it.deviceId() == "gymrun-app" }
     }
 
     def "Scenario 11: Workout event with minimal data (no note, no muscleGroup)"() {
@@ -392,11 +392,11 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        workoutEvent.eventType == "WorkoutRecorded.v1"
-        workoutEvent.payload.get("note") == null
+        workoutEvent.eventType() == "WorkoutRecorded.v1"
+        workoutEvent.payload().get("note") == null
     }
 
     def "Scenario 12: Workout event with complex data (multiple exercises, multiple sets)"() {
@@ -413,10 +413,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored with all exercises and sets"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        def exercises = (List) workoutEvent.payload.get("exercises")
+        def exercises = (List) workoutEvent.payload().get("exercises")
         exercises.size() == 5
 
         and: "first exercise has 3 sets"
@@ -466,10 +466,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches performedAt"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        def occurredAt = Instant.parse(workoutEvent.occurredAt.toString())
+        def occurredAt = Instant.parse(workoutEvent.occurredAt().toString())
         occurredAt == Instant.parse(performedAt)
     }
 
@@ -517,10 +517,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored with warmup flags preserved"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        def exercises = (List) workoutEvent.payload.get("exercises")
+        def exercises = (List) workoutEvent.payload().get("exercises")
         def exercise = (Map) exercises.get(0)
         def sets = (List) exercise.get("sets")
         sets.size() == 4
@@ -571,10 +571,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored with zero weight"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        def exercises = (List) workoutEvent.payload.get("exercises")
+        def exercises = (List) workoutEvent.payload().get("exercises")
         def exercise = (Map) exercises.get(0)
         def sets = (List) exercise.get("sets")
         ((Map) sets.get(0)).get("weightKg") == 0.0

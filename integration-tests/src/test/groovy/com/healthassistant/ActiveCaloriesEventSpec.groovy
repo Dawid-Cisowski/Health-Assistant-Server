@@ -49,18 +49,18 @@ class ActiveCaloriesEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def caloriesEvent = events.first()
-        caloriesEvent.eventType == "ActiveCaloriesBurnedRecorded.v1"
+        caloriesEvent.eventType() == "ActiveCaloriesBurnedRecorded.v1"
 
         and: "event has correct device ID"
-        caloriesEvent.deviceId == "mobile-app"
+        caloriesEvent.deviceId() == "mobile-app"
 
         and: "event has correct payload"
-        def payload = caloriesEvent.payload
+        def payload = caloriesEvent.payload()
         payload.get("bucketStart") == "2025-11-21T10:00:00Z"
         payload.get("bucketEnd") == "2025-11-21T11:00:00Z"
         payload.get("energyKcal") == 350.5
@@ -246,10 +246,10 @@ class ActiveCaloriesEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def caloriesEvent = dbEvents.first()
-        caloriesEvent.payload.get("energyKcal") == 0
+        caloriesEvent.payload().get("energyKcal") == 0
     }
 
     def "Scenario 9: Active calories event occurredAt timestamp is preserved"() {
@@ -276,10 +276,10 @@ class ActiveCaloriesEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def caloriesEvent = dbEvents.first()
-        def storedOccurredAt = Instant.parse(caloriesEvent.occurredAt.toString())
+        def storedOccurredAt = Instant.parse(caloriesEvent.occurredAt().toString())
         storedOccurredAt == Instant.parse(occurredAt)
     }
 

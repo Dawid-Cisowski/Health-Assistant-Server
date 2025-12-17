@@ -1,6 +1,6 @@
 package com.healthassistant
 
-import com.healthassistant.workout.WorkoutProjectionJpaRepository
+import com.healthassistant.workout.api.WorkoutFacade
 import io.restassured.RestAssured
 import io.restassured.builder.MultiPartSpecBuilder
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,12 +17,10 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
     private static final String IMPORT_ENDPOINT = "/v1/workouts/import-image"
 
     @Autowired
-    WorkoutProjectionJpaRepository workoutProjectionRepository
+    WorkoutFacade workoutFacade
 
     def cleanup() {
-        if (workoutProjectionRepository != null) {
-            workoutProjectionRepository.deleteAll()
-        }
+        workoutFacade?.deleteAllProjections()
         TestChatModelConfiguration.resetResponse()
     }
 
@@ -66,10 +64,10 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("status") == "success"
 
         and: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
-        events.first().eventType == "WorkoutRecorded.v1"
-        events.first().payload.get("source") == "GYMRUN_SCREENSHOT"
+        events.first().eventType() == "WorkoutRecorded.v1"
+        events.first().payload().get("source") == "GYMRUN_SCREENSHOT"
     }
 
     def "Scenario 3: Duplicate image upload returns same workoutId"() {
@@ -97,7 +95,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         secondResponse.body().jsonPath().getString("workoutId") == firstWorkoutId
 
         and: "only one event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
     }
 
@@ -121,7 +119,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         body.getString("errorMessage").contains("Not a workout screenshot")
 
         and: "no event is stored in database"
-        eventRepository.findAll().isEmpty()
+        findAllEvents().isEmpty()
     }
 
     def "Scenario 5: Empty file returns 400 Bad Request"() {
@@ -200,8 +198,8 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         body.getInt("totalSets") == 9
 
         and: "event payload has correct structure"
-        def events = eventRepository.findAll()
-        def payload = events.first().payload
+        def events = findAllEvents()
+        def payload = events.first().payload()
         def exercises = payload.get("exercises") as List
         exercises.size() == 3
         exercises[0].name == "Podciąganie się nachwytem"
@@ -225,8 +223,8 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         body.getString("note") == "Plecy i biceps"
 
         and: "event payload has note"
-        def events = eventRepository.findAll()
-        events.first().payload.get("note") == "Plecy i biceps"
+        def events = findAllEvents()
+        events.first().payload().get("note") == "Plecy i biceps"
     }
 
     def "Scenario 10: Bodyweight exercises have weight 0"() {
@@ -244,8 +242,8 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event has bodyweight exercise with weight 0"
-        def events = eventRepository.findAll()
-        def exercises = events.first().payload.get("exercises") as List
+        def events = findAllEvents()
+        def exercises = events.first().payload().get("exercises") as List
         def sets = exercises[0].sets as List
         sets[0].weightKg == 0.0
     }
@@ -332,8 +330,8 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "exercises are in correct order"
-        def events = eventRepository.findAll()
-        def exercises = events.first().payload.get("exercises") as List
+        def events = findAllEvents()
+        def exercises = events.first().payload().get("exercises") as List
         exercises[0].orderInWorkout == 1
         exercises[1].orderInWorkout == 2
         exercises[2].orderInWorkout == 3

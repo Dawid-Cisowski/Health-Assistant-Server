@@ -6,6 +6,8 @@ import java.util.Map;
 public record EventData(
         String eventType,
         Instant occurredAt,
-        Map<String, Object> payload
+        Map<String, Object> payload,
+        String deviceId,
+        String idempotencyKey
 ) {
 }

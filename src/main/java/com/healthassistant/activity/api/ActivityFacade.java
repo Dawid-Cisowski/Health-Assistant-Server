@@ -10,4 +10,6 @@ public interface ActivityFacade {
     ActivityDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date);
 
     ActivityRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
+
+    void deleteAllProjections();
 }

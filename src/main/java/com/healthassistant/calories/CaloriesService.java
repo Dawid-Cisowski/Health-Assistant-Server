@@ -127,4 +127,11 @@ class CaloriesService implements CaloriesFacade {
             .dailyStats(dailyStats)
             .build();
     }
+
+    @Override
+    @Transactional
+    public void deleteAllProjections() {
+        hourlyRepository.deleteAll();
+        dailyRepository.deleteAll();
+    }
 }

@@ -49,18 +49,18 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def hrEvent = events.first()
-        hrEvent.eventType == "HeartRateSummaryRecorded.v1"
+        hrEvent.eventType() == "HeartRateSummaryRecorded.v1"
 
         and: "event has correct device ID"
-        hrEvent.deviceId == "mobile-app"
+        hrEvent.deviceId() == "mobile-app"
 
         and: "event has correct payload"
-        def payload = hrEvent.payload
+        def payload = hrEvent.payload()
         payload.get("bucketStart") == "2025-11-21T10:00:00Z"
         payload.get("bucketEnd") == "2025-11-21T10:15:00Z"
         payload.get("avg") == 78.5
@@ -112,7 +112,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
     }
 
@@ -517,10 +517,10 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def hrEvent = dbEvents.first()
-        hrEvent.payload.get("samples") == 1
+        hrEvent.payload().get("samples") == 1
     }
 
     def "Scenario 16: Heart rate event occurredAt timestamp is preserved"() {
@@ -550,10 +550,10 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def hrEvent = dbEvents.first()
-        def storedOccurredAt = Instant.parse(hrEvent.occurredAt.toString())
+        def storedOccurredAt = Instant.parse(hrEvent.occurredAt().toString())
         storedOccurredAt == Instant.parse(occurredAt)
     }
 

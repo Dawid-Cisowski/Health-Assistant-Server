@@ -129,9 +129,9 @@ class MealImportSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("status") == "success"
 
         and: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
-        events.first().eventType == "MealRecorded.v1"
+        events.first().eventType() == "MealRecorded.v1"
     }
 
     def "Scenario 6: Each meal import creates a new event (no idempotency)"() {
@@ -160,7 +160,7 @@ class MealImportSpec extends BaseIntegrationSpec {
         secondMealId != firstMealId
 
         and: "two events are stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 2
     }
 
@@ -183,7 +183,7 @@ class MealImportSpec extends BaseIntegrationSpec {
         body.getString("errorMessage").contains("Not food-related")
 
         and: "no event is stored in database"
-        eventRepository.findAll().isEmpty()
+        findAllEvents().isEmpty()
     }
 
     def "Scenario 8: Request with blank description and no images returns 400"() {

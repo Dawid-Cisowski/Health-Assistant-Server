@@ -49,18 +49,18 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def walkEvent = events.first()
-        walkEvent.eventType == "WalkingSessionRecorded.v1"
+        walkEvent.eventType() == "WalkingSessionRecorded.v1"
 
         and: "event has correct device ID"
-        walkEvent.deviceId == "mobile-app"
+        walkEvent.deviceId() == "mobile-app"
 
         and: "event has correct payload"
-        def payload = walkEvent.payload
+        def payload = walkEvent.payload()
         payload.get("sessionId") == "walk-session-123"
         payload.get("start") == "2025-11-21T09:00:00Z"
         payload.get("end") == "2025-11-21T10:00:00Z"
@@ -113,7 +113,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
     }
 
@@ -373,11 +373,11 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def walkEvent = dbEvents.first()
-        walkEvent.payload.get("durationMinutes") == 0
-        walkEvent.payload.get("totalSteps") == 0
+        walkEvent.payload().get("durationMinutes") == 0
+        walkEvent.payload().get("totalSteps") == 0
     }
 
     def "Scenario 12: Walking session event with only required fields is valid"() {
@@ -411,7 +411,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         def events = body.getList("events")
         events[0].status == "stored"
 
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
     }
 
@@ -440,10 +440,10 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def walkEvent = dbEvents.first()
-        def storedOccurredAt = Instant.parse(walkEvent.occurredAt.toString())
+        def storedOccurredAt = Instant.parse(walkEvent.occurredAt().toString())
         storedOccurredAt == Instant.parse(occurredAt)
     }
 

@@ -1,11 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.meals.MealDailyProjectionJpaRepository
-import com.healthassistant.meals.MealProjectionJpaRepository
+import com.healthassistant.meals.api.MealsFacade
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
-
-import java.time.LocalDate
 
 /**
  * Integration tests for Meal Projections
@@ -17,14 +14,10 @@ class MealProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
-    MealDailyProjectionJpaRepository dailyProjectionRepository
-
-    @Autowired
-    MealProjectionJpaRepository mealProjectionRepository
+    MealsFacade mealsFacade
 
     def setup() {
-        mealProjectionRepository?.deleteAll()
-        dailyProjectionRepository?.deleteAll()
+        mealsFacade?.deleteAllProjections()
     }
 
     def "Scenario 1: MealRecorded event creates meal and daily projections"() {
@@ -57,8 +50,9 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "meal projection is created"
-        def meals = mealProjectionRepository.findByDateOrderByMealNumberAsc(LocalDate.parse(date))
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def meals = response.getList("meals")
         meals.size() == 1
         meals[0].mealNumber == 1
         meals[0].title == "Grilled chicken salad"
@@ -70,15 +64,13 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         meals[0].healthRating == "HEALTHY"
 
         and: "daily projection is created with totals"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalMealCount == 1
-        dailyData.get().totalCaloriesKcal == 450
-        dailyData.get().totalProteinGrams == 35
-        dailyData.get().totalFatGrams == 15
-        dailyData.get().totalCarbohydratesGrams == 30
-        dailyData.get().lunchCount == 1
-        dailyData.get().healthyCount == 1
+        response.getInt("totalMealCount") == 1
+        response.getInt("totalCaloriesKcal") == 450
+        response.getInt("totalProteinGrams") == 35
+        response.getInt("totalFatGrams") == 15
+        response.getInt("totalCarbohydratesGrams") == 30
+        response.getInt("mealTypeCounts.lunch") == 1
+        response.getInt("healthRatingCounts.healthy") == 1
     }
 
     def "Scenario 2: Multiple meals in same day are tracked with meal_number"() {
@@ -140,8 +132,9 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "three meal projections are created with sequential numbers"
-        def meals = mealProjectionRepository.findByDateOrderByMealNumberAsc(LocalDate.parse(date))
+        then: "three meal projections are created with sequential numbers (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def meals = response.getList("meals")
         meals.size() == 3
         meals[0].mealNumber == 1
         meals[0].mealType == "BREAKFAST"
@@ -151,12 +144,10 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         meals[2].mealType == "DINNER"
 
         and: "daily projection aggregates all meals"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalMealCount == 3
-        dailyData.get().breakfastCount == 1
-        dailyData.get().lunchCount == 1
-        dailyData.get().dinnerCount == 1
+        response.getInt("totalMealCount") == 3
+        response.getInt("mealTypeCounts.breakfast") == 1
+        response.getInt("mealTypeCounts.lunch") == 1
+        response.getInt("mealTypeCounts.dinner") == 1
     }
 
     def "Scenario 3: Daily projection aggregates macros correctly"() {
@@ -204,14 +195,13 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "daily projection has correct macro totals"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalCaloriesKcal == 1100  // 400 + 700
-        dailyData.get().totalProteinGrams == 55   // 20 + 35
-        dailyData.get().totalFatGrams == 40       // 15 + 25
-        dailyData.get().totalCarbohydratesGrams == 120  // 40 + 80
-        dailyData.get().averageCaloriesPerMeal == 550   // 1100 / 2
+        then: "daily projection has correct macro totals (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        response.getInt("totalCaloriesKcal") == 1100  // 400 + 700
+        response.getInt("totalProteinGrams") == 55   // 20 + 35
+        response.getInt("totalFatGrams") == 40       // 15 + 25
+        response.getInt("totalCarbohydratesGrams") == 120  // 40 + 80
+        response.getInt("averageCaloriesPerMeal") == 550   // 1100 / 2
     }
 
     def "Scenario 4: Meal type counts are calculated correctly"() {
@@ -287,17 +277,16 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "meal type counts are correct"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalMealCount == 4
-        dailyData.get().breakfastCount == 1
-        dailyData.get().snackCount == 2
-        dailyData.get().dessertCount == 1
-        dailyData.get().lunchCount == 0
-        dailyData.get().dinnerCount == 0
-        dailyData.get().brunchCount == 0
-        dailyData.get().drinkCount == 0
+        then: "meal type counts are correct (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        response.getInt("totalMealCount") == 4
+        response.getInt("mealTypeCounts.breakfast") == 1
+        response.getInt("mealTypeCounts.snack") == 2
+        response.getInt("mealTypeCounts.dessert") == 1
+        response.getInt("mealTypeCounts.lunch") == 0
+        response.getInt("mealTypeCounts.dinner") == 0
+        response.getInt("mealTypeCounts.brunch") == 0
+        response.getInt("mealTypeCounts.drink") == 0
     }
 
     def "Scenario 5: Health rating counts are calculated correctly"() {
@@ -359,14 +348,13 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "health rating counts are correct"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().veryHealthyCount == 1
-        dailyData.get().healthyCount == 1
-        dailyData.get().neutralCount == 0
-        dailyData.get().unhealthyCount == 0
-        dailyData.get().veryUnhealthyCount == 1
+        then: "health rating counts are correct (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        response.getInt("healthRatingCounts.veryHealthy") == 1
+        response.getInt("healthRatingCounts.healthy") == 1
+        response.getInt("healthRatingCounts.neutral") == 0
+        response.getInt("healthRatingCounts.unhealthy") == 0
+        response.getInt("healthRatingCounts.veryUnhealthy") == 1
     }
 
     def "Scenario 6: Query API returns daily detail with all meals"() {
@@ -562,16 +550,15 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "projection is not duplicated"
-        def meals = mealProjectionRepository.findByDateOrderByMealNumberAsc(LocalDate.parse(date))
+        then: "projection is not duplicated (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def meals = response.getList("meals")
         meals.size() == 1
         meals[0].caloriesKcal == 500
 
         and: "daily projection reflects single meal"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalMealCount == 1
-        dailyData.get().totalCaloriesKcal == 500
+        response.getInt("totalMealCount") == 1
+        response.getInt("totalCaloriesKcal") == 500
     }
 
     def "Scenario 9: Duplicate event with same idempotency key keeps original projection"() {
@@ -629,19 +616,18 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "projection keeps original data (projections are created on first event only)"
-        def meals = mealProjectionRepository.findByDateOrderByMealNumberAsc(LocalDate.parse(date))
+        then: "projection keeps original data (projections are created on first event only, verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def meals = response.getList("meals")
         meals.size() == 1
         meals[0].title == "Original meal"
         meals[0].caloriesKcal == 500
         meals[0].healthRating == "HEALTHY"
 
         and: "daily projection keeps original data"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalCaloriesKcal == 500
-        dailyData.get().healthyCount == 1
-        dailyData.get().neutralCount == 0
+        response.getInt("totalCaloriesKcal") == 500
+        response.getInt("healthRatingCounts.healthy") == 1
+        response.getInt("healthRatingCounts.neutral") == 0
     }
 
     def "Scenario 10: API returns 404 for date with no meal data"() {
@@ -779,11 +765,10 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "daily projection has correct time tracking"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().firstMealTime.toString() == "2025-12-02T07:30:00Z"
-        dailyData.get().lastMealTime.toString() == "2025-12-02T20:00:00Z"
+        then: "daily projection has correct time tracking (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        response.getString("firstMealTime") == "2025-12-02T07:30:00Z"
+        response.getString("lastMealTime") == "2025-12-02T20:00:00Z"
     }
 
     def "Scenario 14: All meal types are tracked correctly"() {
@@ -901,16 +886,15 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "all meal types are counted"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalMealCount == 7
-        dailyData.get().breakfastCount == 1
-        dailyData.get().brunchCount == 1
-        dailyData.get().lunchCount == 1
-        dailyData.get().snackCount == 1
-        dailyData.get().dinnerCount == 1
-        dailyData.get().dessertCount == 1
-        dailyData.get().drinkCount == 1
+        then: "all meal types are counted (verified via API)"
+        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        response.getInt("totalMealCount") == 7
+        response.getInt("mealTypeCounts.breakfast") == 1
+        response.getInt("mealTypeCounts.brunch") == 1
+        response.getInt("mealTypeCounts.lunch") == 1
+        response.getInt("mealTypeCounts.snack") == 1
+        response.getInt("mealTypeCounts.dinner") == 1
+        response.getInt("mealTypeCounts.dessert") == 1
+        response.getInt("mealTypeCounts.drink") == 1
     }
 }

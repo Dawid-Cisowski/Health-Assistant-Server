@@ -165,7 +165,9 @@ class HealthEventsService implements HealthEventsFacade {
                 .map(entity -> new EventData(
                         entity.getEventType(),
                         entity.getOccurredAt(),
-                        entity.getPayload()
+                        entity.getPayload(),
+                        entity.getDeviceId(),
+                        entity.getIdempotencyKey()
                 ))
                 .toList();
     }

@@ -51,18 +51,18 @@ class MealEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def mealEvent = events.first()
-        mealEvent.eventType == "MealRecorded.v1"
+        mealEvent.eventType() == "MealRecorded.v1"
 
         and: "event has correct device ID"
-        mealEvent.deviceId == "mobile-app"
+        mealEvent.deviceId() == "mobile-app"
 
         and: "event has correct payload"
-        def payload = mealEvent.payload
+        def payload = mealEvent.payload()
         payload.get("title") == "Oatmeal with berries"
         payload.get("mealType") == "BREAKFAST"
         payload.get("caloriesKcal") == 350
@@ -114,7 +114,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
     }
 
@@ -382,10 +382,10 @@ class MealEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 4
 
         and: "all events are stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 4
-        dbEvents.every { it.eventType == "MealRecorded.v1" }
-        dbEvents.every { it.deviceId == "mobile-app" }
+        dbEvents.every { it.eventType() == "MealRecorded.v1" }
+        dbEvents.every { it.deviceId() == "mobile-app" }
     }
 
     def "Scenario 11: Meal event with all meal types are accepted"() {
@@ -415,9 +415,9 @@ class MealEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 7
 
         and: "all events are stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 7
-        dbEvents.collect { it.payload.get("mealType") }.containsAll(mealTypes)
+        dbEvents.collect { it.payload().get("mealType") }.containsAll(mealTypes)
     }
 
     def "Scenario 12: Meal event with all health ratings are accepted"() {
@@ -447,9 +447,9 @@ class MealEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 5
 
         and: "all events are stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 5
-        dbEvents.collect { it.payload.get("healthRating") }.containsAll(healthRatings)
+        dbEvents.collect { it.payload().get("healthRating") }.containsAll(healthRatings)
     }
 
     def "Scenario 13: Meal event with zero macros is valid"() {
@@ -486,11 +486,11 @@ class MealEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def mealEvent = dbEvents.first()
-        mealEvent.payload.get("caloriesKcal") == 0
-        mealEvent.payload.get("proteinGrams") == 0
+        mealEvent.payload().get("caloriesKcal") == 0
+        mealEvent.payload().get("proteinGrams") == 0
     }
 
     def "Scenario 14: Meal event occurredAt timestamp is preserved"() {
@@ -525,10 +525,10 @@ class MealEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def mealEvent = dbEvents.first()
-        def storedOccurredAt = Instant.parse(mealEvent.occurredAt.toString())
+        def storedOccurredAt = Instant.parse(mealEvent.occurredAt().toString())
         storedOccurredAt == Instant.parse(occurredAt)
     }
 

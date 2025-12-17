@@ -10,4 +10,6 @@ public interface CaloriesFacade {
     CaloriesDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date);
 
     CaloriesRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
+
+    void deleteAllProjections();
 }

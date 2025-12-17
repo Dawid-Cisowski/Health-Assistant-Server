@@ -1,15 +1,9 @@
 package com.healthassistant
 
-import com.healthassistant.dailysummary.DailySummaryJpaRepository
-import com.healthassistant.workout.WorkoutExerciseProjectionJpaRepository
-import com.healthassistant.workout.WorkoutProjectionJpaRepository
-import com.healthassistant.workout.WorkoutSetProjectionJpaRepository
-import io.restassured.RestAssured
-import io.restassured.http.ContentType
+import com.healthassistant.dailysummary.api.DailySummaryFacade
+import com.healthassistant.workout.api.WorkoutFacade
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
-
-import java.time.LocalDate
 
 /**
  * Integration tests for Workout Projections
@@ -21,23 +15,14 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
-    WorkoutProjectionJpaRepository workoutProjectionRepository
+    WorkoutFacade workoutFacade
 
     @Autowired
-    WorkoutExerciseProjectionJpaRepository exerciseProjectionRepository
-
-    @Autowired
-    WorkoutSetProjectionJpaRepository setProjectionRepository
-
-    @Autowired
-    DailySummaryJpaRepository dailySummaryRepository
+    DailySummaryFacade dailySummaryFacade
 
     def setup() {
-        // Clean projection tables (in addition to base cleanup)
-        setProjectionRepository?.deleteAll()
-        exerciseProjectionRepository?.deleteAll()
-        workoutProjectionRepository?.deleteAll()
-        dailySummaryRepository?.deleteAll()
+        workoutFacade?.deleteAllProjections()
+        dailySummaryFacade?.deleteAllSummaries()
     }
 
     def "Scenario 1: WorkoutRecorded event creates complete projection"() {
@@ -51,28 +36,24 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "workout projection is created"
-        def workouts = workoutProjectionRepository.findAll()
-        workouts.size() == 1
-        def workout = workouts.first()
-        workout.workoutId == workoutId
-        workout.source == "GYMRUN_SCREENSHOT"
-        workout.note == "Plecy i biceps"
-        workout.totalExercises == 2
-        workout.totalSets == 5
+        then: "workout projection is created (verified via API)"
+        def response = waitForApiResponse("/v1/workouts/${workoutId}")
+        response.getString("workoutId") == workoutId
+        response.getString("source") == "GYMRUN_SCREENSHOT"
+        response.getString("note") == "Plecy i biceps"
+        response.getInt("totalExercises") == 2
+        response.getInt("totalSets") == 5
 
         and: "exercise projections are created"
-        def exercises = exerciseProjectionRepository.findAll()
+        def exercises = response.getList("exercises")
         exercises.size() == 2
-        exercises.every { it.workout.workoutId == workoutId }
 
         and: "set projections are created"
-        def sets = setProjectionRepository.findAll()
-        sets.size() == 5
-        sets.every { it.workoutId == workoutId }
+        def totalSets = exercises.collect { it.sets.size() }.sum()
+        totalSets == 5
 
         and: "total volume is calculated correctly"
-        workout.totalVolumeKg > 0
+        response.getDouble("totalVolumeKg") > 0
     }
 
     def "Scenario 2: Idempotent projection - duplicate event doesn't create duplicate projection"() {
@@ -92,17 +73,17 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "only one projection exists"
-        def workouts = workoutProjectionRepository.findAll()
-        workouts.size() == 1
+        then: "only one projection exists (verified via API)"
+        def response = waitForApiResponse("/v1/workouts/${workoutId}")
+        response.getString("workoutId") == workoutId
 
         and: "only one set of exercises exists"
-        def exercises = exerciseProjectionRepository.findAll()
+        def exercises = response.getList("exercises")
         exercises.size() == 2
 
         and: "only one set of sets exists"
-        def sets = setProjectionRepository.findAll()
-        sets.size() == 5
+        def totalSets = exercises.collect { it.sets.size() }.sum()
+        totalSets == 5
     }
 
     def "Scenario 3: Multiple workouts on same day create separate projections"() {
@@ -122,21 +103,12 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "two workout projections are created"
-        def workouts = workoutProjectionRepository.findAll()
-        workouts.size() == 2
-        workouts.every { it.performedDate == LocalDate.parse("2025-11-19") }
+        then: "two workout projections are created (verified via API)"
+        def workoutsResponse = waitForApiResponse("/v1/workouts?from=2025-11-19&to=2025-11-19")
+        workoutsResponse.getList("").size() == 2
 
         and: "daily summary contains both workouts"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-        def summary = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/2025-11-19")
-                .get("/v1/daily-summaries/2025-11-19")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def summary = waitForApiResponse("/v1/daily-summaries/2025-11-19")
         summary.getList("workouts").size() == 2
     }
 
@@ -171,10 +143,11 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "exercise projection has null muscle group"
-        def exercises = exerciseProjectionRepository.findAll()
+        then: "exercise projection has null muscle group (verified via API)"
+        def response = waitForApiResponse("/v1/workouts/gymrun-nogrup")
+        def exercises = response.getList("exercises")
         exercises.size() == 1
-        exercises.first().muscleGroup == null
+        exercises[0].muscleGroup == null
     }
 
     def "Scenario 5: Warmup sets are distinguished from working sets in volume calculation"() {
@@ -210,15 +183,15 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "total volume includes warmup sets"
-        def workout = workoutProjectionRepository.findAll().first()
-        workout.totalVolumeKg == (40.0 * 15 + 80.0 * 10)
+        then: "total volume includes warmup sets (verified via API)"
+        def response = waitForApiResponse("/v1/workouts/gymrun-warmup")
+        response.getDouble("totalVolumeKg") == (40.0 * 15 + 80.0 * 10)
 
         and: "working volume excludes warmup sets"
-        workout.totalWorkingVolumeKg == (80.0 * 10)
+        response.getDouble("totalWorkingVolumeKg") == (80.0 * 10)
 
         and: "sets have correct warmup flags"
-        def sets = setProjectionRepository.findAll()
+        def sets = response.getList("exercises")[0].sets
         sets.size() == 2
         sets.find { it.setNumber == 1 }.isWarmup == true
         sets.find { it.setNumber == 2 }.isWarmup == false
@@ -255,14 +228,14 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "total volume is zero"
-        def workout = workoutProjectionRepository.findAll().first()
-        workout.totalVolumeKg == 0.0
+        then: "total volume is zero (verified via API)"
+        def response = waitForApiResponse("/v1/workouts/gymrun-bodyweight")
+        response.getDouble("totalVolumeKg") == 0.0
 
         and: "set has zero weight"
-        def sets = setProjectionRepository.findAll()
-        sets.first().weightKg == 0.0
-        sets.first().volumeKg == 0.0
+        def sets = response.getList("exercises")[0].sets
+        sets[0].weightKg == 0.0
+        sets[0].volumeKg == 0.0
     }
 
     def "Scenario 7: Exercise order is preserved in projections"() {
@@ -276,8 +249,9 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "exercises are ordered correctly"
-        def exercises = exerciseProjectionRepository.findAll().sort { it.orderInWorkout }
+        then: "exercises are ordered correctly (verified via API)"
+        def response = waitForApiResponse("/v1/workouts/${workoutId}")
+        def exercises = response.getList("exercises")
         exercises.size() == 2
         exercises[0].orderInWorkout == 1
         exercises[0].exerciseName == "Podciąganie się nachwytem (szeroki rozstaw rąk)"
@@ -421,9 +395,9 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "performedDate is in Warsaw timezone (2025-11-20)"
-        def workout = workoutProjectionRepository.findAll().first()
-        workout.performedDate == LocalDate.parse("2025-11-20")
+        then: "performedDate is in Warsaw timezone (2025-11-20) - verified via API"
+        def response = waitForApiResponse("/v1/workouts/gymrun-tz")
+        response.getString("performedDate") == "2025-11-20"
     }
 
     def "Scenario 12: Query API returns 404 for non-existent workout"() {

@@ -49,18 +49,18 @@ class DistanceEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def distanceEvent = events.first()
-        distanceEvent.eventType == "DistanceBucketRecorded.v1"
+        distanceEvent.eventType() == "DistanceBucketRecorded.v1"
 
         and: "event has correct device ID"
-        distanceEvent.deviceId == "mobile-app"
+        distanceEvent.deviceId() == "mobile-app"
 
         and: "event has correct payload"
-        def payload = distanceEvent.payload
+        def payload = distanceEvent.payload()
         payload.get("bucketStart") == "2025-11-21T10:00:00Z"
         payload.get("bucketEnd") == "2025-11-21T11:00:00Z"
         payload.get("distanceMeters") == 1500.5
@@ -106,7 +106,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
     }
 
@@ -289,10 +289,10 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def distanceEvent = dbEvents.first()
-        distanceEvent.payload.get("distanceMeters") == 0
+        distanceEvent.payload().get("distanceMeters") == 0
     }
 
     def "Scenario 10: Multiple distance events are stored correctly"() {
@@ -321,10 +321,10 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 3
 
         and: "all events are stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 3
-        dbEvents.every { it.eventType == "DistanceBucketRecorded.v1" }
-        dbEvents.every { it.deviceId == "mobile-app" }
+        dbEvents.every { it.eventType() == "DistanceBucketRecorded.v1" }
+        dbEvents.every { it.deviceId() == "mobile-app" }
     }
 
     def "Scenario 11: Distance event occurredAt timestamp is preserved"() {
@@ -351,10 +351,10 @@ class DistanceEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def distanceEvent = dbEvents.first()
-        def storedOccurredAt = Instant.parse(distanceEvent.occurredAt.toString())
+        def storedOccurredAt = Instant.parse(distanceEvent.occurredAt().toString())
         storedOccurredAt == Instant.parse(occurredAt)
     }
 

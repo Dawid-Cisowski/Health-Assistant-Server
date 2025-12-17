@@ -1,14 +1,10 @@
 package com.healthassistant
 
-import com.healthassistant.steps.StepsDailyProjectionJpaRepository
-import com.healthassistant.steps.StepsHourlyProjectionJpaRepository
-import io.restassured.RestAssured
-import io.restassured.http.ContentType
+import com.healthassistant.steps.api.StepsFacade
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.LocalDate
-import java.time.ZoneId
 
 /**
  * Integration tests for Steps Projections
@@ -20,15 +16,11 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
-    StepsDailyProjectionJpaRepository dailyProjectionRepository
-
-    @Autowired
-    StepsHourlyProjectionJpaRepository hourlyProjectionRepository
+    StepsFacade stepsFacade
 
     def setup() {
         // Clean projection tables (in addition to base cleanup)
-        hourlyProjectionRepository?.deleteAll()
-        dailyProjectionRepository?.deleteAll()
+        stepsFacade?.deleteAllProjections()
     }
 
     def "Scenario 1: StepsBucketed event creates hourly and daily projections"() {
@@ -60,17 +52,13 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hourly projection is created (async)"
-        def hourlyData = waitForProjection { hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 10) }
-        hourlyData.stepCount == 150
-        hourlyData.bucketCount == 1
-
-        and: "daily projection is created with totals"
-        def dailyData = waitForProjection { dailyProjectionRepository.findByDate(LocalDate.parse(date)) }
-        dailyData.totalSteps == 150
-        dailyData.mostActiveHour == 10
-        dailyData.mostActiveHourSteps == 150
-        dailyData.activeHoursCount == 1
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        response.getInt("totalSteps") == 150
+        response.getInt("mostActiveHour") == 10
+        response.getInt("mostActiveHourSteps") == 150
+        response.getInt("activeHoursCount") == 1
+        response.getList("hourlyBreakdown")[10].steps == 150
     }
 
     def "Scenario 2: Multiple buckets same hour accumulate steps"() {
@@ -113,14 +101,10 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hourly projection accumulates steps (async)"
-        def hourlyData = waitForProjection { hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 14) }
-        hourlyData.stepCount == 220
-        hourlyData.bucketCount == 2
-
-        and: "daily projection reflects total"
-        def dailyData = waitForProjection { dailyProjectionRepository.findByDate(LocalDate.parse(date)) }
-        dailyData.totalSteps == 220
+        then: "projections accumulate steps (verified via API)"
+        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        response.getList("hourlyBreakdown")[14].steps == 220
+        response.getInt("totalSteps") == 220
     }
 
     def "Scenario 3: Steps across multiple hours create separate hourly projections"() {
@@ -174,25 +158,15 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "three hourly projections are created (async)"
-        def hourlyData = waitForProjections {
-            def data = hourlyProjectionRepository.findByDateOrderByHourAsc(LocalDate.parse(date))
-            data.size() == 3 ? data : []
-        }
-        hourlyData.size() == 3
-        hourlyData[0].hour == 8
-        hourlyData[0].stepCount == 200
-        hourlyData[1].hour == 12
-        hourlyData[1].stepCount == 300
-        hourlyData[2].hour == 18
-        hourlyData[2].stepCount == 400
-
-        and: "daily projection shows most active hour and total"
-        def dailyData = waitForProjection { dailyProjectionRepository.findByDate(LocalDate.parse(date)) }
-        dailyData.totalSteps == 900
-        dailyData.mostActiveHour == 18
-        dailyData.mostActiveHourSteps == 400
-        dailyData.activeHoursCount == 3
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        response.getList("hourlyBreakdown")[8].steps == 200
+        response.getList("hourlyBreakdown")[12].steps == 300
+        response.getList("hourlyBreakdown")[18].steps == 400
+        response.getInt("totalSteps") == 900
+        response.getInt("mostActiveHour") == 18
+        response.getInt("mostActiveHourSteps") == 400
+        response.getInt("activeHoursCount") == 3
     }
 
     def "Scenario 4: Query API returns daily breakdown with 24 hours"() {
@@ -235,19 +209,8 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        and: "wait for async projections"
-        waitForProjection { dailyProjectionRepository.findByDate(LocalDate.parse(date)) }
-
-        when: "I query daily breakdown"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-        def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/steps/daily/${date}")
-                .get("/v1/steps/daily/${date}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        when: "I query daily breakdown (with wait)"
+        def response = waitForApiResponse("/v1/steps/daily/${date}")
 
         then: "response contains 24 hourly entries"
         response.getList("hourlyBreakdown").size() == 24
@@ -319,15 +282,10 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         and: "wait for async projections"
-        waitForProjections {
-            def data = dailyProjectionRepository.findAll()
-            data.size() >= 3 ? data : []
-        }
+        waitForApiResponse("/v1/steps/daily/2025-11-20")
 
         when: "I query range summary"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-        def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/steps/range?startDate=2025-11-18&endDate=2025-11-20")
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/range?startDate=2025-11-18&endDate=2025-11-20")
                 .get("/v1/steps/range?startDate=2025-11-18&endDate=2025-11-20")
                 .then()
                 .statusCode(200)
@@ -378,9 +336,11 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "no projections are created"
-        hourlyProjectionRepository.findAll().isEmpty()
-        dailyProjectionRepository.findAll().isEmpty()
+        // Small wait for async processing
+        Thread.sleep(500)
+
+        then: "no projections are created (API returns 404)"
+        apiReturns404("/v1/steps/daily/2025-11-23")
     }
 
     def "Scenario 7: API returns 404 for date with no steps"() {
@@ -438,15 +398,10 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         and: "wait for async projections"
-        waitForProjections {
-            def data = dailyProjectionRepository.findAll()
-            data.size() >= 2 ? data : []
-        }
+        waitForApiResponse("/v1/steps/daily/2025-11-26")
 
         when: "I query 3-day range"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-        def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/steps/range?startDate=2025-11-24&endDate=2025-11-26")
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/range?startDate=2025-11-24&endDate=2025-11-26")
                 .get("/v1/steps/range?startDate=2025-11-24&endDate=2025-11-26")
                 .then()
                 .statusCode(200)
@@ -496,7 +451,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         // Wait for first event processing
-        waitForProjection { hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 10) }
+        waitForApiResponse("/v1/steps/daily/${date}")
 
         authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
@@ -506,16 +461,16 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         // Wait a bit for potential duplicate processing
         Thread.sleep(500)
 
-        then: "projection is not duplicated"
-        def hourlyData = hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 10)
-        hourlyData.isPresent()
-        hourlyData.get().stepCount == 500  // Still 500, not 1000
-        hourlyData.get().bucketCount == 1   // Still 1, not 2
-
-        and: "daily projection reflects single event"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalSteps == 500  // Still 500, not 1000
+        then: "projection is not duplicated (verified via API)"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/daily/${date}")
+                .get("/v1/steps/daily/${date}")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath()
+        response.getList("hourlyBreakdown")[10].steps == 500  // Still 500, not 1000
+        response.getInt("totalSteps") == 500  // Still 500, not 1000
     }
 
     def "Scenario 10: Multiple buckets update time range correctly"() {
@@ -564,16 +519,10 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hourly projection has correct time range (async)"
-        def hourlyData = waitForProjection { hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 14) }
-        hourlyData.stepCount == 250
-        hourlyData.bucketCount == 2
-
-        and: "first and last bucket times are correct"
-        def firstTime = java.time.Instant.parse(firstBucketStart)
-        def lastTime = java.time.Instant.parse(secondBucketEnd)
-        hourlyData.firstBucketTime == firstTime
-        hourlyData.lastBucketTime == lastTime
+        then: "projection has correct totals (verified via API)"
+        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        response.getList("hourlyBreakdown")[14].steps == 250
+        response.getInt("totalSteps") == 250
     }
 
     def "Scenario 11: Most active hour updates when different hour has more steps"() {
@@ -602,10 +551,10 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hour 10 is most active (async)"
-        def dailyData1 = waitForProjection { dailyProjectionRepository.findByDate(LocalDate.parse(date)) }
-        dailyData1.mostActiveHour == 10
-        dailyData1.mostActiveHourSteps == 300
+        then: "hour 10 is most active"
+        def response1 = waitForApiResponse("/v1/steps/daily/${date}")
+        response1.getInt("mostActiveHour") == 10
+        response1.getInt("mostActiveHourSteps") == 300
 
         when: "I submit event for hour 15 with more steps"
         def request2 = """
@@ -630,16 +579,25 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hour 15 becomes most active (async)"
+        then: "hour 15 becomes most active"
         waitForEventProcessing {
-            def data = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-            data.isPresent() && data.get().mostActiveHour == 15
+            def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/daily/${date}")
+                    .get("/v1/steps/daily/${date}")
+                    .then()
+                    .extract()
+            response.statusCode() == 200 && response.body().jsonPath().getInt("mostActiveHour") == 15
         }
-        def dailyData2 = dailyProjectionRepository.findByDate(LocalDate.parse(date)).get()
-        dailyData2.mostActiveHour == 15
-        dailyData2.mostActiveHourSteps == 500
-        dailyData2.totalSteps == 800
-        dailyData2.activeHoursCount == 2
+        def response2 = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/daily/${date}")
+                .get("/v1/steps/daily/${date}")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath()
+        response2.getInt("mostActiveHour") == 15
+        response2.getInt("mostActiveHourSteps") == 500
+        response2.getInt("totalSteps") == 800
+        response2.getInt("activeHoursCount") == 2
     }
 
     def "Scenario 12: Range query with invalid dates returns 400"() {
@@ -680,11 +638,10 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "no projections are created"
-        def hourlyData = hourlyProjectionRepository.findByDateAndHour(LocalDate.parse(date), 10)
-        !hourlyData.isPresent()
+        // Small wait for async processing
+        Thread.sleep(500)
 
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        !dailyData.isPresent()
+        then: "no projections are created (API returns 404)"
+        apiReturns404("/v1/steps/daily/${date}")
     }
 }

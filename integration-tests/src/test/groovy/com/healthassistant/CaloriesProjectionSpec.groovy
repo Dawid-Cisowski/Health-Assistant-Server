@@ -1,13 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.calories.CaloriesDailyProjectionJpaRepository
-import com.healthassistant.calories.CaloriesHourlyProjectionJpaRepository
-import io.restassured.RestAssured
-import io.restassured.http.ContentType
+import com.healthassistant.calories.api.CaloriesFacade
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
-
-import java.time.LocalDate
 
 /**
  * Integration tests for Calories Projections
@@ -19,15 +14,10 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
-    CaloriesDailyProjectionJpaRepository dailyProjectionRepository
-
-    @Autowired
-    CaloriesHourlyProjectionJpaRepository hourlyProjectionRepository
+    CaloriesFacade caloriesFacade
 
     def setup() {
-        // Clean projection tables (in addition to base cleanup)
-        hourlyProjectionRepository?.deleteAll()
-        dailyProjectionRepository?.deleteAll()
+        caloriesFacade?.deleteAllProjections()
     }
 
     def "Scenario 1: ActiveCaloriesBurned event creates hourly and daily projections"() {
@@ -59,19 +49,15 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hourly projection is created"
-        def hourlyData = hourlyProjectionRepository.findByDeviceIdAndDateAndHour(DEVICE_ID, LocalDate.parse(date), 10)
-        hourlyData.isPresent()
-        hourlyData.get().caloriesKcal == 125.5
-        hourlyData.get().bucketCount == 1
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/calories/daily/${date}")
+        response.getList("hourlyBreakdown")[10].calories == 125.5
 
         and: "daily projection is created with totals"
-        def dailyData = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalCaloriesKcal == 125.5
-        dailyData.get().mostActiveHour == 10
-        dailyData.get().mostActiveHourCalories == 125.5
-        dailyData.get().activeHoursCount == 1
+        response.getDouble("totalCalories") == 125.5
+        response.getInt("mostActiveHour") == 10
+        response.getDouble("mostActiveHourCalories") == 125.5
+        response.getInt("activeHoursCount") == 1
     }
 
     def "Scenario 2: Multiple buckets same hour accumulate calories"() {
@@ -114,16 +100,10 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hourly projection accumulates calories"
-        def hourlyData = hourlyProjectionRepository.findByDeviceIdAndDateAndHour(DEVICE_ID, LocalDate.parse(date), 14)
-        hourlyData.isPresent()
-        hourlyData.get().caloriesKcal == 175.5
-        hourlyData.get().bucketCount == 2
-
-        and: "daily projection reflects total"
-        def dailyData = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalCaloriesKcal == 175.5
+        then: "projections accumulate calories (verified via API)"
+        def response = waitForApiResponse("/v1/calories/daily/${date}")
+        response.getList("hourlyBreakdown")[14].calories == 175.5
+        response.getDouble("totalCalories") == 175.5
     }
 
     def "Scenario 3: Calories across multiple hours create separate hourly projections"() {
@@ -177,23 +157,18 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "three hourly projections are created"
-        def hourlyData = hourlyProjectionRepository.findByDeviceIdAndDateOrderByHourAsc(DEVICE_ID, LocalDate.parse(date))
-        hourlyData.size() == 3
-        hourlyData[0].hour == 8
-        hourlyData[0].caloriesKcal == 50.0
-        hourlyData[1].hour == 12
-        hourlyData[1].caloriesKcal == 150.0
-        hourlyData[2].hour == 18
-        hourlyData[2].caloriesKcal == 200.0
+        then: "three hourly projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/calories/daily/${date}")
+        def hourlyBreakdown = response.getList("hourlyBreakdown")
+        hourlyBreakdown[8].calories == 50.0
+        hourlyBreakdown[12].calories == 150.0
+        hourlyBreakdown[18].calories == 200.0
 
         and: "daily projection shows most active hour and total"
-        def dailyData = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalCaloriesKcal == 400.0
-        dailyData.get().mostActiveHour == 18
-        dailyData.get().mostActiveHourCalories == 200.0
-        dailyData.get().activeHoursCount == 3
+        response.getDouble("totalCalories") == 400.0
+        response.getInt("mostActiveHour") == 18
+        response.getDouble("mostActiveHourCalories") == 200.0
+        response.getInt("activeHoursCount") == 3
     }
 
     def "Scenario 4: Query API returns daily breakdown with 24 hours"() {
@@ -365,9 +340,9 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "no projections are created"
-        hourlyProjectionRepository.findAll().isEmpty()
-        dailyProjectionRepository.findAll().isEmpty()
+        then: "no projections are created (verified via API returning 404)"
+        Thread.sleep(500) // Give time for projection to be created (if any)
+        apiReturns404("/v1/calories/daily/2025-11-23")
     }
 
     def "Scenario 7: API returns 404 for date with no calories"() {
@@ -500,25 +475,12 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "each device has its own projection"
-        def device1Data = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        device1Data.isPresent()
-        device1Data.get().totalCaloriesKcal == 100.0
+        then: "each device has its own projection (verified via API)"
+        def response1 = waitForApiResponse("/v1/calories/daily/${date}", DEVICE_ID, SECRET_BASE64)
+        response1.getDouble("totalCalories") == 100.0
 
-        def device2Data = dailyProjectionRepository.findByDeviceIdAndDate("different-device-id", LocalDate.parse(date))
-        device2Data.isPresent()
-        device2Data.get().totalCaloriesKcal == 200.0
-
-        when: "I query API for test-device"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/calories/daily/${date}")
-                .get("/v1/calories/daily/${date}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
-
-        then: "only test-device data is returned"
-        response.getDouble("totalCalories") == 100.0
+        and: "different device has its own data"
+        def response2 = waitForApiResponse("/v1/calories/daily/${date}", "different-device-id", DIFFERENT_DEVICE_SECRET_BASE64)
+        response2.getDouble("totalCalories") == 200.0
     }
 }

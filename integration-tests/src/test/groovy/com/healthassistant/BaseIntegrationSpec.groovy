@@ -1,7 +1,6 @@
 package com.healthassistant
 
-import com.healthassistant.healthevents.HealthEventJpaRepository
-import com.healthassistant.dailysummary.DailySummaryJpaRepository
+import com.healthassistant.healthevents.api.HealthEventsFacade
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import io.restassured.RestAssured
@@ -42,7 +41,7 @@ abstract class BaseIntegrationSpec extends Specification {
     int port
 
     @Autowired
-    HealthEventJpaRepository eventRepository
+    HealthEventsFacade healthEventsFacade
 
 
     @Shared
@@ -67,7 +66,7 @@ abstract class BaseIntegrationSpec extends Specification {
         System.setProperty("app.hmac.devices-json", '{"test-device":"dGVzdC1zZWNyZXQtMTIz","different-device-id":"ZGlmZmVyZW50LXNlY3JldC0xMjM="}')
         System.setProperty("app.hmac.tolerance-seconds", "600")
         System.setProperty("app.nonce.cache-ttl-seconds", "600")
-        
+
         // Configure WireMock URLs for Google Fit API and OAuth
         String wireMockUrl = "http://localhost:${wireMockServer.port()}"
         System.setProperty("app.google-fit.api-url", wireMockUrl)
@@ -89,18 +88,18 @@ abstract class BaseIntegrationSpec extends Specification {
         // Runs before each test
         RestAssured.port = port
         RestAssured.baseURI = "http://localhost"
-        
+
         // Reset WireMock
         wireMockServer.resetAll()
-        
+
         // Setup default OAuth mock
         setupOAuthMock()
-        
-        if (eventRepository != null) {
-            eventRepository.deleteAll() // Clean DB before each test
+
+        if (healthEventsFacade != null) {
+            healthEventsFacade.deleteAllEvents() // Clean DB before each test
         }
     }
-    
+
     void setupOAuthMock() {
         wireMockServer.stubFor(post(urlEqualTo("/token"))
                 .willReturn(aResponse()
@@ -108,7 +107,7 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withHeader("Content-Type", "application/json")
                         .withBody('{"access_token":"test-access-token","expires_in":3600,"token_type":"Bearer"}')))
     }
-    
+
     void setupGoogleFitApiMock(String responseBody) {
         wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
                 .withHeader("Authorization", matching("Bearer .+"))
@@ -128,7 +127,7 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withBody(responseBody))
                 .atPriority(10))
     }
-    
+
     void setupGoogleFitSessionsApiMock(String responseBody) {
         wireMockServer.stubFor(get(urlPathMatching("/users/me/sessions"))
                 .withHeader("Authorization", matching("Bearer .+"))
@@ -148,7 +147,7 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withBody(responseBody))
                 .atPriority(10))
     }
-    
+
     String createGoogleFitResponseWithSteps(long startTimeMillis, long endTimeMillis, long steps) {
         return """
         {
@@ -169,7 +168,7 @@ abstract class BaseIntegrationSpec extends Specification {
         }
         """
     }
-    
+
     String createGoogleFitResponseWithMultipleDataTypes(long startTimeMillis, long endTimeMillis, long steps, double distance, double calories, int heartRate) {
         return """
         {
@@ -214,11 +213,11 @@ abstract class BaseIntegrationSpec extends Specification {
         }
         """
     }
-    
+
     String createEmptyGoogleFitResponse() {
         return '{"bucket": []}'
     }
-    
+
     String createGoogleFitSessionsResponseWithSleep(long startTimeMillis, long endTimeMillis, String sessionId = "sleep-session-123") {
         return """
         {
@@ -232,7 +231,7 @@ abstract class BaseIntegrationSpec extends Specification {
         }
         """
     }
-    
+
     String createEmptyGoogleFitSessionsResponse() {
         return '{"session": []}'
     }
@@ -258,14 +257,14 @@ abstract class BaseIntegrationSpec extends Specification {
         // This stub should have higher priority to match first for session-specific requests
         def bucketCount = (int) ((endTimeMillis - startTimeMillis) / 60000)
         def buckets = []
-        
+
         for (int i = 0; i < bucketCount; i++) {
             def bucketStart = startTimeMillis + (i * 60000)
             def bucketEnd = bucketStart + 60000
             def stepsPerBucket = (int) (steps / bucketCount)
             def distancePerBucket = distance / bucketCount
             def caloriesPerBucket = calories / bucketCount
-            
+
             def datasets = []
             if (stepsPerBucket > 0) {
                 datasets.add("""
@@ -315,7 +314,7 @@ abstract class BaseIntegrationSpec extends Specification {
                     }
                 """)
             }
-            
+
             buckets.add("""
                 {
                     "startTimeMillis": ${bucketStart},
@@ -324,13 +323,13 @@ abstract class BaseIntegrationSpec extends Specification {
                 }
             """)
         }
-        
+
         def responseBody = """
         {
             "bucket": [${buckets.join(',')}]
         }
         """
-        
+
         wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
                 .withHeader("Authorization", matching("Bearer .+"))
                 .withRequestBody(matching(".*\"startTimeMillis\"\\s*:\\s*${startTimeMillis}.*"))
@@ -340,7 +339,7 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withBody(responseBody))
                 .atPriority(5))
     }
-    
+
     void setupGoogleFitApiMockError(int statusCode, String errorBody) {
         wireMockServer.stubFor(post(urlPathMatching("/users/me/dataset:aggregate"))
                 .withHeader("Authorization", matching("Bearer .+"))
@@ -380,8 +379,8 @@ abstract class BaseIntegrationSpec extends Specification {
 
     def cleanup() {
         // Runs after each test
-        if (eventRepository != null) {
-            eventRepository.deleteAll()
+        if (healthEventsFacade != null) {
+            healthEventsFacade.deleteAllEvents()
         }
     }
 
@@ -685,6 +684,58 @@ abstract class BaseIntegrationSpec extends Specification {
                         return true
                     }
                     return false
+                } as Callable<Boolean>)
+        return result
+    }
+
+    def waitForApiResponse(String path, String deviceId = TEST_DEVICE_ID, String secretBase64 = TEST_SECRET_BASE64, int timeoutSeconds = 5) {
+        def result = null
+        Awaitility.await()
+                .atMost(timeoutSeconds, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until({
+                    def response = authenticatedGetRequest(deviceId, secretBase64, path)
+                            .get(path)
+                            .then()
+                            .extract()
+                    if (response.statusCode() == 200) {
+                        result = response.body().jsonPath()
+                        return true
+                    }
+                    return false
+                } as Callable<Boolean>)
+        return result
+    }
+
+    boolean apiReturns404(String path, String deviceId = TEST_DEVICE_ID, String secretBase64 = TEST_SECRET_BASE64) {
+        def response = authenticatedGetRequest(deviceId, secretBase64, path)
+                .get(path)
+                .then()
+                .extract()
+        return response.statusCode() == 404
+    }
+
+    /**
+     * Find all events using facade (with a wide time range).
+     * Returns list of EventData objects.
+     */
+    List findAllEvents() {
+        def start = Instant.parse("2020-01-01T00:00:00Z")
+        def end = Instant.parse("2030-12-31T23:59:59Z")
+        return healthEventsFacade.findEventsByOccurredAtBetween(start, end)
+    }
+
+    /**
+     * Wait for events to be stored and return them.
+     */
+    List waitForEvents(int expectedCount, int timeoutSeconds = 5) {
+        def result = []
+        Awaitility.await()
+                .atMost(timeoutSeconds, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until({
+                    result = findAllEvents()
+                    return result.size() >= expectedCount
                 } as Callable<Boolean>)
         return result
     }

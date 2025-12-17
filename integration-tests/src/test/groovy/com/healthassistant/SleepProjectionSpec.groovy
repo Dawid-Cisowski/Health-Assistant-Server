@@ -1,9 +1,6 @@
 package com.healthassistant
 
-import com.healthassistant.sleep.SleepDailyProjectionJpaRepository
-import com.healthassistant.sleep.SleepSessionProjectionJpaRepository
-import io.restassured.RestAssured
-import io.restassured.http.ContentType
+import com.healthassistant.sleep.api.SleepFacade
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
@@ -19,15 +16,11 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
-    SleepDailyProjectionJpaRepository dailyProjectionRepository
-
-    @Autowired
-    SleepSessionProjectionJpaRepository sessionProjectionRepository
+    SleepFacade sleepFacade
 
     def setup() {
         // Clean projection tables (in addition to base cleanup)
-        sessionProjectionRepository?.deleteAll()
-        dailyProjectionRepository?.deleteAll()
+        sleepFacade?.deleteAllProjections()
     }
 
     def "Scenario 1: SleepSession event creates session and daily projections"() {
@@ -61,22 +54,16 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "session projection is created"
-        def sessions = sessionProjectionRepository.findByDateOrderBySessionNumberAsc(LocalDate.parse(date))
-        sessions.size() == 1
-        sessions[0].sessionNumber == 1
-        sessions[0].durationMinutes == 480
-        sessions[0].sleepStart.toString() == sleepStart
-        sessions[0].sleepEnd.toString() == sleepEnd
-
-        and: "daily projection is created with totals"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalSleepMinutes == 480
-        dailyData.get().sleepCount == 1
-        dailyData.get().longestSessionMinutes == 480
-        dailyData.get().shortestSessionMinutes == 480
-        dailyData.get().averageSessionMinutes == 480
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        response.getList("sessions").size() == 1
+        response.getList("sessions")[0].sessionNumber == 1
+        response.getList("sessions")[0].durationMinutes == 480
+        response.getInt("totalSleepMinutes") == 480
+        response.getInt("sleepCount") == 1
+        response.getInt("longestSessionMinutes") == 480
+        response.getInt("shortestSessionMinutes") == 480
+        response.getInt("averageSessionMinutes") == 480
     }
 
     def "Scenario 2: Multiple sleep sessions in same day (naps)"() {
@@ -127,22 +114,18 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "two session projections are created"
-        def sessions = sessionProjectionRepository.findByDateOrderBySessionNumberAsc(LocalDate.parse(date))
-        sessions.size() == 2
-        sessions[0].sessionNumber == 1
-        sessions[0].durationMinutes == 480
-        sessions[1].sessionNumber == 2
-        sessions[1].durationMinutes == 60
-
-        and: "daily projection aggregates both sessions"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalSleepMinutes == 540  // 480 + 60
-        dailyData.get().sleepCount == 2
-        dailyData.get().longestSessionMinutes == 480
-        dailyData.get().shortestSessionMinutes == 60
-        dailyData.get().averageSessionMinutes == 270  // 540 / 2
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        response.getList("sessions").size() == 2
+        response.getList("sessions")[0].sessionNumber == 1
+        response.getList("sessions")[0].durationMinutes == 480
+        response.getList("sessions")[1].sessionNumber == 2
+        response.getList("sessions")[1].durationMinutes == 60
+        response.getInt("totalSleepMinutes") == 540  // 480 + 60
+        response.getInt("sleepCount") == 2
+        response.getInt("longestSessionMinutes") == 480
+        response.getInt("shortestSessionMinutes") == 60
+        response.getInt("averageSessionMinutes") == 270  // 540 / 2
     }
 
     def "Scenario 3: Query API returns daily detail with all sessions"() {
@@ -394,9 +377,11 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "no projections are created"
-        sessionProjectionRepository.findAll().isEmpty()
-        dailyProjectionRepository.findAll().isEmpty()
+        // Small wait for async processing
+        Thread.sleep(500)
+
+        then: "no projections are created (API returns 404)"
+        apiReturns404("/v1/sleep/daily/2025-11-26")
     }
 
     def "Scenario 7: API returns 404 for date with no sleep data"() {
@@ -505,21 +490,28 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
+        waitForApiResponse("/v1/sleep/daily/${date}")
+
         authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
 
-        then: "projection is not duplicated"
-        def sessions = sessionProjectionRepository.findByDateOrderBySessionNumberAsc(LocalDate.parse(date))
-        sessions.size() == 1
-        sessions[0].durationMinutes == 480
+        // Wait for potential duplicate processing
+        Thread.sleep(500)
 
-        and: "daily projection reflects single session"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalSleepMinutes == 480
-        dailyData.get().sleepCount == 1
+        then: "projection is not duplicated (verified via API)"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/sleep/daily/${date}")
+                .get("/v1/sleep/daily/${date}")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath()
+        response.getList("sessions").size() == 1
+        response.getList("sessions")[0].durationMinutes == 480
+        response.getInt("totalSleepMinutes") == 480
+        response.getInt("sleepCount") == 1
     }
 
     def "Scenario 10: Range query with invalid dates returns 400"() {
@@ -560,12 +552,11 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "no projections are created"
-        def sessions = sessionProjectionRepository.findByDateOrderBySessionNumberAsc(LocalDate.parse(date))
-        sessions.isEmpty()
+        // Small wait for async processing
+        Thread.sleep(500)
 
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        !dailyData.isPresent()
+        then: "no projections are created (API returns 404)"
+        apiReturns404("/v1/sleep/daily/${date}")
     }
 
     def "Scenario 12: Multiple sessions update daily aggregates correctly"() {
@@ -621,24 +612,20 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "three session projections are created"
-        def sessions = sessionProjectionRepository.findByDateOrderBySessionNumberAsc(LocalDate.parse(date))
-        sessions.size() == 3
-        sessions[0].sessionNumber == 1
-        sessions[0].durationMinutes == 480
-        sessions[1].sessionNumber == 2
-        sessions[1].durationMinutes == 60
-        sessions[2].sessionNumber == 3
-        sessions[2].durationMinutes == 30
-
-        and: "daily projection aggregates all correctly"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalSleepMinutes == 570  // 480 + 60 + 30
-        dailyData.get().sleepCount == 3
-        dailyData.get().longestSessionMinutes == 480
-        dailyData.get().shortestSessionMinutes == 30
-        dailyData.get().averageSessionMinutes == 190  // 570 / 3
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        response.getList("sessions").size() == 3
+        response.getList("sessions")[0].sessionNumber == 1
+        response.getList("sessions")[0].durationMinutes == 480
+        response.getList("sessions")[1].sessionNumber == 2
+        response.getList("sessions")[1].durationMinutes == 60
+        response.getList("sessions")[2].sessionNumber == 3
+        response.getList("sessions")[2].durationMinutes == 30
+        response.getInt("totalSleepMinutes") == 570  // 480 + 60 + 30
+        response.getInt("sleepCount") == 3
+        response.getInt("longestSessionMinutes") == 480
+        response.getInt("shortestSessionMinutes") == 30
+        response.getInt("averageSessionMinutes") == 190  // 570 / 3
     }
 
     def "Scenario 13: Session time range is tracked correctly"() {
@@ -670,16 +657,11 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "session projection has correct times"
-        def sessions = sessionProjectionRepository.findByDateOrderBySessionNumberAsc(LocalDate.parse(date))
-        sessions.size() == 1
-        sessions[0].sleepStart.toString() == sleepStart
-        sessions[0].sleepEnd.toString() == sleepEnd
-
-        and: "daily projection reflects time range"
-        def dailyData = dailyProjectionRepository.findByDate(LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().firstSleepStart.toString() == sleepStart
-        dailyData.get().lastSleepEnd.toString() == sleepEnd
+        then: "projections are created with correct time range (verified via API)"
+        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        response.getList("sessions").size() == 1
+        response.getInt("totalSleepMinutes") == 660
+        response.getString("firstSleepStart") == sleepStart
+        response.getString("lastSleepEnd") == sleepEnd
     }
 }

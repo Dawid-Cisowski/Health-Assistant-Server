@@ -49,18 +49,18 @@ class SleepEventValidationSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def sleepEvent = events.first()
-        sleepEvent.eventType == "SleepSessionRecorded.v1"
+        sleepEvent.eventType() == "SleepSessionRecorded.v1"
 
         and: "event has correct device ID"
-        sleepEvent.deviceId == "mobile-app"
+        sleepEvent.deviceId() == "mobile-app"
 
         and: "event has correct payload"
-        def payload = sleepEvent.payload
+        def payload = sleepEvent.payload()
         payload.get("sleepId") == "sleep-session-validation-test"
         payload.get("sleepStart") == "2025-11-20T22:00:00Z"
         payload.get("sleepEnd") == "2025-11-21T06:00:00Z"
@@ -282,10 +282,10 @@ class SleepEventValidationSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def sleepEvent = dbEvents.first()
-        def storedOccurredAt = Instant.parse(sleepEvent.occurredAt.toString())
+        def storedOccurredAt = Instant.parse(sleepEvent.occurredAt().toString())
         storedOccurredAt == Instant.parse(occurredAt)
     }
 

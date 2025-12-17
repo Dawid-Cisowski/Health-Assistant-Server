@@ -49,18 +49,18 @@ class StepsEventValidationSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = eventRepository.findAll()
+        def events = findAllEvents()
         events.size() == 1
 
         and: "event has correct type"
         def stepsEvent = events.first()
-        stepsEvent.eventType == "StepsBucketedRecorded.v1"
+        stepsEvent.eventType() == "StepsBucketedRecorded.v1"
 
         and: "event has correct device ID"
-        stepsEvent.deviceId == "mobile-app"
+        stepsEvent.deviceId() == "mobile-app"
 
         and: "event has correct payload"
-        def payload = stepsEvent.payload
+        def payload = stepsEvent.payload()
         payload.get("bucketStart") == "2025-11-21T10:00:00Z"
         payload.get("bucketEnd") == "2025-11-21T11:00:00Z"
         payload.get("count") == 5000
@@ -106,7 +106,7 @@ class StepsEventValidationSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
     }
 
@@ -289,10 +289,10 @@ class StepsEventValidationSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def stepsEvent = dbEvents.first()
-        stepsEvent.payload.get("count") == 0
+        stepsEvent.payload().get("count") == 0
     }
 
     def "Scenario 10: Steps event occurredAt timestamp is preserved"() {
@@ -319,10 +319,10 @@ class StepsEventValidationSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = eventRepository.findAll()
+        def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def stepsEvent = dbEvents.first()
-        def storedOccurredAt = Instant.parse(stepsEvent.occurredAt.toString())
+        def storedOccurredAt = Instant.parse(stepsEvent.occurredAt().toString())
         storedOccurredAt == Instant.parse(occurredAt)
     }
 

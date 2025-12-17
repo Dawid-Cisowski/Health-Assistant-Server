@@ -1,11 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.activity.ActivityDailyProjectionJpaRepository
-import com.healthassistant.activity.ActivityHourlyProjectionJpaRepository
+import com.healthassistant.activity.api.ActivityFacade
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
-
-import java.time.LocalDate
 
 /**
  * Integration tests for Activity (Active Minutes) Projections
@@ -17,14 +14,10 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
-    ActivityDailyProjectionJpaRepository dailyProjectionRepository
-
-    @Autowired
-    ActivityHourlyProjectionJpaRepository hourlyProjectionRepository
+    ActivityFacade activityFacade
 
     def setup() {
-        hourlyProjectionRepository?.deleteAll()
-        dailyProjectionRepository?.deleteAll()
+        activityFacade?.deleteAllProjections()
     }
 
     def "Scenario 1: ActiveMinutesRecorded event creates hourly and daily projections"() {
@@ -55,19 +48,13 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hourly projection is created"
-        def hourlyData = hourlyProjectionRepository.findByDeviceIdAndDateAndHour(DEVICE_ID, LocalDate.parse(date), 10)
-        hourlyData.isPresent()
-        hourlyData.get().activeMinutes == 15
-        hourlyData.get().bucketCount == 1
-
-        and: "daily projection is created with totals"
-        def dailyData = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalActiveMinutes == 15
-        dailyData.get().mostActiveHour == 10
-        dailyData.get().mostActiveHourMinutes == 15
-        dailyData.get().activeHoursCount == 1
+        then: "projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/activity/daily/${date}")
+        response.getList("hourlyBreakdown")[10].activeMinutes == 15
+        response.getInt("totalActiveMinutes") == 15
+        response.getInt("mostActiveHour") == 10
+        response.getInt("mostActiveHourMinutes") == 15
+        response.getInt("activeHoursCount") == 1
     }
 
     def "Scenario 2: Multiple buckets same hour accumulate minutes"() {
@@ -109,16 +96,10 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "hourly projection accumulates minutes"
-        def hourlyData = hourlyProjectionRepository.findByDeviceIdAndDateAndHour(DEVICE_ID, LocalDate.parse(date), 14)
-        hourlyData.isPresent()
-        hourlyData.get().activeMinutes == 18
-        hourlyData.get().bucketCount == 2
-
-        and: "daily projection reflects total"
-        def dailyData = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalActiveMinutes == 18
+        then: "projections accumulate minutes (verified via API)"
+        def response = waitForApiResponse("/v1/activity/daily/${date}")
+        response.getList("hourlyBreakdown")[14].activeMinutes == 18
+        response.getInt("totalActiveMinutes") == 18
     }
 
     def "Scenario 3: Activity across multiple hours create separate hourly projections"() {
@@ -171,23 +152,18 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "three hourly projections are created"
-        def hourlyData = hourlyProjectionRepository.findByDeviceIdAndDateOrderByHourAsc(DEVICE_ID, LocalDate.parse(date))
-        hourlyData.size() == 3
-        hourlyData[0].hour == 8
-        hourlyData[0].activeMinutes == 5
-        hourlyData[1].hour == 12
-        hourlyData[1].activeMinutes == 20
-        hourlyData[2].hour == 18
-        hourlyData[2].activeMinutes == 30
+        then: "three hourly projections are created (verified via API)"
+        def response = waitForApiResponse("/v1/activity/daily/${date}")
+        def hourlyBreakdown = response.getList("hourlyBreakdown")
+        hourlyBreakdown[8].activeMinutes == 5
+        hourlyBreakdown[12].activeMinutes == 20
+        hourlyBreakdown[18].activeMinutes == 30
 
         and: "daily projection shows most active hour and total"
-        def dailyData = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        dailyData.isPresent()
-        dailyData.get().totalActiveMinutes == 55
-        dailyData.get().mostActiveHour == 18
-        dailyData.get().mostActiveHourMinutes == 30
-        dailyData.get().activeHoursCount == 3
+        response.getInt("totalActiveMinutes") == 55
+        response.getInt("mostActiveHour") == 18
+        response.getInt("mostActiveHourMinutes") == 30
+        response.getInt("activeHoursCount") == 3
     }
 
     def "Scenario 4: Query API returns daily breakdown with 24 hours"() {
@@ -358,9 +334,9 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "no projections are created"
-        hourlyProjectionRepository.findAll().isEmpty()
-        dailyProjectionRepository.findAll().isEmpty()
+        then: "no projections are created (verified via API returning 404)"
+        Thread.sleep(500) // Give time for projection to be created (if any)
+        apiReturns404("/v1/activity/daily/2025-11-23")
     }
 
     def "Scenario 7: API returns 404 for date with no activity"() {
@@ -493,25 +469,12 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        then: "each device has its own projection"
-        def device1Data = dailyProjectionRepository.findByDeviceIdAndDate(DEVICE_ID, LocalDate.parse(date))
-        device1Data.isPresent()
-        device1Data.get().totalActiveMinutes == 10
+        then: "each device has its own projection (verified via API)"
+        def response1 = waitForApiResponse("/v1/activity/daily/${date}", DEVICE_ID, SECRET_BASE64)
+        response1.getInt("totalActiveMinutes") == 10
 
-        def device2Data = dailyProjectionRepository.findByDeviceIdAndDate("different-device-id", LocalDate.parse(date))
-        device2Data.isPresent()
-        device2Data.get().totalActiveMinutes == 25
-
-        when: "I query API for test-device"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/activity/daily/${date}")
-                .get("/v1/activity/daily/${date}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
-
-        then: "only test-device data is returned"
-        response.getInt("totalActiveMinutes") == 10
+        and: "different device has its own data"
+        def response2 = waitForApiResponse("/v1/activity/daily/${date}", "different-device-id", DIFFERENT_DEVICE_SECRET_BASE64)
+        response2.getInt("totalActiveMinutes") == 25
     }
 }

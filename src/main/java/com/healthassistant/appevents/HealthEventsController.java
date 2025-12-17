@@ -33,12 +33,42 @@ class HealthEventsController {
     @PostMapping
     @Operation(
             summary = "Submit health events",
-            description = "Accepts health events from mobile applications (workouts, nutrition, custom metrics, etc.). Requires HMAC authentication.",
+            description = """
+                    Accepts health events from mobile applications. Requires HMAC authentication.
+
+                    ## Supported Event Types
+
+                    | Event Type | Description |
+                    |------------|-------------|
+                    | `StepsBucketedRecorded.v1` | Steps count in a time bucket |
+                    | `DistanceBucketRecorded.v1` | Distance traveled in a time bucket |
+                    | `HeartRateSummaryRecorded.v1` | Heart rate summary for a time bucket |
+                    | `SleepSessionRecorded.v1` | Sleep session data |
+                    | `ActiveCaloriesBurnedRecorded.v1` | Active calories burned in a time bucket |
+                    | `ActiveMinutesRecorded.v1` | Active minutes in a time bucket |
+                    | `WalkingSessionRecorded.v1` | Walking/running session |
+                    | `WorkoutRecorded.v1` | Gym workout with exercises and sets |
+                    | `MealRecorded.v1` | Meal/nutrition entry |
+
+                    ## Idempotency
+
+                    Each event requires an `idempotencyKey` for deduplication. If not provided, it will be auto-generated as:
+                    - For workouts: `{deviceId}|workout|{workoutId}`
+                    - For other events: `{deviceId}|{eventType}|{occurredAt}-{index}`
+
+                    Duplicate submissions (same idempotencyKey) will update the existing event.
+
+                    ## Response Status Codes
+
+                    - `stored` - Event was successfully stored
+                    - `duplicate` - Event with same idempotencyKey already exists (updated)
+                    - `invalid` - Event failed validation
+                    """,
             security = @SecurityRequirement(name = "HmacHeaderAuth")
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Events processed"),
-            @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "200", description = "Events processed - check individual event results for status"),
+            @ApiResponse(responseCode = "400", description = "Invalid request - empty events list"),
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed"),
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
