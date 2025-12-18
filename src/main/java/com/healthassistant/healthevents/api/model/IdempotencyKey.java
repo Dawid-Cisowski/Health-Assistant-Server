@@ -1,8 +1,10 @@
 package com.healthassistant.healthevents.api.model;
 
-import java.util.Map;
+import com.healthassistant.healthevents.api.dto.payload.EventPayload;
+import com.healthassistant.healthevents.api.dto.payload.SleepSessionPayload;
+import com.healthassistant.healthevents.api.dto.payload.WorkoutPayload;
+
 import java.util.Objects;
-import java.util.Optional;
 
 public record IdempotencyKey(String value) {
 
@@ -24,19 +26,15 @@ public record IdempotencyKey(String value) {
             String providedKey,
             String deviceId,
             String eventType,
-            Map<String, Object> payload,
+            EventPayload payload,
             int index) {
 
         String keyValue;
         if (providedKey != null && !providedKey.isBlank()) {
             keyValue = providedKey;
         } else {
-            String workoutId = Optional.ofNullable(payload.get("workoutId"))
-                    .map(Object::toString)
-                    .orElse(null);
-            String sleepId = Optional.ofNullable(payload.get("sleepId"))
-                    .map(Object::toString)
-                    .orElse(null);
+            String workoutId = payload instanceof WorkoutPayload w ? w.workoutId() : null;
+            String sleepId = payload instanceof SleepSessionPayload s ? s.sleepId() : null;
 
             keyValue = generate(deviceId, eventType, workoutId, sleepId, index);
         }

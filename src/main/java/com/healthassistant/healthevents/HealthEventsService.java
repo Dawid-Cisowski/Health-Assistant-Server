@@ -1,5 +1,6 @@
 package com.healthassistant.healthevents;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.EventData;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
@@ -12,6 +13,7 @@ import com.healthassistant.healthevents.api.dto.events.MealsEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.SleepEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.WorkoutEventsStoredEvent;
+import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import com.healthassistant.healthevents.api.model.EventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +48,7 @@ class HealthEventsService implements HealthEventsFacade {
     private final StoreHealthEventsCommandHandler commandHandler;
     private final ApplicationEventPublisher eventPublisher;
     private final HealthEventJpaRepository healthEventJpaRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -165,11 +168,17 @@ class HealthEventsService implements HealthEventsFacade {
                 .map(entity -> new EventData(
                         entity.getEventType(),
                         entity.getOccurredAt(),
-                        entity.getPayload(),
+                        toPayload(entity.getEventType(), entity.getPayload()),
                         entity.getDeviceId(),
                         entity.getIdempotencyKey()
                 ))
                 .toList();
+    }
+
+    private EventPayload toPayload(String eventTypeStr, Map<String, Object> map) {
+        EventType eventType = EventType.from(eventTypeStr);
+        Class<? extends EventPayload> clazz = EventPayload.payloadClassFor(eventType);
+        return objectMapper.convertValue(map, clazz);
     }
 
     @Override

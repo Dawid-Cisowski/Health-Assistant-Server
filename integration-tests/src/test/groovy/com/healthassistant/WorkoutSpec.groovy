@@ -63,11 +63,11 @@ class WorkoutSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = workoutEvent.payload()
-        payload.get("workoutId") == "gymrun-2025-11-17-2"
-        payload.get("source") == "GYMRUN_SCREENSHOT"
-        payload.get("note") == "Plecy i biceps"
-        payload.get("exercises") != null
-        ((List) payload.get("exercises")).size() == 2
+        payload.workoutId() == "gymrun-2025-11-17-2"
+        payload.source() == "GYMRUN_SCREENSHOT"
+        payload.note() == "Plecy i biceps"
+        payload.exercises() != null
+        payload.exercises().size() == 2
     }
 
     def "Scenario 3: Duplicate workout event returns duplicate status"() {
@@ -396,7 +396,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
         workoutEvent.eventType() == "WorkoutRecorded.v1"
-        workoutEvent.payload().get("note") == null
+        workoutEvent.payload().note() == null
     }
 
     def "Scenario 12: Workout event with complex data (multiple exercises, multiple sets)"() {
@@ -416,17 +416,17 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        def exercises = (List) workoutEvent.payload().get("exercises")
+        def exercises = workoutEvent.payload().exercises()
         exercises.size() == 5
 
         and: "first exercise has 3 sets"
-        def firstExercise = (Map) exercises.get(0)
-        def firstExerciseSets = (List) firstExercise.get("sets")
+        def firstExercise = exercises.get(0)
+        def firstExerciseSets = firstExercise.sets()
         firstExerciseSets.size() == 3
 
         and: "exercise details are preserved"
-        firstExercise.get("name") == "Podciąganie się nachwytem (szeroki rozstaw rąk)"
-        firstExercise.get("orderInWorkout") == 1
+        firstExercise.name() == "Podciąganie się nachwytem (szeroki rozstaw rąk)"
+        firstExercise.orderInWorkout() == 1
     }
 
     def "Scenario 13: Workout event occurredAt matches performedAt timestamp"() {
@@ -520,14 +520,14 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        def exercises = (List) workoutEvent.payload().get("exercises")
-        def exercise = (Map) exercises.get(0)
-        def sets = (List) exercise.get("sets")
+        def exercises = workoutEvent.payload().exercises()
+        def exercise = exercises.get(0)
+        def sets = exercise.sets()
         sets.size() == 4
-        ((Map) sets.get(0)).get("isWarmup") == true
-        ((Map) sets.get(1)).get("isWarmup") == true
-        ((Map) sets.get(2)).get("isWarmup") == false
-        ((Map) sets.get(3)).get("isWarmup") == false
+        sets.get(0).isWarmup() == true
+        sets.get(1).isWarmup() == true
+        sets.get(2).isWarmup() == false
+        sets.get(3).isWarmup() == false
     }
 
     def "Scenario 15: Workout event with bodyweight exercise (weight 0)"() {
@@ -574,10 +574,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
-        def exercises = (List) workoutEvent.payload().get("exercises")
-        def exercise = (Map) exercises.get(0)
-        def sets = (List) exercise.get("sets")
-        ((Map) sets.get(0)).get("weightKg") == 0.0
+        def exercises = workoutEvent.payload().exercises()
+        def exercise = exercises.get(0)
+        def sets = exercise.sets()
+        sets.get(0).weightKg() == 0.0
     }
 
     // Helper methods

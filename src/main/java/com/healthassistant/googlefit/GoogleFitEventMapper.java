@@ -1,6 +1,7 @@
 package com.healthassistant.googlefit;
 
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.dto.payload.*;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,9 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -21,7 +20,6 @@ class GoogleFitEventMapper {
 
     private static final String GOOGLE_FIT_ORIGIN = "google-fit";
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
     private static final String DEFAULT_USER_ID = "default";
 
     List<StoreHealthEventsCommand.EventEnvelope> mapToEventEnvelopes(List<GoogleFitBucketData> buckets) {
@@ -65,119 +63,124 @@ class GoogleFitEventMapper {
     }
 
     private StoreHealthEventsCommand.EventEnvelope createStepsEnvelope(GoogleFitBucketData bucket) {
-        ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
-        ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
+        Instant bucketStart = bucket.bucketStart();
+        Instant bucketEnd = bucket.bucketEnd();
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
-        payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
-        payload.put("count", bucket.steps());
-        payload.put("originPackage", GOOGLE_FIT_ORIGIN);
+        StepsPayload payload = new StepsPayload(
+                bucketStart,
+                bucketEnd,
+                bucket.steps().intValue(),
+                GOOGLE_FIT_ORIGIN
+        );
 
         String idempotencyKey = String.format("google-fit|steps|%d|%d",
-                bucket.bucketStart().toEpochMilli(),
-                bucket.bucketEnd().toEpochMilli());
+                bucketStart.toEpochMilli(),
+                bucketEnd.toEpochMilli());
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "StepsBucketedRecorded.v1",
-                bucket.bucketEnd(),
+                bucketEnd,
                 payload
         );
     }
 
     private StoreHealthEventsCommand.EventEnvelope createDistanceEnvelope(GoogleFitBucketData bucket) {
-        ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
-        ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
+        Instant bucketStart = bucket.bucketStart();
+        Instant bucketEnd = bucket.bucketEnd();
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
-        payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
-        payload.put("distanceMeters", Math.round(bucket.distance()));
-        payload.put("originPackage", GOOGLE_FIT_ORIGIN);
+        DistanceBucketPayload payload = new DistanceBucketPayload(
+                bucketStart,
+                bucketEnd,
+                (double) Math.round(bucket.distance()),
+                GOOGLE_FIT_ORIGIN
+        );
 
         String idempotencyKey = String.format("google-fit|distance|%d|%d",
-                bucket.bucketStart().toEpochMilli(),
-                bucket.bucketEnd().toEpochMilli());
+                bucketStart.toEpochMilli(),
+                bucketEnd.toEpochMilli());
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "DistanceBucketRecorded.v1",
-                bucket.bucketEnd(),
+                bucketEnd,
                 payload
         );
     }
 
     private StoreHealthEventsCommand.EventEnvelope createCaloriesEnvelope(GoogleFitBucketData bucket) {
-        ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
-        ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
+        Instant bucketStart = bucket.bucketStart();
+        Instant bucketEnd = bucket.bucketEnd();
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
-        payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
-        payload.put("energyKcal", bucket.calories().intValue());
-        payload.put("originPackage", GOOGLE_FIT_ORIGIN);
+        ActiveCaloriesPayload payload = new ActiveCaloriesPayload(
+                bucketStart,
+                bucketEnd,
+                (double) bucket.calories().intValue(),
+                GOOGLE_FIT_ORIGIN
+        );
 
         String idempotencyKey = String.format("google-fit|calories|%d|%d",
-                bucket.bucketStart().toEpochMilli(),
-                bucket.bucketEnd().toEpochMilli());
+                bucketStart.toEpochMilli(),
+                bucketEnd.toEpochMilli());
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "ActiveCaloriesBurnedRecorded.v1",
-                bucket.bucketEnd(),
+                bucketEnd,
                 payload
         );
     }
 
     private StoreHealthEventsCommand.EventEnvelope createHeartRateEnvelope(GoogleFitBucketData bucket) {
         List<Integer> heartRates = bucket.heartRates();
-        int avg = (int) heartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+        double avg = heartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0);
         int min = heartRates.stream().mapToInt(Integer::intValue).min().orElse(0);
         int max = heartRates.stream().mapToInt(Integer::intValue).max().orElse(0);
 
-        ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
-        ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
+        Instant bucketStart = bucket.bucketStart();
+        Instant bucketEnd = bucket.bucketEnd();
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
-        payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
-        payload.put("avg", avg);
-        payload.put("min", min);
-        payload.put("max", max);
-        payload.put("samples", heartRates.size());
-        payload.put("originPackage", GOOGLE_FIT_ORIGIN);
+        HeartRatePayload payload = new HeartRatePayload(
+                bucketStart,
+                bucketEnd,
+                avg,
+                min,
+                max,
+                heartRates.size(),
+                GOOGLE_FIT_ORIGIN
+        );
 
         String idempotencyKey = String.format("google-fit|heart-rate|%d|%d",
-                bucket.bucketStart().toEpochMilli(),
-                bucket.bucketEnd().toEpochMilli());
+                bucketStart.toEpochMilli(),
+                bucketEnd.toEpochMilli());
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "HeartRateSummaryRecorded.v1",
-                bucket.bucketEnd(),
+                bucketEnd,
                 payload
         );
     }
 
     private StoreHealthEventsCommand.EventEnvelope createActiveMinutesEnvelope(GoogleFitBucketData bucket) {
-        ZonedDateTime bucketStartPoland = bucket.bucketStart().atZone(POLAND_ZONE);
-        ZonedDateTime bucketEndPoland = bucket.bucketEnd().atZone(POLAND_ZONE);
+        Instant bucketStart = bucket.bucketStart();
+        Instant bucketEnd = bucket.bucketEnd();
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("bucketStart", bucketStartPoland.format(ISO_FORMATTER));
-        payload.put("bucketEnd", bucketEndPoland.format(ISO_FORMATTER));
-        payload.put("activeMinutes", 1);
-        payload.put("originPackage", GOOGLE_FIT_ORIGIN);
+        ActiveMinutesPayload payload = new ActiveMinutesPayload(
+                bucketStart,
+                bucketEnd,
+                1,
+                GOOGLE_FIT_ORIGIN
+        );
 
         String idempotencyKey = String.format("google-fit|active-minutes|%d|%d",
-                bucket.bucketStart().toEpochMilli(),
-                bucket.bucketEnd().toEpochMilli());
+                bucketStart.toEpochMilli(),
+                bucketEnd.toEpochMilli());
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
                 "ActiveMinutesRecorded.v1",
-                bucket.bucketEnd(),
+                bucketEnd,
                 payload
         );
     }
@@ -192,17 +195,15 @@ class GoogleFitEventMapper {
 
         long totalMinutes = java.time.Duration.between(start, end).toMinutes();
 
-        ZonedDateTime sleepStartPoland = start.atZone(POLAND_ZONE);
-        ZonedDateTime sleepEndPoland = end.atZone(POLAND_ZONE);
-
         String sleepId = session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli());
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("sleepId", sleepId);
-        payload.put("sleepStart", sleepStartPoland.format(ISO_FORMATTER));
-        payload.put("sleepEnd", sleepEndPoland.format(ISO_FORMATTER));
-        payload.put("totalMinutes", (int) totalMinutes);
-        payload.put("originPackage", session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN);
+        SleepSessionPayload payload = new SleepSessionPayload(
+                sleepId,
+                start,
+                end,
+                (int) totalMinutes,
+                session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN
+        );
 
         String idempotencyKey = String.format("google-fit|sleep|%s|%s", DEFAULT_USER_ID, sleepId);
 
@@ -244,20 +245,22 @@ class GoogleFitEventMapper {
                 })
                 .toList();
 
-        long totalSteps = sessionBuckets.stream()
+        int totalSteps = (int) sessionBuckets.stream()
                 .filter(b -> b.steps() != null && b.steps() > 0)
                 .mapToLong(GoogleFitBucketData::steps)
                 .sum();
 
-        long totalDistance = Math.round(sessionBuckets.stream()
+        double totalDistanceSum = sessionBuckets.stream()
                 .filter(b -> b.distance() != null && b.distance() > 0)
                 .mapToDouble(GoogleFitBucketData::distance)
-                .sum());
+                .sum();
+        Long totalDistance = totalDistanceSum > 0 ? Math.round(totalDistanceSum) : null;
 
-        double totalCalories = sessionBuckets.stream()
+        double totalCaloriesSum = sessionBuckets.stream()
                 .filter(b -> b.calories() != null && b.calories() > 0)
                 .mapToDouble(GoogleFitBucketData::calories)
                 .sum();
+        Integer totalCalories = totalCaloriesSum > 0 ? (int) Math.round(totalCaloriesSum) : null;
 
         List<Integer> allHeartRates = sessionBuckets.stream()
                 .filter(b -> b.heartRates() != null && !b.heartRates().isEmpty())
@@ -265,44 +268,30 @@ class GoogleFitEventMapper {
                 .collect(Collectors.toList());
 
         Integer avgHeartRate = allHeartRates.isEmpty() ? null :
-                (int) allHeartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+                (int) Math.round(allHeartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0));
         Integer maxHeartRate = allHeartRates.isEmpty() ? null :
                 allHeartRates.stream().mapToInt(Integer::intValue).max().orElse(0);
 
         long durationMinutes = java.time.Duration.between(start, end).toMinutes();
 
-        ZonedDateTime walkStartPoland = start.atZone(POLAND_ZONE);
-        ZonedDateTime walkEndPoland = end.atZone(POLAND_ZONE);
+        String sessionId = session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli());
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("sessionId", session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
-        if (session.name() != null) {
-            payload.put("name", session.name());
-        }
-        payload.put("start", walkStartPoland.format(ISO_FORMATTER));
-        payload.put("end", walkEndPoland.format(ISO_FORMATTER));
-        payload.put("durationMinutes", (int) durationMinutes);
-        payload.put("totalSteps", (int) totalSteps);
-        if (totalDistance > 0) {
-            payload.put("totalDistanceMeters", (long) totalDistance);
-        }
-        if (totalCalories > 0) {
-            payload.put("totalCalories", (int) totalCalories);
-        }
-        if (avgHeartRate != null && avgHeartRate > 0) {
-            payload.put("avgHeartRate", avgHeartRate);
-        }
-        if (maxHeartRate != null && maxHeartRate > 0) {
-            payload.put("maxHeartRate", maxHeartRate);
-        }
-        if (!allHeartRates.isEmpty()) {
-            payload.put("heartRateSamples", allHeartRates);
-        }
-        payload.put("originPackage", session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN);
+        WalkingSessionPayload payload = new WalkingSessionPayload(
+                sessionId,
+                session.name(),
+                start,
+                end,
+                (int) durationMinutes,
+                totalSteps,
+                totalDistance,
+                totalCalories,
+                avgHeartRate != null && avgHeartRate > 0 ? avgHeartRate : null,
+                maxHeartRate != null && maxHeartRate > 0 ? maxHeartRate : null,
+                !allHeartRates.isEmpty() ? allHeartRates : null,
+                session.getPackageName() != null ? session.getPackageName() : GOOGLE_FIT_ORIGIN
+        );
 
-        String idempotencyKey = String.format("google-fit|walking|%s|%s",
-                DEFAULT_USER_ID,
-                session.id() != null ? session.id() : String.format("%d-%d", start.toEpochMilli(), end.toEpochMilli()));
+        String idempotencyKey = String.format("google-fit|walking|%s|%s", DEFAULT_USER_ID, sessionId);
 
         return new StoreHealthEventsCommand.EventEnvelope(
                 IdempotencyKey.of(idempotencyKey),
@@ -327,4 +316,3 @@ class GoogleFitEventMapper {
         return d >= 20.0;
     }
 }
-

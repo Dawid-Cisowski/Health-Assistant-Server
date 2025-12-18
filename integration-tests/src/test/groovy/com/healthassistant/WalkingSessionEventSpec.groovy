@@ -61,16 +61,16 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = walkEvent.payload()
-        payload.get("sessionId") == "walk-session-123"
-        payload.get("start") == "2025-11-21T09:00:00Z"
-        payload.get("end") == "2025-11-21T10:00:00Z"
-        payload.get("durationMinutes") == 60
-        payload.get("totalSteps") == 6500
-        payload.get("totalDistanceMeters") == 5200.0
-        payload.get("totalCalories") == 280.0
-        payload.get("avgHeartRate") == 95
-        payload.get("maxHeartRate") == 125
-        payload.get("originPackage") == "com.heytap.health.international"
+        payload.sessionId() == "walk-session-123"
+        payload.start() == Instant.parse("2025-11-21T09:00:00Z")
+        payload.end() == Instant.parse("2025-11-21T10:00:00Z")
+        payload.durationMinutes() == 60
+        payload.totalSteps() == 6500
+        payload.totalDistanceMeters() == 5200L
+        payload.totalCalories() == 280
+        payload.avgHeartRate() == 95
+        payload.maxHeartRate() == 125
+        payload.originPackage() == "com.heytap.health.international"
     }
 
     def "Scenario 3: Duplicate walking session event returns duplicate status"() {
@@ -376,8 +376,8 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def walkEvent = dbEvents.first()
-        walkEvent.payload().get("durationMinutes") == 0
-        walkEvent.payload().get("totalSteps") == 0
+        walkEvent.payload().durationMinutes() == 0
+        walkEvent.payload().totalSteps() == 0
     }
 
     def "Scenario 12: Walking session event with only required fields is valid"() {

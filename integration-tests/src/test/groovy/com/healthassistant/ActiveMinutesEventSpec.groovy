@@ -61,10 +61,10 @@ class ActiveMinutesEventSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = activeMinutesEvent.payload()
-        payload.get("bucketStart") == "2025-11-21T10:00:00Z"
-        payload.get("bucketEnd") == "2025-11-21T11:00:00Z"
-        payload.get("activeMinutes") == 45
-        payload.get("originPackage") == "com.google.android.apps.fitness"
+        payload.bucketStart() == Instant.parse("2025-11-21T10:00:00Z")
+        payload.bucketEnd() == Instant.parse("2025-11-21T11:00:00Z")
+        payload.activeMinutes() == 45
+        payload.originPackage() == "com.google.android.apps.fitness"
     }
 
     def "Scenario 3: Active minutes event with missing bucketStart returns validation error"() {
@@ -249,7 +249,7 @@ class ActiveMinutesEventSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def activeMinutesEvent = dbEvents.first()
-        activeMinutesEvent.payload().get("activeMinutes") == 0
+        activeMinutesEvent.payload().activeMinutes() == 0
     }
 
     def "Scenario 9: Active minutes event occurredAt timestamp is preserved"() {

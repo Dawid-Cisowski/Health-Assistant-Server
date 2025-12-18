@@ -1,6 +1,7 @@
 package com.healthassistant.sleep;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.payload.SleepSessionPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,7 +12,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -36,12 +36,16 @@ class SleepProjector {
     }
 
     private void projectSleepSession(StoredEventData eventData) {
-        Map<String, Object> payload = eventData.payload();
+        if (!(eventData.payload() instanceof SleepSessionPayload sleep)) {
+            log.warn("Expected SleepSessionPayload but got {}, skipping projection",
+                    eventData.payload().getClass().getSimpleName());
+            return;
+        }
 
-        Instant sleepStart = parseInstant(payload.get("sleepStart"));
-        Instant sleepEnd = parseInstant(payload.get("sleepEnd"));
-        Integer totalMinutes = getInteger(payload, "totalMinutes");
-        String originPackage = (String) payload.get("originPackage");
+        Instant sleepStart = sleep.sleepStart();
+        Instant sleepEnd = sleep.sleepEnd();
+        Integer totalMinutes = sleep.totalMinutes();
+        String originPackage = sleep.originPackage();
 
         if (sleepStart == null || sleepEnd == null || totalMinutes == null) {
             log.warn("SleepSession event missing required fields, skipping projection");
@@ -180,35 +184,5 @@ class SleepProjector {
         daily.setTotalAwakeMinutes(totalAwake);
 
         dailyRepository.save(daily);
-    }
-
-
-    private Instant parseInstant(Object value) {
-        if (value == null) return null;
-        if (value instanceof Instant) {
-            return (Instant) value;
-        }
-        if (value instanceof String) {
-            try {
-                return Instant.parse((String) value);
-            } catch (Exception e) {
-                log.warn("Failed to parse Instant from string: {}", value);
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private Integer getInteger(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value == null) return null;
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

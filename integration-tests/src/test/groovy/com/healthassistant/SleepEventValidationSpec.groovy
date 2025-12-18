@@ -61,11 +61,11 @@ class SleepEventValidationSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = sleepEvent.payload()
-        payload.get("sleepId") == "sleep-session-validation-test"
-        payload.get("sleepStart") == "2025-11-20T22:00:00Z"
-        payload.get("sleepEnd") == "2025-11-21T06:00:00Z"
-        payload.get("totalMinutes") == 480
-        payload.get("originPackage") == "com.google.android.apps.fitness"
+        payload.sleepId() == "sleep-session-validation-test"
+        payload.sleepStart() == Instant.parse("2025-11-20T22:00:00Z")
+        payload.sleepEnd() == Instant.parse("2025-11-21T06:00:00Z")
+        payload.totalMinutes() == 480
+        payload.originPackage() == "com.google.android.apps.fitness"
     }
 
     def "Scenario 3: Sleep session event with missing sleepId returns validation error"() {

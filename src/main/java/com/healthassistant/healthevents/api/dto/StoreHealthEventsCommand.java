@@ -1,11 +1,11 @@
 package com.healthassistant.healthevents.api.dto;
 
+import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 public record StoreHealthEventsCommand(
         List<EventEnvelope> events,
@@ -16,7 +16,7 @@ public record StoreHealthEventsCommand(
             IdempotencyKey idempotencyKey,
             String eventType,
             Instant occurredAt,
-            Map<String, Object> payload
+            EventPayload payload
     ) {
     }
 }

@@ -2,11 +2,16 @@ package com.healthassistant.healthevents.api.dto.payload;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.healthassistant.healthevents.api.model.*;
 import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.util.Map;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
 @JsonSubTypes({
     @JsonSubTypes.Type(value = StepsPayload.class),
+    @JsonSubTypes.Type(value = DistanceBucketPayload.class),
     @JsonSubTypes.Type(value = HeartRatePayload.class),
     @JsonSubTypes.Type(value = SleepSessionPayload.class),
     @JsonSubTypes.Type(value = ActiveCaloriesPayload.class),
@@ -19,6 +24,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
     description = "Event payload - structure depends on event type. The payload type is determined by the 'type' field in the parent EventEnvelope.",
     oneOf = {
         StepsPayload.class,
+        DistanceBucketPayload.class,
         HeartRatePayload.class,
         SleepSessionPayload.class,
         ActiveCaloriesPayload.class,
@@ -30,6 +36,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 )
 public sealed interface EventPayload permits
     StepsPayload,
+    DistanceBucketPayload,
     HeartRatePayload,
     SleepSessionPayload,
     ActiveCaloriesPayload,
@@ -37,5 +44,30 @@ public sealed interface EventPayload permits
     WalkingSessionPayload,
     WorkoutPayload,
     MealRecordedPayload {
+
+    static Class<? extends EventPayload> payloadClassFor(EventType eventType) {
+        return payloadClassForType(eventType.value());
+    }
+
+    static Class<? extends EventPayload> payloadClassForType(String eventTypeValue) {
+        return switch (eventTypeValue) {
+            case "StepsBucketedRecorded.v1" -> StepsPayload.class;
+            case "DistanceBucketRecorded.v1" -> DistanceBucketPayload.class;
+            case "HeartRateSummaryRecorded.v1" -> HeartRatePayload.class;
+            case "SleepSessionRecorded.v1" -> SleepSessionPayload.class;
+            case "ActiveCaloriesBurnedRecorded.v1" -> ActiveCaloriesPayload.class;
+            case "ActiveMinutesRecorded.v1" -> ActiveMinutesPayload.class;
+            case "WalkingSessionRecorded.v1" -> WalkingSessionPayload.class;
+            case "WorkoutRecorded.v1" -> WorkoutPayload.class;
+            case "MealRecorded.v1" -> MealRecordedPayload.class;
+            default -> throw new IllegalArgumentException("Unknown event type: " + eventTypeValue);
+        };
+    }
+
+    static EventPayload fromMap(String eventTypeStr, Map<String, Object> payload, ObjectMapper mapper) {
+        EventType eventType = EventType.from(eventTypeStr);
+        Class<? extends EventPayload> clazz = payloadClassFor(eventType);
+        return mapper.convertValue(payload, clazz);
+    }
 }
 

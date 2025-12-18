@@ -1,6 +1,9 @@
 package com.healthassistant.mealimport;
 
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.dto.payload.HealthRating;
+import com.healthassistant.healthevents.api.dto.payload.MealRecordedPayload;
+import com.healthassistant.healthevents.api.dto.payload.MealType;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.RequiredArgsConstructor;
@@ -8,8 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -21,17 +22,16 @@ class MealEventMapper {
     StoreHealthEventsCommand.EventEnvelope mapToEventEnvelope(
         ExtractedMealData data, String mealId, DeviceId deviceId, Instant occurredAt
     ) {
-        Map<String, Object> payload = new HashMap<>();
+        MealRecordedPayload payload = new MealRecordedPayload(
+            data.title(),
+            MealType.valueOf(data.mealType()),
+            data.caloriesKcal(),
+            data.proteinGrams(),
+            data.fatGrams(),
+            data.carbohydratesGrams(),
+            HealthRating.valueOf(data.healthRating())
+        );
 
-        payload.put("title", data.title());
-        payload.put("mealType", data.mealType());
-        payload.put("caloriesKcal", data.caloriesKcal());
-        payload.put("proteinGrams", data.proteinGrams());
-        payload.put("fatGrams", data.fatGrams());
-        payload.put("carbohydratesGrams", data.carbohydratesGrams());
-        payload.put("healthRating", data.healthRating());
-
-        // Generate unique idempotency key using mealId (UUID-based, so always unique)
         String idempotencyKeyValue = deviceId.value() + "|meal|" + mealId;
         IdempotencyKey idempotencyKey = IdempotencyKey.of(idempotencyKeyValue);
 

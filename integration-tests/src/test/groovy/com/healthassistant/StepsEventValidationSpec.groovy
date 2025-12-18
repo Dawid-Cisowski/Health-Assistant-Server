@@ -61,10 +61,10 @@ class StepsEventValidationSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = stepsEvent.payload()
-        payload.get("bucketStart") == "2025-11-21T10:00:00Z"
-        payload.get("bucketEnd") == "2025-11-21T11:00:00Z"
-        payload.get("count") == 5000
-        payload.get("originPackage") == "com.google.android.apps.fitness"
+        payload.bucketStart() == Instant.parse("2025-11-21T10:00:00Z")
+        payload.bucketEnd() == Instant.parse("2025-11-21T11:00:00Z")
+        payload.count() == 5000
+        payload.originPackage() == "com.google.android.apps.fitness"
     }
 
     def "Scenario 3: Duplicate steps event returns duplicate status"() {
@@ -292,7 +292,7 @@ class StepsEventValidationSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def stepsEvent = dbEvents.first()
-        stepsEvent.payload().get("count") == 0
+        stepsEvent.payload().count() == 0
     }
 
     def "Scenario 10: Steps event occurredAt timestamp is preserved"() {

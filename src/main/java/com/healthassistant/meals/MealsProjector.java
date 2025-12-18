@@ -1,6 +1,7 @@
 package com.healthassistant.meals;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.payload.MealRecordedPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +23,6 @@ import java.util.stream.Collectors;
 class MealsProjector {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final String MEAL_RECORDED_V1 = "MealRecorded.v1";
 
     private final MealProjectionJpaRepository mealRepository;
     private final MealDailyProjectionJpaRepository dailyRepository;
@@ -37,15 +37,19 @@ class MealsProjector {
     }
 
     private void projectMealRecorded(StoredEventData eventData) {
-        Map<String, Object> payload = eventData.payload();
+        if (!(eventData.payload() instanceof MealRecordedPayload payload)) {
+            log.warn("Expected MealRecordedPayload but got {}, skipping projection",
+                    eventData.payload().getClass().getSimpleName());
+            return;
+        }
 
-        String title = getString(payload, "title");
-        String mealType = getString(payload, "mealType");
-        Integer caloriesKcal = getInteger(payload, "caloriesKcal");
-        Integer proteinGrams = getInteger(payload, "proteinGrams");
-        Integer fatGrams = getInteger(payload, "fatGrams");
-        Integer carbohydratesGrams = getInteger(payload, "carbohydratesGrams");
-        String healthRating = getString(payload, "healthRating");
+        String title = payload.title();
+        String mealType = payload.mealType() != null ? payload.mealType().name() : null;
+        Integer caloriesKcal = payload.caloriesKcal();
+        Integer proteinGrams = payload.proteinGrams();
+        Integer fatGrams = payload.fatGrams();
+        Integer carbohydratesGrams = payload.carbohydratesGrams();
+        String healthRating = payload.healthRating() != null ? payload.healthRating().name() : null;
 
         if (title == null || mealType == null || healthRating == null) {
             log.warn("MealRecorded event missing required fields, skipping projection");
@@ -190,24 +194,5 @@ class MealsProjector {
         daily.setLastMealTime(lastMealTime);
 
         dailyRepository.save(daily);
-    }
-
-    private String getString(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value == null) return null;
-        return value.toString();
-    }
-
-    private Integer getInteger(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value == null) return null;
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

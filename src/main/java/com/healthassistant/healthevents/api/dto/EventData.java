@@ -1,12 +1,13 @@
 package com.healthassistant.healthevents.api.dto;
 
+import com.healthassistant.healthevents.api.dto.payload.EventPayload;
+
 import java.time.Instant;
-import java.util.Map;
 
 public record EventData(
         String eventType,
         Instant occurredAt,
-        Map<String, Object> payload,
+        EventPayload payload,
         String deviceId,
         String idempotencyKey
 ) {

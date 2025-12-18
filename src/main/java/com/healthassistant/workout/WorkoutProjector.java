@@ -1,6 +1,7 @@
 package com.healthassistant.workout;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.payload.WorkoutPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,7 +13,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -26,9 +26,13 @@ class WorkoutProjector {
 
     @Transactional
     public void projectWorkout(StoredEventData eventData) {
+        if (!(eventData.payload() instanceof WorkoutPayload workout)) {
+            log.warn("Expected WorkoutPayload but got {}, skipping projection",
+                    eventData.payload().getClass().getSimpleName());
+            return;
+        }
 
-        Map<String, Object> payload = eventData.payload();
-        String workoutId = getString(payload, "workoutId");
+        String workoutId = workout.workoutId();
 
         if (workoutId == null) {
             log.warn("WorkoutRecorded event missing workoutId, skipping projection");
@@ -41,7 +45,7 @@ class WorkoutProjector {
         }
 
         try {
-            buildWorkoutProjection(eventData, payload, workoutId);
+            buildWorkoutProjection(eventData, workout);
             log.info("Created workout projection for workoutId: {}", workoutId);
         } catch (Exception e) {
             log.error("Failed to create workout projection for workoutId: {}", workoutId, e);
@@ -49,22 +53,20 @@ class WorkoutProjector {
         }
     }
 
-    private void buildWorkoutProjection(StoredEventData eventData, Map<String, Object> payload, String workoutId) {
-        Instant performedAt = parseInstant(payload.get("performedAt"));
+    private void buildWorkoutProjection(StoredEventData eventData, WorkoutPayload workout) {
+        Instant performedAt = workout.performedAt();
         if (performedAt == null) {
             performedAt = eventData.occurredAt();
         }
 
         LocalDate performedDate = performedAt.atZone(POLAND_ZONE).toLocalDate();
-        String source = getString(payload, "source");
-        String note = getString(payload, "note");
 
-        WorkoutProjectionJpaEntity workout = WorkoutProjectionJpaEntity.builder()
-                .workoutId(workoutId)
+        WorkoutProjectionJpaEntity workoutEntity = WorkoutProjectionJpaEntity.builder()
+                .workoutId(workout.workoutId())
                 .performedAt(performedAt)
                 .performedDate(performedDate)
-                .source(source)
-                .note(note)
+                .source(workout.source())
+                .note(workout.note())
                 .deviceId(eventData.deviceId().value())
                 .eventId(eventData.eventId().value())
                 .totalExercises(0)
@@ -74,8 +76,10 @@ class WorkoutProjector {
                 .exercises(new ArrayList<>())
                 .build();
 
-        if (!(payload.get("exercises") instanceof List<?> exercises)) {
+        List<WorkoutPayload.Exercise> exercises = workout.exercises();
+        if (exercises == null || exercises.isEmpty()) {
             log.warn("WorkoutRecorded event missing exercises list, creating empty projection");
+            workoutRepository.save(workoutEntity);
             return;
         }
 
@@ -84,17 +88,10 @@ class WorkoutProjector {
         BigDecimal totalWorkingVolume = BigDecimal.ZERO;
         List<WorkoutSetProjectionJpaEntity> allSets = new ArrayList<>();
 
-        for (Object exerciseObj : exercises) {
-            if (!(exerciseObj instanceof Map<?, ?> exerciseMap)) {
-                continue;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> exercise = (Map<String, Object>) exerciseMap;
-
-            ExerciseProjectionResult result = buildExerciseProjection(workout, exercise);
+        for (WorkoutPayload.Exercise exercise : exercises) {
+            ExerciseProjectionResult result = buildExerciseProjection(workoutEntity, exercise);
             WorkoutExerciseProjectionJpaEntity exerciseProjection = result.exerciseProjection;
-            workout.addExercise(exerciseProjection);
+            workoutEntity.addExercise(exerciseProjection);
             allSets.addAll(result.sets);
 
             totalSets += exerciseProjection.getTotalSets();
@@ -107,32 +104,27 @@ class WorkoutProjector {
             }
         }
 
-        workout.setTotalExercises(workout.getExercises().size());
-        workout.setTotalSets(totalSets);
-        workout.setTotalVolumeKg(totalVolume);
-        workout.setTotalWorkingVolumeKg(totalWorkingVolume);
+        workoutEntity.setTotalExercises(workoutEntity.getExercises().size());
+        workoutEntity.setTotalSets(totalSets);
+        workoutEntity.setTotalVolumeKg(totalVolume);
+        workoutEntity.setTotalWorkingVolumeKg(totalWorkingVolume);
 
-        workoutRepository.save(workout);
+        workoutRepository.save(workoutEntity);
 
         if (!allSets.isEmpty()) {
             setRepository.saveAll(allSets);
         }
-
     }
 
     private ExerciseProjectionResult buildExerciseProjection(
-            WorkoutProjectionJpaEntity workout,
-            Map<String, Object> exercise
+            WorkoutProjectionJpaEntity workoutEntity,
+            WorkoutPayload.Exercise exercise
     ) {
-        String exerciseName = getString(exercise, "name");
-        String muscleGroup = getString(exercise, "muscleGroup");
-        Integer orderInWorkout = getInteger(exercise, "orderInWorkout", 0);
-
         WorkoutExerciseProjectionJpaEntity exerciseProjection = WorkoutExerciseProjectionJpaEntity.builder()
-                .workout(workout)
-                .exerciseName(exerciseName)
-                .muscleGroup(muscleGroup)
-                .orderInWorkout(orderInWorkout)
+                .workout(workoutEntity)
+                .exerciseName(exercise.name())
+                .muscleGroup(exercise.muscleGroup())
+                .orderInWorkout(exercise.orderInWorkout())
                 .totalSets(0)
                 .totalVolumeKg(BigDecimal.ZERO)
                 .maxWeightKg(BigDecimal.ZERO)
@@ -140,7 +132,8 @@ class WorkoutProjector {
 
         List<WorkoutSetProjectionJpaEntity> sets = new ArrayList<>();
 
-        if (!(exercise.get("sets") instanceof List<?> setsList)) {
+        List<WorkoutPayload.ExerciseSet> exerciseSets = exercise.sets();
+        if (exerciseSets == null || exerciseSets.isEmpty()) {
             return new ExerciseProjectionResult(exerciseProjection, sets);
         }
 
@@ -148,15 +141,12 @@ class WorkoutProjector {
         BigDecimal totalVolume = BigDecimal.ZERO;
         BigDecimal maxWeight = BigDecimal.ZERO;
 
-        for (Object setObj : setsList) {
-            if (!(setObj instanceof Map<?, ?> setMap)) {
-                continue;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> set = (Map<String, Object>) setMap;
-
-            WorkoutSetProjectionJpaEntity setProjection = buildSetProjection(workout.getWorkoutId(), exerciseName, set);
+        for (WorkoutPayload.ExerciseSet set : exerciseSets) {
+            WorkoutSetProjectionJpaEntity setProjection = buildSetProjection(
+                    workoutEntity.getWorkoutId(),
+                    exercise.name(),
+                    set
+            );
             sets.add(setProjection);
 
             totalSets++;
@@ -181,89 +171,20 @@ class WorkoutProjector {
     private WorkoutSetProjectionJpaEntity buildSetProjection(
             String workoutId,
             String exerciseName,
-            Map<String, Object> set
+            WorkoutPayload.ExerciseSet set
     ) {
-        Integer setNumber = getInteger(set, "setNumber", 0);
-        Double weightKg = getDouble(set, "weightKg");
-        Integer reps = getInteger(set, "reps", 0);
-        Boolean isWarmup = getBoolean(set, "isWarmup", false);
-
-        BigDecimal weight = weightKg != null ? BigDecimal.valueOf(weightKg) : BigDecimal.ZERO;
-        BigDecimal volume = weight.multiply(BigDecimal.valueOf(reps));
+        BigDecimal weight = BigDecimal.valueOf(set.weightKg());
+        BigDecimal volume = weight.multiply(BigDecimal.valueOf(set.reps()));
 
         return WorkoutSetProjectionJpaEntity.builder()
                 .workoutId(workoutId)
                 .exerciseName(exerciseName)
-                .setNumber(setNumber)
+                .setNumber(set.setNumber())
                 .weightKg(weight)
-                .reps(reps)
-                .isWarmup(isWarmup)
+                .reps(set.reps())
+                .isWarmup(set.isWarmup())
                 .volumeKg(volume)
                 .build();
-    }
-
-
-    private String getString(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value != null ? value.toString() : null;
-    }
-
-    private Integer getInteger(Map<String, Object> map, String key, Integer defaultValue) {
-        Object value = map.get(key);
-        if (value == null) return defaultValue;
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    private Double getDouble(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value == null) return null;
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue();
-        }
-        if (value instanceof String) {
-            try {
-                return Double.parseDouble((String) value);
-            } catch (Exception e) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private Boolean getBoolean(Map<String, Object> map, String key, Boolean defaultValue) {
-        Object value = map.get(key);
-        if (value == null) return defaultValue;
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        }
-        try {
-            return Boolean.parseBoolean(value.toString());
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    private Instant parseInstant(Object value) {
-        if (value == null) return null;
-        if (value instanceof Instant) {
-            return (Instant) value;
-        }
-        if (value instanceof String) {
-            try {
-                return Instant.parse((String) value);
-            } catch (Exception e) {
-                log.warn("Failed to parse Instant from string: {}", value);
-                return null;
-            }
-        }
-        return null;
     }
 
     public static class WorkoutProjectionException extends RuntimeException {

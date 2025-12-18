@@ -200,10 +200,11 @@ class StoreHealthEventsCommandHandler {
             return createInvalidResult(index, "type", "Missing required field: type");
         }
 
-        List<EventValidationError> validationErrors = eventValidator.validate(
-                eventTypeStr,
-                envelope.payload() != null ? envelope.payload() : java.util.Map.of()
-        );
+        if (envelope.payload() == null) {
+            return createInvalidResult(index, "payload", "Missing required field: payload");
+        }
+
+        List<EventValidationError> validationErrors = eventValidator.validate(envelope.payload());
 
         if (!validationErrors.isEmpty()) {
             log.debug("Validation failed for event at index {}: {}", index, validationErrors);

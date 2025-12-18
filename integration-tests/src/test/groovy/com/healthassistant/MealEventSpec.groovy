@@ -63,13 +63,13 @@ class MealEventSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = mealEvent.payload()
-        payload.get("title") == "Oatmeal with berries"
-        payload.get("mealType") == "BREAKFAST"
-        payload.get("caloriesKcal") == 350
-        payload.get("proteinGrams") == 12
-        payload.get("fatGrams") == 8
-        payload.get("carbohydratesGrams") == 55
-        payload.get("healthRating") == "HEALTHY"
+        payload.title() == "Oatmeal with berries"
+        payload.mealType().name() == "BREAKFAST"
+        payload.caloriesKcal() == 350
+        payload.proteinGrams() == 12
+        payload.fatGrams() == 8
+        payload.carbohydratesGrams() == 55
+        payload.healthRating().name() == "HEALTHY"
     }
 
     def "Scenario 3: Duplicate meal event returns duplicate status"() {
@@ -417,7 +417,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         and: "all events are stored"
         def dbEvents = findAllEvents()
         dbEvents.size() == 7
-        dbEvents.collect { it.payload().get("mealType") }.containsAll(mealTypes)
+        dbEvents.collect { it.payload().mealType().name() }.containsAll(mealTypes)
     }
 
     def "Scenario 12: Meal event with all health ratings are accepted"() {
@@ -449,7 +449,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         and: "all events are stored"
         def dbEvents = findAllEvents()
         dbEvents.size() == 5
-        dbEvents.collect { it.payload().get("healthRating") }.containsAll(healthRatings)
+        dbEvents.collect { it.payload().healthRating().name() }.containsAll(healthRatings)
     }
 
     def "Scenario 13: Meal event with zero macros is valid"() {
@@ -489,8 +489,8 @@ class MealEventSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def mealEvent = dbEvents.first()
-        mealEvent.payload().get("caloriesKcal") == 0
-        mealEvent.payload().get("proteinGrams") == 0
+        mealEvent.payload().caloriesKcal() == 0
+        mealEvent.payload().proteinGrams() == 0
     }
 
     def "Scenario 14: Meal event occurredAt timestamp is preserved"() {

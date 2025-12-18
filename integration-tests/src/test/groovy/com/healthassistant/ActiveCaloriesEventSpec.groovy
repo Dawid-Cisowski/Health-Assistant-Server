@@ -61,10 +61,10 @@ class ActiveCaloriesEventSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = caloriesEvent.payload()
-        payload.get("bucketStart") == "2025-11-21T10:00:00Z"
-        payload.get("bucketEnd") == "2025-11-21T11:00:00Z"
-        payload.get("energyKcal") == 350.5
-        payload.get("originPackage") == "com.google.android.apps.fitness"
+        payload.bucketStart() == Instant.parse("2025-11-21T10:00:00Z")
+        payload.bucketEnd() == Instant.parse("2025-11-21T11:00:00Z")
+        payload.energyKcal() == 350.5
+        payload.originPackage() == "com.google.android.apps.fitness"
     }
 
     def "Scenario 3: Active calories event with missing bucketStart returns validation error"() {
@@ -249,7 +249,7 @@ class ActiveCaloriesEventSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def caloriesEvent = dbEvents.first()
-        caloriesEvent.payload().get("energyKcal") == 0
+        caloriesEvent.payload().energyKcal() == 0
     }
 
     def "Scenario 9: Active calories event occurredAt timestamp is preserved"() {

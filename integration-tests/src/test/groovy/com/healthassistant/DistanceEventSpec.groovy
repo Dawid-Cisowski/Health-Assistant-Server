@@ -61,10 +61,10 @@ class DistanceEventSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = distanceEvent.payload()
-        payload.get("bucketStart") == "2025-11-21T10:00:00Z"
-        payload.get("bucketEnd") == "2025-11-21T11:00:00Z"
-        payload.get("distanceMeters") == 1500.5
-        payload.get("originPackage") == "com.google.android.apps.fitness"
+        payload.bucketStart() == Instant.parse("2025-11-21T10:00:00Z")
+        payload.bucketEnd() == Instant.parse("2025-11-21T11:00:00Z")
+        payload.distanceMeters() == 1500.5
+        payload.originPackage() == "com.google.android.apps.fitness"
     }
 
     def "Scenario 3: Duplicate distance event returns duplicate status"() {
@@ -292,7 +292,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def distanceEvent = dbEvents.first()
-        distanceEvent.payload().get("distanceMeters") == 0
+        distanceEvent.payload().distanceMeters() == 0
     }
 
     def "Scenario 10: Multiple distance events are stored correctly"() {

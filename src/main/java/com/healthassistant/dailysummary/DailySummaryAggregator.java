@@ -3,6 +3,7 @@ package com.healthassistant.dailysummary;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.EventData;
+import com.healthassistant.healthevents.api.dto.payload.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,7 +13,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 @Component
@@ -59,12 +59,15 @@ class DailySummaryAggregator {
         long totalDistanceMeters = 0L;
 
         for (EventData event : events) {
-            Map<String, Object> payload = event.payload();
+            EventPayload payload = event.payload();
 
-            totalSteps += extractSteps(event.eventType(), payload);
-            totalActiveMinutes += extractActiveMinutes(event.eventType(), payload);
-            totalActiveCalories += extractActiveCalories(event.eventType(), payload);
-            totalDistanceMeters += extractDistance(event.eventType(), payload);
+            switch (payload) {
+                case StepsPayload steps -> totalSteps += steps.count() != null ? steps.count() : 0;
+                case ActiveMinutesPayload am -> totalActiveMinutes += am.activeMinutes() != null ? am.activeMinutes() : 0;
+                case ActiveCaloriesPayload ac -> totalActiveCalories += ac.energyKcal() != null ? ac.energyKcal().intValue() : 0;
+                case DistanceBucketPayload dist -> totalDistanceMeters += dist.distanceMeters() != null ? Math.round(dist.distanceMeters()) : 0L;
+                default -> { }
+            }
         }
 
         return new DailySummary.Activity(
@@ -73,33 +76,6 @@ class DailySummaryAggregator {
                 nullIfZero(totalActiveCalories),
                 nullIfZero(totalDistanceMeters)
         );
-    }
-
-    private int extractSteps(String eventType, Map<String, Object> payload) {
-        if ("StepsBucketedRecorded.v1".equals(eventType)) {
-            return getInteger(payload, "count", 0);
-        }
-        return 0;
-    }
-
-    private int extractActiveMinutes(String eventType, Map<String, Object> payload) {
-        if (!"ActiveMinutesRecorded.v1".equals(eventType)) return 0;
-        return getInteger(payload, "activeMinutes", 0);
-    }
-
-    private int extractActiveCalories(String eventType, Map<String, Object> payload) {
-        if ("ActiveCaloriesBurnedRecorded.v1".equals(eventType)) {
-            return getInteger(payload, "energyKcal", 0);
-        }
-        return 0;
-    }
-
-    private long extractDistance(String eventType, Map<String, Object> payload) {
-        if ("DistanceBucketRecorded.v1".equals(eventType)) {
-            Double distance = getDouble(payload, "distanceMeters");
-            return distance != null ? Math.round(distance) : 0L;
-        }
-        return 0L;
     }
 
     private <T extends Number> T nullIfZero(T value) {
@@ -112,26 +88,27 @@ class DailySummaryAggregator {
 
     private List<DailySummary.Exercise> aggregateExercises(List<EventData> events) {
         return events.stream()
-                .filter(e -> "WalkingSessionRecorded.v1".equals(e.eventType()))
+                .filter(e -> e.payload() instanceof WalkingSessionPayload)
                 .map(this::toExercise)
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     private DailySummary.Exercise toExercise(EventData event) {
-        Map<String, Object> payload = event.payload();
+        if (!(event.payload() instanceof WalkingSessionPayload walking)) {
+            return null;
+        }
 
         try {
-            Instant start = parseInstant(payload.get("start"));
-            Instant end = parseInstant(payload.get("end"));
-            Integer durationMinutes = getInteger(payload, "durationMinutes");
-            Double distanceMetersDouble = getDouble(payload, "totalDistanceMeters");
-            Long distanceMeters = distanceMetersDouble != null ? Math.round(distanceMetersDouble) : null;
-            Integer steps = getInteger(payload, "totalSteps");
-            Integer avgHr = getInteger(payload, "avgHeartRate");
-            Integer energyKcal = getInteger(payload, "totalCalories");
-            if (energyKcal == null) {
-                energyKcal = calculateWorkoutCalories(payload, durationMinutes);
+            Instant start = walking.start();
+            Instant end = walking.end();
+            Integer durationMinutes = walking.durationMinutes();
+            Long distanceMeters = walking.totalDistanceMeters();
+            Integer steps = walking.totalSteps();
+            Integer avgHr = walking.avgHeartRate();
+            Integer energyKcal = walking.totalCalories();
+            if (energyKcal == null && avgHr != null && durationMinutes != null) {
+                energyKcal = calculateWorkoutCalories(avgHr, durationMinutes);
             }
 
             if (start == null || end == null) {
@@ -156,20 +133,19 @@ class DailySummaryAggregator {
 
     private List<DailySummary.Workout> aggregateWorkouts(List<EventData> events) {
         return events.stream()
-                .filter(e -> "WorkoutRecorded.v1".equals(e.eventType()))
+                .filter(e -> e.payload() instanceof WorkoutPayload)
                 .map(this::toWorkout)
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     private DailySummary.Workout toWorkout(EventData event) {
-        Map<String, Object> payload = event.payload();
+        if (!(event.payload() instanceof WorkoutPayload workout)) {
+            return null;
+        }
 
         try {
-            String workoutId = getString(payload, "workoutId");
-            String note = getString(payload, "note");
-
-            return new DailySummary.Workout(workoutId, note);
+            return new DailySummary.Workout(workout.workoutId(), workout.note());
         } catch (Exception e) {
             log.warn("Failed to convert event to workout: {}", e.getMessage());
             return null;
@@ -178,19 +154,18 @@ class DailySummaryAggregator {
 
     private List<DailySummary.Sleep> aggregateSleep(List<EventData> events) {
         return events.stream()
-                .filter(e -> "SleepSessionRecorded.v1".equals(e.eventType()))
+                .filter(e -> e.payload() instanceof SleepSessionPayload)
                 .map(this::toSleep)
+                .filter(Objects::nonNull)
                 .toList();
     }
 
     private DailySummary.Sleep toSleep(EventData event) {
-        Map<String, Object> payload = event.payload();
+        if (!(event.payload() instanceof SleepSessionPayload sleep)) {
+            return null;
+        }
 
-        Instant sleepStart = parseInstant(payload.get("sleepStart"));
-        Instant sleepEnd = parseInstant(payload.get("sleepEnd"));
-        Integer totalMinutes = getInteger(payload, "totalMinutes");
-
-        return new DailySummary.Sleep(sleepStart, sleepEnd, totalMinutes);
+        return new DailySummary.Sleep(sleep.sleepStart(), sleep.sleepEnd(), sleep.totalMinutes());
     }
 
     private DailySummary.Heart aggregateHeart(List<EventData> events) {
@@ -198,28 +173,30 @@ class DailySummaryAggregator {
         Integer maxHr = null;
 
         for (EventData event : events) {
-            Map<String, Object> payload = event.payload();
+            EventPayload payload = event.payload();
 
-            if ("HeartRateSummaryRecorded.v1".equals(event.eventType())) {
-                Integer avg = getInteger(payload, "avg");
-                Integer max = getInteger(payload, "max");
-
-                if (avg != null) {
-                    heartRates.add(avg);
+            switch (payload) {
+                case HeartRatePayload hr -> {
+                    Integer avg = hr.avg() != null ? hr.avg().intValue() : null;
+                    Integer max = hr.max();
+                    if (avg != null) {
+                        heartRates.add(avg);
+                    }
+                    if (max != null && (maxHr == null || max > maxHr)) {
+                        maxHr = max;
+                    }
                 }
-                if (max != null && (maxHr == null || max > maxHr)) {
-                    maxHr = max;
+                case WalkingSessionPayload walking -> {
+                    Integer avg = walking.avgHeartRate();
+                    Integer max = walking.maxHeartRate();
+                    if (avg != null) {
+                        heartRates.add(avg);
+                    }
+                    if (max != null && (maxHr == null || max > maxHr)) {
+                        maxHr = max;
+                    }
                 }
-            } else if ("WalkingSessionRecorded.v1".equals(event.eventType())) {
-                Integer avg = getInteger(payload, "avgHeartRate");
-                Integer max = getInteger(payload, "maxHeartRate");
-
-                if (avg != null) {
-                    heartRates.add(avg);
-                }
-                if (max != null && (maxHr == null || max > maxHr)) {
-                    maxHr = max;
-                }
+                default -> { }
             }
         }
 
@@ -239,13 +216,11 @@ class DailySummaryAggregator {
         int mealCount = 0;
 
         for (EventData event : events) {
-            if ("MealRecorded.v1".equals(event.eventType())) {
-                Map<String, Object> payload = event.payload();
-
-                totalCalories += getInteger(payload, "caloriesKcal", 0);
-                totalProtein += getInteger(payload, "proteinGrams", 0);
-                totalFat += getInteger(payload, "fatGrams", 0);
-                totalCarbs += getInteger(payload, "carbohydratesGrams", 0);
+            if (event.payload() instanceof MealRecordedPayload meal) {
+                totalCalories += meal.caloriesKcal() != null ? meal.caloriesKcal() : 0;
+                totalProtein += meal.proteinGrams() != null ? meal.proteinGrams() : 0;
+                totalFat += meal.fatGrams() != null ? meal.fatGrams() : 0;
+                totalCarbs += meal.carbohydratesGrams() != null ? meal.carbohydratesGrams() : 0;
                 mealCount++;
             }
         }
@@ -261,34 +236,27 @@ class DailySummaryAggregator {
 
     private List<DailySummary.Meal> aggregateMeals(List<EventData> events) {
         return events.stream()
-                .filter(e -> "MealRecorded.v1".equals(e.eventType()))
+                .filter(e -> e.payload() instanceof MealRecordedPayload)
                 .map(this::toMeal)
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     private DailySummary.Meal toMeal(EventData event) {
-        Map<String, Object> payload = event.payload();
+        if (!(event.payload() instanceof MealRecordedPayload meal)) {
+            return null;
+        }
 
         try {
-            String title = getString(payload, "title");
-            String mealType = getString(payload, "mealType");
-            Integer caloriesKcal = getInteger(payload, "caloriesKcal");
-            Integer proteinGrams = getInteger(payload, "proteinGrams");
-            Integer fatGrams = getInteger(payload, "fatGrams");
-            Integer carbohydratesGrams = getInteger(payload, "carbohydratesGrams");
-            String healthRating = getString(payload, "healthRating");
-            Instant occurredAt = event.occurredAt();
-
             return new DailySummary.Meal(
-                    title,
-                    mealType,
-                    caloriesKcal,
-                    proteinGrams,
-                    fatGrams,
-                    carbohydratesGrams,
-                    healthRating,
-                    occurredAt
+                    meal.title(),
+                    meal.mealType() != null ? meal.mealType().name() : null,
+                    meal.caloriesKcal(),
+                    meal.proteinGrams(),
+                    meal.fatGrams(),
+                    meal.carbohydratesGrams(),
+                    meal.healthRating() != null ? meal.healthRating().name() : null,
+                    event.occurredAt()
             );
         } catch (Exception e) {
             log.warn("Failed to convert event to meal: {}", e.getMessage());
@@ -296,76 +264,8 @@ class DailySummaryAggregator {
         }
     }
 
-
-    private String getString(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value != null ? value.toString() : null;
-    }
-
-    private Integer getInteger(Map<String, Object> map, String key) {
-        return getInteger(map, key, null);
-    }
-
-    private Integer getInteger(Map<String, Object> map, String key, Integer defaultValue) {
-        Object value = map.get(key);
-        if (value == null) return defaultValue;
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    private Double getDouble(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        switch (value) {
-            case null -> {
-                return null;
-            }
-            case Number number -> {
-                return number.doubleValue();
-            }
-            case String s -> {
-                try {
-                    return Double.parseDouble(s);
-                } catch (Exception e) {
-                    return null;
-                }
-            }
-            default -> {
-            }
-        }
-        return null;
-    }
-
-    private Instant parseInstant(Object value) {
-        switch (value) {
-            case null -> {
-                return null;
-            }
-            case Instant instant -> {
-                return instant;
-            }
-            case String s -> {
-                try {
-                    return Instant.parse(s);
-                } catch (Exception e) {
-                    return null;
-                }
-            }
-            default -> {
-            }
-        }
-        return null;
-    }
-
-    private Integer calculateWorkoutCalories(Map<String, Object> payload, Integer durationMinutes) {
+    private Integer calculateWorkoutCalories(Integer avgHr, Integer durationMinutes) {
         if (durationMinutes == null || durationMinutes == 0) return null;
-
-        Integer avgHr = getInteger(payload, "avgHeartRate");
         if (avgHr == null) return null;
 
         double mets = estimateMets(avgHr);

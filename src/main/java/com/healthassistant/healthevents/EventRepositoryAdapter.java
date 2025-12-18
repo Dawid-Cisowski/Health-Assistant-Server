@@ -1,5 +1,8 @@
 package com.healthassistant.healthevents;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.EventId;
 import com.healthassistant.healthevents.api.model.EventType;
@@ -17,6 +20,7 @@ import java.util.stream.Collectors;
 class EventRepositoryAdapter implements EventRepository {
 
     private final HealthEventJpaRepository jpaRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -27,7 +31,7 @@ class EventRepositoryAdapter implements EventRepository {
                         .idempotencyKey(event.idempotencyKey().value())
                         .eventType(event.eventType().value())
                         .occurredAt(event.occurredAt())
-                        .payload(event.payload())
+                        .payload(toMap(event.payload()))
                         .deviceId(event.deviceId().value())
                         .createdAt(event.createdAt())
                         .build())
@@ -45,16 +49,21 @@ class EventRepositoryAdapter implements EventRepository {
         return jpaRepository.findByIdempotencyKeyIn(keys).stream()
                 .collect(Collectors.toMap(
                         HealthEventJpaEntity::getIdempotencyKey,
-                        entity -> Event.create(
-                                IdempotencyKey.of(entity.getIdempotencyKey()),
-                                EventType.from(entity.getEventType()),
-                                entity.getOccurredAt(),
-                                entity.getPayload(),
-                                DeviceId.of(entity.getDeviceId()),
-                                EventId.of(entity.getEventId())
-                        ).withCreatedAt(entity.getCreatedAt()),
+                        this::toEvent,
                         (existing, replacement) -> existing.createdAt().isAfter(replacement.createdAt()) ? existing : replacement
                 ));
+    }
+
+    private Event toEvent(HealthEventJpaEntity entity) {
+        EventType eventType = EventType.from(entity.getEventType());
+        return Event.create(
+                IdempotencyKey.of(entity.getIdempotencyKey()),
+                eventType,
+                entity.getOccurredAt(),
+                toPayload(eventType, entity.getPayload()),
+                DeviceId.of(entity.getDeviceId()),
+                EventId.of(entity.getEventId())
+        ).withCreatedAt(entity.getCreatedAt());
     }
 
     @Override
@@ -81,7 +90,7 @@ class EventRepositoryAdapter implements EventRepository {
 
                     existing.setEventType(event.eventType().value());
                     existing.setOccurredAt(event.occurredAt());
-                    existing.setPayload(event.payload());
+                    existing.setPayload(toMap(event.payload()));
                     existing.setDeviceId(event.deviceId().value());
 
                     return existing;
@@ -90,5 +99,14 @@ class EventRepositoryAdapter implements EventRepository {
 
         jpaRepository.saveAll(entitiesToUpdate);
         jpaRepository.flush();
+    }
+
+    private Map<String, Object> toMap(EventPayload payload) {
+        return objectMapper.convertValue(payload, new TypeReference<>() {});
+    }
+
+    private EventPayload toPayload(EventType eventType, Map<String, Object> map) {
+        Class<? extends EventPayload> clazz = EventPayload.payloadClassFor(eventType);
+        return objectMapper.convertValue(map, clazz);
     }
 }

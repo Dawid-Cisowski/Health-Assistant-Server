@@ -1,6 +1,7 @@
 package com.healthassistant.calories;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.payload.ActiveCaloriesPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,7 +12,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -35,12 +35,16 @@ class CaloriesProjector {
     }
 
     private void projectActiveCalories(StoredEventData eventData) {
-        Map<String, Object> payload = eventData.payload();
-        String deviceId = eventData.deviceId().value();
+        if (!(eventData.payload() instanceof ActiveCaloriesPayload payload)) {
+            log.warn("Expected ActiveCaloriesPayload but got {}, skipping projection",
+                    eventData.payload().getClass().getSimpleName());
+            return;
+        }
 
-        Instant bucketStart = parseInstant(payload.get("bucketStart"));
-        Instant bucketEnd = parseInstant(payload.get("bucketEnd"));
-        Double energyKcal = getDouble(payload, "energyKcal", 0.0);
+        String deviceId = eventData.deviceId().value();
+        Instant bucketStart = payload.bucketStart();
+        Instant bucketEnd = payload.bucketEnd();
+        Double energyKcal = payload.energyKcal();
 
         if (bucketStart == null || bucketEnd == null) {
             log.warn("ActiveCaloriesBurned event missing bucketStart or bucketEnd, skipping projection");
@@ -150,34 +154,5 @@ class CaloriesProjector {
         }
 
         dailyRepository.save(daily);
-    }
-
-    private Instant parseInstant(Object value) {
-        if (value == null) return null;
-        if (value instanceof Instant) {
-            return (Instant) value;
-        }
-        if (value instanceof String) {
-            try {
-                return Instant.parse((String) value);
-            } catch (Exception e) {
-                log.warn("Failed to parse Instant from string: {}", value);
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private Double getDouble(Map<String, Object> map, String key, Double defaultValue) {
-        Object value = map.get(key);
-        if (value == null) return defaultValue;
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue();
-        }
-        try {
-            return Double.parseDouble(value.toString());
-        } catch (Exception e) {
-            return defaultValue;
-        }
     }
 }

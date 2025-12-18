@@ -1,11 +1,10 @@
 package com.healthassistant.steps;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import jakarta.persistence.EntityManager;
+import com.healthassistant.healthevents.api.dto.payload.StepsPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -13,7 +12,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -37,18 +35,22 @@ class StepsProjector {
     }
 
     private void projectStepsBucketed(StoredEventData eventData) {
-        Map<String, Object> payload = eventData.payload();
+        if (!(eventData.payload() instanceof StepsPayload steps)) {
+            log.warn("Expected StepsPayload but got {}, skipping projection",
+                    eventData.payload().getClass().getSimpleName());
+            return;
+        }
 
-        Instant bucketStart = parseInstant(payload.get("bucketStart"));
-        Instant bucketEnd = parseInstant(payload.get("bucketEnd"));
-        Integer stepCount = getInteger(payload, "count", 0);
+        Instant bucketStart = steps.bucketStart();
+        Instant bucketEnd = steps.bucketEnd();
+        Integer stepCount = steps.count();
 
         if (bucketStart == null || bucketEnd == null) {
             log.warn("StepsBucketed event missing bucketStart or bucketEnd, skipping projection");
             return;
         }
 
-        if (stepCount == 0) {
+        if (stepCount == null || stepCount == 0) {
             log.debug("StepsBucketed event has zero steps, skipping projection");
             return;
         }
@@ -148,36 +150,5 @@ class StepsProjector {
         daily.setMostActiveHourSteps(mostActiveHourData.getStepCount());
 
         dailyRepository.save(daily);
-    }
-
-    // Helper methods
-
-    private Instant parseInstant(Object value) {
-        if (value == null) return null;
-        if (value instanceof Instant) {
-            return (Instant) value;
-        }
-        if (value instanceof String) {
-            try {
-                return Instant.parse((String) value);
-            } catch (Exception e) {
-                log.warn("Failed to parse Instant from string: {}", value);
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private Integer getInteger(Map<String, Object> map, String key, Integer defaultValue) {
-        Object value = map.get(key);
-        if (value == null) return defaultValue;
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (Exception e) {
-            return defaultValue;
-        }
     }
 }

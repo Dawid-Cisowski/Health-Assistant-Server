@@ -61,13 +61,13 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
 
         and: "event has correct payload"
         def payload = hrEvent.payload()
-        payload.get("bucketStart") == "2025-11-21T10:00:00Z"
-        payload.get("bucketEnd") == "2025-11-21T10:15:00Z"
-        payload.get("avg") == 78.5
-        payload.get("min") == 62
-        payload.get("max") == 115
-        payload.get("samples") == 46
-        payload.get("originPackage") == "com.google.android.apps.fitness"
+        payload.bucketStart() == Instant.parse("2025-11-21T10:00:00Z")
+        payload.bucketEnd() == Instant.parse("2025-11-21T10:15:00Z")
+        payload.avg() == 78.5
+        payload.min() == 62
+        payload.max() == 115
+        payload.samples() == 46
+        payload.originPackage() == "com.google.android.apps.fitness"
     }
 
     def "Scenario 3: Duplicate heart rate event returns duplicate status"() {
@@ -520,7 +520,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
         def dbEvents = findAllEvents()
         dbEvents.size() == 1
         def hrEvent = dbEvents.first()
-        hrEvent.payload().get("samples") == 1
+        hrEvent.payload().samples() == 1
     }
 
     def "Scenario 16: Heart rate event occurredAt timestamp is preserved"() {

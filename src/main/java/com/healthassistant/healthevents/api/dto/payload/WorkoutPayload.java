@@ -2,6 +2,11 @@ package com.healthassistant.healthevents.api.dto.payload;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,10 +34,12 @@ import java.util.List;
 )
 public record WorkoutPayload(
     @JsonProperty("workoutId")
+    @NotBlank(message = "workoutId is required")
     @Schema(description = "Unique workout identifier from GymRun app", example = "gymrun-2025-11-17-1")
     String workoutId,
 
     @JsonProperty("performedAt")
+    @NotNull(message = "performedAt is required")
     @Schema(description = "When the workout was performed (ISO-8601 UTC)", example = "2025-11-17T18:00:00Z")
     Instant performedAt,
 
@@ -45,6 +52,8 @@ public record WorkoutPayload(
     String note,
 
     @JsonProperty("exercises")
+    @NotEmpty(message = "exercises cannot be empty")
+    @Valid
     @Schema(description = "List of exercises performed in this workout")
     List<Exercise> exercises
 ) implements EventPayload {
@@ -52,6 +61,7 @@ public record WorkoutPayload(
     @Schema(description = "Single exercise in the workout")
     public record Exercise(
         @JsonProperty("name")
+        @NotBlank(message = "exercise name is required")
         @Schema(description = "Exercise name", example = "Podciąganie się nachwytem (szeroki rozstaw rąk)")
         String name,
 
@@ -64,6 +74,8 @@ public record WorkoutPayload(
         int orderInWorkout,
 
         @JsonProperty("sets")
+        @NotEmpty(message = "sets cannot be empty")
+        @Valid
         @Schema(description = "List of sets performed for this exercise")
         List<ExerciseSet> sets
     ) {}
@@ -75,10 +87,12 @@ public record WorkoutPayload(
         int setNumber,
 
         @JsonProperty("weightKg")
+        @Min(value = 0, message = "must be non-negative")
         @Schema(description = "Weight used in kilograms", example = "73.0")
         double weightKg,
 
         @JsonProperty("reps")
+        @Min(value = 1, message = "must be positive")
         @Schema(description = "Number of repetitions", example = "12")
         int reps,
 

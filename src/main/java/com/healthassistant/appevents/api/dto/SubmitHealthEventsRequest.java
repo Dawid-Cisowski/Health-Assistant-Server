@@ -1,11 +1,13 @@
 package com.healthassistant.appevents.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 @Schema(description = "Request to submit health events from mobile applications")
 public record SubmitHealthEventsRequest(
@@ -202,6 +204,7 @@ public record SubmitHealthEventsRequest(
             **mealType values:** BREAKFAST, BRUNCH, LUNCH, DINNER, SNACK, DESSERT, DRINK
             **healthRating values:** VERY_HEALTHY, HEALTHY, NEUTRAL, UNHEALTHY, VERY_UNHEALTHY
             """)
+    @JsonDeserialize(using = HealthEventRequestDeserializer.class)
     public record HealthEventRequest(
         @JsonProperty("idempotencyKey")
         @Schema(description = """
@@ -238,8 +241,19 @@ public record SubmitHealthEventsRequest(
         Instant occurredAt,
 
         @JsonProperty("payload")
+        @Valid
         @Schema(description = "Event-specific data. Structure depends on event type - see HealthEventRequest description for payload schemas.",
                 requiredMode = Schema.RequiredMode.REQUIRED)
-        Map<String, Object> payload
-    ) {}
+        EventPayload payload,
+
+        @Schema(hidden = true)
+        String deserializationError
+    ) {
+        /**
+         * Constructor without deserializationError for backward compatibility.
+         */
+        public HealthEventRequest(String idempotencyKey, String type, Instant occurredAt, EventPayload payload) {
+            this(idempotencyKey, type, occurredAt, payload, null);
+        }
+    }
 }

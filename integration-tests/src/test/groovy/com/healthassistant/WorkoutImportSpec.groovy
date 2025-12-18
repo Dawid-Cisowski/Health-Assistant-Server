@@ -67,7 +67,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         def events = findAllEvents()
         events.size() == 1
         events.first().eventType() == "WorkoutRecorded.v1"
-        events.first().payload().get("source") == "GYMRUN_SCREENSHOT"
+        events.first().payload().source() == "GYMRUN_SCREENSHOT"
     }
 
     def "Scenario 3: Duplicate image upload returns same workoutId"() {
@@ -200,10 +200,10 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         and: "event payload has correct structure"
         def events = findAllEvents()
         def payload = events.first().payload()
-        def exercises = payload.get("exercises") as List
+        def exercises = payload.exercises()
         exercises.size() == 3
-        exercises[0].name == "Podciąganie się nachwytem"
-        (exercises[0].sets as List).size() == 3
+        exercises[0].name() == "Podciąganie się nachwytem"
+        exercises[0].sets().size() == 3
     }
 
     def "Scenario 9: Workout note is extracted correctly"() {
@@ -224,7 +224,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
 
         and: "event payload has note"
         def events = findAllEvents()
-        events.first().payload().get("note") == "Plecy i biceps"
+        events.first().payload().note() == "Plecy i biceps"
     }
 
     def "Scenario 10: Bodyweight exercises have weight 0"() {
@@ -243,9 +243,9 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
 
         and: "event has bodyweight exercise with weight 0"
         def events = findAllEvents()
-        def exercises = events.first().payload().get("exercises") as List
-        def sets = exercises[0].sets as List
-        sets[0].weightKg == 0.0
+        def exercises = events.first().payload().exercises()
+        def sets = exercises[0].sets()
+        sets[0].weightKg() == 0.0
     }
 
     def "Scenario 11: Confidence score is returned in response"() {
@@ -331,10 +331,10 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
 
         and: "exercises are in correct order"
         def events = findAllEvents()
-        def exercises = events.first().payload().get("exercises") as List
-        exercises[0].orderInWorkout == 1
-        exercises[1].orderInWorkout == 2
-        exercises[2].orderInWorkout == 3
+        def exercises = events.first().payload().exercises()
+        exercises[0].orderInWorkout() == 1
+        exercises[1].orderInWorkout() == 2
+        exercises[2].orderInWorkout() == 3
     }
 
     // Helper methods
