@@ -10,7 +10,7 @@ A Spring Boot 3.3 backend service for health data ingestion, synchronization wit
 - **Smart Date Recognition**: Understands "dzisiaj", "wczoraj", "ostatni tydzień", "ostatni miesiąc"
 - **Real-time Streaming**: SSE-based responses that stream word-by-word
 - **Intelligent Tool Selection**: AI automatically chooses which data to fetch
-- **4 Health Tools**: Sleep data, steps, workouts, and daily summaries
+- **5 Health Tools**: Sleep data, steps, workouts, meals, and daily summaries
 - **Gemini 2.0 Flash**: Fast and accurate responses powered by Google's latest model
 
 ### Core Event Ingestion
@@ -20,10 +20,10 @@ A Spring Boot 3.3 backend service for health data ingestion, synchronization wit
 - **Append-Only Storage**: Events stored in PostgreSQL with JSONB payloads
 - **Event Validation**: Type-specific payload validation
 
-### Google Fit Integration
-- **Automatic Synchronization**: Scheduled sync every 15 minutes
-- **Historical Data Sync**: Parallel processing of historical data by day
-- **1-Minute Buckets**: Steps, distance, calories, and heart rate in 1-minute intervals
+### Health Connect Integration (Push Model)
+- **Event-Based Ingestion**: Health data pushed directly from mobile app via Health Connect
+- **Historical Data Sync**: Optional Google Fit sync for backfilling historical data
+- **15-Minute Buckets**: Steps, distance, calories, and heart rate in 15-minute intervals
 - **Session Import**: Sleep sessions and walking sessions with step attribution
 - **Activity Time Calculation**: Automatic detection of active periods from step data
 
@@ -156,9 +156,8 @@ Configure via environment variables:
 ### Event Ingestion
 - `POST /v1/health-events` - Batch event ingestion (no auth required)
 
-### Google Fit Sync
-- `POST /v1/google-fit/sync` - Manually trigger sync
-- `POST /v1/google-fit/sync/history?days=7` - Sync historical data
+### Google Fit Sync (Historical/Legacy)
+- `POST /v1/google-fit/sync/history?days=7` - Sync historical data from Google Fit
 
 ### Daily Summaries
 - `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
@@ -170,6 +169,7 @@ Configure via environment variables:
 - `GET /v1/workouts/{workoutId}` - Workout details
 - `GET /v1/workouts/date/{date}` - Workouts on date
 - `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
+- `GET /v1/meals/range?from={date}&to={date}` - Meals data range
 
 See [Swagger UI](http://localhost:8080/swagger-ui.html) for detailed documentation.
 
@@ -211,36 +211,33 @@ See [Swagger UI](http://localhost:8080/swagger-ui.html) for detailed documentati
 - `activity_time_minutes` (INTEGER): Time spent active (calculated from steps)
 - `updated_at` (TIMESTAMPTZ): Last update time
 
-**`google_fit_sync_state`** - Sync state tracking
+**`historical_sync_tasks`** - Historical sync job tracking
 - `id` (BIGSERIAL): Primary key
-- `user_id` (VARCHAR): User identifier
-- `last_synced_at` (TIMESTAMPTZ): Last successful sync timestamp
+- `date` (DATE): Date being synced
+- `status` (VARCHAR): Task status (pending, processing, completed, failed)
+- `created_at` (TIMESTAMPTZ): Task creation time
 
-## 🔄 Google Fit Synchronization
+## 🔄 Health Data Synchronization
 
-### Automatic Sync (every 15 minutes)
-Runs via `@Scheduled` task with smart data fetching:
-- **Aggregate data** (steps, distance, calories, HR): fetched incrementally from last sync time (with 1-hour buffer)
-- **Sessions** (sleep, workouts): fetched for the entire current day (handles delayed data from wearables)
-- Updates daily summaries
+### Push Model (Health Connect)
+Health data is pushed directly from the mobile app via Health Connect:
+- Events submitted via `POST /v1/health-events`
+- Idempotent processing with automatic deduplication
+- Real-time projection updates
 
-### Daily Safety Net Sync (01:00 CET)
-Runs at midnight UTC (01:00 CET / 02:00 CEST):
-- Full sync of the previous day's data
-- Ensures no data is missed due to delayed uploads from wearables
-
-### Historical Sync
-Parallel processing of historical data:
+### Historical Google Fit Sync (Optional)
+For backfilling historical data from Google Fit:
 ```bash
 curl -X POST http://localhost:8080/v1/google-fit/sync/history?days=30
 ```
 - Processes each day in parallel using virtual threads
 - Safe for large date ranges (1-365 days)
 - Idempotent - can be run multiple times
+- Tracked via `historical_sync_tasks` table
 
 ### Activity Detection
 - Automatically calculates activity time from step patterns
-- Identifies walking sessions from Google Fit
+- Identifies walking sessions
 - Attributes steps to walks based on time overlap
 
 ## 🧪 Testing
@@ -256,23 +253,12 @@ curl -X POST http://localhost:8080/v1/google-fit/sync/history?days=30
 open integration-tests/build/reports/tests/test/index.html
 ```
 
-**Test Coverage**: 228 integration tests covering:
-- HMAC authentication (11 tests)
-- Batch event processing (13 tests)
-- Error handling (9 tests)
-- Daily summaries (20 tests)
-- Meal event validation (14 tests)
-- Workout event validation (15 tests)
-- Steps event validation (10 tests)
-- Distance event validation (11 tests)
-- Heart rate event validation (16 tests)
-- Sleep event validation (9 tests)
-- Walking session validation (13 tests)
-- Active minutes validation (9 tests)
-- Active calories validation (9 tests)
-- Steps projections (17 tests)
-- Sleep projections (17 tests)
-- Workout projections (35 tests)
+**Test Coverage**: 250+ integration tests covering:
+- Event validation (Steps, Sleep, Workout, Meal, Heart Rate, Distance, Walking Session, Active Minutes, Active Calories)
+- Projections (Steps, Sleep, Workout, Calories, Activity, Meals)
+- Features (Daily Summaries, AI Assistant, Conversation History, Google Fit Sync)
+- Import (Workout Import, Meal Import)
+- AI Evaluation (LLM-as-a-Judge hallucination tests)
 
 ## 📈 Monitoring
 

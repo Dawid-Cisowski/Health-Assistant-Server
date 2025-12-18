@@ -132,4 +132,113 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
         println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
         evaluation.isPass()
     }
+
+    // ==================== No Data / Hallucination Prevention Tests ====================
+
+    def "AI does not hallucinate steps when no data exists"() {
+        given: "no steps recorded"
+        // nothing submitted - data cleaned in setup()
+
+        when: "asking about today's steps"
+        def response = askAssistant("How many steps did I take today?")
+        println "DEBUG: AI response: $response"
+
+        then: "AI should indicate no data, not invent numbers"
+        def evaluation = healthDataEvaluator.evaluate(
+                new EvaluationRequest("AI should indicate no data available, zero steps, or that it cannot find step data - NOT invent a specific number like 5000 or 10000", [], response)
+        )
+        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
+        evaluation.isPass()
+    }
+
+    def "AI does not hallucinate sleep when no data exists"() {
+        given: "no sleep recorded"
+        // nothing submitted
+
+        when: "asking about last night's sleep"
+        def response = askAssistant("How did I sleep last night?")
+        println "DEBUG: AI response: $response"
+
+        then: "AI should indicate no data, not invent hours"
+        def evaluation = healthDataEvaluator.evaluate(
+                new EvaluationRequest("AI should indicate no sleep data available or zero sleep recorded - NOT invent hours like 7 or 8", [], response)
+        )
+        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
+        evaluation.isPass()
+    }
+
+    // ==================== Date Range Tests ====================
+
+    def "AI returns correct weekly steps summary"() {
+        given: "steps recorded for multiple days"
+        def today = LocalDate.now(POLAND_ZONE)
+        submitStepsForDate(today, 5000)
+        submitStepsForDate(today.minusDays(1), 8000)
+        submitStepsForDate(today.minusDays(2), 6000)
+        waitForProjections()
+
+        and: "verify data exists"
+        def weekStart = today.minusDays(6)
+        def stepsData = stepsFacade.getRangeSummary(weekStart, today)
+        println "DEBUG: Steps facade returned for ${weekStart} to ${today}: totalSteps=${stepsData.totalSteps()}"
+
+        when: "asking about this week's steps"
+        def response = askAssistant("How many steps did I take this week?")
+        println "DEBUG: AI response: $response"
+
+        then: "AI returns approximately 19000 steps (5000+8000+6000)"
+        def evaluation = healthDataEvaluator.evaluate(
+                new EvaluationRequest("User took approximately 19000 total steps this week (sum of 5000, 8000, and 6000)", [], response)
+        )
+        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
+        evaluation.isPass()
+    }
+
+    // ==================== Multiple Records Tests ====================
+
+    def "AI returns correct summary for multiple meals"() {
+        given: "three meals recorded today"
+        submitMeal("Oatmeal", "BREAKFAST", 400, 15, 10, 60)
+        submitMeal("Chicken Salad", "LUNCH", 550, 40, 20, 30)
+        submitMeal("Pasta", "DINNER", 700, 25, 15, 90)
+        waitForProjections()
+
+        and: "verify data exists"
+        def today = LocalDate.now(POLAND_ZONE)
+        def mealsData = mealsFacade.getRangeSummary(today, today)
+        assert mealsData.totalMealCount() == 3 : "Should have 3 meals"
+        println "DEBUG: Meals facade: ${mealsData.totalMealCount()} meals, ${mealsData.totalCaloriesKcal()} total calories"
+
+        when: "asking about today's meals"
+        def response = askAssistant("How many calories did I eat today?")
+        println "DEBUG: AI response: $response"
+
+        then: "AI returns approximately 1650 total calories (400+550+700)"
+        def evaluation = healthDataEvaluator.evaluate(
+                new EvaluationRequest("User consumed approximately 1650 total calories today from 3 meals", [], response)
+        )
+        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
+        evaluation.isPass()
+    }
+
+    // ==================== Daily Summary Tests ====================
+
+    def "AI returns correct daily summary with mixed data"() {
+        given: "various health data recorded today"
+        submitStepsForToday(7500)
+        submitActiveCalories(350)
+        submitMeal("Lunch", "LUNCH", 600, 30, 20, 50)
+        waitForProjections()
+
+        when: "asking for daily summary"
+        def response = askAssistant("Give me a summary of my health data for today")
+        println "DEBUG: AI response: $response"
+
+        then: "AI returns summary with correct data points"
+        def evaluation = healthDataEvaluator.evaluate(
+                new EvaluationRequest("Summary should include: approximately 7500 steps, approximately 350 active calories burned, and meal with approximately 600 calories", [], response)
+        )
+        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
+        evaluation.isPass()
+    }
 }

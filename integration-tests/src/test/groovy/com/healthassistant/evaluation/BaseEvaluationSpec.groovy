@@ -2,6 +2,8 @@ package com.healthassistant.evaluation
 
 import com.healthassistant.HealthAssistantApplication
 import com.healthassistant.TestAsyncConfiguration
+import com.healthassistant.calories.api.CaloriesFacade
+import com.healthassistant.dailysummary.api.DailySummaryFacade
 import com.healthassistant.healthevents.api.HealthEventsFacade
 import com.healthassistant.sleep.api.SleepFacade
 import com.healthassistant.workout.api.WorkoutFacade
@@ -66,6 +68,12 @@ abstract class BaseEvaluationSpec extends Specification {
     @Autowired
     StepsFacade stepsFacade
 
+    @Autowired
+    CaloriesFacade caloriesFacade
+
+    @Autowired
+    DailySummaryFacade dailySummaryFacade
+
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("test_db")
@@ -92,14 +100,36 @@ abstract class BaseEvaluationSpec extends Specification {
         RestAssured.port = port
         RestAssured.baseURI = "http://localhost"
 
-        if (healthEventsFacade != null) {
-            healthEventsFacade.deleteAllEvents()
-        }
+        cleanAllData()
     }
 
     def cleanup() {
+        cleanAllData()
+    }
+
+    private void cleanAllData() {
+        // Delete events first
         if (healthEventsFacade != null) {
             healthEventsFacade.deleteAllEvents()
+        }
+        // Delete all projections
+        if (stepsFacade != null) {
+            stepsFacade.deleteAllProjections()
+        }
+        if (sleepFacade != null) {
+            sleepFacade.deleteAllProjections()
+        }
+        if (workoutFacade != null) {
+            workoutFacade.deleteAllProjections()
+        }
+        if (mealsFacade != null) {
+            mealsFacade.deleteAllProjections()
+        }
+        if (caloriesFacade != null) {
+            caloriesFacade.deleteAllProjections()
+        }
+        if (dailySummaryFacade != null) {
+            dailySummaryFacade.deleteAllSummaries()
         }
     }
 

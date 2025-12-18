@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run only main module tests (if any exist)
 ./gradlew test
 
-# Run only integration tests (228 Spock tests)
+# Run only integration tests
 ./gradlew :integration-tests:test
 
 # Clean build
@@ -65,7 +65,12 @@ The codebase follows a modular architecture organized by feature/bounded context
 - `dailysummary/` - Daily aggregated summaries from health events
 - `steps/` - Steps tracking projections and queries
 - `workout/` - Workout projections and queries
+- `workoutimport/` - Workout import from external sources
 - `sleep/` - Sleep data projections and queries
+- `calories/` - Calories tracking projections
+- `activity/` - Activity minutes projections
+- `meals/` - Meal tracking projections and queries
+- `mealimport/` - Meal import from external sources
 - `googlefit/` - Google Fit synchronization and OAuth
 - `assistant/` - AI health assistant with Gemini integration (SSE streaming)
 - `security/` - HMAC authentication filters
@@ -109,6 +114,18 @@ Events are projected into query-optimized views:
 - Output: `workout_projections` → `workout_exercise_projections` → `workout_set_projections`
 - Purpose: Pre-calculated workout metrics (volume, max weights)
 
+**Calories Projection** (`CaloriesProjector.java`):
+- Input: `ActiveCaloriesBurnedRecorded.v1` events
+- Output: `calories_hourly_projections` → `calories_daily_projections`
+
+**Activity Projection** (`ActivityProjector.java`):
+- Input: `ActiveMinutesRecorded.v1` events
+- Output: `activity_hourly_projections` → `activity_daily_projections`
+
+**Meals Projection** (`MealsProjector.java`):
+- Input: `MealRecorded.v1` events
+- Output: `meal_projections`
+
 **Important**: Projections are eventually consistent. Projection failures don't block event ingestion.
 
 ### AI Health Assistant (Spring AI + Gemini)
@@ -127,7 +144,7 @@ Events are projected into query-optimized views:
 - **Conversation History**: Multi-turn conversations with context retention (last 20 messages)
 - **Smart Date Recognition**: AI automatically converts natural language ("dzisiaj", "ostatni tydzień", "ostatni miesiąc") to ISO-8601 dates
 - **Dynamic System Prompt**: Current date injected into prompt so AI can calculate relative dates
-- **4 Tools Available**: `getStepsData`, `getSleepData`, `getWorkoutData`, `getDailySummary`
+- **5 Tools Available**: `getStepsData`, `getSleepData`, `getWorkoutData`, `getDailySummary`, `getMealsData`
 - **SSE Streaming**: Real-time word-by-word responses via Server-Sent Events
 - **Context Management**: `AssistantContext` uses ThreadLocal to pass deviceId to tools
 
@@ -168,26 +185,17 @@ export GOOGLE_GEMINI_MODEL="gemini-2.0-flash-exp"  # optional, this is default
 
 See `AI_ASSISTANT_README.md` for detailed documentation on date recognition patterns and conversation history.
 
-### Google Fit Synchronization
+### Health Data Push Model (Health Connect)
 
-**Scheduled Sync**: Runs every 15 minutes via `@Scheduled(cron = "0 */15 * * * *")`
+**Architecture**: The app uses a PUSH model where health data is submitted directly from Health Connect on the mobile device via `POST /v1/health-events`. The previous Google Fit polling model has been removed.
 
-**Flow**:
-1. `GoogleFitSyncService.performSync()` checks `last_synced_at`
-2. Fetches data with 1-hour overlap buffer (catches delayed wearable uploads)
-3. Maps Google Fit data to events:
-   - Aggregate buckets → Steps/Distance/Calories/HeartRate events
-   - Sleep sessions → SleepSessionRecorded events
-   - Walking sessions → WalkingSessionRecorded events
-4. Submits events via `HealthEventsFacade` (normal ingestion path)
-5. Updates `google_fit_sync_state.last_synced_at`
-
-**Historical Sync**: Manual trigger for backfilling data
-- POST /v1/google-fit/sync/history?days=N
+**Google Fit Module** (Legacy/Optional):
+- Manual sync endpoints still available for historical backfill
+- `POST /v1/google-fit/sync/history?days=N` - Historical sync (1-365 days)
 - Uses virtual threads (Project Loom) for parallel processing
-- Each day synced independently
+- Each day synced independently via `HistoricalSyncTask`
 
-**Key File**: `GoogleFitSyncService.java`
+**Key Files**: `GoogleFitSyncService.java`, `HistoricalSyncTaskProcessor.java`
 
 ### HMAC Authentication
 
@@ -246,16 +254,19 @@ export NONCE_CACHE_TTL_SEC=600
 **Core Tables**:
 - `health_events` - Append-only event log (JSONB payload, GIN indexed)
 - `daily_summaries` - Aggregated daily metrics (JSONB summary)
-- `google_fit_sync_state` - Sync cursor (last_synced_at timestamp)
 - `conversations` - AI assistant conversation tracking (V8)
 - `conversation_messages` - Message history per conversation (V8)
+- `historical_sync_tasks` - Track historical sync jobs (V12)
 
-**Projection Tables** (V5, V6, V7):
-- `steps_hourly_projections`, `steps_daily_projections`
-- `workout_projections`, `workout_exercise_projections`, `workout_set_projections`
-- `sleep_projection_tables` (V7)
+**Projection Tables**:
+- `steps_hourly_projections`, `steps_daily_projections` (V6)
+- `workout_projections`, `workout_exercise_projections`, `workout_set_projections` (V5)
+- `sleep_projections` (V7)
+- `calories_hourly_projections`, `calories_daily_projections` (V10)
+- `activity_hourly_projections`, `activity_daily_projections` (V11)
+- `meal_projections` (V13)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/`
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V14)
 
 ## Event Types
 
@@ -290,28 +301,17 @@ See `EventValidator.java` for detailed validation rules.
 **Test Framework**: Spock (Groovy) with Spring Boot Test + Testcontainers
 
 **Integration Tests** (`integration-tests/` module):
-- 228 Spock specifications
+- 250+ Spock specifications
 - PostgreSQL via Testcontainers
 - REST Assured for API testing
-- WireMock for mocking Google Fit API
+- WireMock for mocking external APIs
 
-**Test Categories**:
-- HMAC authentication (11 tests)
-- Batch event processing (13 tests)
-- Error handling (9 tests)
-- Daily summaries (20 tests)
-- Meal event validation (14 tests)
-- Workout event validation (15 tests)
-- Steps event validation (10 tests)
-- Distance event validation (11 tests)
-- Heart rate event validation (16 tests)
-- Sleep event validation (9 tests)
-- Walking session validation (13 tests)
-- Active minutes validation (9 tests)
-- Active calories validation (9 tests)
-- Steps projections (17 tests)
-- Sleep projections (17 tests)
-- Workout projections (35 tests)
+**Test Spec Files**:
+- Event validation: `StepsEventValidationSpec`, `SleepEventValidationSpec`, `WorkoutSpec`, `MealEventSpec`, `HeartRateEventSpec`, `DistanceEventSpec`, `WalkingSessionEventSpec`, `ActiveMinutesEventSpec`, `ActiveCaloriesEventSpec`
+- Projections: `StepsProjectionSpec`, `SleepProjectionSpec`, `WorkoutProjectionSpec`, `CaloriesProjectionSpec`, `ActivityProjectionSpec`, `MealProjectionSpec`
+- Features: `DailySummarySpec`, `AssistantSpec`, `ConversationHistorySpec`, `GoogleFitSyncSpec`
+- Import: `WorkoutImportSpec`, `MealImportSpec`
+- AI Evaluation: `evaluation/AiHallucinationSpec` (LLM-as-a-Judge tests)
 
 **Running Tests**:
 ```bash
@@ -335,13 +335,11 @@ open integration-tests/build/reports/tests/test/index.html
 ### Optional Environment Variables
 - `HMAC_TOLERANCE_SEC` - Timestamp tolerance (default: 600)
 - `NONCE_CACHE_TTL_SEC` - Nonce cache TTL (default: 600)
-- `GOOGLE_FIT_API_URL` - Google Fit API base URL (default: https://www.googleapis.com/fitness/v1)
-- `GOOGLE_FIT_OAUTH_URL` - Google OAuth base URL (default: https://oauth2.googleapis.com)
-- `GOOGLE_FIT_CLIENT_ID` - Google OAuth client ID
-- `GOOGLE_FIT_CLIENT_SECRET` - Google OAuth client secret
-- `GOOGLE_FIT_REFRESH_TOKEN` - Google OAuth refresh token
 - `GOOGLE_GEMINI_API_KEY` - Gemini API key for AI Assistant (required for /v1/assistant/chat)
 - `GOOGLE_GEMINI_MODEL` - Gemini model name (default: gemini-2.0-flash-exp)
+- `GOOGLE_FIT_CLIENT_ID` - Google OAuth client ID (for historical sync)
+- `GOOGLE_FIT_CLIENT_SECRET` - Google OAuth client secret (for historical sync)
+- `GOOGLE_FIT_REFRESH_TOKEN` - Google OAuth refresh token (for historical sync)
 
 ### Spring Features
 - `@EnableScheduling` - Google Fit sync scheduled tasks
@@ -364,8 +362,7 @@ open integration-tests/build/reports/tests/test/index.html
 - `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
 - `GET /v1/daily-summaries/range?from={date}&to={date}` - Get daily summary range (HMAC auth required)
 
-### Google Fit Sync
-- `POST /v1/google-fit/sync` - Manual sync trigger
+### Google Fit Sync (Historical/Legacy)
 - `POST /v1/google-fit/sync/history?days=N` - Historical sync (1-365 days)
 
 ### Query APIs
@@ -374,6 +371,7 @@ open integration-tests/build/reports/tests/test/index.html
 - `GET /v1/workouts/{workoutId}` - Workout details
 - `GET /v1/workouts/date/{date}` - Workouts on date
 - `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
+- `GET /v1/meals/range?from={date}&to={date}` - Meals data range
 
 ### Monitoring
 - `GET /actuator/health` - Health check
@@ -451,6 +449,4 @@ SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 
 ## Additional Documentation
 
-- **AI_ASSISTANT_README.md** - Detailed documentation on AI Assistant architecture, date recognition patterns, SSE events, and example questions
-- **AI_ASSISTANT_SSE.md** - Technical details on SSE streaming implementation
 - **README.md** - Overview, quick start guide, and API documentation
