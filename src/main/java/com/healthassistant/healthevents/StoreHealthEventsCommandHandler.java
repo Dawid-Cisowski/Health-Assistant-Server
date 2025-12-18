@@ -2,7 +2,6 @@ package com.healthassistant.healthevents;
 
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
-import com.healthassistant.healthevents.api.model.EventId;
 import com.healthassistant.healthevents.api.model.EventType;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,7 @@ class StoreHealthEventsCommandHandler {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final EventRepository eventRepository;
-    private final EventIdGenerator eventIdGenerator;
+    private final HealthEventFactory eventFactory;
     private final EventValidator eventValidator;
 
     @Transactional
@@ -66,17 +65,11 @@ class StoreHealthEventsCommandHandler {
                     String idempotencyKeyValue = envelope.idempotencyKey().value();
                     Event existingEvent = existingEvents.get(idempotencyKeyValue);
                     EventType eventType = EventType.from(envelope.eventType());
-                    EventId eventId = existingEvent != null ? existingEvent.eventId() : eventIdGenerator.generate();
-                    Instant createdAt = existingEvent != null ? existingEvent.createdAt() : Instant.now();
-                    Event event = new Event(
-                            envelope.idempotencyKey(),
-                            eventType,
-                            envelope.occurredAt(),
-                            envelope.payload(),
-                            command.deviceId(),
-                            eventId,
-                            createdAt
-                    );
+
+                    Event event = existingEvent != null
+                            ? eventFactory.createUpdate(existingEvent, eventType, envelope.occurredAt(), envelope.payload(), command.deviceId())
+                            : eventFactory.createNew(envelope.idempotencyKey(), eventType, envelope.occurredAt(), envelope.payload(), command.deviceId());
+
                     if (existingEvent != null) {
                         eventsToUpdate.add(event);
                     } else {
@@ -168,7 +161,7 @@ class StoreHealthEventsCommandHandler {
                     Instant occurredAt = envelope.occurredAt();
                     return occurredAt != null ? occurredAt.atZone(POLAND_ZONE).toLocalDate() : null;
                 })
-                .filter(date -> date != null)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
 
