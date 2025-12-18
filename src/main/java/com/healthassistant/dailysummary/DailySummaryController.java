@@ -1,6 +1,7 @@
 package com.healthassistant.dailysummary;
 
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
+import com.healthassistant.dailysummary.api.dto.AiDailySummaryResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummaryRangeSummaryResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Optional;
+
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/v1/daily-summaries")
@@ -24,6 +28,7 @@ import java.time.LocalDate;
 class DailySummaryController {
 
     private final DailySummaryFacade dailySummaryFacade;
+    private final Optional<AiDailySummaryService> aiDailySummaryService;
 
     @GetMapping("/{date}")
     @Operation(
@@ -68,5 +73,35 @@ class DailySummaryController {
         log.info("Retrieving daily summaries range for {} to {}", startDate, endDate);
         DailySummaryRangeSummaryResponse summary = dailySummaryFacade.getRangeSummary(startDate, endDate);
         return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/{date}/ai-text")
+    @Operation(
+            summary = "Get AI-generated daily summary text",
+            description = "Returns a short (max 3 sentences), casual Polish text summarizing the day's health data. Requires HMAC authentication.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Summary generated successfully"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed"),
+            @ApiResponse(responseCode = "503", description = "AI service unavailable")
+    })
+    ResponseEntity<AiDailySummaryResponse> getAiSummary(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        log.info("Generating AI summary for date: {}", date);
+
+        if (aiDailySummaryService.isEmpty()) {
+            log.warn("AI service is not available");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+
+        try {
+            AiDailySummaryResponse response = aiDailySummaryService.get().generateSummary(date);
+            return ResponseEntity.ok(response);
+        } catch (AiSummaryGenerationException e) {
+            log.error("AI summary generation failed for date: {}", date, e);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
     }
 }

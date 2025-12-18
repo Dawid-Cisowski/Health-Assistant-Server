@@ -154,7 +154,7 @@ Configure via environment variables:
   - **Response**: Server-Sent Events stream with real-time answers
 
 ### Event Ingestion
-- `POST /v1/health-events` - Batch event ingestion (no auth required)
+- `POST /v1/health-events` - Batch event ingestion (HMAC auth required)
 
 ### Google Fit Sync (Historical/Legacy)
 - `POST /v1/google-fit/sync/history?days=7` - Sync historical data from Google Fit

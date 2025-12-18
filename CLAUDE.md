@@ -356,7 +356,7 @@ open integration-tests/build/reports/tests/test/index.html
   - Response: SSE stream with `ContentEvent`, `ToolCallEvent`, `ToolResultEvent`, `DoneEvent`
 
 ### Event Ingestion
-- `POST /v1/health-events` - Batch event ingestion (no auth)
+- `POST /v1/health-events` - Batch event ingestion (HMAC auth required)
 
 ### Daily Summaries
 - `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
