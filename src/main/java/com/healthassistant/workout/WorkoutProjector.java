@@ -47,6 +47,8 @@ class WorkoutProjector {
     }
 
     static class WorkoutProjectionException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
         WorkoutProjectionException(String message, Throwable cause) {
             super(message, cause);
         }
