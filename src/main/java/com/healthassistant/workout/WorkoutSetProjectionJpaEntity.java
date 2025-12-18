@@ -49,4 +49,16 @@ class WorkoutSetProjectionJpaEntity {
             createdAt = Instant.now();
         }
     }
+
+    static WorkoutSetProjectionJpaEntity from(String workoutId, String exerciseName, ExerciseSet set) {
+        return WorkoutSetProjectionJpaEntity.builder()
+                .workoutId(workoutId)
+                .exerciseName(exerciseName)
+                .setNumber(set.setNumber())
+                .weightKg(set.weight().kilograms())
+                .reps(set.reps().count())
+                .isWarmup(set.warmup())
+                .volumeKg(set.volume().kilograms())
+                .build();
+    }
 }

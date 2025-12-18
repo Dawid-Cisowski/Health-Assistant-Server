@@ -90,4 +90,34 @@ class WorkoutProjectionJpaEntity {
         exercises.remove(exercise);
         exercise.setWorkout(null);
     }
+
+    static WorkoutProjectionJpaEntity from(Workout workout) {
+        WorkoutProjectionJpaEntity entity = WorkoutProjectionJpaEntity.builder()
+                .workoutId(workout.workoutId())
+                .performedAt(workout.performedAt())
+                .performedDate(workout.performedDate())
+                .source(workout.source())
+                .note(workout.note())
+                .deviceId(workout.deviceId())
+                .eventId(workout.eventId())
+                .totalExercises(workout.totalExercises())
+                .totalSets(workout.totalSets())
+                .totalVolumeKg(workout.totalVolume().kilograms())
+                .totalWorkingVolumeKg(workout.workingVolume().kilograms())
+                .exercises(new ArrayList<>())
+                .build();
+
+        workout.exercises().stream()
+                .map(exercise -> WorkoutExerciseProjectionJpaEntity.from(entity, exercise))
+                .forEach(entity::addExercise);
+
+        return entity;
+    }
+
+    static List<WorkoutSetProjectionJpaEntity> setsFrom(Workout workout) {
+        return workout.exercises().stream()
+                .flatMap(exercise -> exercise.sets().stream()
+                        .map(set -> WorkoutSetProjectionJpaEntity.from(workout.workoutId(), exercise.name(), set)))
+                .toList();
+    }
 }

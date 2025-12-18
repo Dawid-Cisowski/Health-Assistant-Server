@@ -13,7 +13,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WorkoutExerciseProjectionJpaEntity {
+class WorkoutExerciseProjectionJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,5 +49,17 @@ public class WorkoutExerciseProjectionJpaEntity {
         if (createdAt == null) {
             createdAt = Instant.now();
         }
+    }
+
+    static WorkoutExerciseProjectionJpaEntity from(WorkoutProjectionJpaEntity workoutEntity, Exercise exercise) {
+        return WorkoutExerciseProjectionJpaEntity.builder()
+                .workout(workoutEntity)
+                .exerciseName(exercise.name())
+                .muscleGroup(exercise.muscleGroup())
+                .orderInWorkout(exercise.orderInWorkout())
+                .totalSets(exercise.totalSets())
+                .totalVolumeKg(exercise.totalVolume().kilograms())
+                .maxWeightKg(exercise.maxWeight().kilograms())
+                .build();
     }
 }
