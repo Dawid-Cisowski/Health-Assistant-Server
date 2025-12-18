@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -106,11 +107,7 @@ class HealthEventsService implements HealthEventsFacade {
     }
 
     private void publishActivityEvents(Map<String, List<StoredEventData>> eventsByType) {
-        List<StoredEventData> activityEvents = new java.util.ArrayList<>();
-        activityEvents.addAll(eventsByType.getOrDefault(ACTIVE_MINUTES_V1, List.of()));
-        activityEvents.addAll(eventsByType.getOrDefault(WALKING_SESSION_V1, List.of()));
-        activityEvents.addAll(eventsByType.getOrDefault(HEART_RATE_V1, List.of()));
-
+        List<StoredEventData> activityEvents = new java.util.ArrayList<>(eventsByType.getOrDefault(ACTIVE_MINUTES_V1, List.of()));
         if (!activityEvents.isEmpty()) {
             Set<LocalDate> dates = extractAffectedDates(activityEvents);
             log.info("Publishing ActivityEventsStoredEvent with {} events for {} dates", activityEvents.size(), dates.size());
@@ -152,7 +149,7 @@ class HealthEventsService implements HealthEventsFacade {
     private Set<LocalDate> extractAffectedDates(List<StoredEventData> events) {
         return events.stream()
                 .map(StoredEventData::occurredAt)
-                .filter(occurredAt -> occurredAt != null)
+                .filter(Objects::nonNull)
                 .map(this::toLocalDate)
                 .collect(Collectors.toSet());
     }

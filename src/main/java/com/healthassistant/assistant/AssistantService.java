@@ -45,6 +45,7 @@ class AssistantService implements AssistantFacade {
               • getSleepData - sleep data,
               • getStepsData - steps and activity,
               • getWorkoutData - workouts,
+              • getMealsData - meals, food, nutrition, calories from food,
               • getDailySummary - complete daily summary.
             - If the question requires time calculation - do it yourself based on the CURRENT DATE above.
             - IMPORTANT: All date parameters in tool calls MUST be in ISO-8601 format: YYYY-MM-DD (e.g. 2025-11-24).

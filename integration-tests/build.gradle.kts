@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     groovy
     jacoco
@@ -51,8 +53,8 @@ dependencies {
     // Need explicit dependency for compilation
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
-    // Spring AI for ChatModel mock (compile time)
-    testCompileOnly("org.springframework.ai:spring-ai-model:1.1.0")
+    // Spring AI for ChatModel mock and evaluation tests
+    testImplementation("org.springframework.ai:spring-ai-starter-model-google-genai")
     testCompileOnly("io.projectreactor:reactor-core")
 
     // Testcontainers
@@ -99,6 +101,29 @@ jacoco {
 tasks.test {
     ignoreFailures = true  // Allow coverage report even when tests fail
     finalizedBy(tasks.jacocoTestReport)
+
+    // Exclude evaluation tests from regular test run (they require real Gemini API)
+    exclude("**/*HallucinationSpec.class", "**/*EvaluationSpec.class")
+}
+
+// Separate task for AI evaluation tests using real Gemini API
+tasks.register<Test>("evaluationTest") {
+    description = "Run AI evaluation tests with real Gemini API (requires GEMINI_API_KEY)"
+    group = "verification"
+
+    useJUnitPlatform()
+
+    // Only run evaluation specs
+    include("**/*HallucinationSpec.class", "**/*EvaluationSpec.class")
+
+    // Set profiles - evaluation profile uses real Gemini, not mock
+    systemProperty("spring.profiles.active", "test,evaluation")
+
+    // Pass through GEMINI_API_KEY from environment
+    environment("GEMINI_API_KEY", System.getenv("GEMINI_API_KEY") ?: "")
+
+    // Longer timeout for LLM inference
+    timeout.set(Duration.ofMinutes(10))
 }
 
 tasks.jacocoTestReport {

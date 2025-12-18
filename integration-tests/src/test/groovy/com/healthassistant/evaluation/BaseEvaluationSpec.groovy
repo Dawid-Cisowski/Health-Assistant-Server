@@ -1,0 +1,343 @@
+package com.healthassistant.evaluation
+
+import com.healthassistant.HealthAssistantApplication
+import com.healthassistant.TestAsyncConfiguration
+import com.healthassistant.healthevents.api.HealthEventsFacade
+import com.healthassistant.sleep.api.SleepFacade
+import com.healthassistant.workout.api.WorkoutFacade
+import com.healthassistant.meals.api.MealsFacade
+import com.healthassistant.steps.api.StepsFacade
+import io.restassured.RestAssured
+import io.restassured.http.ContentType
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.context.annotation.Import
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.ContextConfiguration
+import org.testcontainers.containers.PostgreSQLContainer
+import spock.lang.Shared
+import spock.lang.Specification
+
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import java.nio.charset.StandardCharsets
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+/**
+ * Base class for AI evaluation tests using real Gemini API.
+ *
+ * IMPORTANT: This class does NOT import TestChatModelConfiguration,
+ * which means it uses the REAL Gemini API instead of mocks.
+ *
+ * Tests extending this class require GEMINI_API_KEY environment variable.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ContextConfiguration(classes = [HealthAssistantApplication])
+@Import([EvaluationTestConfiguration, TestAsyncConfiguration])
+@ActiveProfiles(["test", "evaluation"])
+abstract class BaseEvaluationSpec extends Specification {
+
+    static final String TEST_DEVICE_ID = "test-device"
+    static final String TEST_SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+    static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw")
+
+    @LocalServerPort
+    int port
+
+    @Autowired
+    HealthEventsFacade healthEventsFacade
+
+    @Autowired
+    HealthDataEvaluator healthDataEvaluator
+
+    @Autowired
+    SleepFacade sleepFacade
+
+    @Autowired
+    WorkoutFacade workoutFacade
+
+    @Autowired
+    MealsFacade mealsFacade
+
+    @Autowired
+    StepsFacade stepsFacade
+
+    @Shared
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+            .withDatabaseName("test_db")
+            .withUsername("test")
+            .withPassword("test")
+            .withReuse(true)
+
+    static {
+        postgres.start()
+
+        System.setProperty("spring.datasource.url", postgres.getJdbcUrl())
+        System.setProperty("spring.datasource.username", postgres.getUsername())
+        System.setProperty("spring.datasource.password", postgres.getPassword())
+        System.setProperty("app.hmac.devices-json", '{"test-device":"dGVzdC1zZWNyZXQtMTIz"}')
+        System.setProperty("app.hmac.tolerance-seconds", "600")
+        System.setProperty("app.nonce.cache-ttl-seconds", "600")
+
+        // Use real Gemini API - key should be provided via environment variable
+        String geminiApiKey = System.getenv("GEMINI_API_KEY") ?: "test-key"
+        System.setProperty("spring.ai.google.genai.api-key", geminiApiKey)
+    }
+
+    def setup() {
+        RestAssured.port = port
+        RestAssured.baseURI = "http://localhost"
+
+        if (healthEventsFacade != null) {
+            healthEventsFacade.deleteAllEvents()
+        }
+    }
+
+    def cleanup() {
+        if (healthEventsFacade != null) {
+            healthEventsFacade.deleteAllEvents()
+        }
+    }
+
+    // ==================== Assistant Helpers ====================
+
+    /**
+     * Send a chat message to the AI assistant and return the response content.
+     */
+    String askAssistant(String message) {
+        def chatRequest = """{"message": "${escapeJson(message)}"}"""
+        def response = authenticatedPostRequestWithBody(
+                TEST_DEVICE_ID, TEST_SECRET_BASE64,
+                "/v1/assistant/chat", chatRequest
+        )
+                .when()
+                .post("/v1/assistant/chat")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .asString()
+
+        return parseSSEContent(response)
+    }
+
+    /**
+     * Parse SSE response and extract all content events concatenated.
+     */
+    String parseSSEContent(String sseResponse) {
+        def content = new StringBuilder()
+        sseResponse.split("\n\n").each { event ->
+            event.split("\n").each { line ->
+                if (line.startsWith("data:")) {
+                    def json = line.substring(5).trim()
+                    if (json && json.contains('"type":"content"')) {
+                        def matcher = json =~ /"content":"([^"]*(?:\\.[^"]*)*)"/
+                        if (matcher.find()) {
+                            def extracted = matcher.group(1)
+                                    .replace('\\n', '\n')
+                                    .replace('\\"', '"')
+                                    .replace('\\\\', '\\')
+                            content.append(extracted)
+                        }
+                    }
+                }
+            }
+        }
+        return content.toString()
+    }
+
+    // ==================== Event Submission Helpers ====================
+
+    void submitStepsForToday(int count) {
+        submitStepsForDate(LocalDate.now(POLAND_ZONE), count)
+    }
+
+    void submitStepsForDate(LocalDate date, int count) {
+        def bucketEnd = date.atTime(12, 0).atZone(POLAND_ZONE).toInstant()
+        def bucketStart = bucketEnd.minusSeconds(3600)
+
+        def request = [
+            deviceId: TEST_DEVICE_ID,
+            events: [[
+                idempotencyKey: UUID.randomUUID().toString(),
+                type: "StepsBucketedRecorded.v1",
+                occurredAt: bucketEnd.toString(),
+                payload: [
+                    bucketStart: bucketStart.toString(),
+                    bucketEnd: bucketEnd.toString(),
+                    count: count,
+                    originPackage: "com.test"
+                ]
+            ]]
+        ]
+        submitEventMap(request)
+    }
+
+    void submitSleepForLastNight(int totalMinutes) {
+        // Sleep ends yesterday (so it's attributed to yesterday in projections)
+        // Example: sleep from Dec 16 22:00 to Dec 17 05:00 → attributed to Dec 17
+        def yesterday = LocalDate.now(POLAND_ZONE).minusDays(1)
+        def sleepEnd = yesterday.atTime(5, 0).atZone(POLAND_ZONE).toInstant()
+        def sleepStart = sleepEnd.minusSeconds(totalMinutes * 60L)
+
+        def request = [
+            deviceId: TEST_DEVICE_ID,
+            events: [[
+                idempotencyKey: UUID.randomUUID().toString(),
+                type: "SleepSessionRecorded.v1",
+                occurredAt: sleepEnd.toString(),
+                payload: [
+                    sleepId: UUID.randomUUID().toString(),
+                    sleepStart: sleepStart.toString(),
+                    sleepEnd: sleepEnd.toString(),
+                    totalMinutes: totalMinutes,
+                    originPackage: "com.test"
+                ]
+            ]]
+        ]
+        submitEventMap(request)
+    }
+
+    void submitWorkout(String exerciseName, int sets, int reps, double weightKg) {
+        def performedAt = Instant.now()
+        def setsData = (1..sets).collect { setNum ->
+            [setNumber: setNum, reps: reps, weightKg: weightKg, isWarmup: false]
+        }
+
+        def request = [
+            deviceId: TEST_DEVICE_ID,
+            events: [[
+                idempotencyKey: UUID.randomUUID().toString(),
+                type: "WorkoutRecorded.v1",
+                occurredAt: performedAt.toString(),
+                payload: [
+                    workoutId: UUID.randomUUID().toString(),
+                    performedAt: performedAt.toString(),
+                    source: "TEST",
+                    note: null,
+                    exercises: [[
+                        name: exerciseName,
+                        muscleGroup: null,
+                        orderInWorkout: 1,
+                        sets: setsData
+                    ]]
+                ]
+            ]]
+        ]
+        submitEventMap(request)
+    }
+
+    void submitActiveCalories(double kcal) {
+        def bucketEnd = Instant.now()
+        def bucketStart = bucketEnd.minusSeconds(3600)
+
+        def request = [
+            deviceId: TEST_DEVICE_ID,
+            events: [[
+                idempotencyKey: UUID.randomUUID().toString(),
+                type: "ActiveCaloriesBurnedRecorded.v1",
+                occurredAt: bucketEnd.toString(),
+                payload: [
+                    bucketStart: bucketStart.toString(),
+                    bucketEnd: bucketEnd.toString(),
+                    energyKcal: kcal,
+                    originPackage: "com.test"
+                ]
+            ]]
+        ]
+        submitEventMap(request)
+    }
+
+    void submitMeal(String title, String mealType, int calories, int protein, int fat, int carbs) {
+        def occurredAt = Instant.now()
+
+        def request = [
+            deviceId: TEST_DEVICE_ID,
+            events: [[
+                idempotencyKey: UUID.randomUUID().toString(),
+                type: "MealRecorded.v1",
+                occurredAt: occurredAt.toString(),
+                payload: [
+                    title: title,
+                    mealType: mealType,
+                    caloriesKcal: calories,
+                    proteinGrams: protein,
+                    fatGrams: fat,
+                    carbohydratesGrams: carbs,
+                    healthRating: "HEALTHY"
+                ]
+            ]]
+        ]
+        submitEventMap(request)
+    }
+
+    void submitEvent(String eventJson) {
+        authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, "/v1/health-events", eventJson)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+    }
+
+    void submitEventMap(Map request) {
+        def jsonBuilder = new groovy.json.JsonBuilder(request)
+        submitEvent(jsonBuilder.toString())
+    }
+
+    /**
+     * Wait for async projections to complete.
+     */
+    void waitForProjections() {
+        Thread.sleep(500)
+    }
+
+    // ==================== HMAC Authentication Helpers ====================
+
+    String generateHmacSignature(String method, String path, String timestamp, String nonce, String deviceId, String body, String secretBase64) {
+        byte[] secret = Base64.decoder.decode(secretBase64)
+        String canonicalString = [method, path, timestamp, nonce, deviceId, body].join('\n')
+
+        Mac mac = Mac.getInstance("HmacSHA256")
+        SecretKeySpec keySpec = new SecretKeySpec(secret, "HmacSHA256")
+        mac.init(keySpec)
+        byte[] hmacBytes = mac.doFinal(canonicalString.getBytes(StandardCharsets.UTF_8))
+
+        return Base64.encoder.encodeToString(hmacBytes)
+    }
+
+    String generateTimestamp() {
+        return DateTimeFormatter.ISO_INSTANT.format(Instant.now())
+    }
+
+    String generateNonce() {
+        return UUID.randomUUID().toString().toLowerCase()
+    }
+
+    def authenticatedPostRequestWithBody(String deviceId, String secretBase64, String path, String body) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, body, secretBase64)
+
+        return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+                .body(body)
+    }
+
+    // ==================== Utility Helpers ====================
+
+    String escapeJson(String text) {
+        return text
+                .replace('\\', '\\\\')
+                .replace('"', '\\"')
+                .replace('\n', '\\n')
+                .replace('\r', '\\r')
+                .replace('\t', '\\t')
+    }
+}

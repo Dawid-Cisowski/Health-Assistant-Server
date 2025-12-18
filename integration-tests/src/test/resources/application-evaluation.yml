@@ -1,0 +1,27 @@
+# Evaluation profile configuration
+# This profile is used alongside 'test' profile for AI evaluation tests
+# It enables real Gemini API instead of mocks
+
+spring:
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:}
+        model: gemini-2.0-flash-exp
+
+app:
+  hmac:
+    tolerance-seconds: ${HMAC_TOLERANCE_SEC:600}
+  nonce:
+    cache-ttl-seconds: ${NONCE_CACHE_TTL_SEC:600}
+  batch:
+    max-events: 100
+  google-fit:
+    api-url: ${GOOGLE_FIT_API_URL:url}
+    oauth-url: ${GOOGLE_FIT_OAUTH_URL:url}
+    client-id: ${GOOGLE_FIT_CLIENT_ID:id}
+    client-secret: ${GOOGLE_FIT_CLIENT_SECRET:secret}
+    refresh-token: ${GOOGLE_FIT_REFRESH_TOKEN:token}
+  assistant:
+    max-iterations: ${ASSISTANT_MAX_ITERATIONS:5}
+
