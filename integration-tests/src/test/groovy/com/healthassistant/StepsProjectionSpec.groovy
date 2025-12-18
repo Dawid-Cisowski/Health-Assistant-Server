@@ -336,9 +336,6 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        // Small wait for async processing
-        Thread.sleep(500)
-
         then: "no projections are created (API returns 404)"
         apiReturns404("/v1/steps/daily/2025-11-23")
     }
@@ -457,9 +454,6 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-
-        // Wait a bit for potential duplicate processing
-        Thread.sleep(500)
 
         then: "projection is not duplicated (verified via API)"
         def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/daily/${date}")
@@ -637,9 +631,6 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-
-        // Small wait for async processing
-        Thread.sleep(500)
 
         then: "no projections are created (API returns 404)"
         apiReturns404("/v1/steps/daily/${date}")

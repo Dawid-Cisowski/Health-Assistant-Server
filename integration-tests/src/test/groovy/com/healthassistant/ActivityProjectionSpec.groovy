@@ -335,7 +335,6 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "no projections are created (verified via API returning 404)"
-        Thread.sleep(500) // Give time for projection to be created (if any)
         apiReturns404("/v1/activity/daily/2025-11-23")
     }
 

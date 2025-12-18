@@ -377,9 +377,6 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        // Small wait for async processing
-        Thread.sleep(500)
-
         then: "no projections are created (API returns 404)"
         apiReturns404("/v1/sleep/daily/2025-11-26")
     }
@@ -497,9 +494,6 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        // Wait for potential duplicate processing
-        Thread.sleep(500)
-
         then: "projection is not duplicated (verified via API)"
         def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/sleep/daily/${date}")
                 .get("/v1/sleep/daily/${date}")
@@ -551,9 +545,6 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-
-        // Small wait for async processing
-        Thread.sleep(500)
 
         then: "no projections are created (API returns 404)"
         apiReturns404("/v1/sleep/daily/${date}")

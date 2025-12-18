@@ -377,13 +377,6 @@ abstract class BaseIntegrationSpec extends Specification {
                         .withBody(sseResponse)))
     }
 
-    def cleanup() {
-        // Runs after each test
-        if (healthEventsFacade != null) {
-            healthEventsFacade.deleteAllEvents()
-        }
-    }
-
     String generateHmacSignature(String method, String path, String timestamp, String nonce, String deviceId, String body, String secretBase64) {
         // Decode base64 secret
         byte[] secret = Base64.decoder.decode(secretBase64)
