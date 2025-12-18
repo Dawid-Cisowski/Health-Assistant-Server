@@ -76,4 +76,30 @@ class MealProjectionJpaEntity {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    static MealProjectionJpaEntity from(Meal meal, int mealNumber) {
+        return MealProjectionJpaEntity.builder()
+                .eventId(meal.eventId())
+                .date(meal.date())
+                .mealNumber(mealNumber)
+                .occurredAt(meal.occurredAt())
+                .title(meal.title())
+                .mealType(meal.mealTypeName())
+                .caloriesKcal(meal.caloriesKcal())
+                .proteinGrams(meal.proteinGrams())
+                .fatGrams(meal.fatGrams())
+                .carbohydratesGrams(meal.carbohydratesGrams())
+                .healthRating(meal.healthRatingName())
+                .build();
+    }
+
+    void updateFrom(Meal meal) {
+        this.title = meal.title();
+        this.mealType = meal.mealTypeName();
+        this.caloriesKcal = meal.caloriesKcal();
+        this.proteinGrams = meal.proteinGrams();
+        this.fatGrams = meal.fatGrams();
+        this.carbohydratesGrams = meal.carbohydratesGrams();
+        this.healthRating = meal.healthRatingName();
+    }
 }

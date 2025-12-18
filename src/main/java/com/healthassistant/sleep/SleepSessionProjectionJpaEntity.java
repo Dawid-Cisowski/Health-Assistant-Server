@@ -72,4 +72,31 @@ class SleepSessionProjectionJpaEntity {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    static SleepSessionProjectionJpaEntity from(SleepSession session, int sessionNumber) {
+        return SleepSessionProjectionJpaEntity.builder()
+                .eventId(session.eventId())
+                .date(session.date())
+                .sessionNumber(sessionNumber)
+                .sleepStart(session.sleepStart())
+                .sleepEnd(session.sleepEnd())
+                .durationMinutes(session.durationMinutes())
+                .lightSleepMinutes(session.stages().lightMinutes())
+                .deepSleepMinutes(session.stages().deepMinutes())
+                .remSleepMinutes(session.stages().remMinutes())
+                .awakeMinutes(session.stages().awakeMinutes())
+                .originPackage(session.originPackage())
+                .build();
+    }
+
+    void updateFrom(SleepSession session) {
+        this.sleepStart = session.sleepStart();
+        this.sleepEnd = session.sleepEnd();
+        this.durationMinutes = session.durationMinutes();
+        this.lightSleepMinutes = session.stages().lightMinutes();
+        this.deepSleepMinutes = session.stages().deepMinutes();
+        this.remSleepMinutes = session.stages().remMinutes();
+        this.awakeMinutes = session.stages().awakeMinutes();
+        this.originPackage = session.originPackage();
+    }
 }

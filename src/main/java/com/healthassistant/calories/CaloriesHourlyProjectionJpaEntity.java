@@ -62,4 +62,28 @@ class CaloriesHourlyProjectionJpaEntity {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    static CaloriesHourlyProjectionJpaEntity from(CaloriesBucket bucket) {
+        return CaloriesHourlyProjectionJpaEntity.builder()
+                .deviceId(bucket.deviceId())
+                .date(bucket.date())
+                .hour(bucket.hour())
+                .caloriesKcal(bucket.caloriesKcal())
+                .bucketCount(1)
+                .firstBucketTime(bucket.bucketStart())
+                .lastBucketTime(bucket.bucketEnd())
+                .build();
+    }
+
+    void addBucket(CaloriesBucket bucket) {
+        this.caloriesKcal = this.caloriesKcal + bucket.caloriesKcal();
+        this.bucketCount = this.bucketCount + 1;
+
+        if (this.firstBucketTime == null || bucket.bucketStart().isBefore(this.firstBucketTime)) {
+            this.firstBucketTime = bucket.bucketStart();
+        }
+        if (this.lastBucketTime == null || bucket.bucketEnd().isAfter(this.lastBucketTime)) {
+            this.lastBucketTime = bucket.bucketEnd();
+        }
+    }
 }

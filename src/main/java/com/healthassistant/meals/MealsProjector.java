@@ -1,7 +1,6 @@
 package com.healthassistant.meals;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import com.healthassistant.healthevents.api.dto.payload.MealRecordedPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -9,8 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,111 +19,45 @@ import java.util.stream.Collectors;
 @Slf4j
 class MealsProjector {
 
-    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-
     private final MealProjectionJpaRepository mealRepository;
     private final MealDailyProjectionJpaRepository dailyRepository;
+    private final MealFactory mealFactory;
 
     @Transactional
     public void projectMeal(StoredEventData eventData) {
         try {
-            projectMealRecorded(eventData);
+            mealFactory.createFromEvent(eventData)
+                    .ifPresent(this::saveProjection);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             log.warn("Race condition during meal projection for event {}, skipping", eventData.eventId().value());
         }
     }
 
-    private void projectMealRecorded(StoredEventData eventData) {
-        if (!(eventData.payload() instanceof MealRecordedPayload payload)) {
-            log.warn("Expected MealRecordedPayload but got {}, skipping projection",
-                    eventData.payload().getClass().getSimpleName());
-            return;
-        }
+    private synchronized void saveProjection(Meal meal) {
+        Optional<MealProjectionJpaEntity> existingOpt = mealRepository.findByEventId(meal.eventId());
 
-        String title = payload.title();
-        String mealType = payload.mealType() != null ? payload.mealType().name() : null;
-        Integer caloriesKcal = payload.caloriesKcal();
-        Integer proteinGrams = payload.proteinGrams();
-        Integer fatGrams = payload.fatGrams();
-        Integer carbohydratesGrams = payload.carbohydratesGrams();
-        String healthRating = payload.healthRating() != null ? payload.healthRating().name() : null;
-
-        if (title == null || mealType == null || healthRating == null) {
-            log.warn("MealRecorded event missing required fields, skipping projection");
-            return;
-        }
-
-        Instant occurredAt = eventData.occurredAt();
-        ZonedDateTime zonedOccurredAt = occurredAt.atZone(POLAND_ZONE);
-        LocalDate date = zonedOccurredAt.toLocalDate();
-
-        updateMealProjection(
-                eventData.eventId().value(),
-                date,
-                occurredAt,
-                title,
-                mealType,
-                caloriesKcal != null ? caloriesKcal : 0,
-                proteinGrams != null ? proteinGrams : 0,
-                fatGrams != null ? fatGrams : 0,
-                carbohydratesGrams != null ? carbohydratesGrams : 0,
-                healthRating
-        );
-    }
-
-    private synchronized void updateMealProjection(
-            String eventId,
-            LocalDate date,
-            Instant occurredAt,
-            String title,
-            String mealType,
-            int caloriesKcal,
-            int proteinGrams,
-            int fatGrams,
-            int carbohydratesGrams,
-            String healthRating
-    ) {
-        Optional<MealProjectionJpaEntity> existingOpt = mealRepository.findByEventId(eventId);
-
-        MealProjectionJpaEntity meal;
+        MealProjectionJpaEntity entity;
 
         if (existingOpt.isPresent()) {
-            meal = existingOpt.get();
-            meal.setTitle(title);
-            meal.setMealType(mealType);
-            meal.setCaloriesKcal(caloriesKcal);
-            meal.setProteinGrams(proteinGrams);
-            meal.setFatGrams(fatGrams);
-            meal.setCarbohydratesGrams(carbohydratesGrams);
-            meal.setHealthRating(healthRating);
-            log.debug("Updating existing meal projection for event {}", eventId);
+            entity = existingOpt.get();
+            entity.updateFrom(meal);
+            log.debug("Updating existing meal projection for event {}", meal.eventId());
         } else {
-            List<MealProjectionJpaEntity> existingMeals =
-                    mealRepository.findByDateOrderByMealNumberAsc(date);
-
-            int mealNumber = existingMeals.isEmpty() ? 1 :
-                    existingMeals.get(existingMeals.size() - 1).getMealNumber() + 1;
-
-            meal = MealProjectionJpaEntity.builder()
-                    .eventId(eventId)
-                    .date(date)
-                    .mealNumber(mealNumber)
-                    .occurredAt(occurredAt)
-                    .title(title)
-                    .mealType(mealType)
-                    .caloriesKcal(caloriesKcal)
-                    .proteinGrams(proteinGrams)
-                    .fatGrams(fatGrams)
-                    .carbohydratesGrams(carbohydratesGrams)
-                    .healthRating(healthRating)
-                    .build();
-
-            log.debug("Creating new meal projection #{} for date {} from event {}", mealNumber, date, eventId);
+            int mealNumber = calculateNextMealNumber(meal.date());
+            entity = MealProjectionJpaEntity.from(meal, mealNumber);
+            log.debug("Creating new meal projection #{} for date {} from event {}",
+                    mealNumber, meal.date(), meal.eventId());
         }
 
-        mealRepository.save(meal);
+        mealRepository.save(entity);
+        updateDailyProjection(meal.date());
+    }
 
-        updateDailyProjection(date);
+    private int calculateNextMealNumber(LocalDate date) {
+        List<MealProjectionJpaEntity> existingMeals =
+                mealRepository.findByDateOrderByMealNumberAsc(date);
+        return existingMeals.isEmpty() ? 1 :
+                existingMeals.getLast().getMealNumber() + 1;
     }
 
     private void updateDailyProjection(LocalDate date) {
@@ -163,11 +94,10 @@ class MealsProjector {
                 .max(Instant::compareTo)
                 .orElse(null);
 
-        Optional<MealDailyProjectionJpaEntity> existingOpt = dailyRepository.findByDate(date);
-
-        MealDailyProjectionJpaEntity daily = existingOpt.orElseGet(() -> MealDailyProjectionJpaEntity.builder()
-                .date(date)
-                .build());
+        MealDailyProjectionJpaEntity daily = dailyRepository.findByDate(date)
+                .orElseGet(() -> MealDailyProjectionJpaEntity.builder()
+                        .date(date)
+                        .build());
 
         daily.setTotalMealCount(totalMealCount);
         daily.setBreakfastCount(mealTypeCounts.getOrDefault("BREAKFAST", 0L).intValue());

@@ -62,4 +62,28 @@ class ActivityHourlyProjectionJpaEntity {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    static ActivityHourlyProjectionJpaEntity from(ActivityBucket bucket) {
+        return ActivityHourlyProjectionJpaEntity.builder()
+                .deviceId(bucket.deviceId())
+                .date(bucket.date())
+                .hour(bucket.hour())
+                .activeMinutes(bucket.activeMinutes())
+                .bucketCount(1)
+                .firstBucketTime(bucket.bucketStart())
+                .lastBucketTime(bucket.bucketEnd())
+                .build();
+    }
+
+    void addBucket(ActivityBucket bucket) {
+        this.activeMinutes = this.activeMinutes + bucket.activeMinutes();
+        this.bucketCount = this.bucketCount + 1;
+
+        if (this.firstBucketTime == null || bucket.bucketStart().isBefore(this.firstBucketTime)) {
+            this.firstBucketTime = bucket.bucketStart();
+        }
+        if (this.lastBucketTime == null || bucket.bucketEnd().isAfter(this.lastBucketTime)) {
+            this.lastBucketTime = bucket.bucketEnd();
+        }
+    }
 }

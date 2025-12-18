@@ -59,4 +59,27 @@ class StepsHourlyProjectionJpaEntity {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    static StepsHourlyProjectionJpaEntity from(StepsBucket bucket) {
+        return StepsHourlyProjectionJpaEntity.builder()
+                .date(bucket.date())
+                .hour(bucket.hour())
+                .stepCount(bucket.stepCount())
+                .bucketCount(1)
+                .firstBucketTime(bucket.bucketStart())
+                .lastBucketTime(bucket.bucketEnd())
+                .build();
+    }
+
+    void addBucket(StepsBucket bucket) {
+        this.stepCount = this.stepCount + bucket.stepCount();
+        this.bucketCount = this.bucketCount + 1;
+
+        if (this.firstBucketTime == null || bucket.bucketStart().isBefore(this.firstBucketTime)) {
+            this.firstBucketTime = bucket.bucketStart();
+        }
+        if (this.lastBucketTime == null || bucket.bucketEnd().isAfter(this.lastBucketTime)) {
+            this.lastBucketTime = bucket.bucketEnd();
+        }
+    }
 }
