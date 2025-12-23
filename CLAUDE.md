@@ -179,8 +179,8 @@ Events are projected into query-optimized views:
 
 **Configuration**:
 ```bash
-export GOOGLE_GEMINI_API_KEY="your-api-key"
-export GOOGLE_GEMINI_MODEL="gemini-2.0-flash-exp"  # optional, this is default
+export GEMINI_API_KEY="your-api-key"
+export GEMINI_MODEL="gemini-3-flash-preview"  # optional, this is default
 ```
 
 See `AI_ASSISTANT_README.md` for detailed documentation on date recognition patterns and conversation history.
@@ -335,8 +335,8 @@ open integration-tests/build/reports/tests/test/index.html
 ### Optional Environment Variables
 - `HMAC_TOLERANCE_SEC` - Timestamp tolerance (default: 600)
 - `NONCE_CACHE_TTL_SEC` - Nonce cache TTL (default: 600)
-- `GOOGLE_GEMINI_API_KEY` - Gemini API key for AI Assistant (required for /v1/assistant/chat)
-- `GOOGLE_GEMINI_MODEL` - Gemini model name (default: gemini-2.0-flash-exp)
+- `GEMINI_API_KEY` - Gemini API key for AI Assistant (required for /v1/assistant/chat)
+- `GEMINI_MODEL` - Gemini model name (default: gemini-3-flash-preview)
 - `GOOGLE_FIT_CLIENT_ID` - Google OAuth client ID (for historical sync)
 - `GOOGLE_FIT_CLIENT_SECRET` - Google OAuth client secret (for historical sync)
 - `GOOGLE_FIT_REFRESH_TOKEN` - Google OAuth refresh token (for historical sync)

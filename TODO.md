@@ -24,7 +24,7 @@
 - [ ] **#14** For strength workout logging - add confirmation step to verify data accuracy; time should default to current but user should be able to modify it
 
 ## AI Assistant
-- [ ] **#12** Migrate to Gemini 3 Flash model
+- [x] **#12** Migrate to Gemini 3 Flash model
 - [ ] **#17** AI system is too rigid - should be more relaxed and open to discussion
 
 ## Mobile App UI/UX

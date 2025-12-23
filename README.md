@@ -92,8 +92,8 @@ Configure via environment variables:
 | `GOOGLE_FIT_CLIENT_ID` | Google OAuth client ID | - |
 | `GOOGLE_FIT_CLIENT_SECRET` | Google OAuth client secret | - |
 | `GOOGLE_FIT_REFRESH_TOKEN` | Google OAuth refresh token | - |
-| `GOOGLE_GEMINI_API_KEY` | Google Gemini API key for AI Assistant | - |
-| `GOOGLE_GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash-exp` |
+| `GEMINI_API_KEY` | Google Gemini API key for AI Assistant | - |
+| `GEMINI_MODEL` | Gemini model name | `gemini-3-flash-preview` |
 
 ## 🚀 Quick Start
 
