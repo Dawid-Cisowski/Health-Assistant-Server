@@ -57,6 +57,9 @@ spring:
       genai:
         api-key: ${GEMINI_API_KEY}
         model: ${GEMINI_MODEL:gemini-3-flash-preview}
+        chat:
+          options:
+            temperature: 1.5
 
 server:
   port: 8080
