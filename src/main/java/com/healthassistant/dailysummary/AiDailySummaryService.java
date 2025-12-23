@@ -10,12 +10,21 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
 class AiDailySummaryService {
+
+    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+
+    private static final int GOAL_STEPS = 10_000;
+    private static final int GOAL_SLEEP_MINUTES = 420;
+    private static final int GOAL_CALORIES = 2500;
+    private static final int GOAL_ACTIVITY_MINUTES = 300;
 
     private final DailySummaryFacade dailySummaryFacade;
     private final ChatClient chatClient;
@@ -31,9 +40,25 @@ class AiDailySummaryService {
         - You can use emojis (sparingly)
         - DO NOT use words: "podsumowanie", "dzisiaj", "twoje dane"
         - DO NOT start with "Hej" or "Czesc"
-        - If the day was good - praise, if bad - comment with humor or empathy
 
-        EXAMPLE STYLES:
+        GOAL EVALUATION (IMPORTANT):
+        - User goals: Steps=10000, Sleep=7h, Calories=2500kcal, Activity=5h
+        - TOLERANCE: ±10% from goal is "achieved" (e.g., 6h50m sleep vs 7h goal = OK, don't criticize!)
+        - Sleep is ALWAYS evaluated independently of time of day (previous night)
+
+        TIME-AWARE EVALUATION (for steps, calories, activity - NOT sleep):
+        - MORNING (before noon): 20-40% of goal is good progress
+        - AFTERNOON: 40-70% of goal expected
+        - EVENING: 70-100% expected
+        - NIGHT: full day evaluation
+
+        EXAMPLES:
+        - Morning + 2000 steps + 1 meal → "niezly start! dzien dopiero sie rozkreca"
+        - Evening + 3000 steps + 1 meal → "slabo... malo krokow jak na te pore, daj z siebie wiecej"
+        - Sleep 6h50m (goal 7h) → "sen ok" (within tolerance, don't criticize)
+        - Sleep 5h → "za malo snu, jutro sie odśpisz?"
+
+        STYLE EXAMPLES:
         - "super dzien! wyspales sie, zdrowe jedzenie i duzo krokow - szacun"
         - "no slabo to wyglada... malo snu i sniadanie moglo byc lepsze"
         - "solidnie sie narobiles na silce, tylko ten sen moglby byc dluzszy"
@@ -42,14 +67,25 @@ class AiDailySummaryService {
     public AiDailySummaryResponse generateSummary(LocalDate date) {
         log.info("Generating AI daily summary for date: {}", date);
 
+        String timeOfDay = getTimeOfDayContext();
         return dailySummaryFacade.getDailySummary(date)
-                .map(this::generateFromData)
+                .map(summary -> generateFromData(summary, timeOfDay))
                 .map(text -> new AiDailySummaryResponse(date, text, true))
                 .orElse(AiDailySummaryResponse.noData(date));
     }
 
-    private String generateFromData(DailySummary summary) {
-        String dataContext = buildDataContext(summary);
+    private String getTimeOfDayContext() {
+        LocalTime now = LocalTime.now(POLAND_ZONE);
+        int hour = now.getHour();
+
+        if (hour < 12) return "MORNING (before noon)";
+        if (hour < 17) return "AFTERNOON";
+        if (hour < 21) return "EVENING";
+        return "NIGHT";
+    }
+
+    private String generateFromData(DailySummary summary, String timeOfDay) {
+        String dataContext = buildDataContext(summary, timeOfDay);
 
         try {
             String result = chatClient.prompt()
@@ -66,26 +102,31 @@ class AiDailySummaryService {
         }
     }
 
-    private String buildDataContext(DailySummary summary) {
+    private String buildDataContext(DailySummary summary, String timeOfDay) {
         StringBuilder sb = new StringBuilder();
 
         var activity = summary.activity();
-        if (activity.steps() != null && activity.steps() > 0) {
-            sb.append("Steps: ").append(activity.steps()).append("\n");
+        int steps = activity.steps() != null ? activity.steps() : 0;
+        int activeMinutes = activity.activeMinutes() != null ? activity.activeMinutes() : 0;
+        int activeCalories = activity.activeCalories() != null ? activity.activeCalories() : 0;
+
+        if (steps > 0) {
+            sb.append("Steps: ").append(steps).append("\n");
         }
-        if (activity.activeMinutes() != null && activity.activeMinutes() > 0) {
-            sb.append("Active minutes: ").append(activity.activeMinutes()).append("\n");
+        if (activeMinutes > 0) {
+            sb.append("Active minutes: ").append(activeMinutes).append("\n");
         }
-        if (activity.activeCalories() != null && activity.activeCalories() > 0) {
-            sb.append("Calories burned: ").append(activity.activeCalories()).append(" kcal\n");
+        if (activeCalories > 0) {
+            sb.append("Calories burned: ").append(activeCalories).append(" kcal\n");
         }
 
+        int totalSleepMinutes = 0;
         if (!summary.sleep().isEmpty()) {
-            int totalMinutes = summary.sleep().stream()
+            totalSleepMinutes = summary.sleep().stream()
                     .mapToInt(s -> s.totalMinutes() != null ? s.totalMinutes() : 0)
                     .sum();
-            int hours = totalMinutes / 60;
-            int mins = totalMinutes % 60;
+            int hours = totalSleepMinutes / 60;
+            int mins = totalSleepMinutes % 60;
             sb.append("Sleep: ").append(hours).append("h ").append(mins).append("min\n");
         }
 
@@ -99,10 +140,11 @@ class AiDailySummaryService {
         }
 
         var nutrition = summary.nutrition();
+        int mealCalories = nutrition.totalCalories() != null ? nutrition.totalCalories() : 0;
         if (nutrition.mealCount() != null && nutrition.mealCount() > 0) {
             sb.append("Meals: ").append(nutrition.mealCount()).append("\n");
-            if (nutrition.totalCalories() != null) {
-                sb.append("  Calories: ").append(nutrition.totalCalories()).append(" kcal\n");
+            if (mealCalories > 0) {
+                sb.append("  Calories: ").append(mealCalories).append(" kcal\n");
             }
             if (nutrition.totalProtein() != null) {
                 sb.append("  Protein: ").append(nutrition.totalProtein()).append("g\n");
@@ -122,6 +164,27 @@ class AiDailySummaryService {
             if (unhealthyCount > 0) {
                 sb.append("Unhealthy meals: ").append(unhealthyCount).append("\n");
             }
+        }
+
+        sb.append("\n--- CONTEXT ---\n");
+        sb.append("Time of day: ").append(timeOfDay).append("\n");
+        sb.append("Goals: Steps=10000, Sleep=7h, Calories=2500kcal, Activity=5h\n");
+
+        if (steps > 0) {
+            int stepsPct = (steps * 100) / GOAL_STEPS;
+            sb.append("Steps progress: ").append(stepsPct).append("% of goal\n");
+        }
+        if (totalSleepMinutes > 0) {
+            int sleepPct = (totalSleepMinutes * 100) / GOAL_SLEEP_MINUTES;
+            sb.append("Sleep progress: ").append(sleepPct).append("% of goal\n");
+        }
+        if (mealCalories > 0) {
+            int caloriesPct = (mealCalories * 100) / GOAL_CALORIES;
+            sb.append("Calories progress: ").append(caloriesPct).append("% of goal\n");
+        }
+        if (activeMinutes > 0) {
+            int activityPct = (activeMinutes * 100) / GOAL_ACTIVITY_MINUTES;
+            sb.append("Activity progress: ").append(activityPct).append("% of goal\n");
         }
 
         return sb.toString();
