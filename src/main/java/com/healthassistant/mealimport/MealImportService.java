@@ -5,13 +5,19 @@ import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.mealimport.api.MealImportFacade;
+import com.healthassistant.mealimport.api.dto.MealDraftResponse;
+import com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest;
 import com.healthassistant.mealimport.api.dto.MealImportResponse;
+import com.healthassistant.healthevents.api.dto.payload.HealthRating;
+import com.healthassistant.healthevents.api.dto.payload.MealType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -33,6 +39,7 @@ class MealImportService implements MealImportFacade {
     private final MealContentExtractor contentExtractor;
     private final MealEventMapper eventMapper;
     private final HealthEventsFacade healthEventsFacade;
+    private final MealImportDraftRepository draftRepository;
 
     @Override
     public MealImportResponse importMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
@@ -172,5 +179,174 @@ class MealImportService implements MealImportFacade {
 
     private String generateMealId() {
         return "meal-" + UUID.randomUUID().toString().substring(0, 12);
+    }
+
+    @Override
+    @Transactional
+    public MealDraftResponse analyzeMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
+        validateInput(description, images);
+
+        if (images != null && !images.isEmpty()) {
+            for (MultipartFile image : images) {
+                validateImage(image);
+            }
+        }
+
+        try {
+            ExtractedMealData extractedData = contentExtractor.extract(description, images);
+            if (!extractedData.isValid()) {
+                log.warn("Meal extraction invalid for device {}: {}",
+                    deviceId.value(), extractedData.validationError());
+                return MealDraftResponse.failure(
+                    "Could not extract valid meal data: " + extractedData.validationError()
+                );
+            }
+
+            Instant suggestedOccurredAt = extractedData.occurredAt() != null
+                ? extractedData.occurredAt()
+                : Instant.now();
+
+            MealImportDraft draft = MealImportDraft.builder()
+                .id(UUID.randomUUID())
+                .deviceId(deviceId.value())
+                .title(extractedData.title())
+                .mealType(MealType.valueOf(extractedData.mealType()))
+                .caloriesKcal(extractedData.caloriesKcal())
+                .proteinGrams(extractedData.proteinGrams())
+                .fatGrams(extractedData.fatGrams())
+                .carbohydratesGrams(extractedData.carbohydratesGrams())
+                .healthRating(HealthRating.valueOf(extractedData.healthRating()))
+                .confidence(BigDecimal.valueOf(extractedData.confidence()))
+                .suggestedOccurredAt(suggestedOccurredAt)
+                .questions(extractedData.questions())
+                .originalDescription(description)
+                .build();
+
+            draft = draftRepository.save(draft);
+
+            log.info("Created meal draft {} for device {}: {} ({} kcal), confidence={}",
+                draft.getId(), deviceId.value(), draft.getTitle(),
+                draft.getCaloriesKcal(), draft.getConfidence());
+
+            return mapToResponse(draft);
+
+        } catch (MealExtractionException e) {
+            log.warn("Meal extraction failed for device {}: {}", deviceId.value(), e.getMessage());
+            return MealDraftResponse.failure(e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public MealDraftResponse updateDraft(UUID draftId, MealDraftUpdateRequest request, DeviceId deviceId) {
+        MealImportDraft draft = draftRepository.findByIdAndDeviceId(draftId, deviceId.value())
+            .orElseThrow(() -> new DraftNotFoundException(draftId));
+
+        if (!draft.isPending()) {
+            throw new DraftAlreadyConfirmedException(draftId);
+        }
+
+        if (draft.isExpired()) {
+            throw new DraftExpiredException(draftId);
+        }
+
+        draft.applyUpdate(request);
+        draft = draftRepository.save(draft);
+
+        log.info("Updated meal draft {} for device {}", draftId, deviceId.value());
+
+        return mapToResponse(draft);
+    }
+
+    @Override
+    @Transactional
+    public MealImportResponse confirmDraft(UUID draftId, DeviceId deviceId) {
+        MealImportDraft draft = draftRepository.findByIdAndDeviceId(draftId, deviceId.value())
+            .orElseThrow(() -> new DraftNotFoundException(draftId));
+
+        if (!draft.isPending()) {
+            throw new DraftAlreadyConfirmedException(draftId);
+        }
+
+        if (draft.isExpired()) {
+            throw new DraftExpiredException(draftId);
+        }
+
+        Instant occurredAt = draft.getEffectiveOccurredAt();
+        String mealId = generateMealId();
+
+        // Create ExtractedMealData from draft for the mapper
+        ExtractedMealData extractedData = ExtractedMealData.valid(
+            occurredAt,
+            draft.getTitle(),
+            draft.getMealType().name(),
+            draft.getCaloriesKcal(),
+            draft.getProteinGrams(),
+            draft.getFatGrams(),
+            draft.getCarbohydratesGrams(),
+            draft.getHealthRating().name(),
+            draft.getConfidence().doubleValue()
+        );
+
+        StoreHealthEventsCommand.EventEnvelope envelope = eventMapper.mapToEventEnvelope(
+            extractedData, mealId, deviceId, occurredAt
+        );
+
+        StoreHealthEventsCommand command = new StoreHealthEventsCommand(
+            List.of(envelope), deviceId
+        );
+        StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
+
+        var eventResult = result.results().get(0);
+        if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
+            String errorMessage = eventResult.error() != null
+                ? eventResult.error().message()
+                : "Validation failed";
+            log.warn("Meal event validation failed for draft {}: {}", draftId, errorMessage);
+            return MealImportResponse.failure("Validation error: " + errorMessage);
+        }
+
+        draft.markConfirmed();
+        draftRepository.save(draft);
+
+        String eventId = eventResult.eventId() != null
+            ? eventResult.eventId().value()
+            : null;
+
+        log.info("Confirmed meal draft {} as meal {} for device {}: {} ({} kcal)",
+            draftId, mealId, deviceId.value(), draft.getTitle(), draft.getCaloriesKcal());
+
+        return MealImportResponse.success(
+            mealId,
+            eventId,
+            occurredAt,
+            draft.getTitle(),
+            draft.getMealType().name(),
+            draft.getCaloriesKcal(),
+            draft.getProteinGrams(),
+            draft.getFatGrams(),
+            draft.getCarbohydratesGrams(),
+            draft.getHealthRating().name(),
+            draft.getConfidence().doubleValue()
+        );
+    }
+
+    private MealDraftResponse mapToResponse(MealImportDraft draft) {
+        return MealDraftResponse.success(
+            draft.getId().toString(),
+            draft.getSuggestedOccurredAt(),
+            new MealDraftResponse.MealData(
+                draft.getTitle(),
+                draft.getMealType().name(),
+                draft.getCaloriesKcal(),
+                draft.getProteinGrams(),
+                draft.getFatGrams(),
+                draft.getCarbohydratesGrams(),
+                draft.getHealthRating().name()
+            ),
+            draft.getConfidence().doubleValue(),
+            draft.getQuestions(),
+            draft.getExpiresAt()
+        );
     }
 }

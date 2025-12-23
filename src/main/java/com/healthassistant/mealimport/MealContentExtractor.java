@@ -3,6 +3,7 @@ package com.healthassistant.mealimport;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.healthassistant.mealimport.api.dto.ClarifyingQuestion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -13,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -82,6 +84,23 @@ class MealContentExtractor {
             5. Be conservative with estimates - better to underestimate calories
             6. If time is mentioned in description, extract it; otherwise use null
             7. Report your confidence level (0.0 to 1.0)
+            8. If confidence < 0.8 OR information is ambiguous, generate clarifying questions
+
+            CLARIFYING QUESTIONS RULES:
+            - Generate 0-3 questions maximum
+            - Questions should help improve accuracy of nutritional estimates
+            - Use Polish language for questions
+            - Include which fields the answer would affect
+            - Common scenarios requiring questions:
+              * Unclear portion size (mala/srednia/duza porcja)
+              * Multiple preparation methods possible (smazony/pieczony/gotowany)
+              * Missing key ingredients (z sosem/bez sosu)
+              * Ambiguous meal type
+
+            QUESTION TYPES:
+            - SINGLE_CHOICE: Provide 2-4 options
+            - YES_NO: Boolean question
+            - FREE_TEXT: Open answer (use sparingly)
 
             MEAL TYPES (choose one):
             - BREAKFAST: Morning meal (7-10am typical)
@@ -111,7 +130,16 @@ class MealContentExtractor {
               "fatGrams": number,
               "carbohydratesGrams": number,
               "healthRating": "HEALTHY" | "NEUTRAL" | etc.,
-              "validationError": "error description" or null
+              "validationError": "error description" or null,
+              "questions": [
+                {
+                  "questionId": "q1",
+                  "questionText": "Czy porcja byla mala, srednia czy duza?",
+                  "questionType": "SINGLE_CHOICE",
+                  "options": ["SMALL", "MEDIUM", "LARGE"],
+                  "affectedFields": ["caloriesKcal", "proteinGrams", "fatGrams", "carbohydratesGrams"]
+                }
+              ]
             }
 
             ESTIMATION TIPS:
@@ -177,10 +205,12 @@ class MealContentExtractor {
                 healthRating = "NEUTRAL";
             }
 
-            return ExtractedMealData.valid(
+            List<ClarifyingQuestion> questions = parseQuestions(root);
+
+            return ExtractedMealData.validWithQuestions(
                 occurredAt, title, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-                healthRating, confidence
+                healthRating, confidence, questions
             );
 
         } catch (JsonProcessingException e) {
@@ -188,6 +218,54 @@ class MealContentExtractor {
                 "Failed to parse AI response as JSON: " + e.getMessage(), e
             );
         }
+    }
+
+    private List<ClarifyingQuestion> parseQuestions(JsonNode root) {
+        JsonNode questionsNode = root.path("questions");
+        if (questionsNode.isMissingNode() || !questionsNode.isArray()) {
+            return List.of();
+        }
+
+        List<ClarifyingQuestion> questions = new ArrayList<>();
+        for (JsonNode questionNode : questionsNode) {
+            String questionId = getTextOrNull(questionNode, "questionId");
+            String questionText = getTextOrNull(questionNode, "questionText");
+            String questionTypeStr = getTextOrNull(questionNode, "questionType");
+
+            if (questionId == null || questionText == null || questionTypeStr == null) {
+                continue;
+            }
+
+            ClarifyingQuestion.QuestionType questionType;
+            try {
+                questionType = ClarifyingQuestion.QuestionType.valueOf(questionTypeStr);
+            } catch (IllegalArgumentException e) {
+                log.debug("Unknown question type: {}", questionTypeStr);
+                questionType = ClarifyingQuestion.QuestionType.FREE_TEXT;
+            }
+
+            List<String> options = parseStringArray(questionNode.path("options"));
+            List<String> affectedFields = parseStringArray(questionNode.path("affectedFields"));
+
+            questions.add(new ClarifyingQuestion(
+                questionId, questionText, questionType, options, affectedFields
+            ));
+        }
+
+        return questions;
+    }
+
+    private List<String> parseStringArray(JsonNode arrayNode) {
+        if (arrayNode.isMissingNode() || !arrayNode.isArray()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        for (JsonNode item : arrayNode) {
+            if (item.isTextual()) {
+                result.add(item.asText());
+            }
+        }
+        return result;
     }
 
     private String cleanJsonResponse(String response) {
