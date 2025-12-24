@@ -15,7 +15,9 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -42,33 +44,59 @@ class GoogleFitSyncService implements GoogleFitFacade {
 
         log.info("Historical sync range: {} to {} ({} days)", startDate, endDate, days);
 
-        int scheduledCount = 0;
-        LocalDate currentDate = startDate;
+        List<LocalDate> dates = startDate.datesUntil(endDate.plusDays(1)).toList();
+        return scheduleAndProcess(dates);
+    }
 
-        while (!currentDate.isAfter(endDate)) {
+    @Override
+    public HistoricalSyncResult syncDates(List<LocalDate> dates) {
+        log.info("Scheduling Google Fit sync for {} specific dates", dates.size());
+        validateDates(dates);
+        return scheduleAndProcess(dates);
+    }
+
+    private HistoricalSyncResult scheduleAndProcess(List<LocalDate> dates) {
+        int scheduledCount = 0;
+
+        for (LocalDate date : dates) {
             boolean alreadyExists = historicalSyncTaskRepository.existsBySyncDateAndStatusIn(
-                    currentDate,
+                    date,
                     List.of(HistoricalSyncTask.SyncTaskStatus.PENDING, HistoricalSyncTask.SyncTaskStatus.IN_PROGRESS)
             );
 
             if (!alreadyExists) {
-                HistoricalSyncTask task = new HistoricalSyncTask(currentDate);
+                HistoricalSyncTask task = new HistoricalSyncTask(date);
                 historicalSyncTaskRepository.save(task);
                 scheduledCount++;
-                log.debug("Scheduled sync task for date: {}", currentDate);
+                log.debug("Scheduled sync task for date: {}", date);
             } else {
-                log.debug("Skipping date {} - task already exists", currentDate);
+                log.debug("Skipping date {} - task already exists", date);
             }
-
-            currentDate = currentDate.plusDays(1);
         }
 
         log.info("Scheduled {} historical sync tasks", scheduledCount);
 
-        // Trigger immediate processing
         historicalSyncTaskProcessor.processNextBatch();
 
         return new HistoricalSyncResult(scheduledCount, 0, 0);
+    }
+
+    private void validateDates(List<LocalDate> dates) {
+        LocalDate today = LocalDate.now(POLAND_ZONE);
+        LocalDate earliestAllowed = today.minusDays(365);
+
+        Set<LocalDate> seen = new HashSet<>();
+        for (LocalDate date : dates) {
+            if (date.isAfter(today)) {
+                throw new IllegalArgumentException("Date " + date + " is in the future");
+            }
+            if (date.isBefore(earliestAllowed)) {
+                throw new IllegalArgumentException("Date " + date + " is more than 365 days in the past");
+            }
+            if (!seen.add(date)) {
+                throw new IllegalArgumentException("Duplicate date: " + date);
+            }
+        }
     }
 
     int syncTimeWindow(Instant from, Instant to) {

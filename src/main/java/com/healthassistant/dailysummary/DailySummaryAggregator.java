@@ -1,6 +1,7 @@
 package com.healthassistant.dailysummary;
 
 import com.healthassistant.dailysummary.api.dto.DailySummary;
+import com.healthassistant.dailysummary.api.dto.DailySummary.Activity;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.EventData;
 import com.healthassistant.healthevents.api.dto.payload.*;
@@ -14,6 +15,13 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
+import static com.healthassistant.dailysummary.api.dto.DailySummary.Exercise;
+import static com.healthassistant.dailysummary.api.dto.DailySummary.Heart;
+import static com.healthassistant.dailysummary.api.dto.DailySummary.Meal;
+import static com.healthassistant.dailysummary.api.dto.DailySummary.Nutrition;
+import static com.healthassistant.dailysummary.api.dto.DailySummary.Sleep;
+import static com.healthassistant.dailysummary.api.dto.DailySummary.Workout;
 
 @Component
 @RequiredArgsConstructor
@@ -32,13 +40,13 @@ class DailySummaryAggregator {
 
         log.info("Aggregating {} events for date {}", events.size(), date);
 
-        DailySummary.Activity activity = aggregateActivity(events);
-        List<DailySummary.Exercise> exercises = aggregateExercises(events);
-        List<DailySummary.Workout> workouts = aggregateWorkouts(events);
-        List<DailySummary.Sleep> sleep = aggregateSleep(events);
-        DailySummary.Heart heart = aggregateHeart(events);
-        DailySummary.Nutrition nutrition = aggregateNutrition(events);
-        List<DailySummary.Meal> meals = aggregateMeals(events);
+        Activity activity = aggregateActivity(events);
+        List<Exercise> exercises = aggregateExercises(events);
+        List<Workout> workouts = aggregateWorkouts(events);
+        List<Sleep> sleep = aggregateSleep(events);
+        Heart heart = aggregateHeart(events);
+        Nutrition nutrition = aggregateNutrition(events);
+        List<Meal> meals = aggregateMeals(events);
 
         return new DailySummary(
                 date,
@@ -52,7 +60,7 @@ class DailySummaryAggregator {
         );
     }
 
-    private DailySummary.Activity aggregateActivity(List<EventData> events) {
+    private Activity aggregateActivity(List<EventData> events) {
         int totalSteps = 0;
         int totalActiveMinutes = 0;
         int totalActiveCalories = 0;
@@ -70,7 +78,7 @@ class DailySummaryAggregator {
             }
         }
 
-        return new DailySummary.Activity(
+        return new Activity(
                 nullIfZero(totalSteps),
                 nullIfZero(totalActiveMinutes),
                 nullIfZero(totalActiveCalories),
@@ -86,7 +94,7 @@ class DailySummaryAggregator {
         return value.doubleValue() == 0.0 ? null : value;
     }
 
-    private List<DailySummary.Exercise> aggregateExercises(List<EventData> events) {
+    private List<Exercise> aggregateExercises(List<EventData> events) {
         return events.stream()
                 .filter(e -> e.payload() instanceof WalkingSessionPayload)
                 .map(this::toExercise)
@@ -94,7 +102,7 @@ class DailySummaryAggregator {
                 .toList();
     }
 
-    private DailySummary.Exercise toExercise(EventData event) {
+    private Exercise toExercise(EventData event) {
         if (!(event.payload() instanceof WalkingSessionPayload walking)) {
             return null;
         }
@@ -115,7 +123,7 @@ class DailySummaryAggregator {
                 return null;
             }
 
-            return new DailySummary.Exercise(
+            return new Exercise(
                     "WALK",
                     start,
                     end,
@@ -131,7 +139,7 @@ class DailySummaryAggregator {
         }
     }
 
-    private List<DailySummary.Workout> aggregateWorkouts(List<EventData> events) {
+    private List<Workout> aggregateWorkouts(List<EventData> events) {
         return events.stream()
                 .filter(e -> e.payload() instanceof WorkoutPayload)
                 .map(this::toWorkout)
@@ -139,20 +147,20 @@ class DailySummaryAggregator {
                 .toList();
     }
 
-    private DailySummary.Workout toWorkout(EventData event) {
+    private Workout toWorkout(EventData event) {
         if (!(event.payload() instanceof WorkoutPayload workout)) {
             return null;
         }
 
         try {
-            return new DailySummary.Workout(workout.workoutId(), workout.note());
+            return new Workout(workout.workoutId(), workout.note());
         } catch (Exception e) {
             log.warn("Failed to convert event to workout: {}", e.getMessage());
             return null;
         }
     }
 
-    private List<DailySummary.Sleep> aggregateSleep(List<EventData> events) {
+    private List<Sleep> aggregateSleep(List<EventData> events) {
         return events.stream()
                 .filter(e -> e.payload() instanceof SleepSessionPayload)
                 .map(this::toSleep)
@@ -160,15 +168,15 @@ class DailySummaryAggregator {
                 .toList();
     }
 
-    private DailySummary.Sleep toSleep(EventData event) {
+    private Sleep toSleep(EventData event) {
         if (!(event.payload() instanceof SleepSessionPayload sleep)) {
             return null;
         }
 
-        return new DailySummary.Sleep(sleep.sleepStart(), sleep.sleepEnd(), sleep.totalMinutes());
+        return new Sleep(sleep.sleepStart(), sleep.sleepEnd(), sleep.totalMinutes());
     }
 
-    private DailySummary.Heart aggregateHeart(List<EventData> events) {
+    private Heart aggregateHeart(List<EventData> events) {
         List<Integer> heartRates = new ArrayList<>();
         Integer maxHr = null;
 
@@ -205,10 +213,10 @@ class DailySummaryAggregator {
         Integer restingBpm = heartRates.isEmpty() ? null :
                 heartRates.stream().mapToInt(Integer::intValue).min().orElse(0);
 
-        return new DailySummary.Heart(restingBpm, avgBpm, maxHr);
+        return new Heart(restingBpm, avgBpm, maxHr);
     }
 
-    private DailySummary.Nutrition aggregateNutrition(List<EventData> events) {
+    private Nutrition aggregateNutrition(List<EventData> events) {
         int totalCalories = 0;
         int totalProtein = 0;
         int totalFat = 0;
@@ -225,7 +233,7 @@ class DailySummaryAggregator {
             }
         }
 
-        return new DailySummary.Nutrition(
+        return new Nutrition(
                 nullIfZero(totalCalories),
                 nullIfZero(totalProtein),
                 nullIfZero(totalFat),
@@ -234,7 +242,7 @@ class DailySummaryAggregator {
         );
     }
 
-    private List<DailySummary.Meal> aggregateMeals(List<EventData> events) {
+    private List<Meal> aggregateMeals(List<EventData> events) {
         return events.stream()
                 .filter(e -> e.payload() instanceof MealRecordedPayload)
                 .map(this::toMeal)
@@ -242,13 +250,13 @@ class DailySummaryAggregator {
                 .toList();
     }
 
-    private DailySummary.Meal toMeal(EventData event) {
+    private Meal toMeal(EventData event) {
         if (!(event.payload() instanceof MealRecordedPayload meal)) {
             return null;
         }
 
         try {
-            return new DailySummary.Meal(
+            return new Meal(
                     meal.title(),
                     meal.mealType() != null ? meal.mealType().name() : null,
                     meal.caloriesKcal(),

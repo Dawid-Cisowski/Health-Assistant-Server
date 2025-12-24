@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +27,7 @@ public class ActivityService implements ActivityFacade {
     @Override
     public ActivityDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date) {
         Optional<ActivityDailyBreakdownResponse> result = getDailyBreakdownInternal(deviceId, date);
-        return result.orElseGet(() -> createEmptyBreakdown(date));
+        return result.orElseGet(() -> ActivityDailyBreakdownResponse.empty(date));
     }
 
     private Optional<ActivityDailyBreakdownResponse> getDailyBreakdownInternal(String deviceId, LocalDate date) {
@@ -48,40 +47,16 @@ public class ActivityService implements ActivityFacade {
                 ActivityHourlyProjectionJpaEntity::getActiveMinutes
             ));
 
-        List<ActivityDailyBreakdownResponse.HourlyActivity> hourlyBreakdown = IntStream.range(0, 24)
-            .mapToObj(hour -> new ActivityDailyBreakdownResponse.HourlyActivity(
-                hour,
-                hourlyMinutes.getOrDefault(hour, 0)
-            ))
-            .toList();
-
-        return Optional.of(ActivityDailyBreakdownResponse.builder()
-            .date(daily.getDate())
-            .totalActiveMinutes(daily.getTotalActiveMinutes())
-            .firstActivityTime(daily.getFirstActivityTime())
-            .lastActivityTime(daily.getLastActivityTime())
-            .mostActiveHour(daily.getMostActiveHour())
-            .mostActiveHourMinutes(daily.getMostActiveHourMinutes())
-            .activeHoursCount(daily.getActiveHoursCount())
-            .hourlyBreakdown(hourlyBreakdown)
-            .build());
-    }
-
-    private ActivityDailyBreakdownResponse createEmptyBreakdown(LocalDate date) {
-        List<ActivityDailyBreakdownResponse.HourlyActivity> hourlyBreakdown = IntStream.range(0, 24)
-            .mapToObj(hour -> new ActivityDailyBreakdownResponse.HourlyActivity(hour, 0))
-            .toList();
-
-        return ActivityDailyBreakdownResponse.builder()
-            .date(date)
-            .totalActiveMinutes(0)
-            .firstActivityTime(null)
-            .lastActivityTime(null)
-            .mostActiveHour(null)
-            .mostActiveHourMinutes(0)
-            .activeHoursCount(0)
-            .hourlyBreakdown(hourlyBreakdown)
-            .build();
+        return Optional.of(ActivityDailyBreakdownResponse.of(
+            daily.getDate(),
+            daily.getTotalActiveMinutes(),
+            daily.getFirstActivityTime(),
+            daily.getLastActivityTime(),
+            daily.getMostActiveHour(),
+            daily.getMostActiveHourMinutes(),
+            daily.getActiveHoursCount(),
+            hourlyMinutes
+        ));
     }
 
     @Override

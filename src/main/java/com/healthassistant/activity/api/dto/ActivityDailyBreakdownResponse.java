@@ -7,6 +7,8 @@ import lombok.Builder;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.IntStream;
 
 @Builder
 @Schema(description = "Daily activity breakdown with hourly data for chart view")
@@ -53,4 +55,34 @@ public record ActivityDailyBreakdownResponse(
         @Schema(description = "Active minutes in this hour", example = "12")
         Integer activeMinutes
     ) {}
+
+    public static ActivityDailyBreakdownResponse empty(LocalDate date) {
+        return of(date, 0, null, null, null, 0, 0, Map.of());
+    }
+
+    public static ActivityDailyBreakdownResponse of(
+            LocalDate date,
+            int totalActiveMinutes,
+            Instant firstActivityTime,
+            Instant lastActivityTime,
+            Integer mostActiveHour,
+            int mostActiveHourMinutes,
+            int activeHoursCount,
+            Map<Integer, Integer> hourlyMinutes
+    ) {
+        List<HourlyActivity> hourlyBreakdown = IntStream.range(0, 24)
+            .mapToObj(hour -> new HourlyActivity(hour, hourlyMinutes.getOrDefault(hour, 0)))
+            .toList();
+
+        return new ActivityDailyBreakdownResponse(
+            date,
+            totalActiveMinutes,
+            firstActivityTime,
+            lastActivityTime,
+            mostActiveHour,
+            mostActiveHourMinutes,
+            activeHoursCount,
+            hourlyBreakdown
+        );
+    }
 }
