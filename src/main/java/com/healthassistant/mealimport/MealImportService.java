@@ -220,6 +220,7 @@ class MealImportService implements MealImportFacade {
                 .suggestedOccurredAt(suggestedOccurredAt)
                 .questions(extractedData.questions())
                 .originalDescription(description)
+                .description(extractedData.description())
                 .build();
 
             draft = draftRepository.save(draft);
@@ -250,12 +251,84 @@ class MealImportService implements MealImportFacade {
             throw new DraftExpiredException(draftId);
         }
 
+        boolean hasAnswers = request.answers() != null && !request.answers().isEmpty();
+        boolean hasFeedback = request.userFeedback() != null && !request.userFeedback().isBlank();
+
+        if (hasAnswers || hasFeedback) {
+            log.info("Re-analyzing meal draft {} with user context", draftId);
+
+            ExtractedMealData currentExtraction = buildCurrentExtraction(draft);
+
+            try {
+                ExtractedMealData reAnalyzed = contentExtractor.reAnalyzeWithContext(
+                    draft.getOriginalDescription(),
+                    currentExtraction,
+                    request.answers(),
+                    request.userFeedback()
+                );
+
+                if (reAnalyzed.isValid()) {
+                    updateDraftFromExtraction(draft, reAnalyzed);
+                    draft.setUserFeedback(request.userFeedback());
+
+                    log.info("Re-analysis successful for draft {}: {} kcal -> {} kcal",
+                        draftId, currentExtraction.caloriesKcal(), reAnalyzed.caloriesKcal());
+                } else {
+                    log.warn("Re-analysis returned invalid result for draft {}: {}",
+                        draftId, reAnalyzed.validationError());
+                }
+            } catch (MealExtractionException e) {
+                log.warn("Re-analysis failed for draft {}, keeping original values: {}",
+                    draftId, e.getMessage());
+                if (hasAnswers) {
+                    draft.setAnswers(request.answers());
+                }
+                if (hasFeedback) {
+                    draft.setUserFeedback(request.userFeedback());
+                }
+            }
+        }
+
         draft.applyUpdate(request);
         draft = draftRepository.save(draft);
 
         log.info("Updated meal draft {} for device {}", draftId, deviceId.value());
 
         return mapToResponse(draft);
+    }
+
+    private ExtractedMealData buildCurrentExtraction(MealImportDraft draft) {
+        return ExtractedMealData.validWithQuestions(
+            draft.getSuggestedOccurredAt(),
+            draft.getTitle(),
+            draft.getDescription(),
+            draft.getMealType().name(),
+            draft.getCaloriesKcal(),
+            draft.getProteinGrams(),
+            draft.getFatGrams(),
+            draft.getCarbohydratesGrams(),
+            draft.getHealthRating().name(),
+            draft.getConfidence().doubleValue(),
+            draft.getQuestions()
+        );
+    }
+
+    private void updateDraftFromExtraction(MealImportDraft draft, ExtractedMealData extraction) {
+        draft.setTitle(extraction.title());
+        draft.setDescription(extraction.description());
+        draft.setMealType(MealType.valueOf(extraction.mealType()));
+        draft.setCaloriesKcal(extraction.caloriesKcal());
+        draft.setProteinGrams(extraction.proteinGrams());
+        draft.setFatGrams(extraction.fatGrams());
+        draft.setCarbohydratesGrams(extraction.carbohydratesGrams());
+        draft.setHealthRating(HealthRating.valueOf(extraction.healthRating()));
+        draft.setConfidence(BigDecimal.valueOf(extraction.confidence()));
+
+        if (extraction.occurredAt() != null) {
+            draft.setSuggestedOccurredAt(extraction.occurredAt());
+        }
+
+        draft.setQuestions(extraction.questions());
     }
 
     @Override
@@ -279,6 +352,7 @@ class MealImportService implements MealImportFacade {
         ExtractedMealData extractedData = ExtractedMealData.valid(
             occurredAt,
             draft.getTitle(),
+            draft.getDescription(),
             draft.getMealType().name(),
             draft.getCaloriesKcal(),
             draft.getProteinGrams(),
@@ -335,6 +409,7 @@ class MealImportService implements MealImportFacade {
         return MealDraftResponse.success(
             draft.getId().toString(),
             draft.getSuggestedOccurredAt(),
+            draft.getDescription(),
             new MealDraftResponse.MealData(
                 draft.getTitle(),
                 draft.getMealType().name(),

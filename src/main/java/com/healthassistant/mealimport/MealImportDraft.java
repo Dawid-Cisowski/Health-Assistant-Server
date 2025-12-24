@@ -80,6 +80,12 @@ class MealImportDraft {
     @Column(name = "original_description", columnDefinition = "TEXT")
     private String originalDescription;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "user_feedback", columnDefinition = "TEXT")
+    private String userFeedback;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private DraftStatus status;

@@ -336,6 +336,154 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         findAllEvents().size() == 1
     }
 
+    // ==================== DESCRIPTION FIELD TESTS ====================
+
+    def "Scenario 14: Analyze returns description with component breakdown"() {
+        given: "a meal description and AI mock returning valid meal data with description"
+        setupGeminiMealMock(createValidMealExtractionResponse())
+
+        when: "I analyze the meal description"
+        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Sałatka Cezar z kurczakiem")
+                .post(ANALYZE_ENDPOINT)
+                .then()
+                .extract()
+
+        then: "response contains description with component breakdown"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getString("status") == "draft"
+        body.getString("description") != null
+        body.getString("description").contains("Sałatka Cezar")
+        body.getString("description").contains("kurczak")
+    }
+
+    // ==================== RE-ANALYSIS TESTS ====================
+
+    def "Scenario 15: Update with answers triggers re-analysis and updates values"() {
+        given: "an existing draft with low confidence and questions"
+        setupGeminiMealMock(createLowConfidenceWithQuestionsResponse())
+        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Danie z kurczakiem")
+                .post(ANALYZE_ENDPOINT)
+                .then()
+                .extract()
+        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
+        def originalCalories = analyzeResponse.body().jsonPath().getInt("meal.caloriesKcal")
+
+        and: "AI mock for re-analysis returns updated values"
+        setupGeminiMealMock(createReAnalyzedLargePortionResponse())
+
+        when: "I update with answers to questions"
+        def updateRequest = [
+                answers: [
+                        [questionId: "q1", answer: "LARGE"],
+                        [questionId: "q2", answer: "BAKED"]
+                ]
+        ]
+        def response = authenticatedJsonRequest(DEVICE_ID, SECRET_BASE64, updateEndpoint, updateRequest)
+                .patch(updateEndpoint)
+                .then()
+                .extract()
+
+        then: "response contains re-analyzed values"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getString("status") == "draft"
+        body.getInt("meal.caloriesKcal") == 720
+        body.getInt("meal.caloriesKcal") != originalCalories
+        body.getString("meal.title").contains("duża porcja")
+        body.getString("description").contains("skorygowana analiza")
+    }
+
+    def "Scenario 16: Update with userFeedback triggers re-analysis"() {
+        given: "an existing draft"
+        setupGeminiMealMock(createValidMealExtractionResponse())
+        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Danie z kurczakiem")
+                .post(ANALYZE_ENDPOINT)
+                .then()
+                .extract()
+        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
+
+        and: "AI mock for re-analysis returns corrected values"
+        setupGeminiMealMock(createReAnalyzedWithFeedbackResponse())
+
+        when: "I update with user feedback correcting the meal"
+        def updateRequest = [
+                userFeedback: "To nie był kurczak tylko tofu, porcja była mała"
+        ]
+        def response = authenticatedJsonRequest(DEVICE_ID, SECRET_BASE64, updateEndpoint, updateRequest)
+                .patch(updateEndpoint)
+                .then()
+                .extract()
+
+        then: "response contains re-analyzed values based on feedback"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getString("status") == "draft"
+        body.getString("meal.title") == "Tofu z warzywami"
+        body.getInt("meal.caloriesKcal") == 260
+        body.getString("meal.healthRating") == "VERY_HEALTHY"
+    }
+
+    def "Scenario 17: Update with userFeedback can change date/time"() {
+        given: "an existing draft"
+        setupGeminiMealMock(createValidMealExtractionResponse())
+        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Sałatka")
+                .post(ANALYZE_ENDPOINT)
+                .then()
+                .extract()
+        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
+
+        and: "AI mock for re-analysis returns updated time"
+        setupGeminiMealMock(createReAnalyzedWithTimeChangeResponse())
+
+        when: "I update with feedback requesting time change"
+        def updateRequest = [
+                userFeedback: "To było wczoraj o 19:00, nie dzisiaj"
+        ]
+        def response = authenticatedJsonRequest(DEVICE_ID, SECRET_BASE64, updateEndpoint, updateRequest)
+                .patch(updateEndpoint)
+                .then()
+                .extract()
+
+        then: "response contains updated meal type and time"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getString("meal.mealType") == "DINNER"
+    }
+
+    def "Scenario 18: Manual edits override AI re-analysis"() {
+        given: "an existing draft"
+        setupGeminiMealMock(createLowConfidenceWithQuestionsResponse())
+        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Danie")
+                .post(ANALYZE_ENDPOINT)
+                .then()
+                .extract()
+        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
+
+        and: "AI mock for re-analysis"
+        setupGeminiMealMock(createReAnalyzedLargePortionResponse())
+
+        when: "I update with both answers (triggers re-analysis) AND manual meal edits"
+        def updateRequest = [
+                answers: [[questionId: "q1", answer: "LARGE"]],
+                meal: [caloriesKcal: 999, title: "Moja własna nazwa"]
+        ]
+        def response = authenticatedJsonRequest(DEVICE_ID, SECRET_BASE64, updateEndpoint, updateRequest)
+                .patch(updateEndpoint)
+                .then()
+                .extract()
+
+        then: "manual edits override AI values"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getInt("meal.caloriesKcal") == 999
+        body.getString("meal.title") == "Moja własna nazwa"
+    }
+
     // ==================== HELPER METHODS ====================
 
     def authenticatedMultipartRequestWithDescription(String deviceId, String secretBase64, String path, String description) {
@@ -387,6 +535,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
             "isMeal": true,
             "confidence": 0.85,
             "title": "Sałatka Cezar z kurczakiem",
+            "description": "Sałatka Cezar z kurczakiem - rozbicie składników:\\n\\n• Sałata rzymska (~100g): ~15 kcal, ~2g węglowodanów\\n• Pierś z kurczaka grillowana (~150g): ~250 kcal, ~30g białka\\n• Parmezan (~30g): ~120 kcal, ~8g białka, ~10g tłuszczu\\n• Grzanki (~30g): ~50 kcal, ~10g węglowodanów\\n• Sos Cezar (~30ml): ~15 kcal, ~2g tłuszczu",
             "mealType": "LUNCH",
             "occurredAt": null,
             "caloriesKcal": 450,
@@ -404,6 +553,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
             "isMeal": true,
             "confidence": 0.65,
             "title": "Danie z kurczakiem",
+            "description": "Danie z kurczakiem - wstępna analiza:\\n\\n• Kurczak (~200g): ~300-400 kcal (zależy od przygotowania)\\n• Dodatki: szacunkowe ~100-200 kcal",
             "mealType": "LUNCH",
             "occurredAt": null,
             "caloriesKcal": 500,
@@ -436,6 +586,60 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
             "isMeal": false,
             "confidence": 0.9,
             "validationError": "Not food-related content - appears to be about exercise"
+        }"""
+    }
+
+    String createReAnalyzedLargePortionResponse() {
+        return """{
+            "isMeal": true,
+            "confidence": 0.90,
+            "title": "Danie z kurczakiem (duża porcja)",
+            "description": "Danie z kurczakiem - skorygowana analiza (duża porcja):\\n\\n• Kurczak pieczony (~280g): ~420 kcal, ~56g białka\\n• Ryż (~200g): ~260 kcal, ~55g węglowodanów\\n• Warzywa (~100g): ~40 kcal",
+            "mealType": "LUNCH",
+            "occurredAt": null,
+            "caloriesKcal": 720,
+            "proteinGrams": 60,
+            "fatGrams": 28,
+            "carbohydratesGrams": 55,
+            "healthRating": "HEALTHY",
+            "validationError": null,
+            "questions": []
+        }"""
+    }
+
+    String createReAnalyzedWithFeedbackResponse() {
+        return """{
+            "isMeal": true,
+            "confidence": 0.92,
+            "title": "Tofu z warzywami",
+            "description": "Tofu z warzywami - skorygowana analiza:\\n\\n• Tofu (~150g): ~180 kcal, ~15g białka\\n• Warzywa mieszane (~200g): ~70 kcal\\n• Sos sojowy (~15ml): ~10 kcal",
+            "mealType": "LUNCH",
+            "occurredAt": null,
+            "caloriesKcal": 260,
+            "proteinGrams": 18,
+            "fatGrams": 12,
+            "carbohydratesGrams": 20,
+            "healthRating": "VERY_HEALTHY",
+            "validationError": null,
+            "questions": []
+        }"""
+    }
+
+    String createReAnalyzedWithTimeChangeResponse() {
+        return """{
+            "isMeal": true,
+            "confidence": 0.90,
+            "title": "Sałatka Cezar z kurczakiem",
+            "description": "Sałatka Cezar - analiza bez zmian, zaktualizowany czas",
+            "mealType": "DINNER",
+            "occurredAt": "2025-01-14T19:00:00Z",
+            "caloriesKcal": 450,
+            "proteinGrams": 35,
+            "fatGrams": 22,
+            "carbohydratesGrams": 28,
+            "healthRating": "HEALTHY",
+            "validationError": null,
+            "questions": []
         }"""
     }
 }

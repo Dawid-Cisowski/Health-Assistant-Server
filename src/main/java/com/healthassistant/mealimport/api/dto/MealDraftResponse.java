@@ -10,6 +10,7 @@ public record MealDraftResponse(
     String draftId,
     String status,
     Instant suggestedOccurredAt,
+    String description,
     MealData meal,
     Double confidence,
     List<ClarifyingQuestion> questions,
@@ -30,20 +31,21 @@ public record MealDraftResponse(
     public static MealDraftResponse success(
         String draftId,
         Instant suggestedOccurredAt,
+        String description,
         MealData meal,
         double confidence,
         List<ClarifyingQuestion> questions,
         Instant expiresAt
     ) {
         return new MealDraftResponse(
-            draftId, "draft", suggestedOccurredAt, meal,
+            draftId, "draft", suggestedOccurredAt, description, meal,
             confidence, questions, expiresAt, null
         );
     }
 
     public static MealDraftResponse failure(String errorMessage) {
         return new MealDraftResponse(
-            null, "failed", null, null,
+            null, "failed", null, null, null,
             null, null, null, errorMessage
         );
     }

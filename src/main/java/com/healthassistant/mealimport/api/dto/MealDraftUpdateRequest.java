@@ -9,7 +9,8 @@ import java.util.List;
 public record MealDraftUpdateRequest(
     MealUpdateData meal,
     Instant occurredAt,
-    List<QuestionAnswer> answers
+    List<QuestionAnswer> answers,
+    String userFeedback
 ) {
     public record MealUpdateData(
         String title,

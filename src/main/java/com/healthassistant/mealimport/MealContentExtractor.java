@@ -12,10 +12,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.healthassistant.mealimport.api.dto.QuestionAnswer;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -85,6 +88,20 @@ class MealContentExtractor {
             6. If time is mentioned in description, extract it; otherwise use null
             7. Report your confidence level (0.0 to 1.0)
             8. If confidence < 0.8 OR information is ambiguous, generate clarifying questions
+            9. ALWAYS provide detailed description with component breakdown
+
+            DESCRIPTION FIELD RULES:
+            - Write in Polish language
+            - List each identified component/ingredient separately
+            - For each component include: estimated weight/portion and nutritional contribution
+            - Show how total values were calculated
+            - Format as bullet points for readability
+            - Example format:
+              "Kurczak po wietnamsku - rozbicie skladnikow:\\n\\n" +
+              "• Ryz bialy gotowany (~150-180g): ~200 kcal, ~45g weglowodanow\\n" +
+              "• Kurczak w sosie z cebula (~200g): ~350 kcal, ~40g bialka, ~15g tluszczu\\n" +
+              "• Surowka z kapusty (~100g): ~80 kcal, ~5g tluszczu, ~8g weglowodanow\\n" +
+              "• Sos slodko-kwasny (~30ml): ~40 kcal, ~10g weglowodanow"
 
             CLARIFYING QUESTIONS RULES:
             - Generate 0-3 questions maximum
@@ -123,6 +140,7 @@ class MealContentExtractor {
               "isMeal": boolean,
               "confidence": number (0.0-1.0),
               "title": "dish name in Polish" or null,
+              "description": "detailed component breakdown in Polish" or null,
               "mealType": "LUNCH" | "DINNER" | etc.,
               "occurredAt": "ISO-8601 datetime" or null,
               "caloriesKcal": number,
@@ -186,6 +204,7 @@ class MealContentExtractor {
             Instant occurredAt = parseOccurredAt(root);
 
             String title = getTextOrNull(root, "title");
+            String description = getTextOrNull(root, "description");
             String mealType = getTextOrNull(root, "mealType");
             Integer caloriesKcal = getIntOrNull(root, "caloriesKcal");
             Integer proteinGrams = getIntOrNull(root, "proteinGrams");
@@ -208,7 +227,7 @@ class MealContentExtractor {
             List<ClarifyingQuestion> questions = parseQuestions(root);
 
             return ExtractedMealData.validWithQuestions(
-                occurredAt, title, mealType,
+                occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
                 healthRating, confidence, questions
             );
@@ -311,5 +330,121 @@ class MealContentExtractor {
             return null;
         }
         return node.asInt();
+    }
+
+    ExtractedMealData reAnalyzeWithContext(
+            String originalDescription,
+            ExtractedMealData previousExtraction,
+            List<QuestionAnswer> answers,
+            String userFeedback
+    ) {
+        log.info("Re-analyzing meal with context. Has answers: {}, has feedback: {}",
+            answers != null && !answers.isEmpty(),
+            userFeedback != null && !userFeedback.isBlank());
+
+        String reAnalysisPrompt = buildReAnalysisPrompt(originalDescription, previousExtraction, answers, userFeedback);
+
+        try {
+            String response = chatClient.prompt()
+                .system(buildReAnalysisSystemPrompt())
+                .user(reAnalysisPrompt)
+                .call()
+                .content();
+
+            return parseExtractionResponse(response);
+        } catch (Exception e) {
+            log.error("Re-analysis failed: {}", e.getMessage(), e);
+            throw new MealExtractionException("Failed to re-analyze meal: " + e.getMessage(), e);
+        }
+    }
+
+    private String buildReAnalysisSystemPrompt() {
+        return """
+            You are a nutrition expert correcting a previous meal analysis based on user feedback.
+
+            Your task is to adjust the nutritional estimates based on the new information provided.
+
+            IMPORTANT RULES:
+            1. Return ONLY valid JSON without any additional text
+            2. All numeric fields must be numbers (not strings)
+            3. Adjust estimates based on user corrections
+            4. If user says portion was larger/smaller, scale all values accordingly
+            5. If user corrects an ingredient, recalculate affected nutrients
+            6. If user specifies a different time, update occurredAt
+            7. Update the description to reflect the corrected analysis
+            8. Do NOT generate new questions - the user has already provided clarification
+
+            RESPONSE FORMAT (same as initial analysis):
+            {
+              "isMeal": true,
+              "confidence": number (0.0-1.0),
+              "title": "dish name in Polish",
+              "description": "corrected component breakdown in Polish",
+              "mealType": "LUNCH" | "DINNER" | etc.,
+              "occurredAt": "ISO-8601 datetime" or null,
+              "caloriesKcal": number,
+              "proteinGrams": number,
+              "fatGrams": number,
+              "carbohydratesGrams": number,
+              "healthRating": "HEALTHY" | "NEUTRAL" | etc.,
+              "questions": []
+            }
+
+            ADJUSTMENT GUIDELINES:
+            - Small portion: multiply by 0.7
+            - Large portion: multiply by 1.4
+            - Fried vs baked: fried adds ~30% more fat and calories
+            - With sauce vs without: sauce adds ~50-100 kcal
+            - If user says "it was X not Y", replace the ingredient completely
+            """;
+    }
+
+    private String buildReAnalysisPrompt(
+            String originalDescription,
+            ExtractedMealData previousExtraction,
+            List<QuestionAnswer> answers,
+            String userFeedback
+    ) {
+        StringBuilder prompt = new StringBuilder();
+
+        prompt.append("POPRZEDNIA ANALIZA POSILKU:\n");
+        prompt.append("- Tytul: ").append(previousExtraction.title()).append("\n");
+        if (previousExtraction.description() != null) {
+            prompt.append("- Opis: ").append(previousExtraction.description()).append("\n");
+        }
+        prompt.append("- Kalorie: ").append(previousExtraction.caloriesKcal()).append(" kcal\n");
+        prompt.append("- Bialko: ").append(previousExtraction.proteinGrams()).append("g\n");
+        prompt.append("- Tluszcz: ").append(previousExtraction.fatGrams()).append("g\n");
+        prompt.append("- Weglowodany: ").append(previousExtraction.carbohydratesGrams()).append("g\n");
+        prompt.append("- Ocena zdrowotna: ").append(previousExtraction.healthRating()).append("\n");
+        prompt.append("- Typ posilku: ").append(previousExtraction.mealType()).append("\n");
+        if (previousExtraction.occurredAt() != null) {
+            prompt.append("- Data/czas: ").append(previousExtraction.occurredAt()).append("\n");
+        }
+        prompt.append("\n");
+
+        if (originalDescription != null && !originalDescription.isBlank()) {
+            prompt.append("ORYGINALNY OPIS UZYTKOWNIKA:\n");
+            prompt.append(originalDescription).append("\n\n");
+        }
+
+        if (answers != null && !answers.isEmpty()) {
+            prompt.append("ODPOWIEDZI NA PYTANIA:\n");
+            for (QuestionAnswer answer : answers) {
+                prompt.append("- ").append(answer.questionId()).append(": ").append(answer.answer()).append("\n");
+            }
+            prompt.append("\n");
+        }
+
+        if (userFeedback != null && !userFeedback.isBlank()) {
+            prompt.append("KOMENTARZ/POPRAWKA UZYTKOWNIKA:\n");
+            prompt.append(userFeedback).append("\n\n");
+        }
+
+        prompt.append("Skoryguj analize na podstawie powyzszych informacji. ");
+        prompt.append("Zaktualizuj wartosci odzywcze i opis zgodnie z poprawkami uzytkownika. ");
+        prompt.append("Zwroc pelny JSON z zaktualizowanymi wartosciami.");
+
+        return prompt.toString();
     }
 }

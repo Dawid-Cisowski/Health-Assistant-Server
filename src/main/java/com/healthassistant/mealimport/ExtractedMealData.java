@@ -10,6 +10,7 @@ record ExtractedMealData(
         String validationError,
         Instant occurredAt,
         String title,
+        String description,
         String mealType,
         Integer caloriesKcal,
         Integer proteinGrams,
@@ -22,6 +23,7 @@ record ExtractedMealData(
     static ExtractedMealData valid(
             Instant occurredAt,
             String title,
+            String description,
             String mealType,
             Integer caloriesKcal,
             Integer proteinGrams,
@@ -31,7 +33,7 @@ record ExtractedMealData(
             double confidence
     ) {
         return new ExtractedMealData(
-                true, null, occurredAt, title, mealType,
+                true, null, occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
                 healthRating, confidence, List.of()
         );
@@ -40,6 +42,7 @@ record ExtractedMealData(
     static ExtractedMealData validWithQuestions(
             Instant occurredAt,
             String title,
+            String description,
             String mealType,
             Integer caloriesKcal,
             Integer proteinGrams,
@@ -50,7 +53,7 @@ record ExtractedMealData(
             List<ClarifyingQuestion> questions
     ) {
         return new ExtractedMealData(
-                true, null, occurredAt, title, mealType,
+                true, null, occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
                 healthRating, confidence, questions != null ? questions : List.of()
         );
@@ -58,7 +61,7 @@ record ExtractedMealData(
 
     static ExtractedMealData invalid(String error, double confidence) {
         return new ExtractedMealData(
-                false, error, null, null, null,
+                false, error, null, null, null, null,
                 null, null, null, null,
                 null, confidence, List.of()
         );
