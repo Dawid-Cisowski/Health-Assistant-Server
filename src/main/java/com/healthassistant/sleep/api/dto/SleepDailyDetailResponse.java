@@ -95,6 +95,10 @@ public record SleepDailyDetailResponse(
 
         @JsonProperty("awakeMinutes")
         @Schema(description = "Awake minutes during session (future support)", example = "20")
-        Integer awakeMinutes
+        Integer awakeMinutes,
+
+        @JsonProperty("sleepScore")
+        @Schema(description = "Sleep quality score (0-100)", example = "83")
+        Integer sleepScore
     ) {}
 }

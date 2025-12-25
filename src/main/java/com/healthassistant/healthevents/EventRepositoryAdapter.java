@@ -8,15 +8,19 @@ import com.healthassistant.healthevents.api.model.EventId;
 import com.healthassistant.healthevents.api.model.EventType;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 class EventRepositoryAdapter implements EventRepository {
 
     private final HealthEventJpaRepository jpaRepository;
@@ -108,5 +112,49 @@ class EventRepositoryAdapter implements EventRepository {
     private EventPayload toPayload(EventType eventType, Map<String, Object> map) {
         Class<? extends EventPayload> clazz = EventPayload.payloadClassFor(eventType);
         return objectMapper.convertValue(map, clazz);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<IdempotencyKey> findSleepIdempotencyKeyByDeviceIdAndSleepStart(DeviceId deviceId, Instant sleepStart) {
+        log.debug("Looking for sleep event with deviceId={}, sleepStart={}", deviceId.value(), sleepStart);
+
+        List<HealthEventJpaEntity> sleepEvents = jpaRepository.findByDeviceIdAndEventType(
+                deviceId.value(),
+                "SleepSessionRecorded.v1"
+        );
+
+        for (HealthEventJpaEntity entity : sleepEvents) {
+            Object sleepStartObj = entity.getPayload().get("sleepStart");
+            if (sleepStartObj != null) {
+                Instant storedSleepStart = parseStoredInstant(sleepStartObj);
+                if (storedSleepStart != null && storedSleepStart.equals(sleepStart)) {
+                    log.debug("Found matching sleep event with idempotencyKey={}", entity.getIdempotencyKey());
+                    return Optional.of(IdempotencyKey.of(entity.getIdempotencyKey()));
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Instant parseStoredInstant(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            // Epoch seconds format (possibly with fractional seconds)
+            double epochSeconds = ((Number) value).doubleValue();
+            return Instant.ofEpochSecond((long) epochSeconds);
+        }
+        if (value instanceof String) {
+            try {
+                return Instant.parse((String) value);
+            } catch (Exception e) {
+                log.warn("Failed to parse instant from string: {}", value);
+                return null;
+            }
+        }
+        return null;
     }
 }

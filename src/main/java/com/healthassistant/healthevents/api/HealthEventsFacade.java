@@ -3,9 +3,12 @@ package com.healthassistant.healthevents.api;
 import com.healthassistant.healthevents.api.dto.EventData;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
+import com.healthassistant.healthevents.api.model.DeviceId;
+import com.healthassistant.healthevents.api.model.IdempotencyKey;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface HealthEventsFacade {
     StoreHealthEventsResult storeHealthEvents(StoreHealthEventsCommand command);
@@ -13,4 +16,6 @@ public interface HealthEventsFacade {
     List<EventData> findEventsByOccurredAtBetween(Instant start, Instant end);
 
     void deleteAllEvents();
+
+    Optional<IdempotencyKey> findExistingSleepIdempotencyKey(DeviceId deviceId, Instant sleepStart);
 }

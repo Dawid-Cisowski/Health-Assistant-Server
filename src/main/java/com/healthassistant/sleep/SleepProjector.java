@@ -114,6 +114,13 @@ class SleepProjector {
                 .mapToInt(s -> s.getAwakeMinutes() != null ? s.getAwakeMinutes() : 0)
                 .sum();
 
+        List<Integer> scores = sessions.stream()
+                .map(SleepSessionProjectionJpaEntity::getSleepScore)
+                .filter(Objects::nonNull)
+                .toList();
+        Integer averageSleepScore = scores.isEmpty() ? null :
+                (int) scores.stream().mapToInt(Integer::intValue).average().orElse(0);
+
         SleepDailyProjectionJpaEntity daily = dailyRepository.findByDate(date)
                 .orElseGet(() -> SleepDailyProjectionJpaEntity.builder()
                         .date(date)
@@ -130,6 +137,7 @@ class SleepProjector {
         daily.setTotalDeepSleepMinutes(totalDeepSleep);
         daily.setTotalRemSleepMinutes(totalRemSleep);
         daily.setTotalAwakeMinutes(totalAwake);
+        daily.setAverageSleepScore(averageSleepScore);
 
         dailyRepository.save(daily);
     }

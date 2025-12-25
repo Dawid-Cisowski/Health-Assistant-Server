@@ -12,4 +12,6 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
     List<HealthEventJpaEntity> findByIdempotencyKeyIn(List<String> idempotencyKeys);
 
     List<HealthEventJpaEntity> findByOccurredAtBetween(Instant start, Instant end);
+
+    List<HealthEventJpaEntity> findByDeviceIdAndEventType(String deviceId, String eventType);
 }

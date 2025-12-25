@@ -1,0 +1,81 @@
+package com.healthassistant.sleepimport.api.dto;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.time.Instant;
+
+@Schema(description = "Response from sleep import operation")
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record SleepImportResponse(
+        @Schema(description = "Import status: 'success' or 'failed'", example = "success")
+        String status,
+
+        @Schema(description = "Generated sleep ID", example = "ohealth-import-2025-12-25-abc12345")
+        String sleepId,
+
+        @Schema(description = "Event ID if stored", example = "550e8400-e29b-41d4-a716-446655440000")
+        String eventId,
+
+        @Schema(description = "Sleep start time (bedtime)", example = "2025-12-24T23:08:00Z")
+        Instant sleepStart,
+
+        @Schema(description = "Sleep end time (wake time)", example = "2025-12-25T06:14:00Z")
+        Instant sleepEnd,
+
+        @Schema(description = "Total sleep duration in minutes", example = "427")
+        Integer totalSleepMinutes,
+
+        @Schema(description = "Sleep quality score 0-100", example = "83")
+        Integer sleepScore,
+
+        @Schema(description = "Light sleep phase minutes", example = "180")
+        Integer lightSleepMinutes,
+
+        @Schema(description = "Deep sleep phase minutes", example = "120")
+        Integer deepSleepMinutes,
+
+        @Schema(description = "REM sleep phase minutes", example = "90")
+        Integer remSleepMinutes,
+
+        @Schema(description = "Awake time during sleep in minutes", example = "37")
+        Integer awakeMinutes,
+
+        @Schema(description = "AI confidence level 0.0-1.0", example = "0.95")
+        Double confidence,
+
+        @Schema(description = "Whether this import overwrote an existing sleep record")
+        Boolean overwrote,
+
+        @Schema(description = "Error message if import failed")
+        String errorMessage
+) {
+    public static SleepImportResponse success(
+            String sleepId,
+            String eventId,
+            Instant sleepStart,
+            Instant sleepEnd,
+            Integer totalSleepMinutes,
+            Integer sleepScore,
+            Integer lightSleepMinutes,
+            Integer deepSleepMinutes,
+            Integer remSleepMinutes,
+            Integer awakeMinutes,
+            double confidence,
+            boolean overwrote
+    ) {
+        return new SleepImportResponse(
+                "success", sleepId, eventId, sleepStart, sleepEnd,
+                totalSleepMinutes, sleepScore,
+                lightSleepMinutes, deepSleepMinutes, remSleepMinutes, awakeMinutes,
+                confidence, overwrote, null
+        );
+    }
+
+    public static SleepImportResponse failure(String errorMessage) {
+        return new SleepImportResponse(
+                "failed", null, null, null, null, null, null,
+                null, null, null, null, null, null, errorMessage
+        );
+    }
+}

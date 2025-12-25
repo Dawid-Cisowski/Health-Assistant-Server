@@ -13,6 +13,7 @@ record SleepSession(
         Instant sleepEnd,
         SleepDuration duration,
         SleepStages stages,
+        Integer sleepScore,
         String originPackage
 ) {
 
@@ -40,7 +41,7 @@ record SleepSession(
     ) {
         LocalDate date = sleepEnd.atZone(POLAND_ZONE).toLocalDate();
         SleepDuration duration = SleepDuration.of(totalMinutes);
-        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, SleepStages.EMPTY, originPackage);
+        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, SleepStages.EMPTY, null, originPackage);
     }
 
     static SleepSession create(
@@ -54,7 +55,22 @@ record SleepSession(
     ) {
         LocalDate date = sleepEnd.atZone(POLAND_ZONE).toLocalDate();
         SleepDuration duration = SleepDuration.of(totalMinutes);
-        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, stages, originPackage);
+        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, stages, null, originPackage);
+    }
+
+    static SleepSession create(
+            String sleepId,
+            String eventId,
+            Instant sleepStart,
+            Instant sleepEnd,
+            int totalMinutes,
+            SleepStages stages,
+            Integer sleepScore,
+            String originPackage
+    ) {
+        LocalDate date = sleepEnd.atZone(POLAND_ZONE).toLocalDate();
+        SleepDuration duration = SleepDuration.of(totalMinutes);
+        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, stages, sleepScore, originPackage);
     }
 
     boolean hasValidDuration() {

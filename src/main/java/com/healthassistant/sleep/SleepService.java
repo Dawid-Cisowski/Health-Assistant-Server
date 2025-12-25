@@ -51,6 +51,7 @@ public class SleepService implements SleepFacade {
                 .deepSleepMinutes(s.getDeepSleepMinutes())
                 .remSleepMinutes(s.getRemSleepMinutes())
                 .awakeMinutes(s.getAwakeMinutes())
+                .sleepScore(s.getSleepScore())
                 .build())
             .toList();
 

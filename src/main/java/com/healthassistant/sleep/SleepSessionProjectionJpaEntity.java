@@ -49,6 +49,9 @@ class SleepSessionProjectionJpaEntity {
     @Column(name = "awake_minutes")
     private Integer awakeMinutes;
 
+    @Column(name = "sleep_score")
+    private Integer sleepScore;
+
     @Column(name = "origin_package")
     private String originPackage;
 
@@ -85,6 +88,7 @@ class SleepSessionProjectionJpaEntity {
                 .deepSleepMinutes(session.stages().deepMinutes())
                 .remSleepMinutes(session.stages().remMinutes())
                 .awakeMinutes(session.stages().awakeMinutes())
+                .sleepScore(session.sleepScore())
                 .originPackage(session.originPackage())
                 .build();
     }
@@ -97,6 +101,7 @@ class SleepSessionProjectionJpaEntity {
         this.deepSleepMinutes = session.stages().deepMinutes();
         this.remSleepMinutes = session.stages().remMinutes();
         this.awakeMinutes = session.stages().awakeMinutes();
+        this.sleepScore = session.sleepScore();
         this.originPackage = session.originPackage();
     }
 }

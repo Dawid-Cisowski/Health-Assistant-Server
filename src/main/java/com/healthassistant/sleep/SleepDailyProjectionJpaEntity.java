@@ -62,6 +62,9 @@ class SleepDailyProjectionJpaEntity {
     @Builder.Default
     private Integer totalAwakeMinutes = 0;
 
+    @Column(name = "average_sleep_score")
+    private Integer averageSleepScore;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

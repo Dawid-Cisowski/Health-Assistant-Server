@@ -14,7 +14,9 @@ import com.healthassistant.healthevents.api.dto.events.SleepEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.WorkoutEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
+import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.EventType;
+import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,6 +29,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -49,6 +52,7 @@ class HealthEventsService implements HealthEventsFacade {
     private final StoreHealthEventsCommandHandler commandHandler;
     private final ApplicationEventPublisher eventPublisher;
     private final HealthEventJpaRepository healthEventJpaRepository;
+    private final EventRepository eventRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -183,5 +187,11 @@ class HealthEventsService implements HealthEventsFacade {
     public void deleteAllEvents() {
         log.warn("Deleting all health events");
         healthEventJpaRepository.deleteAll();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<IdempotencyKey> findExistingSleepIdempotencyKey(DeviceId deviceId, Instant sleepStart) {
+        return eventRepository.findSleepIdempotencyKeyByDeviceIdAndSleepStart(deviceId, sleepStart);
     }
 }
