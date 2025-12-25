@@ -233,8 +233,11 @@ class MealContentExtractor {
             );
 
         } catch (JsonProcessingException e) {
+            log.error("Failed to parse AI response as JSON. Error: {}. Response snippet: {}",
+                e.getMessage(),
+                response != null && response.length() > 300 ? response.substring(0, 300) + "..." : response);
             throw new MealExtractionException(
-                "Failed to parse AI response as JSON: " + e.getMessage(), e
+                "Failed to parse AI response as JSON: " + e.getOriginalMessage(), e
             );
         }
     }
@@ -288,19 +291,42 @@ class MealContentExtractor {
     }
 
     private String cleanJsonResponse(String response) {
-        if (response == null) {
+        if (response == null || response.isBlank()) {
+            log.warn("AI returned null or blank response");
             return "{}";
         }
+
         String cleaned = response.trim();
+        log.debug("Raw AI response (first 500 chars): {}",
+            cleaned.length() > 500 ? cleaned.substring(0, 500) + "..." : cleaned);
+
+        // Remove markdown code blocks - handle various formats
         if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```JSON")) {
             cleaned = cleaned.substring(7);
         } else if (cleaned.startsWith("```")) {
             cleaned = cleaned.substring(3);
         }
+
         if (cleaned.endsWith("```")) {
             cleaned = cleaned.substring(0, cleaned.length() - 3);
         }
-        return cleaned.trim();
+
+        cleaned = cleaned.trim();
+
+        // Try to extract JSON if response contains extra text
+        int jsonStart = cleaned.indexOf('{');
+        int jsonEnd = cleaned.lastIndexOf('}');
+
+        if (jsonStart >= 0 && jsonEnd > jsonStart) {
+            cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+        } else {
+            log.warn("Could not find JSON object in response: {}",
+                cleaned.length() > 200 ? cleaned.substring(0, 200) + "..." : cleaned);
+        }
+
+        return cleaned;
     }
 
     private Instant parseOccurredAt(JsonNode root) {
