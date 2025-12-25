@@ -95,13 +95,9 @@ class MealContentExtractor {
             - List each identified component/ingredient separately
             - For each component include: estimated weight/portion and nutritional contribution
             - Show how total values were calculated
-            - Format as bullet points for readability
-            - Example format:
-              "Kurczak po wietnamsku - rozbicie skladnikow:\\n\\n" +
-              "• Ryz bialy gotowany (~150-180g): ~200 kcal, ~45g weglowodanow\\n" +
-              "• Kurczak w sosie z cebula (~200g): ~350 kcal, ~40g bialka, ~15g tluszczu\\n" +
-              "• Surowka z kapusty (~100g): ~80 kcal, ~5g tluszczu, ~8g weglowodanow\\n" +
-              "• Sos slodko-kwasny (~30ml): ~40 kcal, ~10g weglowodanow"
+            - Format as bullet points using newline characters
+            - Use \\n for newlines in JSON string (NOT string concatenation with +)
+            - Example: "Kurczak - skladniki:\\n• Ryz (~150g): ~200 kcal\\n• Kurczak (~200g): ~350 kcal"
 
             CLARIFYING QUESTIONS RULES:
             - Generate 0-3 questions maximum
