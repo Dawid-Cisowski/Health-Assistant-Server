@@ -38,6 +38,15 @@ class DailySummaryJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "ai_summary", columnDefinition = "TEXT")
+    private String aiSummary;
+
+    @Column(name = "ai_summary_generated_at")
+    private Instant aiSummaryGeneratedAt;
+
+    @Column(name = "last_event_at")
+    private Instant lastEventAt;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

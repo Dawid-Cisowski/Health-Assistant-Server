@@ -8,7 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -27,6 +29,7 @@ class AiDailySummaryService {
     private static final int GOAL_ACTIVITY_MINUTES = 300;
 
     private final DailySummaryFacade dailySummaryFacade;
+    private final DailySummaryJpaRepository repository;
     private final ChatClient chatClient;
 
     private static final String SYSTEM_PROMPT = """
@@ -70,14 +73,49 @@ class AiDailySummaryService {
         - "solidnie sie narobiles na silce, tylko ten sen moglby byc dluzszy"
         """;
 
+    @Transactional
     public AiDailySummaryResponse generateSummary(LocalDate date) {
         log.info("Generating AI daily summary for date: {}", date);
 
+        var entityOpt = repository.findByDate(date);
+        if (entityOpt.isEmpty()) {
+            log.info("No daily summary entity found for date: {}", date);
+            return AiDailySummaryResponse.noData(date);
+        }
+
+        DailySummaryJpaEntity entity = entityOpt.get();
+
+        if (isCacheValid(entity)) {
+            log.info("Returning cached AI summary for date: {} (generated at: {})",
+                    date, entity.getAiSummaryGeneratedAt());
+            return new AiDailySummaryResponse(date, entity.getAiSummary(), true);
+        }
+
         String timeOfDay = getTimeOfDayContext();
         return dailySummaryFacade.getDailySummary(date)
-                .map(summary -> generateFromData(summary, timeOfDay))
-                .map(text -> new AiDailySummaryResponse(date, text, true))
+                .map(summary -> {
+                    String aiText = generateFromData(summary, timeOfDay);
+                    cacheAiSummary(entity, aiText);
+                    return new AiDailySummaryResponse(date, aiText, true);
+                })
                 .orElse(AiDailySummaryResponse.noData(date));
+    }
+
+    private boolean isCacheValid(DailySummaryJpaEntity entity) {
+        if (entity.getAiSummary() == null || entity.getAiSummaryGeneratedAt() == null) {
+            return false;
+        }
+        if (entity.getLastEventAt() == null) {
+            return true;
+        }
+        return !entity.getLastEventAt().isAfter(entity.getAiSummaryGeneratedAt());
+    }
+
+    private void cacheAiSummary(DailySummaryJpaEntity entity, String aiSummary) {
+        entity.setAiSummary(aiSummary);
+        entity.setAiSummaryGeneratedAt(Instant.now());
+        repository.save(entity);
+        log.info("Cached AI summary for date: {}", entity.getDate());
     }
 
     private String getTimeOfDayContext() {
