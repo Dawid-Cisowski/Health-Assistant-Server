@@ -4,6 +4,8 @@ import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.model.DeviceId;
+import com.healthassistant.meals.api.MealsFacade;
+import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.mealimport.api.MealImportFacade;
 import com.healthassistant.mealimport.api.dto.MealDraftResponse;
 import com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest;
@@ -19,6 +21,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -40,6 +44,7 @@ class MealImportService implements MealImportFacade {
     private final MealEventMapper eventMapper;
     private final HealthEventsFacade healthEventsFacade;
     private final MealImportDraftRepository draftRepository;
+    private final MealsFacade mealsFacade;
 
     @Override
     public MealImportResponse importMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
@@ -52,7 +57,8 @@ class MealImportService implements MealImportFacade {
         }
 
         try {
-            ExtractedMealData extractedData = contentExtractor.extract(description, images);
+            MealTimeContext timeContext = buildMealTimeContext();
+            ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
                     deviceId.value(), extractedData.validationError());
@@ -193,7 +199,8 @@ class MealImportService implements MealImportFacade {
         }
 
         try {
-            ExtractedMealData extractedData = contentExtractor.extract(description, images);
+            MealTimeContext timeContext = buildMealTimeContext();
+            ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
                     deviceId.value(), extractedData.validationError());
@@ -423,5 +430,22 @@ class MealImportService implements MealImportFacade {
             draft.getQuestions(),
             draft.getExpiresAt()
         );
+    }
+
+    private MealTimeContext buildMealTimeContext() {
+        LocalDate today = LocalDate.now(MealTimeContext.POLAND_ZONE);
+        LocalTime now = LocalTime.now(MealTimeContext.POLAND_ZONE);
+
+        MealDailyDetailResponse todayMeals = mealsFacade.getDailyDetail(today);
+
+        List<MealTimeContext.TodaysMeal> meals = todayMeals.meals().stream()
+            .map(m -> new MealTimeContext.TodaysMeal(
+                m.mealType(),
+                m.occurredAt(),
+                m.title()
+            ))
+            .toList();
+
+        return new MealTimeContext(now, today, meals);
     }
 }

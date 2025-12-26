@@ -28,25 +28,26 @@ class MealContentExtractor {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
 
-    ExtractedMealData extract(String description, List<MultipartFile> images) {
-        log.info("Extracting meal data from description: {}, images: {}",
+    ExtractedMealData extract(String description, List<MultipartFile> images, MealTimeContext timeContext) {
+        log.info("Extracting meal data from description: {}, images: {}, time: {}",
             description != null ? description.length() + " chars" : "none",
-            images != null ? images.size() : 0);
+            images != null ? images.size() : 0,
+            timeContext != null ? timeContext.formatCurrentTime() : "none");
 
         try {
-            String response = callAI(description, images);
+            String response = callAI(description, images, timeContext);
             return parseExtractionResponse(response);
         } catch (IOException e) {
             throw new MealExtractionException("Failed to read image data: " + e.getMessage(), e);
         }
     }
 
-    private String callAI(String description, List<MultipartFile> images) throws IOException {
+    private String callAI(String description, List<MultipartFile> images, MealTimeContext timeContext) throws IOException {
         var promptBuilder = chatClient.prompt()
-            .system(buildSystemPrompt());
+            .system(buildSystemPrompt(timeContext));
 
         return promptBuilder.user(userSpec -> {
-            userSpec.text(buildUserPrompt(description, images));
+            userSpec.text(buildUserPrompt(description, images, timeContext));
 
             if (images != null && !images.isEmpty()) {
                 for (MultipartFile image : images) {
@@ -73,8 +74,10 @@ class MealContentExtractor {
         return contentType;
     }
 
-    private String buildSystemPrompt() {
-        return """
+    private String buildSystemPrompt(MealTimeContext timeContext) {
+        String timeInfo = buildTimeContextInfo(timeContext);
+
+        return timeInfo + """
             You are a nutrition expert analyzing meals from photos and/or descriptions.
 
             Your task is to estimate nutritional values and return them as JSON.
@@ -89,6 +92,7 @@ class MealContentExtractor {
             7. Report your confidence level (0.0 to 1.0)
             8. If confidence < 0.8 OR information is ambiguous, generate clarifying questions
             9. ALWAYS provide detailed description with component breakdown
+            10. Report mealTypeConfidence (0.0 to 1.0) - your confidence in the meal type determination
 
             DESCRIPTION FIELD RULES:
             - Write in Polish language
@@ -108,21 +112,42 @@ class MealContentExtractor {
               * Unclear portion size (mala/srednia/duza porcja)
               * Multiple preparation methods possible (smazony/pieczony/gotowany)
               * Missing key ingredients (z sosem/bez sosu)
-              * Ambiguous meal type
+              * Ambiguous meal type (if mealTypeConfidence < 0.5, add question about meal type)
 
             QUESTION TYPES:
             - SINGLE_CHOICE: Provide 2-4 options
             - YES_NO: Boolean question
             - FREE_TEXT: Open answer (use sparingly)
 
-            MEAL TYPES (choose one):
-            - BREAKFAST: Morning meal (7-10am typical)
-            - BRUNCH: Late morning (10am-12pm)
-            - LUNCH: Midday meal (12-3pm)
-            - DINNER: Evening meal (5-9pm)
-            - SNACK: Small meal between main meals
-            - DESSERT: Sweet course
-            - DRINK: Beverages (coffee, smoothie, etc.)
+            MEAL TYPE DETERMINATION RULES (mealType):
+
+            Priority 1 - Context from description/photo:
+            - If user explicitly specifies type (e.g., "breakfast", "dinner", "lunch"), use it
+
+            Priority 2 - Time of day + today's meals context:
+            - 06:00-10:00 (morning):
+              * If NO breakfast yet -> BREAKFAST
+              * If breakfast EXISTS and small meal -> BRUNCH (second breakfast)
+              * If large meal -> LUNCH
+            - 10:00-12:00 (late morning):
+              * If NO breakfast -> BREAKFAST (late breakfast)
+              * Small meal -> BRUNCH
+              * Large meal -> LUNCH
+            - 12:00-15:00 (midday):
+              * Large meal -> LUNCH
+              * Small meal -> SNACK
+            - 15:00-17:00 (afternoon):
+              * Usually -> SNACK
+              * Large meal without lunch -> LUNCH
+            - 17:00-21:00 (evening):
+              * Large meal -> DINNER
+              * Small meal -> SNACK
+            - 21:00-06:00 (night):
+              * -> SNACK
+
+            Priority 3 - Type of food:
+            - Beverages (coffee, tea, smoothie, juice) -> DRINK
+            - Sweets, cakes, ice cream, cookies -> DESSERT
 
             HEALTH RATINGS:
             - VERY_HEALTHY: Salads, lean proteins, vegetables
@@ -135,9 +160,10 @@ class MealContentExtractor {
             {
               "isMeal": boolean,
               "confidence": number (0.0-1.0),
+              "mealTypeConfidence": number (0.0-1.0),
               "title": "dish name in Polish" or null,
               "description": "detailed component breakdown in Polish" or null,
-              "mealType": "LUNCH" | "DINNER" | etc.,
+              "mealType": "BREAKFAST" | "BRUNCH" | "LUNCH" | "DINNER" | "SNACK" | "DESSERT" | "DRINK",
               "occurredAt": "ISO-8601 datetime" or null,
               "caloriesKcal": number,
               "proteinGrams": number,
@@ -165,7 +191,21 @@ class MealContentExtractor {
             """;
     }
 
-    private String buildUserPrompt(String description, List<MultipartFile> images) {
+    private String buildTimeContextInfo(MealTimeContext timeContext) {
+        if (timeContext == null) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("CURRENT TIME: ").append(timeContext.formatCurrentTime()).append("\n");
+        sb.append("CURRENT DATE: ").append(timeContext.currentDate()).append("\n\n");
+        sb.append("TODAY'S MEALS:\n");
+        sb.append(timeContext.formatMealsForPrompt()).append("\n\n");
+
+        return sb.toString();
+    }
+
+    private String buildUserPrompt(String description, List<MultipartFile> images, MealTimeContext timeContext) {
         StringBuilder prompt = new StringBuilder("Analyze this meal.\n");
 
         if (description != null && !description.isBlank()) {
@@ -176,9 +216,28 @@ class MealContentExtractor {
             prompt.append("Photos attached showing the meal (").append(images.size()).append(" image(s)).\n");
         }
 
+        if (timeContext != null) {
+            prompt.append("\nCurrent time context for meal type inference:\n");
+            prompt.append("- Time: ").append(timeContext.formatCurrentTime()).append("\n");
+            prompt.append("- Date: ").append(timeContext.currentDate()).append("\n");
+            if (timeContext.hasBreakfast()) {
+                prompt.append("- User already had breakfast today\n");
+            }
+            if (timeContext.hasBrunch()) {
+                prompt.append("- User already had brunch today\n");
+            }
+            if (timeContext.hasLunch()) {
+                prompt.append("- User already had lunch today\n");
+            }
+            if (timeContext.hasDinner()) {
+                prompt.append("- User already had dinner today\n");
+            }
+        }
+
         prompt.append("\nExtract nutritional information and return as JSON.\n");
+        prompt.append("Include mealTypeConfidence field indicating your confidence in the meal type determination.\n");
         prompt.append("If this is not food-related, return:\n");
-        prompt.append("{\"isMeal\": false, \"confidence\": X, \"validationError\": \"Reason\"}");
+        prompt.append("{\"isMeal\": false, \"confidence\": X, \"mealTypeConfidence\": 0, \"validationError\": \"Reason\"}");
 
         return prompt.toString();
     }
@@ -220,7 +279,14 @@ class MealContentExtractor {
                 healthRating = "NEUTRAL";
             }
 
+            double mealTypeConfidence = root.path("mealTypeConfidence").asDouble(1.0);
             List<ClarifyingQuestion> questions = parseQuestions(root);
+
+            if (mealTypeConfidence < 0.5 && !hasMealTypeQuestion(questions)) {
+                questions = new ArrayList<>(questions);
+                questions.add(createMealTypeQuestion());
+                log.debug("Added meal type clarifying question due to low confidence: {}", mealTypeConfidence);
+            }
 
             return ExtractedMealData.validWithQuestions(
                 occurredAt, title, description, mealType,
@@ -286,6 +352,22 @@ class MealContentExtractor {
         return result;
     }
 
+    private boolean hasMealTypeQuestion(List<ClarifyingQuestion> questions) {
+        return questions.stream()
+            .anyMatch(q -> "meal_type".equals(q.questionId()) ||
+                          q.affectedFields().contains("mealType"));
+    }
+
+    private ClarifyingQuestion createMealTypeQuestion() {
+        return new ClarifyingQuestion(
+            "meal_type",
+            "What type of meal is this?",
+            ClarifyingQuestion.QuestionType.SINGLE_CHOICE,
+            List.of("BREAKFAST", "BRUNCH", "LUNCH", "DINNER", "SNACK", "DESSERT", "DRINK"),
+            List.of("mealType")
+        );
+    }
+
     private String cleanJsonResponse(String response) {
         if (response == null || response.isBlank()) {
             log.warn("AI returned null or blank response");
@@ -296,7 +378,6 @@ class MealContentExtractor {
         log.debug("Raw AI response (first 500 chars): {}",
             cleaned.length() > 500 ? cleaned.substring(0, 500) + "..." : cleaned);
 
-        // Remove markdown code blocks - handle various formats
         if (cleaned.startsWith("```json")) {
             cleaned = cleaned.substring(7);
         } else if (cleaned.startsWith("```JSON")) {
