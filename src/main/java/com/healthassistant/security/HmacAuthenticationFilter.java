@@ -67,7 +67,6 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean requiresAuthentication(String path) {
-        // All mobile app endpoints require HMAC authentication
         return path.startsWith("/v1/health-events")
             || path.startsWith("/v1/daily-summaries")
             || path.startsWith("/v1/google-fit/sync")

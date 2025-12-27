@@ -45,7 +45,6 @@ class SleepDailyProjectionJpaEntity {
     @Column(name = "average_session_minutes")
     private Integer averageSessionMinutes;
 
-    // Future: Sleep phases aggregates
     @Column(name = "total_light_sleep_minutes")
     @Builder.Default
     private Integer totalLightSleepMinutes = 0;

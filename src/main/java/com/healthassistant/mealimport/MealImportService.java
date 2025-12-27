@@ -355,7 +355,6 @@ class MealImportService implements MealImportFacade {
         Instant occurredAt = draft.getEffectiveOccurredAt();
         String mealId = generateMealId();
 
-        // Create ExtractedMealData from draft for the mapper
         ExtractedMealData extractedData = ExtractedMealData.valid(
             occurredAt,
             draft.getTitle(),

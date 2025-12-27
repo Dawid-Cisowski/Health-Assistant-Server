@@ -255,7 +255,6 @@ class MealContentExtractor {
                 return ExtractedMealData.invalid(error, confidence);
             }
 
-            // Extract timestamp if present
             Instant occurredAt = parseOccurredAt(root);
 
             String title = getTextOrNull(root, "title");
@@ -392,7 +391,6 @@ class MealContentExtractor {
 
         cleaned = cleaned.trim();
 
-        // Try to extract JSON if response contains extra text
         int jsonStart = cleaned.indexOf('{');
         int jsonEnd = cleaned.lastIndexOf('}');
 

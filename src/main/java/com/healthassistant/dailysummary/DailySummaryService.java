@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -89,7 +90,7 @@ class DailySummaryService implements DailySummaryFacade {
         int totalSleepMinutes = summaries.stream()
                 .flatMap(s -> s.sleep().stream())
                 .map(DailySummary.Sleep::totalMinutes)
-                .filter(minutes -> minutes != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
@@ -104,21 +105,20 @@ class DailySummaryService implements DailySummaryFacade {
                 .daysWithSleep(daysWithSleep)
                 .build();
 
-        // Heart rate aggregation
         int sumRestingBpm = summaries.stream()
                 .map(s -> s.heart().restingBpm())
-                .filter(bpm -> bpm != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
         int daysWithRestingBpm = (int) summaries.stream()
                 .map(s -> s.heart().restingBpm())
-                .filter(bpm -> bpm != null)
+                .filter(Objects::nonNull)
                 .count();
 
         int sumAvgBpm = summaries.stream()
                 .map(s -> s.heart().avgBpm())
-                .filter(bpm -> bpm != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
@@ -129,7 +129,7 @@ class DailySummaryService implements DailySummaryFacade {
 
         Integer maxBpmOverall = summaries.stream()
                 .map(s -> s.heart().maxBpm())
-                .filter(bpm -> bpm != null)
+                .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(null);
 
@@ -147,31 +147,31 @@ class DailySummaryService implements DailySummaryFacade {
 
         int totalCalories = summaries.stream()
                 .map(s -> s.nutrition().totalCalories())
-                .filter(cal -> cal != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
         int totalProtein = summaries.stream()
                 .map(s -> s.nutrition().totalProtein())
-                .filter(prot -> prot != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
         int totalFat = summaries.stream()
                 .map(s -> s.nutrition().totalFat())
-                .filter(fat -> fat != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
         int totalCarbs = summaries.stream()
                 .map(s -> s.nutrition().totalCarbs())
-                .filter(carbs -> carbs != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
         int totalMeals = summaries.stream()
                 .map(s -> s.nutrition().mealCount())
-                .filter(count -> count != null)
+                .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 

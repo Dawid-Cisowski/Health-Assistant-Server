@@ -220,10 +220,8 @@ class SleepImageExtractor {
         }
 
         try {
-            // Try ISO format first
             return LocalDate.parse(dateStr);
         } catch (DateTimeParseException e) {
-            // Try Polish format "25 gru"
             return parsePolishDate(dateStr);
         }
     }

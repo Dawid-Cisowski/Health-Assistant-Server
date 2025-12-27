@@ -143,7 +143,6 @@ class EventRepositoryAdapter implements EventRepository {
             return null;
         }
         if (value instanceof Number) {
-            // Epoch seconds format (possibly with fractional seconds)
             double epochSeconds = ((Number) value).doubleValue();
             return Instant.ofEpochSecond((long) epochSeconds);
         }

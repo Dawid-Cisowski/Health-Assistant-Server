@@ -57,18 +57,14 @@ public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealt
         if (message == null) {
             return "Invalid payload";
         }
-        // Extract field name from Jackson error messages like:
-        // "Cannot deserialize value of type `com.healthassistant...MealType` from String \"SUPPER\": not one of the values accepted..."
         if (message.contains("Cannot deserialize value of type")) {
             int fieldStart = message.indexOf("`");
             int fieldEnd = message.indexOf("`", fieldStart + 1);
             if (fieldStart >= 0 && fieldEnd > fieldStart) {
                 String fullTypeName = message.substring(fieldStart + 1, fieldEnd);
-                // Get simple class name (e.g., com.foo.MealType -> MealType)
                 String simpleName = fullTypeName.contains(".")
                         ? fullTypeName.substring(fullTypeName.lastIndexOf('.') + 1)
                         : fullTypeName;
-                // Convert type name to field name (e.g., MealType -> mealType)
                 String fieldName = Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
                 return "Invalid value for " + fieldName;
             }

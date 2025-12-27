@@ -53,7 +53,6 @@ public record SleepSessionPayload(
     @Schema(description = "Source app package or import source", example = "com.google.android.apps.fitness")
     String originPackage,
 
-    // Optional phase fields
     @Min(value = 0, message = "lightSleepMinutes must be non-negative")
     @JsonProperty("lightSleepMinutes")
     @Schema(description = "Minutes spent in light sleep phase (optional)", example = "180", minimum = "0")
