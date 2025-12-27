@@ -31,17 +31,20 @@ class StepsProjector {
         }
     }
 
-    private synchronized void saveProjection(StepsBucket bucket) {
-        StepsHourlyProjectionJpaEntity hourly = hourlyRepository
-                .findByDateAndHour(bucket.date(), bucket.hour())
-                .map(existing -> {
-                    existing.addBucket(bucket);
-                    return existing;
-                })
-                .orElseGet(() -> StepsHourlyProjectionJpaEntity.from(bucket));
+    private void saveProjection(StepsBucket bucket) {
+        String lockKey = (bucket.date() + "-" + bucket.hour()).intern();
+        synchronized (lockKey) {
+            StepsHourlyProjectionJpaEntity hourly = hourlyRepository
+                    .findByDateAndHour(bucket.date(), bucket.hour())
+                    .map(existing -> {
+                        existing.addBucket(bucket);
+                        return existing;
+                    })
+                    .orElseGet(() -> StepsHourlyProjectionJpaEntity.from(bucket));
 
-        hourlyRepository.save(hourly);
-        updateDailyProjection(bucket.date());
+            hourlyRepository.save(hourly);
+            updateDailyProjection(bucket.date());
+        }
     }
 
     private void updateDailyProjection(LocalDate date) {

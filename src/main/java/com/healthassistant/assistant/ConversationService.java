@@ -46,10 +46,9 @@ class ConversationService {
 
     @Transactional(readOnly = true)
     public List<ConversationMessage> loadConversationHistory(UUID conversationId) {
-        var messages = messageRepository.findTop20ByConversationIdOrderByCreatedAtDesc(conversationId);
-        var chronological = messages.reversed();
-        log.info("Loaded {} messages from conversation {}", chronological.size(), conversationId);
-        return chronological;
+        var messages = messageRepository.findLast20ByConversationIdChronological(conversationId);
+        log.info("Loaded {} messages from conversation {}", messages.size(), conversationId);
+        return messages;
     }
 
     @Transactional

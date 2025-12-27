@@ -119,41 +119,10 @@ class EventRepositoryAdapter implements EventRepository {
     public Optional<IdempotencyKey> findSleepIdempotencyKeyByDeviceIdAndSleepStart(DeviceId deviceId, Instant sleepStart) {
         log.debug("Looking for sleep event with deviceId={}, sleepStart={}", deviceId.value(), sleepStart);
 
-        List<HealthEventJpaEntity> sleepEvents = jpaRepository.findByDeviceIdAndEventType(
-                deviceId.value(),
-                "SleepSessionRecorded.v1"
-        );
-
-        for (HealthEventJpaEntity entity : sleepEvents) {
-            Object sleepStartObj = entity.getPayload().get("sleepStart");
-            if (sleepStartObj != null) {
-                Instant storedSleepStart = parseStoredInstant(sleepStartObj);
-                if (storedSleepStart != null && storedSleepStart.equals(sleepStart)) {
-                    log.debug("Found matching sleep event with idempotencyKey={}", entity.getIdempotencyKey());
-                    return Optional.of(IdempotencyKey.of(entity.getIdempotencyKey()));
-                }
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    private Instant parseStoredInstant(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof Number) {
-            double epochSeconds = ((Number) value).doubleValue();
-            return Instant.ofEpochSecond((long) epochSeconds);
-        }
-        if (value instanceof String) {
-            try {
-                return Instant.parse((String) value);
-            } catch (Exception e) {
-                log.warn("Failed to parse instant from string: {}", value);
-                return null;
-            }
-        }
-        return null;
+        return jpaRepository.findSleepIdempotencyKeyByDeviceIdAndSleepStart(
+                        deviceId.value(),
+                        sleepStart.toString()
+                )
+                .map(IdempotencyKey::of);
     }
 }
