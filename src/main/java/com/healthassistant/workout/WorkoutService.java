@@ -48,41 +48,23 @@ public class WorkoutService implements WorkoutFacade {
 
                     List<WorkoutDetailResponse.SetDetail> setDetails = exerciseSets.stream()
                             .sorted(Comparator.comparing(WorkoutSetProjectionJpaEntity::getSetNumber))
-                            .map(set -> WorkoutDetailResponse.SetDetail.builder()
-                                    .setNumber(set.getSetNumber())
-                                    .weightKg(set.getWeightKg())
-                                    .reps(set.getReps())
-                                    .isWarmup(set.getIsWarmup())
-                                    .volumeKg(set.getVolumeKg())
-                                    .build())
+                            .map(set -> new WorkoutDetailResponse.SetDetail(
+                                    set.getSetNumber(), set.getWeightKg(), set.getReps(),
+                                    set.getIsWarmup(), set.getVolumeKg()))
                             .toList();
 
-                    return WorkoutDetailResponse.ExerciseDetail.builder()
-                            .exerciseName(exercise.getExerciseName())
-                            .muscleGroup(exercise.getMuscleGroup())
-                            .orderInWorkout(exercise.getOrderInWorkout())
-                            .totalSets(exercise.getTotalSets())
-                            .totalVolumeKg(exercise.getTotalVolumeKg())
-                            .maxWeightKg(exercise.getMaxWeightKg())
-                            .sets(setDetails)
-                            .build();
+                    return new WorkoutDetailResponse.ExerciseDetail(
+                            exercise.getExerciseName(), exercise.getMuscleGroup(),
+                            exercise.getOrderInWorkout(), exercise.getTotalSets(),
+                            exercise.getTotalVolumeKg(), exercise.getMaxWeightKg(), setDetails);
                 })
                 .toList();
 
-        WorkoutDetailResponse response = WorkoutDetailResponse.builder()
-                .workoutId(workout.getWorkoutId())
-                .performedAt(workout.getPerformedAt())
-                .performedDate(workout.getPerformedDate())
-                .source(workout.getSource())
-                .note(workout.getNote())
-                .totalExercises(workout.getTotalExercises())
-                .totalSets(workout.getTotalSets())
-                .totalVolumeKg(workout.getTotalVolumeKg())
-                .totalWorkingVolumeKg(workout.getTotalWorkingVolumeKg())
-                .exercises(exerciseDetails)
-                .build();
-
-        return Optional.of(response);
+        return Optional.of(new WorkoutDetailResponse(
+                workout.getWorkoutId(), workout.getPerformedAt(), workout.getPerformedDate(),
+                workout.getSource(), workout.getNote(), workout.getTotalExercises(),
+                workout.getTotalSets(), workout.getTotalVolumeKg(), workout.getTotalWorkingVolumeKg(),
+                exerciseDetails));
     }
 
     @Override
@@ -96,29 +78,17 @@ public class WorkoutService implements WorkoutFacade {
                 .map(workout -> {
                     List<WorkoutDetailResponse.ExerciseDetail> exerciseDetails = workout.getExercises().stream()
                             .sorted(Comparator.comparing(WorkoutExerciseProjectionJpaEntity::getOrderInWorkout))
-                            .map(exercise -> WorkoutDetailResponse.ExerciseDetail.builder()
-                                    .exerciseName(exercise.getExerciseName())
-                                    .muscleGroup(exercise.getMuscleGroup())
-                                    .orderInWorkout(exercise.getOrderInWorkout())
-                                    .totalSets(exercise.getTotalSets())
-                                    .totalVolumeKg(exercise.getTotalVolumeKg())
-                                    .maxWeightKg(exercise.getMaxWeightKg())
-                                    .sets(List.of())
-                                    .build())
+                            .map(exercise -> new WorkoutDetailResponse.ExerciseDetail(
+                                    exercise.getExerciseName(), exercise.getMuscleGroup(),
+                                    exercise.getOrderInWorkout(), exercise.getTotalSets(),
+                                    exercise.getTotalVolumeKg(), exercise.getMaxWeightKg(), List.of()))
                             .toList();
 
-                    return WorkoutDetailResponse.builder()
-                            .workoutId(workout.getWorkoutId())
-                            .performedAt(workout.getPerformedAt())
-                            .performedDate(workout.getPerformedDate())
-                            .source(workout.getSource())
-                            .note(workout.getNote())
-                            .totalExercises(workout.getTotalExercises())
-                            .totalSets(workout.getTotalSets())
-                            .totalVolumeKg(workout.getTotalVolumeKg())
-                            .totalWorkingVolumeKg(workout.getTotalWorkingVolumeKg())
-                            .exercises(exerciseDetails)
-                            .build();
+                    return new WorkoutDetailResponse(
+                            workout.getWorkoutId(), workout.getPerformedAt(), workout.getPerformedDate(),
+                            workout.getSource(), workout.getNote(), workout.getTotalExercises(),
+                            workout.getTotalSets(), workout.getTotalVolumeKg(), workout.getTotalWorkingVolumeKg(),
+                            exerciseDetails);
                 })
                 .toList();
     }

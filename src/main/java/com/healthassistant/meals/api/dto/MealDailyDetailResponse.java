@@ -2,13 +2,11 @@ package com.healthassistant.meals.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-@Builder
 @Schema(description = "Daily meal detail with all meals for dashboard view")
 public record MealDailyDetailResponse(
     @JsonProperty("date")
@@ -59,7 +57,6 @@ public record MealDailyDetailResponse(
     @Schema(description = "Individual meals for the day")
     List<MealDetail> meals
 ) {
-    @Builder
     public record MealDetail(
         @JsonProperty("mealNumber")
         @Schema(description = "Sequential meal number for the day", example = "1")
@@ -98,7 +95,6 @@ public record MealDailyDetailResponse(
         String healthRating
     ) {}
 
-    @Builder
     public record MealTypeCounts(
         @JsonProperty("breakfast")
         @Schema(description = "Number of breakfast meals", example = "1")
@@ -129,7 +125,6 @@ public record MealDailyDetailResponse(
         Integer drink
     ) {}
 
-    @Builder
     public record HealthRatingCounts(
         @JsonProperty("veryHealthy")
         @Schema(description = "Number of very healthy meals", example = "1")

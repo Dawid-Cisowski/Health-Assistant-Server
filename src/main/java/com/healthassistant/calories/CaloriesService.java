@@ -55,16 +55,12 @@ class CaloriesService implements CaloriesFacade {
             ))
             .toList();
 
-        return Optional.of(CaloriesDailyBreakdownResponse.builder()
-            .date(daily.getDate())
-            .totalCalories(daily.getTotalCaloriesKcal())
-            .firstCalorieTime(daily.getFirstCalorieTime())
-            .lastCalorieTime(daily.getLastCalorieTime())
-            .mostActiveHour(daily.getMostActiveHour())
-            .mostActiveHourCalories(daily.getMostActiveHourCalories())
-            .activeHoursCount(daily.getActiveHoursCount())
-            .hourlyBreakdown(hourlyBreakdown)
-            .build());
+        return Optional.of(new CaloriesDailyBreakdownResponse(
+            daily.getDate(), daily.getTotalCaloriesKcal(),
+            daily.getFirstCalorieTime(), daily.getLastCalorieTime(),
+            daily.getMostActiveHour(), daily.getMostActiveHourCalories(),
+            daily.getActiveHoursCount(), hourlyBreakdown
+        ));
     }
 
     private CaloriesDailyBreakdownResponse createEmptyBreakdown(LocalDate date) {
@@ -72,16 +68,7 @@ class CaloriesService implements CaloriesFacade {
             .mapToObj(hour -> new CaloriesDailyBreakdownResponse.HourlyCalories(hour, 0.0))
             .toList();
 
-        return CaloriesDailyBreakdownResponse.builder()
-            .date(date)
-            .totalCalories(0.0)
-            .firstCalorieTime(null)
-            .lastCalorieTime(null)
-            .mostActiveHour(null)
-            .mostActiveHourCalories(0.0)
-            .activeHoursCount(0)
-            .hourlyBreakdown(hourlyBreakdown)
-            .build();
+        return new CaloriesDailyBreakdownResponse(date, 0.0, null, null, null, 0.0, 0, hourlyBreakdown);
     }
 
     @Override
@@ -98,11 +85,11 @@ class CaloriesService implements CaloriesFacade {
         while (!current.isAfter(endDate)) {
             CaloriesDailyProjectionJpaEntity dayData = dataByDate.get(current);
 
-            dailyStats.add(CaloriesRangeSummaryResponse.DailyStats.builder()
-                .date(current)
-                .totalCalories(dayData != null ? dayData.getTotalCaloriesKcal() : 0.0)
-                .activeHoursCount(dayData != null ? dayData.getActiveHoursCount() : 0)
-                .build());
+            dailyStats.add(new CaloriesRangeSummaryResponse.DailyStats(
+                current,
+                dayData != null ? dayData.getTotalCaloriesKcal() : 0.0,
+                dayData != null ? dayData.getActiveHoursCount() : 0
+            ));
 
             current = current.plusDays(1);
         }
@@ -118,14 +105,7 @@ class CaloriesService implements CaloriesFacade {
         int totalDays = dailyStats.size();
         double averageCalories = totalDays > 0 ? totalCalories / totalDays : 0.0;
 
-        return CaloriesRangeSummaryResponse.builder()
-            .startDate(startDate)
-            .endDate(endDate)
-            .totalCalories(totalCalories)
-            .averageCalories(averageCalories)
-            .daysWithData(daysWithData)
-            .dailyStats(dailyStats)
-            .build();
+        return new CaloriesRangeSummaryResponse(startDate, endDate, totalCalories, averageCalories, daysWithData, dailyStats);
     }
 
     @Override

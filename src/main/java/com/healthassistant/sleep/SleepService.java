@@ -42,52 +42,23 @@ public class SleepService implements SleepFacade {
             sessionRepository.findByDateOrderBySessionNumberAsc(date);
 
         List<SleepDailyDetailResponse.SleepSession> sessionResponses = sessions.stream()
-            .map(s -> SleepDailyDetailResponse.SleepSession.builder()
-                .sessionNumber(s.getSessionNumber())
-                .sleepStart(s.getSleepStart())
-                .sleepEnd(s.getSleepEnd())
-                .durationMinutes(s.getDurationMinutes())
-                .lightSleepMinutes(s.getLightSleepMinutes())
-                .deepSleepMinutes(s.getDeepSleepMinutes())
-                .remSleepMinutes(s.getRemSleepMinutes())
-                .awakeMinutes(s.getAwakeMinutes())
-                .sleepScore(s.getSleepScore())
-                .build())
+            .map(s -> new SleepDailyDetailResponse.SleepSession(
+                s.getSessionNumber(), s.getSleepStart(), s.getSleepEnd(), s.getDurationMinutes(),
+                s.getLightSleepMinutes(), s.getDeepSleepMinutes(), s.getRemSleepMinutes(),
+                s.getAwakeMinutes(), s.getSleepScore()))
             .toList();
 
-        return Optional.of(SleepDailyDetailResponse.builder()
-            .date(daily.getDate())
-            .totalSleepMinutes(daily.getTotalSleepMinutes())
-            .sleepCount(daily.getSleepCount())
-            .firstSleepStart(daily.getFirstSleepStart())
-            .lastSleepEnd(daily.getLastSleepEnd())
-            .longestSessionMinutes(daily.getLongestSessionMinutes())
-            .shortestSessionMinutes(daily.getShortestSessionMinutes())
-            .averageSessionMinutes(daily.getAverageSessionMinutes())
-            .totalLightSleepMinutes(daily.getTotalLightSleepMinutes())
-            .totalDeepSleepMinutes(daily.getTotalDeepSleepMinutes())
-            .totalRemSleepMinutes(daily.getTotalRemSleepMinutes())
-            .totalAwakeMinutes(daily.getTotalAwakeMinutes())
-            .sessions(sessionResponses)
-            .build());
+        return Optional.of(new SleepDailyDetailResponse(
+            daily.getDate(), daily.getTotalSleepMinutes(), daily.getSleepCount(),
+            daily.getFirstSleepStart(), daily.getLastSleepEnd(),
+            daily.getLongestSessionMinutes(), daily.getShortestSessionMinutes(), daily.getAverageSessionMinutes(),
+            daily.getTotalLightSleepMinutes(), daily.getTotalDeepSleepMinutes(),
+            daily.getTotalRemSleepMinutes(), daily.getTotalAwakeMinutes(), sessionResponses
+        ));
     }
 
     private SleepDailyDetailResponse createEmptyDetail(LocalDate date) {
-        return SleepDailyDetailResponse.builder()
-            .date(date)
-            .totalSleepMinutes(0)
-            .sleepCount(0)
-            .firstSleepStart(null)
-            .lastSleepEnd(null)
-            .longestSessionMinutes(0)
-            .shortestSessionMinutes(0)
-            .averageSessionMinutes(0)
-            .totalLightSleepMinutes(0)
-            .totalDeepSleepMinutes(0)
-            .totalRemSleepMinutes(0)
-            .totalAwakeMinutes(0)
-            .sessions(List.of())
-            .build();
+        return new SleepDailyDetailResponse(date, 0, 0, null, null, 0, 0, 0, 0, 0, 0, 0, List.of());
     }
 
     @Override
@@ -104,14 +75,14 @@ public class SleepService implements SleepFacade {
         while (!current.isAfter(endDate)) {
             SleepDailyProjectionJpaEntity dayData = dataByDate.get(current);
 
-            dailyStats.add(SleepRangeSummaryResponse.DailyStats.builder()
-                .date(current)
-                .totalSleepMinutes(dayData != null ? dayData.getTotalSleepMinutes() : 0)
-                .sleepCount(dayData != null ? dayData.getSleepCount() : 0)
-                .lightSleepMinutes(dayData != null ? dayData.getTotalLightSleepMinutes() : 0)
-                .deepSleepMinutes(dayData != null ? dayData.getTotalDeepSleepMinutes() : 0)
-                .remSleepMinutes(dayData != null ? dayData.getTotalRemSleepMinutes() : 0)
-                .build());
+            dailyStats.add(new SleepRangeSummaryResponse.DailyStats(
+                current,
+                dayData != null ? dayData.getTotalSleepMinutes() : 0,
+                dayData != null ? dayData.getSleepCount() : 0,
+                dayData != null ? dayData.getTotalLightSleepMinutes() : 0,
+                dayData != null ? dayData.getTotalDeepSleepMinutes() : 0,
+                dayData != null ? dayData.getTotalRemSleepMinutes() : 0
+            ));
 
             current = current.plusDays(1);
         }
@@ -130,19 +101,13 @@ public class SleepService implements SleepFacade {
         SleepRangeSummaryResponse.DayExtreme dayWithMostSleep = dailyStats.stream()
             .filter(d -> d.totalSleepMinutes() > 0)
             .max((d1, d2) -> Integer.compare(d1.totalSleepMinutes(), d2.totalSleepMinutes()))
-            .map(d -> SleepRangeSummaryResponse.DayExtreme.builder()
-                .date(d.date())
-                .sleepMinutes(d.totalSleepMinutes())
-                .build())
+            .map(d -> new SleepRangeSummaryResponse.DayExtreme(d.date(), d.totalSleepMinutes()))
             .orElse(null);
 
         SleepRangeSummaryResponse.DayExtreme dayWithLeastSleep = dailyStats.stream()
             .filter(d -> d.totalSleepMinutes() > 0)
             .min((d1, d2) -> Integer.compare(d1.totalSleepMinutes(), d2.totalSleepMinutes()))
-            .map(d -> SleepRangeSummaryResponse.DayExtreme.builder()
-                .date(d.date())
-                .sleepMinutes(d.totalSleepMinutes())
-                .build())
+            .map(d -> new SleepRangeSummaryResponse.DayExtreme(d.date(), d.totalSleepMinutes()))
             .orElse(null);
 
         int totalLightSleep = dailyStats.stream()
@@ -161,22 +126,11 @@ public class SleepService implements SleepFacade {
         int averageDeepSleep = totalDays > 0 ? totalDeepSleep / totalDays : 0;
         int averageRemSleep = totalDays > 0 ? totalRemSleep / totalDays : 0;
 
-        return SleepRangeSummaryResponse.builder()
-            .startDate(startDate)
-            .endDate(endDate)
-            .totalSleepMinutes(totalSleepMinutes)
-            .averageSleepMinutes(averageSleepMinutes)
-            .daysWithData(daysWithData)
-            .dayWithMostSleep(dayWithMostSleep)
-            .dayWithLeastSleep(dayWithLeastSleep)
-            .totalLightSleepMinutes(totalLightSleep)
-            .totalDeepSleepMinutes(totalDeepSleep)
-            .totalRemSleepMinutes(totalRemSleep)
-            .averageLightSleepMinutes(averageLightSleep)
-            .averageDeepSleepMinutes(averageDeepSleep)
-            .averageRemSleepMinutes(averageRemSleep)
-            .dailyStats(dailyStats)
-            .build();
+        return new SleepRangeSummaryResponse(
+            startDate, endDate, totalSleepMinutes, averageSleepMinutes, daysWithData,
+            dayWithMostSleep, dayWithLeastSleep, totalLightSleep, totalDeepSleep, totalRemSleep,
+            averageLightSleep, averageDeepSleep, averageRemSleep, dailyStats
+        );
     }
 
     @Override

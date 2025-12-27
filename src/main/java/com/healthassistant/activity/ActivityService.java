@@ -73,11 +73,11 @@ public class ActivityService implements ActivityFacade {
         while (!current.isAfter(endDate)) {
             ActivityDailyProjectionJpaEntity dayData = dataByDate.get(current);
 
-            dailyStats.add(ActivityRangeSummaryResponse.DailyStats.builder()
-                .date(current)
-                .totalActiveMinutes(dayData != null ? dayData.getTotalActiveMinutes() : 0)
-                .activeHoursCount(dayData != null ? dayData.getActiveHoursCount() : 0)
-                .build());
+            dailyStats.add(new ActivityRangeSummaryResponse.DailyStats(
+                current,
+                dayData != null ? dayData.getTotalActiveMinutes() : 0,
+                dayData != null ? dayData.getActiveHoursCount() : 0
+            ));
 
             current = current.plusDays(1);
         }
@@ -93,14 +93,7 @@ public class ActivityService implements ActivityFacade {
         int totalDays = dailyStats.size();
         int averageMinutes = totalDays > 0 ? totalMinutes / totalDays : 0;
 
-        return ActivityRangeSummaryResponse.builder()
-            .startDate(startDate)
-            .endDate(endDate)
-            .totalActiveMinutes(totalMinutes)
-            .averageActiveMinutes(averageMinutes)
-            .daysWithData(daysWithData)
-            .dailyStats(dailyStats)
-            .build();
+        return new ActivityRangeSummaryResponse(startDate, endDate, totalMinutes, averageMinutes, daysWithData, dailyStats);
     }
 
     @Override

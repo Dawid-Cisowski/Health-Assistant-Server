@@ -2,12 +2,10 @@ package com.healthassistant.dailysummary.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@Builder
 @Schema(description = "Daily summary for a date range (week, month, or year)")
 public record DailySummaryRangeSummaryResponse(
     @JsonProperty("startDate")
@@ -46,7 +44,6 @@ public record DailySummaryRangeSummaryResponse(
     @Schema(description = "Daily statistics for each day in the range")
     List<DailySummaryResponse> dailyStats
 ) {
-    @Builder
     public record ActivitySummary(
         @JsonProperty("totalSteps")
         @Schema(description = "Total steps for the entire range", example = "324500")
@@ -81,7 +78,6 @@ public record DailySummaryRangeSummaryResponse(
         Long averageDistanceMeters
     ) {}
 
-    @Builder
     public record SleepSummary(
         @JsonProperty("totalSleepMinutes")
         @Schema(description = "Total sleep minutes for the entire range", example = "14400")
@@ -96,7 +92,6 @@ public record DailySummaryRangeSummaryResponse(
         Integer daysWithSleep
     ) {}
 
-    @Builder
     public record HeartSummary(
         @JsonProperty("averageRestingBpm")
         @Schema(description = "Average resting heart rate in BPM", example = "62")
@@ -115,7 +110,6 @@ public record DailySummaryRangeSummaryResponse(
         Integer daysWithData
     ) {}
 
-    @Builder
     public record NutritionSummary(
         @JsonProperty("totalCalories")
         @Schema(description = "Total calories consumed", example = "67200")
@@ -162,7 +156,6 @@ public record DailySummaryRangeSummaryResponse(
         Integer daysWithData
     ) {}
 
-    @Builder
     public record WorkoutSummary(
         @JsonProperty("totalWorkouts")
         @Schema(description = "Total number of gym workouts", example = "12")
@@ -176,7 +169,6 @@ public record DailySummaryRangeSummaryResponse(
         @Schema(description = "List of all workouts performed in the range")
         List<WorkoutInfo> workoutList
     ) {
-        @Builder
         public record WorkoutInfo(
             @JsonProperty("workoutId")
             @Schema(description = "Workout identifier", example = "gymrun-2025-11-19-1")

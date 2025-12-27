@@ -2,13 +2,11 @@ package com.healthassistant.sleep.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-@Builder
 @Schema(description = "Daily sleep detail with all sleep sessions for dashboard view")
 public record SleepDailyDetailResponse(
     @JsonProperty("date")
@@ -63,7 +61,6 @@ public record SleepDailyDetailResponse(
     @Schema(description = "Individual sleep sessions for the day")
     List<SleepSession> sessions
 ) {
-    @Builder
     public record SleepSession(
         @JsonProperty("sessionNumber")
         @Schema(description = "Session number (1=main sleep, 2+=naps)", example = "1")

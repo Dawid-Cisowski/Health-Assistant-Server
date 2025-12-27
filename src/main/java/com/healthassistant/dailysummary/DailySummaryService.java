@@ -129,62 +129,53 @@ class DailySummaryService implements DailySummaryFacade {
                 daysWithWorkouts++;
                 totalWorkouts += s.workouts().size();
                 for (DailySummary.Workout w : s.workouts()) {
-                    workoutList.add(DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo.builder()
-                            .workoutId(w.workoutId())
-                            .note(w.note())
-                            .date(s.date())
-                            .build());
+                    workoutList.add(new DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo(
+                            w.workoutId(), w.note(), s.date()));
                 }
             }
         }
 
         DailySummaryRangeSummaryResponse buildResponse(LocalDate startDate, LocalDate endDate,
                                                         List<DailySummaryResponse> dailyStats) {
-            return DailySummaryRangeSummaryResponse.builder()
-                    .startDate(startDate)
-                    .endDate(endDate)
-                    .daysWithData(daysWithData)
-                    .activity(DailySummaryRangeSummaryResponse.ActivitySummary.builder()
-                            .totalSteps(totalSteps)
-                            .averageSteps(daysWithSteps > 0 ? totalSteps / daysWithSteps : 0)
-                            .totalActiveMinutes(totalActiveMinutes)
-                            .averageActiveMinutes(daysWithData > 0 ? totalActiveMinutes / daysWithData : 0)
-                            .totalActiveCalories(totalActiveCalories)
-                            .averageActiveCalories(daysWithData > 0 ? totalActiveCalories / daysWithData : 0)
-                            .totalDistanceMeters(totalDistanceMeters)
-                            .averageDistanceMeters(daysWithData > 0 ? totalDistanceMeters / daysWithData : 0L)
-                            .build())
-                    .sleep(DailySummaryRangeSummaryResponse.SleepSummary.builder()
-                            .totalSleepMinutes(totalSleepMinutes)
-                            .averageSleepMinutes(daysWithSleep > 0 ? totalSleepMinutes / daysWithSleep : 0)
-                            .daysWithSleep(daysWithSleep)
-                            .build())
-                    .heart(DailySummaryRangeSummaryResponse.HeartSummary.builder()
-                            .averageRestingBpm(daysWithRestingBpm > 0 ? sumRestingBpm / daysWithRestingBpm : null)
-                            .averageDailyBpm(daysWithAvgBpm > 0 ? sumAvgBpm / daysWithAvgBpm : null)
-                            .maxBpmOverall(maxBpmOverall)
-                            .daysWithData(daysWithHeartData)
-                            .build())
-                    .nutrition(DailySummaryRangeSummaryResponse.NutritionSummary.builder()
-                            .totalCalories(totalCalories)
-                            .averageCalories(daysWithNutrition > 0 ? totalCalories / daysWithNutrition : 0)
-                            .totalProtein(totalProtein)
-                            .averageProtein(daysWithNutrition > 0 ? totalProtein / daysWithNutrition : 0)
-                            .totalFat(totalFat)
-                            .averageFat(daysWithNutrition > 0 ? totalFat / daysWithNutrition : 0)
-                            .totalCarbs(totalCarbs)
-                            .averageCarbs(daysWithNutrition > 0 ? totalCarbs / daysWithNutrition : 0)
-                            .totalMeals(totalMeals)
-                            .averageMealsPerDay(daysWithNutrition > 0 ? totalMeals / daysWithNutrition : 0)
-                            .daysWithData(daysWithNutrition)
-                            .build())
-                    .workouts(DailySummaryRangeSummaryResponse.WorkoutSummary.builder()
-                            .totalWorkouts(totalWorkouts)
-                            .daysWithWorkouts(daysWithWorkouts)
-                            .workoutList(workoutList)
-                            .build())
-                    .dailyStats(dailyStats)
-                    .build();
+            var activity = new DailySummaryRangeSummaryResponse.ActivitySummary(
+                    totalSteps,
+                    daysWithSteps > 0 ? totalSteps / daysWithSteps : 0,
+                    totalActiveMinutes,
+                    daysWithData > 0 ? totalActiveMinutes / daysWithData : 0,
+                    totalActiveCalories,
+                    daysWithData > 0 ? totalActiveCalories / daysWithData : 0,
+                    totalDistanceMeters,
+                    daysWithData > 0 ? totalDistanceMeters / daysWithData : 0L);
+
+            var sleep = new DailySummaryRangeSummaryResponse.SleepSummary(
+                    totalSleepMinutes,
+                    daysWithSleep > 0 ? totalSleepMinutes / daysWithSleep : 0,
+                    daysWithSleep);
+
+            var heart = new DailySummaryRangeSummaryResponse.HeartSummary(
+                    daysWithRestingBpm > 0 ? sumRestingBpm / daysWithRestingBpm : null,
+                    daysWithAvgBpm > 0 ? sumAvgBpm / daysWithAvgBpm : null,
+                    maxBpmOverall,
+                    daysWithHeartData);
+
+            var nutrition = new DailySummaryRangeSummaryResponse.NutritionSummary(
+                    totalCalories,
+                    daysWithNutrition > 0 ? totalCalories / daysWithNutrition : 0,
+                    totalProtein,
+                    daysWithNutrition > 0 ? totalProtein / daysWithNutrition : 0,
+                    totalFat,
+                    daysWithNutrition > 0 ? totalFat / daysWithNutrition : 0,
+                    totalCarbs,
+                    daysWithNutrition > 0 ? totalCarbs / daysWithNutrition : 0,
+                    totalMeals,
+                    daysWithNutrition > 0 ? totalMeals / daysWithNutrition : 0,
+                    daysWithNutrition);
+
+            var workouts = new DailySummaryRangeSummaryResponse.WorkoutSummary(
+                    totalWorkouts, daysWithWorkouts, workoutList);
+
+            return new DailySummaryRangeSummaryResponse(
+                    startDate, endDate, daysWithData, activity, sleep, heart, nutrition, workouts, dailyStats);
         }
     }
 

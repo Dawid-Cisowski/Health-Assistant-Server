@@ -2,13 +2,11 @@ package com.healthassistant.steps.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-@Builder
 @Schema(description = "Daily steps breakdown with hourly data for dashboard view")
 public record StepsDailyBreakdownResponse(
     @JsonProperty("date")
@@ -43,7 +41,6 @@ public record StepsDailyBreakdownResponse(
     @Schema(description = "24-hour breakdown (0-23)")
     List<HourlySteps> hourlyBreakdown
 ) {
-    @Builder
     public record HourlySteps(
         @JsonProperty("hour")
         @Schema(description = "Hour of day (0-23)", example = "14")

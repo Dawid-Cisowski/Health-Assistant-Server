@@ -53,31 +53,24 @@ public class StepsService implements StepsFacade {
                 hourlySteps.getOrDefault(hour, 0)
         )).collect(Collectors.toList());
 
-        return Optional.of(StepsDailyBreakdownResponse.builder()
-            .date(daily.getDate())
-            .totalSteps(daily.getTotalSteps())
-            .firstStepTime(daily.getFirstStepTime())
-            .lastStepTime(daily.getLastStepTime())
-            .mostActiveHour(daily.getMostActiveHour())
-            .mostActiveHourSteps(daily.getMostActiveHourSteps())
-            .activeHoursCount(daily.getActiveHoursCount())
-            .hourlyBreakdown(hourlyBreakdown)
-            .build());
+        return Optional.of(new StepsDailyBreakdownResponse(
+            daily.getDate(),
+            daily.getTotalSteps(),
+            daily.getFirstStepTime(),
+            daily.getLastStepTime(),
+            daily.getMostActiveHour(),
+            daily.getMostActiveHourSteps(),
+            daily.getActiveHoursCount(),
+            hourlyBreakdown
+        ));
     }
 
     private StepsDailyBreakdownResponse createEmptyBreakdown(LocalDate date) {
-        List<StepsDailyBreakdownResponse.HourlySteps> hourlyBreakdown = IntStream.range(0, 24).mapToObj(hour -> new StepsDailyBreakdownResponse.HourlySteps(hour, 0)).collect(Collectors.toList());
+        List<StepsDailyBreakdownResponse.HourlySteps> hourlyBreakdown = IntStream.range(0, 24)
+            .mapToObj(hour -> new StepsDailyBreakdownResponse.HourlySteps(hour, 0))
+            .collect(Collectors.toList());
 
-        return StepsDailyBreakdownResponse.builder()
-            .date(date)
-            .totalSteps(0)
-            .firstStepTime(null)
-            .lastStepTime(null)
-            .mostActiveHour(null)
-            .mostActiveHourSteps(0)
-            .activeHoursCount(0)
-            .hourlyBreakdown(hourlyBreakdown)
-            .build();
+        return new StepsDailyBreakdownResponse(date, 0, null, null, null, 0, 0, hourlyBreakdown);
     }
     @Override
     public StepsRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate) {
@@ -93,11 +86,11 @@ public class StepsService implements StepsFacade {
         while (!current.isAfter(endDate)) {
             StepsDailyProjectionJpaEntity dayData = dataByDate.get(current);
 
-            dailyStats.add(StepsRangeSummaryResponse.DailyStats.builder()
-                .date(current)
-                .totalSteps(dayData != null ? dayData.getTotalSteps() : 0)
-                .activeHoursCount(dayData != null ? dayData.getActiveHoursCount() : 0)
-                .build());
+            dailyStats.add(new StepsRangeSummaryResponse.DailyStats(
+                current,
+                dayData != null ? dayData.getTotalSteps() : 0,
+                dayData != null ? dayData.getActiveHoursCount() : 0
+            ));
 
             current = current.plusDays(1);
         }
@@ -113,14 +106,7 @@ public class StepsService implements StepsFacade {
         int totalDays = dailyStats.size();
         int averageSteps = totalDays > 0 ? totalSteps / totalDays : 0;
 
-        return StepsRangeSummaryResponse.builder()
-            .startDate(startDate)
-            .endDate(endDate)
-            .totalSteps(totalSteps)
-            .averageSteps(averageSteps)
-            .daysWithData(daysWithData)
-            .dailyStats(dailyStats)
-            .build();
+        return new StepsRangeSummaryResponse(startDate, endDate, totalSteps, averageSteps, daysWithData, dailyStats);
     }
 
     @Override

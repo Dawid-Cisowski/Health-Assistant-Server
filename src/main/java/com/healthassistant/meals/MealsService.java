@@ -42,82 +42,35 @@ class MealsService implements MealsFacade {
             mealRepository.findByDateOrderByMealNumberAsc(date);
 
         List<MealDailyDetailResponse.MealDetail> mealDetails = meals.stream()
-            .map(m -> MealDailyDetailResponse.MealDetail.builder()
-                .mealNumber(m.getMealNumber())
-                .occurredAt(m.getOccurredAt())
-                .title(m.getTitle())
-                .mealType(m.getMealType())
-                .caloriesKcal(m.getCaloriesKcal())
-                .proteinGrams(m.getProteinGrams())
-                .fatGrams(m.getFatGrams())
-                .carbohydratesGrams(m.getCarbohydratesGrams())
-                .healthRating(m.getHealthRating())
-                .build())
+            .map(m -> new MealDailyDetailResponse.MealDetail(
+                m.getMealNumber(), m.getOccurredAt(), m.getTitle(), m.getMealType(),
+                m.getCaloriesKcal(), m.getProteinGrams(), m.getFatGrams(),
+                m.getCarbohydratesGrams(), m.getHealthRating()))
             .toList();
 
-        MealDailyDetailResponse.MealTypeCounts mealTypeCounts = MealDailyDetailResponse.MealTypeCounts.builder()
-            .breakfast(daily.getBreakfastCount())
-            .brunch(daily.getBrunchCount())
-            .lunch(daily.getLunchCount())
-            .dinner(daily.getDinnerCount())
-            .snack(daily.getSnackCount())
-            .dessert(daily.getDessertCount())
-            .drink(daily.getDrinkCount())
-            .build();
+        var mealTypeCounts = new MealDailyDetailResponse.MealTypeCounts(
+            daily.getBreakfastCount(), daily.getBrunchCount(), daily.getLunchCount(),
+            daily.getDinnerCount(), daily.getSnackCount(), daily.getDessertCount(), daily.getDrinkCount());
 
-        MealDailyDetailResponse.HealthRatingCounts healthRatingCounts = MealDailyDetailResponse.HealthRatingCounts.builder()
-            .veryHealthy(daily.getVeryHealthyCount())
-            .healthy(daily.getHealthyCount())
-            .neutral(daily.getNeutralCount())
-            .unhealthy(daily.getUnhealthyCount())
-            .veryUnhealthy(daily.getVeryUnhealthyCount())
-            .build();
+        var healthRatingCounts = new MealDailyDetailResponse.HealthRatingCounts(
+            daily.getVeryHealthyCount(), daily.getHealthyCount(), daily.getNeutralCount(),
+            daily.getUnhealthyCount(), daily.getVeryUnhealthyCount());
 
-        return Optional.of(MealDailyDetailResponse.builder()
-            .date(daily.getDate())
-            .totalMealCount(daily.getTotalMealCount())
-            .totalCaloriesKcal(daily.getTotalCaloriesKcal())
-            .totalProteinGrams(daily.getTotalProteinGrams())
-            .totalFatGrams(daily.getTotalFatGrams())
-            .totalCarbohydratesGrams(daily.getTotalCarbohydratesGrams())
-            .averageCaloriesPerMeal(daily.getAverageCaloriesPerMeal())
-            .mealTypeCounts(mealTypeCounts)
-            .healthRatingCounts(healthRatingCounts)
-            .firstMealTime(daily.getFirstMealTime())
-            .lastMealTime(daily.getLastMealTime())
-            .meals(mealDetails)
-            .build());
+        return Optional.of(new MealDailyDetailResponse(
+            daily.getDate(), daily.getTotalMealCount(), daily.getTotalCaloriesKcal(),
+            daily.getTotalProteinGrams(), daily.getTotalFatGrams(), daily.getTotalCarbohydratesGrams(),
+            daily.getAverageCaloriesPerMeal(), mealTypeCounts, healthRatingCounts,
+            daily.getFirstMealTime(), daily.getLastMealTime(), mealDetails
+        ));
     }
 
     private MealDailyDetailResponse createEmptyDetail(LocalDate date) {
-        return MealDailyDetailResponse.builder()
-            .date(date)
-            .totalMealCount(0)
-            .totalCaloriesKcal(0)
-            .totalProteinGrams(0)
-            .totalFatGrams(0)
-            .totalCarbohydratesGrams(0)
-            .averageCaloriesPerMeal(0)
-            .mealTypeCounts(MealDailyDetailResponse.MealTypeCounts.builder()
-                .breakfast(0)
-                .brunch(0)
-                .lunch(0)
-                .dinner(0)
-                .snack(0)
-                .dessert(0)
-                .drink(0)
-                .build())
-            .healthRatingCounts(MealDailyDetailResponse.HealthRatingCounts.builder()
-                .veryHealthy(0)
-                .healthy(0)
-                .neutral(0)
-                .unhealthy(0)
-                .veryUnhealthy(0)
-                .build())
-            .firstMealTime(null)
-            .lastMealTime(null)
-            .meals(List.of())
-            .build();
+        return new MealDailyDetailResponse(
+            date, 0, 0, 0, 0, 0, 0,
+            new MealDailyDetailResponse.MealTypeCounts(0, 0, 0, 0, 0, 0, 0),
+            new MealDailyDetailResponse.HealthRatingCounts(0, 0, 0, 0, 0),
+            null, null, List.of()
+        );
     }
 
     @Override
@@ -134,14 +87,14 @@ class MealsService implements MealsFacade {
         while (!current.isAfter(endDate)) {
             MealDailyProjectionJpaEntity dayData = dataByDate.get(current);
 
-            dailyStats.add(MealsRangeSummaryResponse.DailyStats.builder()
-                .date(current)
-                .totalMealCount(dayData != null ? dayData.getTotalMealCount() : 0)
-                .totalCaloriesKcal(dayData != null ? dayData.getTotalCaloriesKcal() : 0)
-                .totalProteinGrams(dayData != null ? dayData.getTotalProteinGrams() : 0)
-                .totalFatGrams(dayData != null ? dayData.getTotalFatGrams() : 0)
-                .totalCarbohydratesGrams(dayData != null ? dayData.getTotalCarbohydratesGrams() : 0)
-                .build());
+            dailyStats.add(new MealsRangeSummaryResponse.DailyStats(
+                current,
+                dayData != null ? dayData.getTotalMealCount() : 0,
+                dayData != null ? dayData.getTotalCaloriesKcal() : 0,
+                dayData != null ? dayData.getTotalProteinGrams() : 0,
+                dayData != null ? dayData.getTotalFatGrams() : 0,
+                dayData != null ? dayData.getTotalCarbohydratesGrams() : 0
+            ));
 
             current = current.plusDays(1);
         }
@@ -176,36 +129,21 @@ class MealsService implements MealsFacade {
         MealsRangeSummaryResponse.DayExtreme dayWithMostCalories = dailyStats.stream()
             .filter(d -> d.totalCaloriesKcal() > 0)
             .max((d1, d2) -> Integer.compare(d1.totalCaloriesKcal(), d2.totalCaloriesKcal()))
-            .map(d -> MealsRangeSummaryResponse.DayExtreme.builder()
-                .date(d.date())
-                .calories(d.totalCaloriesKcal())
-                .build())
+            .map(d -> new MealsRangeSummaryResponse.DayExtreme(d.date(), d.totalCaloriesKcal()))
             .orElse(null);
 
         MealsRangeSummaryResponse.DayExtremeMeals dayWithMostMeals = dailyStats.stream()
             .filter(d -> d.totalMealCount() > 0)
             .max((d1, d2) -> Integer.compare(d1.totalMealCount(), d2.totalMealCount()))
-            .map(d -> MealsRangeSummaryResponse.DayExtremeMeals.builder()
-                .date(d.date())
-                .mealCount(d.totalMealCount())
-                .build())
+            .map(d -> new MealsRangeSummaryResponse.DayExtremeMeals(d.date(), d.totalMealCount()))
             .orElse(null);
 
-        return MealsRangeSummaryResponse.builder()
-            .startDate(startDate)
-            .endDate(endDate)
-            .totalMealCount(totalMealCount)
-            .daysWithData(daysWithData)
-            .totalCaloriesKcal(totalCalories)
-            .totalProteinGrams(totalProtein)
-            .totalFatGrams(totalFat)
-            .totalCarbohydratesGrams(totalCarbs)
-            .averageCaloriesPerDay(averageCaloriesPerDay)
-            .averageMealsPerDay(averageMealsPerDay)
-            .dayWithMostCalories(dayWithMostCalories)
-            .dayWithMostMeals(dayWithMostMeals)
-            .dailyStats(dailyStats)
-            .build();
+        return new MealsRangeSummaryResponse(
+            startDate, endDate, totalMealCount, daysWithData,
+            totalCalories, totalProtein, totalFat, totalCarbs,
+            averageCaloriesPerDay, averageMealsPerDay,
+            dayWithMostCalories, dayWithMostMeals, dailyStats
+        );
     }
 
     @Override

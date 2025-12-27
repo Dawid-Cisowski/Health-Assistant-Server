@@ -28,22 +28,12 @@ class GlobalExceptionHandler {
                 .toList();
 
         if (details.stream().anyMatch(d -> d.contains("must contain between 1 and 100"))) {
-            ErrorResponse errorResponse = ErrorResponse.builder()
-                    .code("BATCH_TOO_LARGE")
-                    .message("Too many events in batch")
-                    .details(details)
-                    .build();
-
             return ResponseEntity
                     .status(HttpStatus.PAYLOAD_TOO_LARGE)
-                    .body(errorResponse);
+                    .body(new ErrorResponse("BATCH_TOO_LARGE", "Too many events in batch", details));
         }
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .code("VALIDATION_ERROR")
-                .message("Request validation failed")
-                .details(details)
-                .build();
+        ErrorResponse errorResponse = new ErrorResponse("VALIDATION_ERROR", "Request validation failed", details);
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -58,27 +48,19 @@ class GlobalExceptionHandler {
         log.warn("Malformed request body: {}", ex.getMessage());
 
         Throwable cause = ex.getCause();
-        if (cause instanceof InvalidFormatException) {
-            InvalidFormatException ife = (InvalidFormatException) cause;
+        if (cause instanceof InvalidFormatException ife) {
             String message = "Invalid data format: " + ife.getMessage();
-            ErrorResponse errorResponse = ErrorResponse.builder()
-                    .code("MALFORMED_REQUEST")
-                    .message(message)
-                    .details(List.of(ife.getMessage() != null ? ife.getMessage() : "Invalid request body"))
-                    .build();
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
-                    .body(errorResponse);
+                    .body(new ErrorResponse("MALFORMED_REQUEST", message,
+                            List.of(ife.getMessage() != null ? ife.getMessage() : "Invalid request body")));
         }
 
         String message = determineErrorMessage(ex.getMessage());
         String detail = ex.getMessage();
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .code("MALFORMED_REQUEST")
-                .message(message)
-                .details(List.of(detail != null ? detail : "Invalid request body"))
-                .build();
+        ErrorResponse errorResponse = new ErrorResponse("MALFORMED_REQUEST", message,
+                List.of(detail != null ? detail : "Invalid request body"));
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -92,11 +74,9 @@ class GlobalExceptionHandler {
     ) {
         log.warn("Unsupported media type: {}", ex.getContentType());
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .code("UNSUPPORTED_MEDIA_TYPE")
-                .message("Content-Type must be application/json")
-                .details(List.of("Received: " + ex.getContentType() + ", Expected: application/json"))
-                .build();
+        ErrorResponse errorResponse = new ErrorResponse("UNSUPPORTED_MEDIA_TYPE",
+                "Content-Type must be application/json",
+                List.of("Received: " + ex.getContentType() + ", Expected: application/json"));
 
         return ResponseEntity
                 .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
@@ -110,11 +90,8 @@ class GlobalExceptionHandler {
     ) {
         log.error("Unexpected error", ex);
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .code("INTERNAL_ERROR")
-                .message("An unexpected error occurred")
-                .details(List.of(ex.getMessage()))
-                .build();
+        ErrorResponse errorResponse = new ErrorResponse("INTERNAL_ERROR",
+                "An unexpected error occurred", List.of(ex.getMessage()));
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)

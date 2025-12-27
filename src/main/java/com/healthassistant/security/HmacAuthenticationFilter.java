@@ -162,11 +162,7 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .code("HMAC_AUTH_FAILED")
-                .message(message)
-                .details(java.util.List.of())
-                .build();
+        ErrorResponse errorResponse = new ErrorResponse("HMAC_AUTH_FAILED", message, java.util.List.of());
 
         objectMapper.writeValue(response.getWriter(), errorResponse);
     }

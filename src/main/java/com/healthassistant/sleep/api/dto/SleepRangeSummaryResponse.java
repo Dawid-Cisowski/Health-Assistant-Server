@@ -2,12 +2,10 @@ package com.healthassistant.sleep.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@Builder
 @Schema(description = "Sleep summary for a date range (week, month, or year)")
 public record SleepRangeSummaryResponse(
     @JsonProperty("startDate")
@@ -66,7 +64,6 @@ public record SleepRangeSummaryResponse(
     @Schema(description = "Daily statistics for each day in the range")
     List<DailyStats> dailyStats
 ) {
-    @Builder
     public record DayExtreme(
         @JsonProperty("date")
         @Schema(description = "Date", example = "2025-11-15")
@@ -77,7 +74,6 @@ public record SleepRangeSummaryResponse(
         Integer sleepMinutes
     ) {}
 
-    @Builder
     public record DailyStats(
         @JsonProperty("date")
         @Schema(description = "Date", example = "2025-11-01")

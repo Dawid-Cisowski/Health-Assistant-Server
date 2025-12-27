@@ -2,7 +2,6 @@ package com.healthassistant.activity.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -10,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
-@Builder
 @Schema(description = "Daily activity breakdown with hourly data for chart view")
 public record ActivityDailyBreakdownResponse(
     @JsonProperty("date")
@@ -45,7 +43,6 @@ public record ActivityDailyBreakdownResponse(
     @Schema(description = "24-hour breakdown (0-23)")
     List<HourlyActivity> hourlyBreakdown
 ) {
-    @Builder
     public record HourlyActivity(
         @JsonProperty("hour")
         @Schema(description = "Hour of day (0-23)", example = "14")
