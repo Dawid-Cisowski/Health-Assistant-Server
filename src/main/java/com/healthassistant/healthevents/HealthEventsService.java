@@ -138,15 +138,20 @@ class HealthEventsService implements HealthEventsFacade {
     }
 
     private void publishAllEventsStoredEvent(StoreHealthEventsResult result) {
+        if (result.storedEvents().isEmpty()) {
+            return;
+        }
+
+        String deviceId = result.storedEvents().getFirst().deviceId().value();
         Set<String> eventTypeStrings = result.eventTypes().stream()
                 .map(EventType::value)
                 .collect(Collectors.toSet());
 
-        log.info("Publishing AllEventsStoredEvent for {} affected dates, {} event types, {} stored events",
-                result.affectedDates().size(), eventTypeStrings.size(), result.storedEvents().size());
+        log.info("Publishing AllEventsStoredEvent for device {} with {} affected dates, {} event types, {} stored events",
+                deviceId, result.affectedDates().size(), eventTypeStrings.size(), result.storedEvents().size());
 
         eventPublisher.publishEvent(
-                new AllEventsStoredEvent(result.storedEvents(), result.affectedDates(), eventTypeStrings)
+                new AllEventsStoredEvent(deviceId, result.storedEvents(), result.affectedDates(), eventTypeStrings)
         );
     }
 

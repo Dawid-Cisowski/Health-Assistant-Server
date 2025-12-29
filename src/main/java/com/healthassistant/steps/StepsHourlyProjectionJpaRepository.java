@@ -10,8 +10,8 @@ import java.util.Optional;
 @Repository
 interface StepsHourlyProjectionJpaRepository extends JpaRepository<StepsHourlyProjectionJpaEntity, Long> {
 
-    Optional<StepsHourlyProjectionJpaEntity> findByDateAndHour(LocalDate date, Integer hour);
+    Optional<StepsHourlyProjectionJpaEntity> findByDeviceIdAndDateAndHour(String deviceId, LocalDate date, Integer hour);
 
-    List<StepsHourlyProjectionJpaEntity> findByDateOrderByHourAsc(LocalDate date);
+    List<StepsHourlyProjectionJpaEntity> findByDeviceIdAndDateOrderByHourAsc(String deviceId, LocalDate date);
 
 }

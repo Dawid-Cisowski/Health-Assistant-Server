@@ -10,9 +10,10 @@ import java.util.Optional;
 @Repository
 interface StepsDailyProjectionJpaRepository extends JpaRepository<StepsDailyProjectionJpaEntity, Long> {
 
-    Optional<StepsDailyProjectionJpaEntity> findByDate(LocalDate date);
+    Optional<StepsDailyProjectionJpaEntity> findByDeviceIdAndDate(String deviceId, LocalDate date);
 
-    List<StepsDailyProjectionJpaEntity> findByDateBetweenOrderByDateAsc(
+    List<StepsDailyProjectionJpaEntity> findByDeviceIdAndDateBetweenOrderByDateAsc(
+            String deviceId,
             LocalDate startDate,
             LocalDate endDate
     );

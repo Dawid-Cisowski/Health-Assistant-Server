@@ -25,8 +25,8 @@ class DailySummaryService implements DailySummaryFacade {
     private final ObjectMapper objectMapper;
 
     @Override
-    public void generateDailySummary(LocalDate date) {
-        commandHandler.handle(GenerateDailySummaryCommand.forDate(date));
+    public void generateDailySummary(String deviceId, LocalDate date) {
+        commandHandler.handle(GenerateDailySummaryCommand.forDeviceAndDate(deviceId, date));
     }
 
     @Override

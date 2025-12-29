@@ -19,6 +19,9 @@ class StepsHourlyProjectionJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "device_id", nullable = false)
+    private String deviceId;
+
     @Column(name = "date", nullable = false)
     private LocalDate date;
 
@@ -62,6 +65,7 @@ class StepsHourlyProjectionJpaEntity {
 
     static StepsHourlyProjectionJpaEntity from(StepsBucket bucket) {
         return StepsHourlyProjectionJpaEntity.builder()
+                .deviceId(bucket.deviceId())
                 .date(bucket.date())
                 .hour(bucket.hour())
                 .stepCount(bucket.stepCount())

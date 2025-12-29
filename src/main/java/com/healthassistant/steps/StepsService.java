@@ -26,13 +26,13 @@ public class StepsService implements StepsFacade {
     private final StepsHourlyProjectionJpaRepository hourlyRepository;
 
     @Override
-    public StepsDailyBreakdownResponse getDailyBreakdown(LocalDate date) {
-        Optional<StepsDailyBreakdownResponse> result = getDailyBreakdownInternal(date);
+    public StepsDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date) {
+        Optional<StepsDailyBreakdownResponse> result = getDailyBreakdownInternal(deviceId, date);
         return result.orElseGet(() -> createEmptyBreakdown(date));
     }
 
-    private Optional<StepsDailyBreakdownResponse> getDailyBreakdownInternal(LocalDate date) {
-        Optional<StepsDailyProjectionJpaEntity> dailyOpt = dailyRepository.findByDate(date);
+    private Optional<StepsDailyBreakdownResponse> getDailyBreakdownInternal(String deviceId, LocalDate date) {
+        Optional<StepsDailyProjectionJpaEntity> dailyOpt = dailyRepository.findByDeviceIdAndDate(deviceId, date);
 
         if (dailyOpt.isEmpty()) {
             return Optional.empty();
@@ -40,7 +40,7 @@ public class StepsService implements StepsFacade {
 
         StepsDailyProjectionJpaEntity daily = dailyOpt.get();
         List<StepsHourlyProjectionJpaEntity> hourlyData =
-            hourlyRepository.findByDateOrderByHourAsc(date);
+            hourlyRepository.findByDeviceIdAndDateOrderByHourAsc(deviceId, date);
 
         Map<Integer, Integer> hourlySteps = hourlyData.stream()
             .collect(Collectors.toMap(
@@ -73,9 +73,9 @@ public class StepsService implements StepsFacade {
         return new StepsDailyBreakdownResponse(date, 0, null, null, null, 0, 0, hourlyBreakdown);
     }
     @Override
-    public StepsRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate) {
+    public StepsRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate) {
         List<StepsDailyProjectionJpaEntity> dailyData =
-            dailyRepository.findByDateBetweenOrderByDateAsc(startDate, endDate);
+            dailyRepository.findByDeviceIdAndDateBetweenOrderByDateAsc(deviceId, startDate, endDate);
 
         Map<LocalDate, StepsDailyProjectionJpaEntity> dataByDate = dailyData.stream()
             .collect(Collectors.toMap(StepsDailyProjectionJpaEntity::getDate, d -> d));

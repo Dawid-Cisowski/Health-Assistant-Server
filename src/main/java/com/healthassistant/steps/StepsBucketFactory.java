@@ -29,6 +29,7 @@ class StepsBucketFactory {
         }
 
         return Optional.of(StepsBucket.create(
+                eventData.deviceId().value(),
                 payload.bucketStart(),
                 payload.bucketEnd(),
                 payload.count()

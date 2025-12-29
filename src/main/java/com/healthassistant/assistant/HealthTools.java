@@ -40,7 +40,7 @@ class HealthTools {
 
         var start = LocalDate.parse(startDate);
         var end = LocalDate.parse(endDate);
-        var result = stepsFacade.getRangeSummary(start, end);
+        var result = stepsFacade.getRangeSummary(deviceId, start, end);
 
         log.info("Steps data fetched: {} total steps over {} days", result.totalSteps(), result.daysWithData());
         return result;

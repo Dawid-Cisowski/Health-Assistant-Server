@@ -20,9 +20,9 @@ class GenerateDailySummaryCommandHandler {
 
     @Transactional
     public void handle(GenerateDailySummaryCommand command) {
-        log.info("Generating daily summary for date: {}", command.date());
+        log.info("Generating daily summary for device: {} date: {}", command.deviceId(), command.date());
 
-        DailySummary summary = aggregator.aggregate(command.date());
+        DailySummary summary = aggregator.aggregate(command.deviceId(), command.date());
 
         Map<String, Object> summaryMap = objectMapper.convertValue(summary, Map.class);
 
@@ -38,6 +38,6 @@ class GenerateDailySummaryCommandHandler {
 
         jpaRepository.save(entity);
 
-        log.info("Daily summary generated and saved for date: {}", command.date());
+        log.info("Daily summary generated and saved for device: {} date: {}", command.deviceId(), command.date());
     }
 }

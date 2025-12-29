@@ -37,15 +37,16 @@ class StepsController {
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
     ResponseEntity<StepsDailyBreakdownResponse> getDailyBreakdown(
+            @RequestHeader("X-Device-Id") String deviceId,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
-        log.info("Retrieving daily steps breakdown for date: {}", date);
-        StepsDailyBreakdownResponse breakdown = stepsFacade.getDailyBreakdown(date);
-        
+        log.info("Retrieving daily steps breakdown for device: {} date: {}", deviceId, date);
+        StepsDailyBreakdownResponse breakdown = stepsFacade.getDailyBreakdown(deviceId, date);
+
         if (breakdown.totalSteps() == 0) {
             return ResponseEntity.notFound().build();
         }
-        
+
         return ResponseEntity.ok(breakdown);
     }
 
@@ -61,6 +62,7 @@ class StepsController {
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
     ResponseEntity<StepsRangeSummaryResponse> getRangeSummary(
+            @RequestHeader("X-Device-Id") String deviceId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
@@ -68,9 +70,9 @@ class StepsController {
             log.warn("Invalid date range: start {} is after end {}", startDate, endDate);
             return ResponseEntity.badRequest().build();
         }
-        
-        log.info("Retrieving steps range summary for {} to {}", startDate, endDate);
-        StepsRangeSummaryResponse summary = stepsFacade.getRangeSummary(startDate, endDate);
+
+        log.info("Retrieving steps range summary for device: {} from {} to {}", deviceId, startDate, endDate);
+        StepsRangeSummaryResponse summary = stepsFacade.getRangeSummary(deviceId, startDate, endDate);
         return ResponseEntity.ok(summary);
     }
 }

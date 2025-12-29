@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 
 public record AllEventsStoredEvent(
+        String deviceId,
         List<StoredEventData> events,
         Set<LocalDate> affectedDates,
         Set<String> eventTypes

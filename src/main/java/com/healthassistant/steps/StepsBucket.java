@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.util.Objects;
 
 record StepsBucket(
+        String deviceId,
         LocalDate date,
         int hour,
         StepCount count,
@@ -16,6 +17,7 @@ record StepsBucket(
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     StepsBucket {
+        Objects.requireNonNull(deviceId, "deviceId cannot be null");
         Objects.requireNonNull(date, "date cannot be null");
         Objects.requireNonNull(count, "count cannot be null");
         Objects.requireNonNull(bucketStart, "bucketStart cannot be null");
@@ -28,12 +30,12 @@ record StepsBucket(
         }
     }
 
-    static StepsBucket create(Instant bucketStart, Instant bucketEnd, int stepCount) {
+    static StepsBucket create(String deviceId, Instant bucketStart, Instant bucketEnd, int stepCount) {
         var startZoned = bucketStart.atZone(POLAND_ZONE);
         LocalDate date = startZoned.toLocalDate();
         int hour = startZoned.getHour();
         StepCount count = StepCount.of(stepCount);
-        return new StepsBucket(date, hour, count, bucketStart, bucketEnd);
+        return new StepsBucket(deviceId, date, hour, count, bucketStart, bucketEnd);
     }
 
     int stepCount() {

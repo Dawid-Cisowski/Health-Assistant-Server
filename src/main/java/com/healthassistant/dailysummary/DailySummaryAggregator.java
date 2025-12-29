@@ -36,15 +36,15 @@ class DailySummaryAggregator {
     private final HealthEventsFacade healthEventsFacade;
     private final StepsFacade stepsFacade;
 
-    DailySummary aggregate(LocalDate date) {
+    DailySummary aggregate(String deviceId, LocalDate date) {
         Instant dayStart = date.atStartOfDay(POLAND_ZONE).toInstant();
         Instant dayEnd = date.plusDays(1).atStartOfDay(POLAND_ZONE).toInstant();
 
         List<EventData> events = healthEventsFacade.findEventsByOccurredAtBetween(dayStart, dayEnd);
 
-        log.info("Aggregating {} events for date {}", events.size(), date);
+        log.info("Aggregating {} events for device {} date {}", events.size(), deviceId, date);
 
-        Activity activity = aggregateActivity(events, date);
+        Activity activity = aggregateActivity(deviceId, events, date);
         List<Exercise> exercises = aggregateExercises(events);
         List<Workout> workouts = aggregateWorkouts(events);
         List<Sleep> sleep = aggregateSleep(events);
@@ -64,8 +64,8 @@ class DailySummaryAggregator {
         );
     }
 
-    private Activity aggregateActivity(List<EventData> events, LocalDate date) {
-        Integer totalSteps = Optional.ofNullable(stepsFacade.getDailyBreakdown(date))
+    private Activity aggregateActivity(String deviceId, List<EventData> events, LocalDate date) {
+        Integer totalSteps = Optional.ofNullable(stepsFacade.getDailyBreakdown(deviceId, date))
                 .map(StepsDailyBreakdownResponse::totalSteps)
                 .orElse(null);
 

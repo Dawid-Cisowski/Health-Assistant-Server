@@ -32,10 +32,10 @@ class StepsProjector {
     }
 
     private void saveProjection(StepsBucket bucket) {
-        String lockKey = (bucket.date() + "-" + bucket.hour()).intern();
+        String lockKey = (bucket.deviceId() + "-" + bucket.date() + "-" + bucket.hour()).intern();
         synchronized (lockKey) {
             StepsHourlyProjectionJpaEntity hourly = hourlyRepository
-                    .findByDateAndHour(bucket.date(), bucket.hour())
+                    .findByDeviceIdAndDateAndHour(bucket.deviceId(), bucket.date(), bucket.hour())
                     .map(existing -> {
                         existing.addBucket(bucket);
                         return existing;
@@ -43,13 +43,13 @@ class StepsProjector {
                     .orElseGet(() -> StepsHourlyProjectionJpaEntity.from(bucket));
 
             hourlyRepository.save(hourly);
-            updateDailyProjection(bucket.date());
+            updateDailyProjection(bucket.deviceId(), bucket.date());
         }
     }
 
-    private void updateDailyProjection(LocalDate date) {
+    private void updateDailyProjection(String deviceId, LocalDate date) {
         List<StepsHourlyProjectionJpaEntity> hourlyData =
-                hourlyRepository.findByDateOrderByHourAsc(date);
+                hourlyRepository.findByDeviceIdAndDateOrderByHourAsc(deviceId, date);
 
         if (hourlyData.isEmpty()) {
             return;
@@ -79,8 +79,9 @@ class StepsProjector {
                 .filter(h -> h.getStepCount() > 0)
                 .count();
 
-        StepsDailyProjectionJpaEntity daily = dailyRepository.findByDate(date)
+        StepsDailyProjectionJpaEntity daily = dailyRepository.findByDeviceIdAndDate(deviceId, date)
                 .orElseGet(() -> StepsDailyProjectionJpaEntity.builder()
+                        .deviceId(deviceId)
                         .date(date)
                         .build());
 

@@ -7,9 +7,9 @@ import java.time.LocalDate;
 
 public interface StepsFacade {
 
-    StepsDailyBreakdownResponse getDailyBreakdown(LocalDate date);
+    StepsDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date);
 
-    StepsRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate);
+    StepsRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteAllProjections();
 }

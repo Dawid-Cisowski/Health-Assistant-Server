@@ -464,7 +464,7 @@ abstract class BaseIntegrationSpec extends Specification {
     }
 
 
-    String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z") {
+    String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z", String deviceId = TEST_DEVICE_ID) {
         return """
         {
             "events": [
@@ -479,12 +479,13 @@ abstract class BaseIntegrationSpec extends Specification {
                         "originPackage": "com.google.android.apps.fitness"
                     }
                 }
-            ]
+            ],
+            "deviceId": "${deviceId}"
         }
         """.stripIndent().trim()
     }
 
-    String createHeartRateEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:15:00Z") {
+    String createHeartRateEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:15:00Z", String deviceId = TEST_DEVICE_ID) {
         return """
         {
             "events": [
@@ -502,7 +503,8 @@ abstract class BaseIntegrationSpec extends Specification {
                         "originPackage": "com.google.android.apps.fitness"
                     }
                 }
-            ]
+            ],
+            "deviceId": "${deviceId}"
         }
         """.stripIndent().trim()
     }
@@ -575,7 +577,7 @@ abstract class BaseIntegrationSpec extends Specification {
         """.stripIndent().trim()
     }
 
-    String createSleepSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T08:00:00Z", String sleepId = "sleep-session-default") {
+    String createSleepSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T08:00:00Z", String sleepId = "sleep-session-default", String deviceId = TEST_DEVICE_ID) {
         return """
         {
             "events": [
@@ -591,7 +593,8 @@ abstract class BaseIntegrationSpec extends Specification {
                         "originPackage": "com.google.android.apps.fitness"
                     }
                 }
-            ]
+            ],
+            "deviceId": "${deviceId}"
         }
         """.stripIndent().trim()
     }
