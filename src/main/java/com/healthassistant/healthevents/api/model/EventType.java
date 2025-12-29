@@ -1,7 +1,11 @@
 package com.healthassistant.healthevents.api.model;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 import java.util.Objects;
 
+@JsonDeserialize(using = EventTypeDeserializer.class)
 public sealed interface EventType permits
         StepsBucketedRecorded,
         DistanceBucketRecorded,
@@ -13,6 +17,7 @@ public sealed interface EventType permits
         WorkoutRecorded,
         MealRecorded {
 
+    @JsonValue
     String value();
 
     static EventType from(String value) {

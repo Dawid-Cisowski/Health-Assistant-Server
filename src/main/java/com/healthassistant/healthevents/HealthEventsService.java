@@ -151,7 +151,7 @@ class HealthEventsService implements HealthEventsFacade {
                 deviceId, result.affectedDates().size(), eventTypeStrings.size(), result.storedEvents().size());
 
         eventPublisher.publishEvent(
-                new AllEventsStoredEvent(deviceId, result.storedEvents(), result.affectedDates(), eventTypeStrings)
+                new AllEventsStoredEvent(deviceId, result.affectedDates(), eventTypeStrings)
         );
     }
 

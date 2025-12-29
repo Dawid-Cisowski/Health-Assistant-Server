@@ -8,8 +8,7 @@ import java.util.Set;
 
 public sealed interface BaseHealthEventsStoredEvent
         permits StepsEventsStoredEvent, WorkoutEventsStoredEvent, SleepEventsStoredEvent,
-                ActivityEventsStoredEvent, CaloriesEventsStoredEvent, MealsEventsStoredEvent,
-                AllEventsStoredEvent {
+                ActivityEventsStoredEvent, CaloriesEventsStoredEvent, MealsEventsStoredEvent {
 
     List<StoredEventData> events();
 
