@@ -1213,5 +1213,91 @@ class DailySummarySpec extends BaseIntegrationSpec {
         summary.get("heart.maxBpm") == 120
     }
 
+    def "Regression: Daily summary uses steps from projection, not naive event sum"() {
+        given: "authenticated device"
+        def deviceId = "test-device"
+        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+
+        and: "date for summary"
+        def summaryDate = LocalDate.of(2025, 12, 1)
+        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
+
+        and: "multiple step events for different hours (simulating Health Connect data)"
+        def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
+
+        // Morning walk: 9:00-10:00, 500 steps
+        def event1 = [
+            idempotencyKey: "steps-regression-1",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: summaryZoned.plusHours(10).toInstant().toString(),
+            payload: [
+                bucketStart: summaryZoned.plusHours(9).toInstant().toString(),
+                bucketEnd: summaryZoned.plusHours(10).toInstant().toString(),
+                count: 500,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        // Lunch walk: 12:00-13:00, 300 steps
+        def event2 = [
+            idempotencyKey: "steps-regression-2",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: summaryZoned.plusHours(13).toInstant().toString(),
+            payload: [
+                bucketStart: summaryZoned.plusHours(12).toInstant().toString(),
+                bucketEnd: summaryZoned.plusHours(13).toInstant().toString(),
+                count: 300,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        // Evening walk: 18:00-19:00, 700 steps
+        def event3 = [
+            idempotencyKey: "steps-regression-3",
+            type: "StepsBucketedRecorded.v1",
+            occurredAt: summaryZoned.plusHours(19).toInstant().toString(),
+            payload: [
+                bucketStart: summaryZoned.plusHours(18).toInstant().toString(),
+                bucketEnd: summaryZoned.plusHours(19).toInstant().toString(),
+                count: 700,
+                originPackage: "com.google.android.apps.fitness"
+            ]
+        ]
+
+        when: "I submit all step events"
+        authenticatedPostRequestWithBody(deviceId, secretBase64, "/v1/health-events", groovy.json.JsonOutput.toJson([
+            events: [event1, event2, event3],
+            deviceId: deviceId
+        ]))
+            .post("/v1/health-events")
+            .then()
+            .statusCode(200)
+
+        and: "I check steps projection directly"
+        def stepsResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/steps/daily/${dateStr}")
+            .get("/v1/steps/daily/${dateStr}")
+            .then()
+            .extract()
+
+        and: "I get daily summary"
+        def summaryResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
+            .get("/v1/daily-summaries/${dateStr}")
+            .then()
+            .extract()
+
+        then: "steps projection shows correct total"
+        stepsResponse.statusCode() == 200
+        def projectedSteps = stepsResponse.body().jsonPath().getInt("totalSteps")
+        projectedSteps == 1500 // 500 + 300 + 700
+
+        and: "daily summary uses projection value (not naive event sum)"
+        summaryResponse.statusCode() == 200
+        def summarySteps = summaryResponse.body().jsonPath().getInt("activity.steps")
+        summarySteps == projectedSteps // Daily summary should match projection
+
+        and: "both show expected total"
+        summarySteps == 1500
+    }
+
 }
 

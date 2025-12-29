@@ -1,6 +1,7 @@
 package com.healthassistant
 
 import com.healthassistant.healthevents.api.HealthEventsFacade
+import com.healthassistant.steps.api.StepsFacade
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import io.restassured.RestAssured
@@ -42,6 +43,9 @@ abstract class BaseIntegrationSpec extends Specification {
 
     @Autowired
     HealthEventsFacade healthEventsFacade
+
+    @Autowired
+    StepsFacade stepsFacade
 
 
     @Shared
@@ -97,6 +101,9 @@ abstract class BaseIntegrationSpec extends Specification {
 
         if (healthEventsFacade != null) {
             healthEventsFacade.deleteAllEvents() // Clean DB before each test
+        }
+        if (stepsFacade != null) {
+            stepsFacade.deleteAllProjections() // Clean steps projections before each test
         }
     }
 

@@ -5,6 +5,8 @@ import com.healthassistant.dailysummary.api.dto.DailySummary.Activity;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.EventData;
 import com.healthassistant.healthevents.api.dto.payload.*;
+import com.healthassistant.steps.api.StepsFacade;
+import com.healthassistant.steps.api.dto.StepsDailyBreakdownResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.healthassistant.dailysummary.api.dto.DailySummary.Exercise;
 import static com.healthassistant.dailysummary.api.dto.DailySummary.Heart;
@@ -31,6 +34,7 @@ class DailySummaryAggregator {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final HealthEventsFacade healthEventsFacade;
+    private final StepsFacade stepsFacade;
 
     DailySummary aggregate(LocalDate date) {
         Instant dayStart = date.atStartOfDay(POLAND_ZONE).toInstant();
@@ -40,7 +44,7 @@ class DailySummaryAggregator {
 
         log.info("Aggregating {} events for date {}", events.size(), date);
 
-        Activity activity = aggregateActivity(events);
+        Activity activity = aggregateActivity(events, date);
         List<Exercise> exercises = aggregateExercises(events);
         List<Workout> workouts = aggregateWorkouts(events);
         List<Sleep> sleep = aggregateSleep(events);
@@ -60,8 +64,11 @@ class DailySummaryAggregator {
         );
     }
 
-    private Activity aggregateActivity(List<EventData> events) {
-        int totalSteps = 0;
+    private Activity aggregateActivity(List<EventData> events, LocalDate date) {
+        Integer totalSteps = Optional.ofNullable(stepsFacade.getDailyBreakdown(date))
+                .map(StepsDailyBreakdownResponse::totalSteps)
+                .orElse(null);
+
         int totalActiveMinutes = 0;
         int totalActiveCalories = 0;
         long totalDistanceMeters = 0L;
@@ -70,7 +77,6 @@ class DailySummaryAggregator {
             EventPayload payload = event.payload();
 
             switch (payload) {
-                case StepsPayload steps -> totalSteps += steps.count() != null ? steps.count() : 0;
                 case ActiveMinutesPayload am -> totalActiveMinutes += am.activeMinutes() != null ? am.activeMinutes() : 0;
                 case ActiveCaloriesPayload ac -> totalActiveCalories += ac.energyKcal() != null ? ac.energyKcal().intValue() : 0;
                 case DistanceBucketPayload dist -> totalDistanceMeters += dist.distanceMeters() != null ? Math.round(dist.distanceMeters()) : 0L;
@@ -79,7 +85,7 @@ class DailySummaryAggregator {
         }
 
         return new Activity(
-                nullIfZero(totalSteps),
+                totalSteps,
                 nullIfZero(totalActiveMinutes),
                 nullIfZero(totalActiveCalories),
                 nullIfZero(totalDistanceMeters)
