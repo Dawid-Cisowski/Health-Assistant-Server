@@ -14,4 +14,6 @@ interface StepsHourlyProjectionJpaRepository extends JpaRepository<StepsHourlyPr
 
     List<StepsHourlyProjectionJpaEntity> findByDeviceIdAndDateOrderByHourAsc(String deviceId, LocalDate date);
 
+    void deleteByDeviceId(String deviceId);
+
 }

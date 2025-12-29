@@ -12,15 +12,19 @@ import spock.lang.Title
 @Title("Feature: Workout Import from GymRun Screenshot via AI")
 class WorkoutImportSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-workout-import"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final String IMPORT_ENDPOINT = "/v1/workouts/import-image"
 
     @Autowired
     WorkoutFacade workoutFacade
 
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
+
     def cleanup() {
-        workoutFacade?.deleteAllProjections()
+        // Only reset mock config - no data cleanup needed (isolated by DEVICE_ID)
         TestChatModelConfiguration.resetResponse()
     }
 
@@ -64,7 +68,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("status") == "success"
 
         and: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
         events.first().eventType() == "WorkoutRecorded.v1"
         events.first().payload().source() == "GYMRUN_SCREENSHOT"
@@ -95,7 +99,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         secondResponse.body().jsonPath().getString("workoutId") == firstWorkoutId
 
         and: "only one event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
     }
 
@@ -119,7 +123,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         body.getString("errorMessage").contains("Not a workout screenshot")
 
         and: "no event is stored in database"
-        findAllEvents().isEmpty()
+        findEventsForDevice(DEVICE_ID).isEmpty()
     }
 
     def "Scenario 5: Empty file returns 400 Bad Request"() {
@@ -198,7 +202,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         body.getInt("totalSets") == 9
 
         and: "event payload has correct structure"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         def payload = events.first().payload()
         def exercises = payload.exercises()
         exercises.size() == 3
@@ -223,7 +227,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         body.getString("note") == "Plecy i biceps"
 
         and: "event payload has note"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.first().payload().note() == "Plecy i biceps"
     }
 
@@ -242,7 +246,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event has bodyweight exercise with weight 0"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         def exercises = events.first().payload().exercises()
         def sets = exercises[0].sets()
         sets[0].weightKg() == 0.0
@@ -330,7 +334,7 @@ class WorkoutImportSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "exercises are in correct order"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         def exercises = events.first().payload().exercises()
         exercises[0].orderInWorkout() == 1
         exercises[1].orderInWorkout() == 2

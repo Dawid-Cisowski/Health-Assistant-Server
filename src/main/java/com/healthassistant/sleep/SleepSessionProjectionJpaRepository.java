@@ -14,4 +14,6 @@ interface SleepSessionProjectionJpaRepository extends JpaRepository<SleepSession
 
     List<SleepSessionProjectionJpaEntity> findByDeviceIdAndDateOrderBySessionNumberAsc(String deviceId, LocalDate date);
 
+    void deleteByDeviceId(String deviceId);
+
 }

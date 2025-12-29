@@ -13,9 +13,12 @@ import java.time.ZoneId
 @Title("Feature: Google Fit Historical Synchronization")
 class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-gfit"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     def "Scenario 1: Historical sync processes multiple days correctly"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses for multiple days (same response for all calls)"
@@ -45,7 +48,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 2: Historical sync handles empty days gracefully"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses with no data (will be called multiple times)"
@@ -69,7 +72,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 3: Historical sync validates days parameter - lower bound"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         when: "I trigger historical sync with invalid days parameter"
@@ -89,7 +92,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 4: Historical sync validates days parameter - upper bound"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         when: "I trigger historical sync with days > 365"
@@ -109,7 +112,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 5: Historical sync schedules sleep sessions processing for each day"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses with sleep sessions for multiple days"
@@ -138,7 +141,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 6: Historical sync schedules tasks for processing (async)"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses with steps data"
@@ -166,7 +169,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 7: Historical sync uses default value when days parameter is missing"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses"
@@ -190,7 +193,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 8: Historical sync schedules all days for processing"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses"
@@ -222,7 +225,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 9: Sync specific dates schedules tasks correctly"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses"
@@ -258,7 +261,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 10: Sync specific dates skips already pending dates on second call"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses (will fail intentionally to keep tasks in PENDING/retrying state)"
@@ -308,7 +311,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 11: Sync specific dates rejects empty list"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "request body with empty dates list"
@@ -330,7 +333,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 12: Sync specific dates rejects future dates"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "request body with future date"
@@ -362,7 +365,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 13: Sync specific dates rejects dates older than 365 days"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "request body with date older than 365 days"
@@ -394,7 +397,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 14: Sync specific dates rejects duplicate dates"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "request body with duplicate dates"
@@ -427,7 +430,7 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
 
     def "Scenario 15: Sync specific dates works with single date"() {
         given: "authenticated device"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
 
         and: "mock Google Fit API responses"

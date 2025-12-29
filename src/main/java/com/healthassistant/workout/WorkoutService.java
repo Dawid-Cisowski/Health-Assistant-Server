@@ -102,4 +102,11 @@ public class WorkoutService implements WorkoutFacade {
         exerciseRepository.deleteAll();
         workoutRepository.deleteAll();
     }
+
+    @Override
+    @Transactional
+    public void deleteProjectionsByDeviceId(String deviceId) {
+        log.warn("Deleting workout projections for deviceId: {}", deviceId);
+        workoutRepository.deleteByDeviceId(deviceId);
+    }
 }

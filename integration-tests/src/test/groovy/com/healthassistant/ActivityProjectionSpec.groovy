@@ -10,14 +10,15 @@ import spock.lang.Title
 @Title("Feature: Activity Projections and Query API")
 class ActivityProjectionSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-activity"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
     ActivityFacade activityFacade
 
     def setup() {
-        activityFacade?.deleteAllProjections()
+        cleanupEventsForDevice(DEVICE_ID)
+        activityFacade.deleteProjectionsByDeviceId(DEVICE_ID)
     }
 
     def "Scenario 1: ActiveMinutesRecorded event creates hourly and daily projections"() {
@@ -28,7 +29,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|activity|${bucketStart}",
+                "idempotencyKey": "${DEVICE_ID}|activity|${bucketStart}",
                 "type": "ActiveMinutesRecorded.v1",
                 "occurredAt": "${bucketEnd}",
                 "payload": {
@@ -38,7 +39,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -49,7 +50,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/activity/daily/${date}")
+        def response = waitForApiResponse("/v1/activity/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("hourlyBreakdown")[10].activeMinutes == 15
         response.getInt("totalActiveMinutes") == 15
         response.getInt("mostActiveHour") == 10
@@ -64,7 +65,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-20T13:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-20T13:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-20T13:01:00Z",
                     "payload": {
@@ -75,7 +76,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-20T13:01:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-20T13:01:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-20T13:02:00Z",
                     "payload": {
@@ -86,7 +87,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -97,7 +98,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections accumulate minutes (verified via API)"
-        def response = waitForApiResponse("/v1/activity/daily/${date}")
+        def response = waitForApiResponse("/v1/activity/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("hourlyBreakdown")[14].activeMinutes == 18
         response.getInt("totalActiveMinutes") == 18
     }
@@ -109,7 +110,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-20T07:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-20T07:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-20T07:01:00Z",
                     "payload": {
@@ -120,7 +121,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-20T11:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-20T11:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-20T11:01:00Z",
                     "payload": {
@@ -131,7 +132,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-20T17:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-20T17:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-20T17:01:00Z",
                     "payload": {
@@ -142,7 +143,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -153,7 +154,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "three hourly projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/activity/daily/${date}")
+        def response = waitForApiResponse("/v1/activity/daily/${date}", DEVICE_ID, SECRET_BASE64)
         def hourlyBreakdown = response.getList("hourlyBreakdown")
         hourlyBreakdown[8].activeMinutes == 5
         hourlyBreakdown[12].activeMinutes == 20
@@ -173,7 +174,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-21T08:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-21T08:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-21T08:01:00Z",
                     "payload": {
@@ -184,7 +185,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-21T14:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-21T14:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-21T14:01:00Z",
                     "payload": {
@@ -195,7 +196,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -239,7 +240,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-18T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-18T09:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-18T09:01:00Z",
                     "payload": {
@@ -250,7 +251,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-19T10:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-19T10:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-19T10:01:00Z",
                     "payload": {
@@ -261,7 +262,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-20T11:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-20T11:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-20T11:01:00Z",
                     "payload": {
@@ -272,7 +273,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -314,7 +315,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|activity|2025-11-23T10:00:00Z",
+                "idempotencyKey": "${DEVICE_ID}|activity|2025-11-23T10:00:00Z",
                 "type": "ActiveMinutesRecorded.v1",
                 "occurredAt": "2025-11-23T10:01:00Z",
                 "payload": {
@@ -324,7 +325,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -335,7 +336,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "no projections are created (verified via API returning 404)"
-        apiReturns404("/v1/activity/daily/2025-11-23")
+        apiReturns404("/v1/activity/daily/2025-11-23", DEVICE_ID, SECRET_BASE64)
     }
 
     def "Scenario 7: API returns 404 for date with no activity"() {
@@ -357,7 +358,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-24T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-24T09:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-24T09:01:00Z",
                     "payload": {
@@ -368,7 +369,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|activity|2025-11-26T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|activity|2025-11-26T09:00:00Z",
                     "type": "ActiveMinutesRecorded.v1",
                     "occurredAt": "2025-11-26T09:01:00Z",
                     "payload": {
@@ -379,7 +380,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -428,7 +429,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         def request1 = """
         {
             "events": [{
-                "idempotencyKey": "test-device|activity|2025-11-22T09:00:00Z",
+                "idempotencyKey": "${DEVICE_ID}|activity|2025-11-22T09:00:00Z",
                 "type": "ActiveMinutesRecorded.v1",
                 "occurredAt": "2025-11-22T09:01:00Z",
                 "payload": {
@@ -438,7 +439,7 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
         def request2 = """

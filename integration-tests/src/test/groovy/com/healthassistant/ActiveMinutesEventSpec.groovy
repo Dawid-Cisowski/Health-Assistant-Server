@@ -10,8 +10,12 @@ import java.time.Instant
 @Title("Feature: Active Minutes Event Validation via Health Events API")
 class ActiveMinutesEventSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-active-min"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def "Scenario 1: Submit valid active minutes event returns success"() {
         given: "a valid active minutes event request"
@@ -49,7 +53,7 @@ class ActiveMinutesEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "event has correct type"
@@ -57,7 +61,7 @@ class ActiveMinutesEventSpec extends BaseIntegrationSpec {
         activeMinutesEvent.eventType() == "ActiveMinutesRecorded.v1"
 
         and: "event has correct device ID"
-        activeMinutesEvent.deviceId() == "mobile-app"
+        activeMinutesEvent.deviceId() == DEVICE_ID
 
         and: "event has correct payload"
         def payload = activeMinutesEvent.payload()
@@ -246,7 +250,7 @@ class ActiveMinutesEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def activeMinutesEvent = dbEvents.first()
         activeMinutesEvent.payload().activeMinutes() == 0
@@ -276,7 +280,7 @@ class ActiveMinutesEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def activeMinutesEvent = dbEvents.first()
         def storedOccurredAt = Instant.parse(activeMinutesEvent.occurredAt().toString())
@@ -289,7 +293,7 @@ class ActiveMinutesEventSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }

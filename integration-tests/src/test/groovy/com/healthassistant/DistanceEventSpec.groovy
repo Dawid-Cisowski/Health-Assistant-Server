@@ -10,8 +10,12 @@ import java.time.Instant
 @Title("Feature: Distance Event Ingestion via Health Events API")
 class DistanceEventSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-distance"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def "Scenario 1: Submit valid distance event returns success"() {
         given: "a valid distance event request"
@@ -49,7 +53,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "event has correct type"
@@ -57,7 +61,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         distanceEvent.eventType() == "DistanceBucketRecorded.v1"
 
         and: "event has correct device ID"
-        distanceEvent.deviceId() == "mobile-app"
+        distanceEvent.deviceId() == DEVICE_ID
 
         and: "event has correct payload"
         def payload = distanceEvent.payload()
@@ -106,7 +110,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
     }
 
@@ -289,7 +293,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def distanceEvent = dbEvents.first()
         distanceEvent.payload().distanceMeters() == 0
@@ -304,7 +308,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event1}, ${event2}, ${event3}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -321,10 +325,10 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 3
 
         and: "all events are stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 3
         dbEvents.every { it.eventType() == "DistanceBucketRecorded.v1" }
-        dbEvents.every { it.deviceId() == "mobile-app" }
+        dbEvents.every { it.deviceId() == DEVICE_ID }
     }
 
     def "Scenario 11: Distance event occurredAt timestamp is preserved"() {
@@ -351,7 +355,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def distanceEvent = dbEvents.first()
         def storedOccurredAt = Instant.parse(distanceEvent.occurredAt().toString())
@@ -364,7 +368,7 @@ class DistanceEventSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }

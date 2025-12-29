@@ -15,15 +15,20 @@ import java.time.LocalDate
 @Title("Feature: Sleep Import from ohealth Screenshot via AI")
 class SleepImportSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-sleep-import"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final String IMPORT_ENDPOINT = "/v1/sleep/import-image"
 
     @Autowired
     SleepFacade sleepFacade
 
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+        sleepFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+    }
+
     def cleanup() {
-        sleepFacade?.deleteAllProjections()
+        // Only reset mock config - no data cleanup needed (isolated by DEVICE_ID)
         TestChatModelConfiguration.resetResponse()
     }
 
@@ -67,7 +72,7 @@ class SleepImportSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("status") == "success"
 
         and: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
         events.first().eventType() == "SleepSessionRecorded.v1"
         events.first().payload().source() == "OHEALTH_SCREENSHOT"
@@ -96,7 +101,7 @@ class SleepImportSpec extends BaseIntegrationSpec {
         body.getBoolean("overwrote") == true
 
         and: "only one sleep event exists (overwritten)"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "the event now has phase data from import"
@@ -131,7 +136,7 @@ class SleepImportSpec extends BaseIntegrationSpec {
         body.getBoolean("overwrote") == false
 
         and: "two sleep events exist (both Health Connect and imported)"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 2
     }
 
@@ -155,7 +160,7 @@ class SleepImportSpec extends BaseIntegrationSpec {
         body.getString("errorMessage").contains("Not a sleep screenshot")
 
         and: "no event is stored in database"
-        findAllEvents().isEmpty()
+        findEventsForDevice(DEVICE_ID).isEmpty()
     }
 
     def "Scenario 6: Empty file returns 400 Bad Request"() {
@@ -275,7 +280,7 @@ class SleepImportSpec extends BaseIntegrationSpec {
         secondResponse.body().jsonPath().getBoolean("overwrote") == true
 
         and: "only one event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
     }
 

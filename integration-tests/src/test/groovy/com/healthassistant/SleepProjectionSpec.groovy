@@ -12,15 +12,14 @@ import java.time.LocalDate
 @Title("Feature: Sleep Projections and Query API")
 class SleepProjectionSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-sleep-proj"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
     SleepFacade sleepFacade
 
     def setup() {
-        // Clean projection tables (in addition to base cleanup)
-        sleepFacade?.deleteAllProjections()
+        sleepFacade.deleteProjectionsByDeviceId(DEVICE_ID)
     }
 
     def "Scenario 1: SleepSession event creates session and daily projections"() {
@@ -33,7 +32,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|sleep|${sleepStart}",
+                "idempotencyKey": "${DEVICE_ID}|sleep|${sleepStart}",
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "${sleepEnd}",
                 "payload": {
@@ -44,7 +43,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -55,7 +54,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        def response = waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("sessions").size() == 1
         response.getList("sessions")[0].sessionNumber == 1
         response.getList("sessions")[0].durationMinutes == 480
@@ -80,7 +79,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|sleep|main",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|main",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "${mainSleepEnd}",
                     "payload": {
@@ -92,7 +91,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|nap",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|nap",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "${napEnd}",
                     "payload": {
@@ -104,7 +103,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -115,7 +114,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        def response = waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("sessions").size() == 2
         response.getList("sessions")[0].sessionNumber == 1
         response.getList("sessions")[0].durationMinutes == 480
@@ -135,7 +134,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|sleep|night-2025-11-22",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|night-2025-11-22",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-22T06:00:00Z",
                     "payload": {
@@ -147,7 +146,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|nap-2025-11-22",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|nap-2025-11-22",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-22T15:00:00Z",
                     "payload": {
@@ -159,7 +158,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -170,7 +169,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query daily detail"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
         def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/sleep/daily/${date}")
                 .get("/v1/sleep/daily/${date}")
@@ -204,7 +203,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-18",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-18",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-18T06:00:00Z",
                     "payload": {
@@ -216,7 +215,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-19",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-19",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-19T07:00:00Z",
                     "payload": {
@@ -228,7 +227,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-20",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-20",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-20T08:00:00Z",
                     "payload": {
@@ -240,7 +239,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -251,7 +250,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query range summary"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
         def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/sleep/range?startDate=2025-11-18&endDate=2025-11-20")
                 .get("/v1/sleep/range?startDate=2025-11-18&endDate=2025-11-20")
@@ -285,7 +284,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-23",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-23",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-23T06:00:00Z",
                     "payload": {
@@ -297,7 +296,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-24",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-24",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-24T08:00:00Z",
                     "payload": {
@@ -309,7 +308,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-25",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-25",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-25T07:00:00Z",
                     "payload": {
@@ -321,7 +320,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -332,7 +331,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query range summary"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
         def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/sleep/range?startDate=2025-11-23&endDate=2025-11-25")
                 .get("/v1/sleep/range?startDate=2025-11-23&endDate=2025-11-25")
@@ -356,7 +355,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|sleep|zero-duration",
+                "idempotencyKey": "${DEVICE_ID}|sleep|zero-duration",
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "2025-11-26T06:00:00Z",
                 "payload": {
@@ -367,7 +366,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -378,14 +377,14 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "no projections are created (API returns 404)"
-        apiReturns404("/v1/sleep/daily/2025-11-26")
+        apiReturns404("/v1/sleep/daily/2025-11-26", DEVICE_ID, SECRET_BASE64)
     }
 
     def "Scenario 7: API returns 404 for date with no sleep data"() {
         given: "no sleep data exists"
 
         when: "I query daily detail"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
         def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/sleep/daily/2025-12-01")
                 .get("/v1/sleep/daily/2025-12-01")
@@ -402,7 +401,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-27",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-27",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-27T06:00:00Z",
                     "payload": {
@@ -414,7 +413,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|2025-11-29",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|2025-11-29",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-11-29T06:00:00Z",
                     "payload": {
@@ -426,7 +425,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -437,7 +436,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query 3-day range"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
         def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/sleep/range?startDate=2025-11-27&endDate=2025-11-29")
                 .get("/v1/sleep/range?startDate=2025-11-27&endDate=2025-11-29")
@@ -466,7 +465,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|sleep|duplicate-test",
+                "idempotencyKey": "${DEVICE_ID}|sleep|duplicate-test",
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "2025-11-30T06:00:00Z",
                 "payload": {
@@ -477,7 +476,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -487,7 +486,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        waitForApiResponse("/v1/sleep/daily/${date}")
+        waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
 
         authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
@@ -510,7 +509,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
 
     def "Scenario 10: Range query with invalid dates returns 400"() {
         when: "I query range with endDate before startDate"
-        def deviceId = "test-device"
+        def deviceId = DEVICE_ID
         def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
         def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/sleep/range?startDate=2025-11-30&endDate=2025-11-28")
                 .get("/v1/sleep/range?startDate=2025-11-30&endDate=2025-11-28")
@@ -527,7 +526,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|sleep|missing-sleep-start",
+                "idempotencyKey": "${DEVICE_ID}|sleep|missing-sleep-start",
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "2025-12-01T06:00:00Z",
                 "payload": {
@@ -536,7 +535,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -547,7 +546,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "no projections are created (API returns 404)"
-        apiReturns404("/v1/sleep/daily/${date}")
+        apiReturns404("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
     }
 
     def "Scenario 12: Multiple sessions update daily aggregates correctly"() {
@@ -557,7 +556,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|sleep|session1",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|session1",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-12-02T06:00:00Z",
                     "payload": {
@@ -569,7 +568,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|session2",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|session2",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-12-02T13:00:00Z",
                     "payload": {
@@ -581,7 +580,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|sleep|session3",
+                    "idempotencyKey": "${DEVICE_ID}|sleep|session3",
                     "type": "SleepSessionRecorded.v1",
                     "occurredAt": "2025-12-02T17:00:00Z",
                     "payload": {
@@ -593,7 +592,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -604,7 +603,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        def response = waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("sessions").size() == 3
         response.getList("sessions")[0].sessionNumber == 1
         response.getList("sessions")[0].durationMinutes == 480
@@ -627,7 +626,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|sleep|midnight-span",
+                "idempotencyKey": "${DEVICE_ID}|sleep|midnight-span",
                 "type": "SleepSessionRecorded.v1",
                 "occurredAt": "${sleepEnd}",
                 "payload": {
@@ -638,7 +637,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -649,7 +648,7 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created with correct time range (verified via API)"
-        def response = waitForApiResponse("/v1/sleep/daily/${date}")
+        def response = waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("sessions").size() == 1
         response.getInt("totalSleepMinutes") == 660
         response.getString("firstSleepStart") == sleepStart

@@ -10,14 +10,14 @@ import spock.lang.Title
 @Title("Feature: Meal Projections and Query API")
 class MealProjectionSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-meals"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
     MealsFacade mealsFacade
 
     def setup() {
-        mealsFacade?.deleteAllProjections()
+        mealsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
     }
 
     def "Scenario 1: MealRecorded event creates meal and daily projections"() {
@@ -27,7 +27,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|meal|${occurredAt}",
+                "idempotencyKey": "${DEVICE_ID}|meal|${occurredAt}",
                 "type": "MealRecorded.v1",
                 "occurredAt": "${occurredAt}",
                 "payload": {
@@ -40,7 +40,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     "healthRating": "HEALTHY"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -51,7 +51,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         def meals = response.getList("meals")
         meals.size() == 1
         meals[0].mealNumber == 1
@@ -80,7 +80,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|breakfast",
+                    "idempotencyKey": "${DEVICE_ID}|meal|breakfast",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-21T07:30:00Z",
                     "payload": {
@@ -94,7 +94,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|lunch",
+                    "idempotencyKey": "${DEVICE_ID}|meal|lunch",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-21T12:30:00Z",
                     "payload": {
@@ -108,7 +108,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|dinner",
+                    "idempotencyKey": "${DEVICE_ID}|meal|dinner",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-21T19:00:00Z",
                     "payload": {
@@ -122,7 +122,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -133,7 +133,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "three meal projections are created with sequential numbers (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         def meals = response.getList("meals")
         meals.size() == 3
         meals[0].mealNumber == 1
@@ -157,7 +157,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|meal1",
+                    "idempotencyKey": "${DEVICE_ID}|meal|meal1",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-22T08:00:00Z",
                     "payload": {
@@ -171,7 +171,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|meal2",
+                    "idempotencyKey": "${DEVICE_ID}|meal|meal2",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-22T13:00:00Z",
                     "payload": {
@@ -185,7 +185,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -196,7 +196,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "daily projection has correct macro totals (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getInt("totalCaloriesKcal") == 1100  // 400 + 700
         response.getInt("totalProteinGrams") == 55   // 20 + 35
         response.getInt("totalFatGrams") == 40       // 15 + 25
@@ -211,7 +211,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|breakfast-2025-11-23",
+                    "idempotencyKey": "${DEVICE_ID}|meal|breakfast-2025-11-23",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-23T07:00:00Z",
                     "payload": {
@@ -225,7 +225,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|snack1-2025-11-23",
+                    "idempotencyKey": "${DEVICE_ID}|meal|snack1-2025-11-23",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-23T10:00:00Z",
                     "payload": {
@@ -239,7 +239,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|snack2-2025-11-23",
+                    "idempotencyKey": "${DEVICE_ID}|meal|snack2-2025-11-23",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-23T15:00:00Z",
                     "payload": {
@@ -253,7 +253,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|dessert-2025-11-23",
+                    "idempotencyKey": "${DEVICE_ID}|meal|dessert-2025-11-23",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-23T20:00:00Z",
                     "payload": {
@@ -267,7 +267,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -278,7 +278,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "meal type counts are correct (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getInt("totalMealCount") == 4
         response.getInt("mealTypeCounts.breakfast") == 1
         response.getInt("mealTypeCounts.snack") == 2
@@ -296,7 +296,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|very-healthy",
+                    "idempotencyKey": "${DEVICE_ID}|meal|very-healthy",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-24T08:00:00Z",
                     "payload": {
@@ -310,7 +310,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|healthy",
+                    "idempotencyKey": "${DEVICE_ID}|meal|healthy",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-24T12:00:00Z",
                     "payload": {
@@ -324,7 +324,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|very-unhealthy",
+                    "idempotencyKey": "${DEVICE_ID}|meal|very-unhealthy",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-24T20:00:00Z",
                     "payload": {
@@ -338,7 +338,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -349,7 +349,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "health rating counts are correct (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getInt("healthRatingCounts.veryHealthy") == 1
         response.getInt("healthRatingCounts.healthy") == 1
         response.getInt("healthRatingCounts.neutral") == 0
@@ -364,7 +364,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|breakfast-2025-11-25",
+                    "idempotencyKey": "${DEVICE_ID}|meal|breakfast-2025-11-25",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-25T07:00:00Z",
                     "payload": {
@@ -378,7 +378,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|lunch-2025-11-25",
+                    "idempotencyKey": "${DEVICE_ID}|meal|lunch-2025-11-25",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-25T12:30:00Z",
                     "payload": {
@@ -392,7 +392,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -437,7 +437,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|2025-11-18",
+                    "idempotencyKey": "${DEVICE_ID}|meal|2025-11-18",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-18T12:00:00Z",
                     "payload": {
@@ -451,7 +451,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|2025-11-19",
+                    "idempotencyKey": "${DEVICE_ID}|meal|2025-11-19",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-19T12:00:00Z",
                     "payload": {
@@ -465,7 +465,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|2025-11-20",
+                    "idempotencyKey": "${DEVICE_ID}|meal|2025-11-20",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-20T12:00:00Z",
                     "payload": {
@@ -479,7 +479,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -522,7 +522,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|meal|duplicate-test",
+                "idempotencyKey": "${DEVICE_ID}|meal|duplicate-test",
                 "type": "MealRecorded.v1",
                 "occurredAt": "2025-11-30T12:00:00Z",
                 "payload": {
@@ -535,7 +535,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     "healthRating": "HEALTHY"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -551,7 +551,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projection is not duplicated (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         def meals = response.getList("meals")
         meals.size() == 1
         meals[0].caloriesKcal == 500
@@ -567,7 +567,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         def request1 = """
         {
             "events": [{
-                "idempotencyKey": "test-device|meal|update-test",
+                "idempotencyKey": "${DEVICE_ID}|meal|update-test",
                 "type": "MealRecorded.v1",
                 "occurredAt": "2025-12-01T12:00:00Z",
                 "payload": {
@@ -580,14 +580,14 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     "healthRating": "HEALTHY"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
         def request2 = """
         {
             "events": [{
-                "idempotencyKey": "test-device|meal|update-test",
+                "idempotencyKey": "${DEVICE_ID}|meal|update-test",
                 "type": "MealRecorded.v1",
                 "occurredAt": "2025-12-01T12:00:00Z",
                 "payload": {
@@ -600,7 +600,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     "healthRating": "NEUTRAL"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -617,7 +617,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projection keeps original data (projections are created on first event only, verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         def meals = response.getList("meals")
         meals.size() == 1
         meals[0].title == "Original meal"
@@ -649,7 +649,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|2025-11-27",
+                    "idempotencyKey": "${DEVICE_ID}|meal|2025-11-27",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-27T12:00:00Z",
                     "payload": {
@@ -663,7 +663,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|2025-11-29",
+                    "idempotencyKey": "${DEVICE_ID}|meal|2025-11-29",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-11-29T12:00:00Z",
                     "payload": {
@@ -677,7 +677,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -727,7 +727,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|morning",
+                    "idempotencyKey": "${DEVICE_ID}|meal|morning",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-02T07:30:00Z",
                     "payload": {
@@ -741,7 +741,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|evening",
+                    "idempotencyKey": "${DEVICE_ID}|meal|evening",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-02T20:00:00Z",
                     "payload": {
@@ -755,7 +755,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -766,7 +766,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "daily projection has correct time tracking (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getString("firstMealTime") == "2025-12-02T07:30:00Z"
         response.getString("lastMealTime") == "2025-12-02T20:00:00Z"
     }
@@ -778,7 +778,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|meal|breakfast-all",
+                    "idempotencyKey": "${DEVICE_ID}|meal|breakfast-all",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-03T07:00:00Z",
                     "payload": {
@@ -792,7 +792,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|brunch-all",
+                    "idempotencyKey": "${DEVICE_ID}|meal|brunch-all",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-03T10:00:00Z",
                     "payload": {
@@ -806,7 +806,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|lunch-all",
+                    "idempotencyKey": "${DEVICE_ID}|meal|lunch-all",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-03T13:00:00Z",
                     "payload": {
@@ -820,7 +820,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|snack-all",
+                    "idempotencyKey": "${DEVICE_ID}|meal|snack-all",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-03T15:00:00Z",
                     "payload": {
@@ -834,7 +834,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|dinner-all",
+                    "idempotencyKey": "${DEVICE_ID}|meal|dinner-all",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-03T18:00:00Z",
                     "payload": {
@@ -848,7 +848,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|dessert-all",
+                    "idempotencyKey": "${DEVICE_ID}|meal|dessert-all",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-03T20:00:00Z",
                     "payload": {
@@ -862,7 +862,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|meal|drink-all",
+                    "idempotencyKey": "${DEVICE_ID}|meal|drink-all",
                     "type": "MealRecorded.v1",
                     "occurredAt": "2025-12-03T21:00:00Z",
                     "payload": {
@@ -876,7 +876,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -887,7 +887,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "all meal types are counted (verified via API)"
-        def response = waitForApiResponse("/v1/meals/daily/${date}")
+        def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getInt("totalMealCount") == 7
         response.getInt("mealTypeCounts.breakfast") == 1
         response.getInt("mealTypeCounts.brunch") == 1

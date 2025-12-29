@@ -116,4 +116,12 @@ public class StepsService implements StepsFacade {
         hourlyRepository.deleteAll();
         dailyRepository.deleteAll();
     }
+
+    @Override
+    @Transactional
+    public void deleteProjectionsByDeviceId(String deviceId) {
+        log.debug("Deleting steps projections for device: {}", deviceId);
+        hourlyRepository.deleteByDeviceId(deviceId);
+        dailyRepository.deleteByDeviceId(deviceId);
+    }
 }

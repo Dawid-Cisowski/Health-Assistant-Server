@@ -153,4 +153,12 @@ class MealsService implements MealsFacade {
         mealRepository.deleteAll();
         dailyRepository.deleteAll();
     }
+
+    @Override
+    @Transactional
+    public void deleteProjectionsByDeviceId(String deviceId) {
+        log.warn("Deleting meal projections for device: {}", deviceId);
+        mealRepository.deleteByDeviceId(deviceId);
+        dailyRepository.deleteByDeviceId(deviceId);
+    }
 }

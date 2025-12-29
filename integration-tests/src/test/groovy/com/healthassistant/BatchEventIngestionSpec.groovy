@@ -9,6 +9,13 @@ import java.time.format.DateTimeFormatter
 @Title("Feature: Batch Event Ingestion - Mixed Events, Partial Success, Large Batches")
 class BatchEventIngestionSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-batch"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
+
     // ===========================================
     // Mixed Event Types
     // ===========================================
@@ -64,7 +71,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -120,7 +127,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -154,7 +161,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -181,7 +188,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -219,7 +226,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         def body = """{"events": [${events}]}"""
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -238,7 +245,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         def uniquePrefix = UUID.randomUUID().toString()
         def body = """
         {
-            "deviceId": "${TEST_DEVICE_ID}",
+            "deviceId": "${DEVICE_ID}",
             "events": [
                 {
                     "idempotencyKey": "proj-steps-${uniquePrefix}",
@@ -278,7 +285,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -332,7 +339,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -379,7 +386,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch first time"
-        def response1 = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response1 = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -389,7 +396,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         response1.body().jsonPath().getInt("summary.stored") == 2
 
         when: "I submit the same batch again"
-        def response2 = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response2 = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -411,7 +418,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         def uniquePrefix = UUID.randomUUID().toString()
         def body = """
         {
-            "deviceId": "${TEST_DEVICE_ID}",
+            "deviceId": "${DEVICE_ID}",
             "events": [
                 {
                     "idempotencyKey": "summary-steps-1-${uniquePrefix}",
@@ -451,7 +458,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -504,7 +511,7 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
         """
 
         when: "I submit the batch"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()

@@ -12,8 +12,12 @@ import java.time.Instant
 @Title("Feature: Workout Event Ingestion via Health Events API")
 class WorkoutSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-workout"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def "Scenario 1: Submit valid workout event returns success"() {
         given: "a valid workout event request"
@@ -51,7 +55,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "event has correct type"
@@ -59,7 +63,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         workoutEvent.eventType() == "WorkoutRecorded.v1"
 
         and: "event has correct device ID"
-        workoutEvent.deviceId() == "gymrun-app"
+        workoutEvent.deviceId() == DEVICE_ID
 
         and: "event has correct payload"
         def payload = workoutEvent.payload()
@@ -96,7 +100,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         events[0].status == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
     }
 
@@ -126,7 +130,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -192,7 +196,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -237,7 +241,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -283,7 +287,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -315,10 +319,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event has correct idempotency key"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
         def workoutEvent = events.first()
-        workoutEvent.idempotencyKey() == "gymrun-app|workout|${workoutId}"
+        workoutEvent.idempotencyKey() == "${DEVICE_ID}|workout|${workoutId}"
     }
 
     def "Scenario 10: Multiple workout events are stored correctly"() {
@@ -330,7 +334,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event1}, ${event2}, ${event3}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -347,10 +351,10 @@ class WorkoutSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 3
 
         and: "all events are stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 3
         dbEvents.every { it.eventType() == "WorkoutRecorded.v1" }
-        dbEvents.every { it.deviceId() == "gymrun-app" }
+        dbEvents.every { it.deviceId() == DEVICE_ID }
     }
 
     def "Scenario 11: Workout event with minimal data (no note, no muscleGroup)"() {
@@ -378,7 +382,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -392,7 +396,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
         workoutEvent.eventType() == "WorkoutRecorded.v1"
@@ -413,7 +417,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored with all exercises and sets"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
         def exercises = workoutEvent.payload().exercises()
@@ -455,7 +459,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -466,7 +470,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches performedAt"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
         def occurredAt = Instant.parse(workoutEvent.occurredAt().toString())
@@ -503,7 +507,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -517,7 +521,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored with warmup flags preserved"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
         def exercises = workoutEvent.payload().exercises()
@@ -557,7 +561,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -571,7 +575,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored with zero weight"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def workoutEvent = dbEvents.first()
         def exercises = workoutEvent.payload().exercises()
@@ -586,7 +590,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }
@@ -607,14 +611,14 @@ class WorkoutSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${eventsJson}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }
 
     Map createWorkoutEventMap(String workoutId, String performedAt = "2025-11-17T18:00:00Z") {
         return [
-            idempotencyKey: "gymrun-app|workout|${workoutId}",
+            idempotencyKey: "${DEVICE_ID}|workout|${workoutId}",
             type: "WorkoutRecorded.v1",
             occurredAt: performedAt,
             payload: [
@@ -640,7 +644,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
     String createWorkoutEvent(String workoutId, String performedAt = "2025-11-17T18:00:00Z") {
         return """
         {
-            "idempotencyKey": "gymrun-app|workout|${workoutId}",
+            "idempotencyKey": "${DEVICE_ID}|workout|${workoutId}",
             "type": "WorkoutRecorded.v1",
             "occurredAt": "${performedAt}",
             "payload": {
@@ -677,7 +681,7 @@ class WorkoutSpec extends BaseIntegrationSpec {
     String createComplexWorkoutEvent(String workoutId) {
         return """
         {
-            "idempotencyKey": "gymrun-app|workout|${workoutId}",
+            "idempotencyKey": "${DEVICE_ID}|workout|${workoutId}",
             "type": "WorkoutRecorded.v1",
             "occurredAt": "2025-11-17T18:00:00Z",
             "payload": {

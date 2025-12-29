@@ -10,14 +10,15 @@ import spock.lang.Title
 @Title("Feature: Calories Projections and Query API")
 class CaloriesProjectionSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-calories"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
     CaloriesFacade caloriesFacade
 
     def setup() {
-        caloriesFacade?.deleteAllProjections()
+        cleanupEventsForDevice(DEVICE_ID)
+        caloriesFacade.deleteProjectionsByDeviceId(DEVICE_ID)
     }
 
     def "Scenario 1: ActiveCaloriesBurned event creates hourly and daily projections"() {
@@ -29,7 +30,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|calories|${bucketStart}",
+                "idempotencyKey": "${DEVICE_ID}|calories|${bucketStart}",
                 "type": "ActiveCaloriesBurnedRecorded.v1",
                 "occurredAt": "${bucketEnd}",
                 "payload": {
@@ -39,7 +40,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -50,7 +51,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/calories/daily/${date}")
+        def response = waitForApiResponse("/v1/calories/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("hourlyBreakdown")[10].calories == 125.5
 
         and: "daily projection is created with totals"
@@ -68,7 +69,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-20T13:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-20T13:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-20T13:01:00Z",
                     "payload": {
@@ -79,7 +80,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-20T13:01:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-20T13:01:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-20T13:02:00Z",
                     "payload": {
@@ -90,7 +91,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -101,7 +102,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections accumulate calories (verified via API)"
-        def response = waitForApiResponse("/v1/calories/daily/${date}")
+        def response = waitForApiResponse("/v1/calories/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("hourlyBreakdown")[14].calories == 175.5
         response.getDouble("totalCalories") == 175.5
     }
@@ -114,7 +115,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-20T07:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-20T07:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-20T07:01:00Z",
                     "payload": {
@@ -125,7 +126,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-20T11:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-20T11:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-20T11:01:00Z",
                     "payload": {
@@ -136,7 +137,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-20T17:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-20T17:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-20T17:01:00Z",
                     "payload": {
@@ -147,7 +148,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -158,7 +159,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "three hourly projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/calories/daily/${date}")
+        def response = waitForApiResponse("/v1/calories/daily/${date}", DEVICE_ID, SECRET_BASE64)
         def hourlyBreakdown = response.getList("hourlyBreakdown")
         hourlyBreakdown[8].calories == 50.0
         hourlyBreakdown[12].calories == 150.0
@@ -179,7 +180,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-21T08:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-21T08:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-21T08:01:00Z",
                     "payload": {
@@ -190,7 +191,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-21T14:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-21T14:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-21T14:01:00Z",
                     "payload": {
@@ -201,7 +202,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -245,7 +246,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-18T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-18T09:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-18T09:01:00Z",
                     "payload": {
@@ -256,7 +257,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-19T10:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-19T10:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-19T10:01:00Z",
                     "payload": {
@@ -267,7 +268,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-20T11:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-20T11:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-20T11:01:00Z",
                     "payload": {
@@ -278,7 +279,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -320,7 +321,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|calories|2025-11-23T10:00:00Z",
+                "idempotencyKey": "${DEVICE_ID}|calories|2025-11-23T10:00:00Z",
                 "type": "ActiveCaloriesBurnedRecorded.v1",
                 "occurredAt": "2025-11-23T10:01:00Z",
                 "payload": {
@@ -330,7 +331,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -341,7 +342,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "no projections are created (verified via API returning 404)"
-        apiReturns404("/v1/calories/daily/2025-11-23")
+        apiReturns404("/v1/calories/daily/2025-11-23", DEVICE_ID, SECRET_BASE64)
     }
 
     def "Scenario 7: API returns 404 for date with no calories"() {
@@ -363,7 +364,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-24T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-24T09:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-24T09:01:00Z",
                     "payload": {
@@ -374,7 +375,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|calories|2025-11-26T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|calories|2025-11-26T09:00:00Z",
                     "type": "ActiveCaloriesBurnedRecorded.v1",
                     "occurredAt": "2025-11-26T09:01:00Z",
                     "payload": {
@@ -385,7 +386,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -434,7 +435,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         def request1 = """
         {
             "events": [{
-                "idempotencyKey": "test-device|calories|2025-11-22T09:00:00Z",
+                "idempotencyKey": "${DEVICE_ID}|calories|2025-11-22T09:00:00Z",
                 "type": "ActiveCaloriesBurnedRecorded.v1",
                 "occurredAt": "2025-11-22T09:01:00Z",
                 "payload": {
@@ -444,7 +445,7 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
         def request2 = """

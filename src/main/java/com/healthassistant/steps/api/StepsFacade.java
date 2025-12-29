@@ -12,4 +12,6 @@ public interface StepsFacade {
     StepsRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteAllProjections();
+
+    void deleteProjectionsByDeviceId(String deviceId);
 }

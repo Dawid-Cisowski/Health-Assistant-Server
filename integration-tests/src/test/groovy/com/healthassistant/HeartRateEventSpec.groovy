@@ -10,8 +10,12 @@ import java.time.Instant
 @Title("Feature: Heart Rate Summary Event Ingestion via Health Events API")
 class HeartRateEventSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-heartrate"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def "Scenario 1: Submit valid heart rate summary event returns success"() {
         given: "a valid heart rate summary event request"
@@ -49,7 +53,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "event has correct type"
@@ -57,7 +61,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
         hrEvent.eventType() == "HeartRateSummaryRecorded.v1"
 
         and: "event has correct device ID"
-        hrEvent.deviceId() == "mobile-app"
+        hrEvent.deviceId() == DEVICE_ID
 
         and: "event has correct payload"
         def payload = hrEvent.payload()
@@ -112,7 +116,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
     }
 
@@ -517,7 +521,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def hrEvent = dbEvents.first()
         hrEvent.payload().samples() == 1
@@ -550,7 +554,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def hrEvent = dbEvents.first()
         def storedOccurredAt = Instant.parse(hrEvent.occurredAt().toString())
@@ -563,7 +567,7 @@ class HeartRateEventSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }

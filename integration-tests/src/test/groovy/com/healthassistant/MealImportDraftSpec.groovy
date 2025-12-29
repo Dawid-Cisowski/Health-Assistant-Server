@@ -11,11 +11,15 @@ import spock.lang.Title
 @Title("Feature: Meal Import Draft Flow with User Confirmation")
 class MealImportDraftSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-meal-draft"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final String ANALYZE_ENDPOINT = "/v1/meals/import/analyze"
     private static final String CONFIRM_ENDPOINT_TEMPLATE = "/v1/meals/import/%s/confirm"
     private static final String UPDATE_ENDPOINT_TEMPLATE = "/v1/meals/import/%s"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def cleanup() {
         TestChatModelConfiguration.resetResponse()
@@ -45,7 +49,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         body.getString("expiresAt") != null
 
         and: "no event is stored in database yet"
-        findAllEvents().isEmpty()
+        findEventsForDevice(DEVICE_ID).isEmpty()
     }
 
     def "Scenario 2: Analyze with low confidence generates clarifying questions"() {
@@ -144,7 +148,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 6: Update with wrong deviceId returns 401 (HMAC fails first)"() {
-        given: "an existing draft created by test-device"
+        given: "an existing draft created by ${DEVICE_ID}"
         setupGeminiMealMock(createValidMealExtractionResponse())
         def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Obiad")
                 .post(ANALYZE_ENDPOINT)
@@ -206,7 +210,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         body.getString("eventId") != null
 
         and: "event is now stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
         events.first().eventType() == "MealRecorded.v1"
     }
@@ -255,7 +259,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     }
 
     def "Scenario 11: Confirm with wrong deviceId returns 401 (HMAC fails first)"() {
-        given: "an existing draft created by test-device"
+        given: "an existing draft created by ${DEVICE_ID}"
         setupGeminiMealMock(createValidMealExtractionResponse())
         def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Śniadanie")
                 .post(ANALYZE_ENDPOINT)
@@ -316,7 +320,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         confirmResponse.body().jsonPath().getInt("caloriesKcal") == 800
 
         and: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
     }
 
@@ -333,7 +337,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         then: "response is successful and event is immediately stored"
         response.statusCode() == 200
         response.body().jsonPath().getString("status") == "success"
-        findAllEvents().size() == 1
+        findEventsForDevice(DEVICE_ID).size() == 1
     }
 
     // ==================== DESCRIPTION FIELD TESTS ====================

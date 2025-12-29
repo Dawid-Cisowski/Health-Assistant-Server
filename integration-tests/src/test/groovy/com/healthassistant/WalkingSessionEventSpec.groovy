@@ -10,8 +10,12 @@ import java.time.Instant
 @Title("Feature: Walking Session Event Validation via Health Events API")
 class WalkingSessionEventSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-walking"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def "Scenario 1: Submit valid walking session event returns success"() {
         given: "a valid walking session event request"
@@ -49,7 +53,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "event has correct type"
@@ -57,7 +61,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         walkEvent.eventType() == "WalkingSessionRecorded.v1"
 
         and: "event has correct device ID"
-        walkEvent.deviceId() == "mobile-app"
+        walkEvent.deviceId() == DEVICE_ID
 
         and: "event has correct payload"
         def payload = walkEvent.payload()
@@ -113,7 +117,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
     }
 
@@ -373,7 +377,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def walkEvent = dbEvents.first()
         walkEvent.payload().durationMinutes() == 0
@@ -411,7 +415,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         def events = body.getList("events")
         events[0].status == "stored"
 
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
     }
 
@@ -440,7 +444,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def walkEvent = dbEvents.first()
         def storedOccurredAt = Instant.parse(walkEvent.occurredAt().toString())
@@ -453,7 +457,7 @@ class WalkingSessionEventSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }

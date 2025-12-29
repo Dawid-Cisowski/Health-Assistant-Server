@@ -14,4 +14,6 @@ interface SleepDailyProjectionJpaRepository extends JpaRepository<SleepDailyProj
 
     List<SleepDailyProjectionJpaEntity> findByDeviceIdAndDateBetweenOrderByDateAsc(
             String deviceId, LocalDate startDate, LocalDate endDate);
+
+    void deleteByDeviceId(String deviceId);
 }

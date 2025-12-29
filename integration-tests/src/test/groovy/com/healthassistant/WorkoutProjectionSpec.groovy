@@ -11,7 +11,7 @@ import spock.lang.Title
 @Title("Feature: Workout Projections and Query API")
 class WorkoutProjectionSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-workout-proj"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
@@ -21,8 +21,9 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
     DailySummaryFacade dailySummaryFacade
 
     def setup() {
-        workoutFacade?.deleteAllProjections()
-        dailySummaryFacade?.deleteAllSummaries()
+        cleanupEventsForDevice(DEVICE_ID)
+        workoutFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        dailySummaryFacade.deleteSummariesByDeviceId(DEVICE_ID)
     }
 
     def "Scenario 1: WorkoutRecorded event creates complete projection"() {
@@ -37,7 +38,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "workout projection is created (verified via API)"
-        def response = waitForApiResponse("/v1/workouts/${workoutId}")
+        def response = waitForApiResponse("/v1/workouts/${workoutId}", DEVICE_ID, SECRET_BASE64)
         response.getString("workoutId") == workoutId
         response.getString("source") == "GYMRUN_SCREENSHOT"
         response.getString("note") == "Plecy i biceps"
@@ -74,7 +75,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "only one projection exists (verified via API)"
-        def response = waitForApiResponse("/v1/workouts/${workoutId}")
+        def response = waitForApiResponse("/v1/workouts/${workoutId}", DEVICE_ID, SECRET_BASE64)
         response.getString("workoutId") == workoutId
 
         and: "only one set of exercises exists"
@@ -104,11 +105,11 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "two workout projections are created (verified via API)"
-        def workoutsResponse = waitForApiResponse("/v1/workouts?from=2025-11-19&to=2025-11-19")
+        def workoutsResponse = waitForApiResponse("/v1/workouts?from=2025-11-19&to=2025-11-19", DEVICE_ID, SECRET_BASE64)
         workoutsResponse.getList("").size() == 2
 
         and: "daily summary contains both workouts"
-        def summary = waitForApiResponse("/v1/daily-summaries/2025-11-19")
+        def summary = waitForApiResponse("/v1/daily-summaries/2025-11-19", DEVICE_ID, SECRET_BASE64)
         summary.getList("workouts").size() == 2
     }
 
@@ -116,7 +117,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         given: "a workout event without muscle group"
         def event = """
         {
-            "idempotencyKey": "gymrun-app|workout|gymrun-nogrup",
+            "idempotencyKey": "${DEVICE_ID}|workout|gymrun-nogrup",
             "type": "WorkoutRecorded.v1",
             "occurredAt": "2025-11-19T18:00:00Z",
             "payload": {
@@ -144,7 +145,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "exercise projection has null muscle group (verified via API)"
-        def response = waitForApiResponse("/v1/workouts/gymrun-nogrup")
+        def response = waitForApiResponse("/v1/workouts/gymrun-nogrup", DEVICE_ID, SECRET_BASE64)
         def exercises = response.getList("exercises")
         exercises.size() == 1
         exercises[0].muscleGroup == null
@@ -154,7 +155,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         given: "a workout with warmup and working sets"
         def event = """
         {
-            "idempotencyKey": "gymrun-app|workout|gymrun-warmup",
+            "idempotencyKey": "${DEVICE_ID}|workout|gymrun-warmup",
             "type": "WorkoutRecorded.v1",
             "occurredAt": "2025-11-19T18:00:00Z",
             "payload": {
@@ -184,7 +185,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "total volume includes warmup sets (verified via API)"
-        def response = waitForApiResponse("/v1/workouts/gymrun-warmup")
+        def response = waitForApiResponse("/v1/workouts/gymrun-warmup", DEVICE_ID, SECRET_BASE64)
         response.getDouble("totalVolumeKg") == (40.0 * 15 + 80.0 * 10)
 
         and: "working volume excludes warmup sets"
@@ -201,7 +202,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         given: "a workout with bodyweight exercise"
         def event = """
         {
-            "idempotencyKey": "gymrun-app|workout|gymrun-bodyweight",
+            "idempotencyKey": "${DEVICE_ID}|workout|gymrun-bodyweight",
             "type": "WorkoutRecorded.v1",
             "occurredAt": "2025-11-19T18:00:00Z",
             "payload": {
@@ -229,7 +230,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "total volume is zero (verified via API)"
-        def response = waitForApiResponse("/v1/workouts/gymrun-bodyweight")
+        def response = waitForApiResponse("/v1/workouts/gymrun-bodyweight", DEVICE_ID, SECRET_BASE64)
         response.getDouble("totalVolumeKg") == 0.0
 
         and: "set has zero weight"
@@ -250,7 +251,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "exercises are ordered correctly (verified via API)"
-        def response = waitForApiResponse("/v1/workouts/${workoutId}")
+        def response = waitForApiResponse("/v1/workouts/${workoutId}", DEVICE_ID, SECRET_BASE64)
         def exercises = response.getList("exercises")
         exercises.size() == 2
         exercises[0].orderInWorkout == 1
@@ -271,9 +272,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         and: "I fetch the daily summary"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-        def summary = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/2025-11-17")
+        def summary = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/daily-summaries/2025-11-17")
                 .get("/v1/daily-summaries/2025-11-17")
                 .then()
                 .statusCode(200)
@@ -368,7 +367,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         given: "a workout performed at 23:30 UTC (should be next day in Warsaw)"
         def event = """
         {
-            "idempotencyKey": "gymrun-app|workout|gymrun-tz",
+            "idempotencyKey": "${DEVICE_ID}|workout|gymrun-tz",
             "type": "WorkoutRecorded.v1",
             "occurredAt": "2025-11-19T23:30:00Z",
             "payload": {
@@ -396,7 +395,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "performedDate is in Warsaw timezone (2025-11-20) - verified via API"
-        def response = waitForApiResponse("/v1/workouts/gymrun-tz")
+        def response = waitForApiResponse("/v1/workouts/gymrun-tz", DEVICE_ID, SECRET_BASE64)
         response.getString("performedDate") == "2025-11-20"
     }
 

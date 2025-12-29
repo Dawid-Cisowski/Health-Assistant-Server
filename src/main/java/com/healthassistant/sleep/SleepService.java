@@ -140,4 +140,12 @@ public class SleepService implements SleepFacade {
         sessionRepository.deleteAll();
         dailyRepository.deleteAll();
     }
+
+    @Override
+    @Transactional
+    public void deleteProjectionsByDeviceId(String deviceId) {
+        log.debug("Deleting sleep projections for device: {}", deviceId);
+        sessionRepository.deleteByDeviceId(deviceId);
+        dailyRepository.deleteByDeviceId(deviceId);
+    }
 }

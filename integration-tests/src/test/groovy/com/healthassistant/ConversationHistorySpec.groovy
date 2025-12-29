@@ -6,6 +6,9 @@ import static io.restassured.RestAssured.given
 
 class ConversationHistorySpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-convo"
+    private static final String SECRET_BASE64 = TEST_SECRET_BASE64
+
     def "should create new conversation when conversationId not provided"() {
         given: "a valid chat request without conversationId"
         def request = [
@@ -13,7 +16,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
         ]
 
         when: "sending chat request"
-        def response = sendAuthenticatedSseRequest("/v1/assistant/chat", request, TEST_DEVICE_ID)
+        def response = sendAuthenticatedSseRequest("/v1/assistant/chat", request, DEVICE_ID)
 
         then: "response contains conversation events"
         response.size() > 0
@@ -29,7 +32,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
         def firstRequest = [
                 message: "Ile kroków zrobiłem dzisiaj?"
         ]
-        def firstResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", firstRequest, TEST_DEVICE_ID)
+        def firstResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", firstRequest, DEVICE_ID)
         def conversationId = firstResponse.find { it.type == "done" }?.conversationId
 
         when: "sending second message with conversationId"
@@ -37,7 +40,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
                 message: "A wczoraj?",
                 conversationId: conversationId
         ]
-        def secondResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", secondRequest, TEST_DEVICE_ID)
+        def secondResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", secondRequest, DEVICE_ID)
 
         then: "response uses same conversationId"
         def doneEvent = secondResponse.find { it.type == "done" }
@@ -55,7 +58,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
         def response = given()
                 .contentType(ContentType.JSON)
                 .accept("text/event-stream")
-                .headers(createHmacHeaders(TEST_DEVICE_ID, "/v1/assistant/chat", request))
+                .headers(createHmacHeaders(DEVICE_ID, "/v1/assistant/chat", request))
                 .body(request)
                 .post("/v1/assistant/chat")
 
@@ -68,7 +71,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
     def "should reject conversationId from different device"() {
         given: "conversation created by device1"
         def request1 = [message: "Test"]
-        def response1 = sendAuthenticatedSseRequest("/v1/assistant/chat", request1, TEST_DEVICE_ID)
+        def response1 = sendAuthenticatedSseRequest("/v1/assistant/chat", request1, DEVICE_ID)
         def conversationId = response1.find { it.type == "done" }?.conversationId
 
         when: "device2 tries to use same conversationId"
@@ -91,11 +94,11 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
 
     def "should maintain conversation context across messages"() {
         given: "setup test data"
-        setupTestData(TEST_DEVICE_ID)
+        setupTestData(DEVICE_ID)
 
         and: "first message about steps"
         def firstRequest = [message: "Ile kroków zrobiłem dzisiaj?"]
-        def firstResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", firstRequest, TEST_DEVICE_ID)
+        def firstResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", firstRequest, DEVICE_ID)
         def conversationId = firstResponse.find { it.type == "done" }?.conversationId
 
         when: "follow-up question using context"
@@ -103,7 +106,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
                 message: "A wczoraj?",  // Refers to "steps yesterday" from context
                 conversationId: conversationId
         ]
-        def secondResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", secondRequest, TEST_DEVICE_ID)
+        def secondResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", secondRequest, DEVICE_ID)
 
         then: "AI should understand context and provide steps for yesterday"
         def contentEvents = secondResponse.findAll { it.type == "content" }
@@ -116,11 +119,11 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
 
     def "should limit history to last 20 messages"() {
         given: "setup test data"
-        setupTestData(TEST_DEVICE_ID)
+        setupTestData(DEVICE_ID)
 
         and: "create conversation with first message"
         def firstRequest = [message: "Rozpocznij konwersację"]
-        def response = sendAuthenticatedSseRequest("/v1/assistant/chat", firstRequest, TEST_DEVICE_ID)
+        def response = sendAuthenticatedSseRequest("/v1/assistant/chat", firstRequest, DEVICE_ID)
         def conversationId = response.find { it.type == "done" }?.conversationId
 
         when: "send 15 more messages (30 total messages: 15 user + 15 assistant)"
@@ -129,7 +132,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
                     message: "Wiadomość numer ${i}",
                     conversationId: conversationId
             ]
-            sendAuthenticatedSseRequest("/v1/assistant/chat", request, TEST_DEVICE_ID)
+            sendAuthenticatedSseRequest("/v1/assistant/chat", request, DEVICE_ID)
         }
 
         and: "send final message"
@@ -137,7 +140,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
                 message: "Czy pamiętasz pierwszą wiadomość?",
                 conversationId: conversationId
         ]
-        def finalResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", finalRequest, TEST_DEVICE_ID)
+        def finalResponse = sendAuthenticatedSseRequest("/v1/assistant/chat", finalRequest, DEVICE_ID)
 
         then: "conversation completes successfully"
         def doneEvent = finalResponse.find { it.type == "done" }
@@ -155,7 +158,7 @@ class ConversationHistorySpec extends BaseIntegrationSpec {
         ]
 
         when: "sending request"
-        def response = sendAuthenticatedSseRequest("/v1/assistant/chat", request, TEST_DEVICE_ID)
+        def response = sendAuthenticatedSseRequest("/v1/assistant/chat", request, DEVICE_ID)
 
         then: "conversation is created successfully"
         def doneEvent = response.find { it.type == "done" }

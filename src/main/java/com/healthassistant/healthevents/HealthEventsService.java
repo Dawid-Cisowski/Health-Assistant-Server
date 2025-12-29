@@ -171,14 +171,26 @@ class HealthEventsService implements HealthEventsFacade {
     public List<EventData> findEventsByOccurredAtBetween(Instant start, Instant end) {
         return healthEventJpaRepository.findByOccurredAtBetween(start, end)
                 .stream()
-                .map(entity -> new EventData(
-                        entity.getEventType(),
-                        entity.getOccurredAt(),
-                        toPayload(entity.getEventType(), entity.getPayload()),
-                        entity.getDeviceId(),
-                        entity.getIdempotencyKey()
-                ))
+                .map(this::toEventData)
                 .toList();
+    }
+
+    @Override
+    public List<EventData> findEventsByDeviceId(String deviceId) {
+        return healthEventJpaRepository.findByDeviceId(deviceId)
+                .stream()
+                .map(this::toEventData)
+                .toList();
+    }
+
+    private EventData toEventData(HealthEventJpaEntity entity) {
+        return new EventData(
+                entity.getEventType(),
+                entity.getOccurredAt(),
+                toPayload(entity.getEventType(), entity.getPayload()),
+                entity.getDeviceId(),
+                entity.getIdempotencyKey()
+        );
     }
 
     private EventPayload toPayload(String eventTypeStr, Map<String, Object> map) {
@@ -192,6 +204,13 @@ class HealthEventsService implements HealthEventsFacade {
     public void deleteAllEvents() {
         log.warn("Deleting all health events");
         healthEventJpaRepository.deleteAll();
+    }
+
+    @Override
+    @Transactional
+    public void deleteEventsByDeviceId(String deviceId) {
+        log.warn("Deleting health events for device: {}", deviceId);
+        healthEventJpaRepository.deleteByDeviceId(deviceId);
     }
 
     @Override

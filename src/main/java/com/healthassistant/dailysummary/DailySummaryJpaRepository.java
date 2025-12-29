@@ -27,4 +27,6 @@ interface DailySummaryJpaRepository extends JpaRepository<DailySummaryJpaEntity,
             @Param("deviceId") String deviceId,
             @Param("dates") Set<LocalDate> dates,
             @Param("timestamp") Instant timestamp);
+
+    void deleteByDeviceId(String deviceId);
 }

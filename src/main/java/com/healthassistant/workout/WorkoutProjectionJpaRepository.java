@@ -38,4 +38,6 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    void deleteByDeviceId(String deviceId);
 }

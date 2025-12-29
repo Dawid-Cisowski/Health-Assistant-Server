@@ -1,7 +1,15 @@
 package com.healthassistant
 
+import com.healthassistant.activity.api.ActivityFacade
+import com.healthassistant.calories.api.CaloriesFacade
+import com.healthassistant.dailysummary.api.DailySummaryFacade
+import com.healthassistant.meals.api.MealsFacade
+import com.healthassistant.sleep.api.SleepFacade
+import com.healthassistant.steps.api.StepsFacade
+import com.healthassistant.workout.api.WorkoutFacade
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
+import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.Instant
@@ -15,13 +23,44 @@ import java.time.format.DateTimeFormatter
 @Title("Feature: Daily Summary")
 class DailySummarySpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-daily"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    @Autowired
+    DailySummaryFacade dailySummaryFacade
+
+    @Autowired
+    StepsFacade stepsFacade
+
+    @Autowired
+    SleepFacade sleepFacade
+
+    @Autowired
+    WorkoutFacade workoutFacade
+
+    @Autowired
+    MealsFacade mealsFacade
+
+    @Autowired
+    CaloriesFacade caloriesFacade
+
+    @Autowired
+    ActivityFacade activityFacade
+
+    def setup() {
+        dailySummaryFacade.deleteSummariesByDeviceId(DEVICE_ID)
+        stepsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        sleepFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        workoutFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        mealsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        caloriesFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        activityFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+    }
 
     def "Scenario 1: Get daily summary after sync with multiple event types"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 12)
@@ -143,8 +182,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 2: Get daily summary by date"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 13)
@@ -197,8 +236,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
         and: "no sync performed for this date"
 
         when: "I get summary for the date"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/${dateStr}")
                 .get("/v1/daily-summaries/${dateStr}")
                 .then()
@@ -210,8 +249,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 4: Summary updates when new events arrive"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 15)
@@ -280,8 +319,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 5: Get summary for date with no events returns 404"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date with no events"
         def summaryDate = LocalDate.of(2025, 11, 16)
@@ -301,8 +340,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 6: Summary aggregates multiple events correctly"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 17)
@@ -366,8 +405,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 7: Summary includes walking exercises"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 18)
@@ -423,8 +462,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 8: Summary includes workout with basic metrics"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 19)
@@ -499,8 +538,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 9: Summary only includes events from specified date"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "events from target date"
         def targetDate = LocalDate.of(2025, 11, 22)
@@ -544,8 +583,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 10: Summary includes single sleep session"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 23)
@@ -597,8 +636,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 11: Summary includes multiple sleep sessions (night sleep + nap)"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 24)
@@ -671,8 +710,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 12: Summary has empty sleep list when no sleep events"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 11, 25)
@@ -717,8 +756,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 13: Get range summary for multiple days with various activities"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "multiple days with different activities"
         def startDate = LocalDate.of(2025, 11, 26)
@@ -880,8 +919,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 14: Range summary with invalid dates returns 400"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         when: "I request range with endDate before startDate"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/range?startDate=2025-11-30&endDate=2025-11-28")
@@ -895,8 +934,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 15: Range summary returns empty stats for dates with no data"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         when: "I request range for dates with no summaries"
         def getResponse = authenticatedGetRequest(deviceId, secretBase64, "/v1/daily-summaries/range?startDate=2025-12-01&endDate=2025-12-03")
@@ -924,8 +963,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 16: Summary includes distance data from DistanceBucketRecorded events"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 12, 5)
@@ -969,8 +1008,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 17: Summary includes heart rate data from HeartRateSummaryRecorded events"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 12, 6)
@@ -1019,8 +1058,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 18: Summary includes active minutes data"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 12, 7)
@@ -1064,8 +1103,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 19: Summary includes active calories data"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 12, 8)
@@ -1110,8 +1149,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Scenario 20: Summary aggregates multiple event types from the same day correctly"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 12, 9)
@@ -1215,8 +1254,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
 
     def "Regression: Daily summary uses steps from projection, not naive event sum"() {
         given: "authenticated device"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
+        def deviceId = DEVICE_ID
+        def secretBase64 = SECRET_BASE64
 
         and: "date for summary"
         def summaryDate = LocalDate.of(2025, 12, 1)

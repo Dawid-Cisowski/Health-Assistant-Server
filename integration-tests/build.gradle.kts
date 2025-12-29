@@ -104,6 +104,15 @@ tasks.test {
 
     // Exclude evaluation tests from regular test run (they require real Gemini API)
     exclude("**/*HallucinationSpec.class", "**/*EvaluationSpec.class")
+
+    // Enable parallel test execution
+    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+
+    // JVM args for parallel execution
+    jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
+
+    // Ensure tests have enough time
+    timeout.set(Duration.ofMinutes(10))
 }
 
 // Separate task for AI evaluation tests using real Gemini API

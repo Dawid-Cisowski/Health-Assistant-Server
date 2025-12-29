@@ -15,7 +15,11 @@ public interface HealthEventsFacade {
 
     List<EventData> findEventsByOccurredAtBetween(Instant start, Instant end);
 
+    List<EventData> findEventsByDeviceId(String deviceId);
+
     void deleteAllEvents();
+
+    void deleteEventsByDeviceId(String deviceId);
 
     Optional<IdempotencyKey> findExistingSleepIdempotencyKey(DeviceId deviceId, Instant sleepStart);
 }

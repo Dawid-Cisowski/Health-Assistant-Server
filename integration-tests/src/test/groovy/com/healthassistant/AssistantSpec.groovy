@@ -5,6 +5,9 @@ import io.restassured.http.ContentType
 
 class AssistantSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-assistant"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     def "POST /v1/assistant/chat should require HMAC authentication"() {
         when: "chat request is sent without authentication"
         def response = RestAssured.given()
@@ -23,7 +26,7 @@ class AssistantSpec extends BaseIntegrationSpec {
     def "POST /v1/assistant/chat should accept valid authenticated request and return SSE stream"() {
         given: "user has some health data"
         def sleepEvent = createSleepSessionEvent("sleep-key-1", "2025-11-22T08:00:00Z")
-        authenticatedPostRequestWithBody("test-device", "dGVzdC1zZWNyZXQtMTIz", "/v1/health-events", sleepEvent)
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", sleepEvent)
                 .when()
                 .post("/v1/health-events")
                 .then()
@@ -31,7 +34,7 @@ class AssistantSpec extends BaseIntegrationSpec {
 
         when: "authenticated chat request is sent"
         def chatRequest = '{"message": "Ile spałem wczoraj?"}'
-        def response = authenticatedPostRequestWithBody("test-device", "dGVzdC1zZWNyZXQtMTIz", "/v1/assistant/chat", chatRequest)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/assistant/chat", chatRequest)
                 .when()
                 .post("/v1/assistant/chat")
 
@@ -48,7 +51,7 @@ class AssistantSpec extends BaseIntegrationSpec {
     def "POST /v1/assistant/chat should reject empty message"() {
         when: "authenticated request with empty message is sent"
         def chatRequest = '{"message": ""}'
-        def response = authenticatedPostRequestWithBody("test-device", "dGVzdC1zZWNyZXQtMTIz", "/v1/assistant/chat", chatRequest)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/assistant/chat", chatRequest)
                 .when()
                 .post("/v1/assistant/chat")
 
@@ -60,7 +63,7 @@ class AssistantSpec extends BaseIntegrationSpec {
         when: "authenticated request with very long message is sent"
         String longMessage = "a" * 1001  // Max is 1000
         def chatRequest = "{\"message\": \"${longMessage}\"}"
-        def response = authenticatedPostRequestWithBody("test-device", "dGVzdC1zZWNyZXQtMTIz", "/v1/assistant/chat", chatRequest)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/assistant/chat", chatRequest)
                 .when()
                 .post("/v1/assistant/chat")
 

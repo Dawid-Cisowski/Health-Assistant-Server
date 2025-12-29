@@ -114,4 +114,11 @@ class CaloriesService implements CaloriesFacade {
         hourlyRepository.deleteAll();
         dailyRepository.deleteAll();
     }
+
+    @Override
+    @Transactional
+    public void deleteProjectionsByDeviceId(String deviceId) {
+        hourlyRepository.deleteByDeviceId(deviceId);
+        dailyRepository.deleteByDeviceId(deviceId);
+    }
 }

@@ -12,15 +12,15 @@ import java.time.LocalDate
 @Title("Feature: Steps Projections and Query API")
 class StepsProjectionSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-steps"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     @Autowired
     StepsFacade stepsFacade
 
     def setup() {
-        // Clean projection tables (in addition to base cleanup)
-        stepsFacade?.deleteAllProjections()
+        cleanupEventsForDevice(DEVICE_ID)
+        stepsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
     }
 
     def "Scenario 1: StepsBucketed event creates hourly and daily projections"() {
@@ -32,7 +32,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|steps|${bucketStart}",
+                "idempotencyKey": "${DEVICE_ID}|steps|${bucketStart}",
                 "type": "StepsBucketedRecorded.v1",
                 "occurredAt": "${bucketEnd}",
                 "payload": {
@@ -42,7 +42,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -53,7 +53,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        def response = waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getInt("totalSteps") == 150
         response.getInt("mostActiveHour") == 10
         response.getInt("mostActiveHourSteps") == 150
@@ -69,7 +69,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-20T13:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-20T13:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-20T13:01:00Z",
                     "payload": {
@@ -80,7 +80,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-20T13:01:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-20T13:01:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-20T13:02:00Z",
                     "payload": {
@@ -91,7 +91,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -102,7 +102,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections accumulate steps (verified via API)"
-        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        def response = waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("hourlyBreakdown")[14].steps == 220
         response.getInt("totalSteps") == 220
     }
@@ -115,7 +115,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-20T07:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-20T07:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-20T07:01:00Z",
                     "payload": {
@@ -126,7 +126,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-20T11:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-20T11:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-20T11:01:00Z",
                     "payload": {
@@ -137,7 +137,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-20T17:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-20T17:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-20T17:01:00Z",
                     "payload": {
@@ -148,7 +148,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -159,7 +159,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projections are created (verified via API)"
-        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        def response = waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("hourlyBreakdown")[8].steps == 200
         response.getList("hourlyBreakdown")[12].steps == 300
         response.getList("hourlyBreakdown")[18].steps == 400
@@ -177,7 +177,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-21T08:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-21T08:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-21T08:01:00Z",
                     "payload": {
@@ -188,7 +188,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-21T14:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-21T14:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-21T14:01:00Z",
                     "payload": {
@@ -199,7 +199,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -210,7 +210,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query daily breakdown (with wait)"
-        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        def response = waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
 
         then: "response contains 24 hourly entries"
         response.getList("hourlyBreakdown").size() == 24
@@ -238,7 +238,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-18T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-18T09:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-18T09:01:00Z",
                     "payload": {
@@ -249,7 +249,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-19T10:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-19T10:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-19T10:01:00Z",
                     "payload": {
@@ -260,7 +260,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-20T11:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-20T11:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-20T11:01:00Z",
                     "payload": {
@@ -271,7 +271,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -282,7 +282,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         and: "wait for async projections"
-        waitForApiResponse("/v1/steps/daily/2025-11-20")
+        waitForApiResponse("/v1/steps/daily/2025-11-20", DEVICE_ID, SECRET_BASE64)
 
         when: "I query range summary"
         def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/range?startDate=2025-11-18&endDate=2025-11-20")
@@ -316,7 +316,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|steps|2025-11-23T10:00:00Z",
+                "idempotencyKey": "${DEVICE_ID}|steps|2025-11-23T10:00:00Z",
                 "type": "StepsBucketedRecorded.v1",
                 "occurredAt": "2025-11-23T10:01:00Z",
                 "payload": {
@@ -326,7 +326,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -337,16 +337,14 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "no projections are created (API returns 404)"
-        apiReturns404("/v1/steps/daily/2025-11-23")
+        apiReturns404("/v1/steps/daily/2025-11-23", DEVICE_ID, SECRET_BASE64)
     }
 
     def "Scenario 7: API returns 404 for date with no steps"() {
         given: "no step data exists"
 
         when: "I query daily breakdown"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-        def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/steps/daily/2025-12-01")
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/daily/2025-12-01")
                 .get("/v1/steps/daily/2025-12-01")
                 .then()
                 .extract()
@@ -362,7 +360,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-24T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-24T09:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-24T09:01:00Z",
                     "payload": {
@@ -373,7 +371,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|2025-11-26T09:00:00Z",
+                    "idempotencyKey": "${DEVICE_ID}|steps|2025-11-26T09:00:00Z",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "2025-11-26T09:01:00Z",
                     "payload": {
@@ -384,7 +382,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -395,7 +393,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         and: "wait for async projections"
-        waitForApiResponse("/v1/steps/daily/2025-11-26")
+        waitForApiResponse("/v1/steps/daily/2025-11-26", DEVICE_ID, SECRET_BASE64)
 
         when: "I query 3-day range"
         def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/range?startDate=2025-11-24&endDate=2025-11-26")
@@ -427,7 +425,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|steps|duplicate-test",
+                "idempotencyKey": "${DEVICE_ID}|steps|duplicate-test",
                 "type": "StepsBucketedRecorded.v1",
                 "occurredAt": "${bucketEnd}",
                 "payload": {
@@ -437,7 +435,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -448,7 +446,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         // Wait for first event processing
-        waitForApiResponse("/v1/steps/daily/${date}")
+        waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
 
         authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
@@ -481,7 +479,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         {
             "events": [
                 {
-                    "idempotencyKey": "test-device|steps|time-range-1",
+                    "idempotencyKey": "${DEVICE_ID}|steps|time-range-1",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "${firstBucketEnd}",
                     "payload": {
@@ -492,7 +490,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 },
                 {
-                    "idempotencyKey": "test-device|steps|time-range-2",
+                    "idempotencyKey": "${DEVICE_ID}|steps|time-range-2",
                     "type": "StepsBucketedRecorded.v1",
                     "occurredAt": "${secondBucketEnd}",
                     "payload": {
@@ -503,7 +501,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     }
                 }
             ],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -514,7 +512,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "projection has correct totals (verified via API)"
-        def response = waitForApiResponse("/v1/steps/daily/${date}")
+        def response = waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response.getList("hourlyBreakdown")[14].steps == 250
         response.getInt("totalSteps") == 250
     }
@@ -525,7 +523,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         def request1 = """
         {
             "events": [{
-                "idempotencyKey": "test-device|steps|hour10",
+                "idempotencyKey": "${DEVICE_ID}|steps|hour10",
                 "type": "StepsBucketedRecorded.v1",
                 "occurredAt": "2025-11-29T09:01:00Z",
                 "payload": {
@@ -535,7 +533,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -546,7 +544,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "hour 10 is most active"
-        def response1 = waitForApiResponse("/v1/steps/daily/${date}")
+        def response1 = waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
         response1.getInt("mostActiveHour") == 10
         response1.getInt("mostActiveHourSteps") == 300
 
@@ -554,7 +552,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         def request2 = """
         {
             "events": [{
-                "idempotencyKey": "test-device|steps|hour15",
+                "idempotencyKey": "${DEVICE_ID}|steps|hour15",
                 "type": "StepsBucketedRecorded.v1",
                 "occurredAt": "2025-11-29T14:01:00Z",
                 "payload": {
@@ -564,7 +562,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -596,9 +594,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
 
     def "Scenario 12: Range query with invalid dates returns 400"() {
         when: "I query range with endDate before startDate"
-        def deviceId = "test-device"
-        def secretBase64 = "dGVzdC1zZWNyZXQtMTIz"
-        def response = authenticatedGetRequest(deviceId, secretBase64, "/v1/steps/range?startDate=2025-11-30&endDate=2025-11-28")
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/steps/range?startDate=2025-11-30&endDate=2025-11-28")
                 .get("/v1/steps/range?startDate=2025-11-30&endDate=2025-11-28")
                 .then()
                 .extract()
@@ -613,7 +609,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [{
-                "idempotencyKey": "test-device|steps|missing-bucket-start",
+                "idempotencyKey": "${DEVICE_ID}|steps|missing-bucket-start",
                 "type": "StepsBucketedRecorded.v1",
                 "occurredAt": "2025-12-01T10:01:00Z",
                 "payload": {
@@ -622,7 +618,7 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                     "originPackage": "com.google.android.apps.fitness"
                 }
             }],
-            "deviceId": "test-device"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -633,6 +629,6 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "no projections are created (API returns 404)"
-        apiReturns404("/v1/steps/daily/${date}")
+        apiReturns404("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
     }
 }

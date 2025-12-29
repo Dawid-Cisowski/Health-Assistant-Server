@@ -15,4 +15,6 @@ public interface DailySummaryFacade {
     DailySummaryRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteAllSummaries();
+
+    void deleteSummariesByDeviceId(String deviceId);
 }

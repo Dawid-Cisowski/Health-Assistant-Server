@@ -14,4 +14,6 @@ interface MealDailyProjectionJpaRepository extends JpaRepository<MealDailyProjec
 
     List<MealDailyProjectionJpaEntity> findByDeviceIdAndDateBetweenOrderByDateAsc(
             String deviceId, LocalDate startDate, LocalDate endDate);
+
+    void deleteByDeviceId(String deviceId);
 }

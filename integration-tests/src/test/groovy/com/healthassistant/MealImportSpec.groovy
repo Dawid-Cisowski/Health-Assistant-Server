@@ -10,9 +10,13 @@ import spock.lang.Title
 @Title("Feature: Meal Import from Description and/or Images via AI")
 class MealImportSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-meal-import"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final String IMPORT_ENDPOINT = "/v1/meals/import"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def cleanup() {
         TestChatModelConfiguration.resetResponse()
@@ -129,7 +133,7 @@ class MealImportSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("status") == "success"
 
         and: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
         events.first().eventType() == "MealRecorded.v1"
     }
@@ -160,7 +164,7 @@ class MealImportSpec extends BaseIntegrationSpec {
         secondMealId != firstMealId
 
         and: "two events are stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 2
     }
 
@@ -183,7 +187,7 @@ class MealImportSpec extends BaseIntegrationSpec {
         body.getString("errorMessage").contains("Not food-related")
 
         and: "no event is stored in database"
-        findAllEvents().isEmpty()
+        findEventsForDevice(DEVICE_ID).isEmpty()
     }
 
     def "Scenario 8: Request with blank description and no images returns 400"() {

@@ -18,6 +18,8 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
 
     List<HealthEventJpaEntity> findByDeviceIdAndEventType(String deviceId, String eventType);
 
+    List<HealthEventJpaEntity> findByDeviceId(String deviceId);
+
     @Query(value = """
         SELECT idempotency_key FROM health_events
         WHERE device_id = :deviceId
@@ -29,4 +31,6 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
             @Param("deviceId") String deviceId,
             @Param("sleepStart") String sleepStart
     );
+
+    void deleteByDeviceId(String deviceId);
 }

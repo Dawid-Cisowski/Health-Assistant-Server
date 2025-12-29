@@ -12,8 +12,12 @@ import java.time.Instant
 @Title("Feature: Meal Event Ingestion via Health Events API")
 class MealEventSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-meal-event"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def "Scenario 1: Submit valid meal event returns success"() {
         given: "a valid meal event request"
@@ -51,7 +55,7 @@ class MealEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "event has correct type"
@@ -59,7 +63,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         mealEvent.eventType() == "MealRecorded.v1"
 
         and: "event has correct device ID"
-        mealEvent.deviceId() == "mobile-app"
+        mealEvent.deviceId() == DEVICE_ID
 
         and: "event has correct payload"
         def payload = mealEvent.payload()
@@ -114,7 +118,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         events[0].get("status") == "duplicate"
 
         and: "only one event is stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
     }
 
@@ -137,7 +141,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -176,7 +180,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -215,7 +219,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -255,7 +259,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -295,7 +299,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -335,7 +339,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -365,7 +369,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event1}, ${event2}, ${event3}, ${event4}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -382,10 +386,10 @@ class MealEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 4
 
         and: "all events are stored in database"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 4
         dbEvents.every { it.eventType() == "MealRecorded.v1" }
-        dbEvents.every { it.deviceId() == "mobile-app" }
+        dbEvents.every { it.deviceId() == DEVICE_ID }
     }
 
     def "Scenario 11: Meal event with all meal types are accepted"() {
@@ -398,7 +402,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${events.join(",")}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -415,7 +419,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 7
 
         and: "all events are stored"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 7
         dbEvents.collect { it.payload().mealType().name() }.containsAll(mealTypes)
     }
@@ -430,7 +434,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${events.join(",")}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -447,7 +451,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         body.getInt("totalEvents") == 5
 
         and: "all events are stored"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 5
         dbEvents.collect { it.payload().healthRating().name() }.containsAll(healthRatings)
     }
@@ -472,7 +476,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -486,7 +490,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "event is stored"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def mealEvent = dbEvents.first()
         mealEvent.payload().caloriesKcal() == 0
@@ -514,7 +518,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -525,7 +529,7 @@ class MealEventSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def mealEvent = dbEvents.first()
         def storedOccurredAt = Instant.parse(mealEvent.occurredAt().toString())
@@ -538,7 +542,7 @@ class MealEventSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }

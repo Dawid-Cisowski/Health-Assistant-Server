@@ -10,8 +10,12 @@ import java.time.Instant
 @Title("Feature: Sleep Session Event Validation via Health Events API")
 class SleepEventValidationSpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-sleep-valid"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
+    def setup() {
+        cleanupEventsForDevice(DEVICE_ID)
+    }
 
     def "Scenario 1: Submit valid sleep session event returns success"() {
         given: "a valid sleep session event request"
@@ -49,7 +53,7 @@ class SleepEventValidationSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event is stored in database"
-        def events = findAllEvents()
+        def events = findEventsForDevice(DEVICE_ID)
         events.size() == 1
 
         and: "event has correct type"
@@ -57,7 +61,7 @@ class SleepEventValidationSpec extends BaseIntegrationSpec {
         sleepEvent.eventType() == "SleepSessionRecorded.v1"
 
         and: "event has correct device ID"
-        sleepEvent.deviceId() == "mobile-app"
+        sleepEvent.deviceId() == DEVICE_ID
 
         and: "event has correct payload"
         def payload = sleepEvent.payload()
@@ -282,7 +286,7 @@ class SleepEventValidationSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         then: "event occurredAt matches the submitted timestamp"
-        def dbEvents = findAllEvents()
+        def dbEvents = findEventsForDevice(DEVICE_ID)
         dbEvents.size() == 1
         def sleepEvent = dbEvents.first()
         def storedOccurredAt = Instant.parse(sleepEvent.occurredAt().toString())
@@ -295,7 +299,7 @@ class SleepEventValidationSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "mobile-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }

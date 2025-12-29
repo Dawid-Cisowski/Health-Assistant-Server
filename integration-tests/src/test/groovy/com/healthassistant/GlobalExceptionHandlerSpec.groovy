@@ -7,6 +7,9 @@ import spock.lang.Title
 @Title("Feature: Global Exception Handler - Error Response Formatting")
 class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
 
+    private static final String DEVICE_ID = "test-exception"
+    private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
+
     // ===========================================
     // Validation Errors (MethodArgumentNotValidException)
     // ===========================================
@@ -17,7 +20,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         def body = '{"events": []}'
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -47,7 +50,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         '''
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -74,7 +77,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         def invalidJson = '{"events": [invalid json here}'
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, invalidJson)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, invalidJson)
                 .post(path)
                 .then()
                 .extract()
@@ -105,7 +108,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         '''
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -135,7 +138,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         '''
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -162,12 +165,12 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         def timestamp = generateTimestamp()
         def nonce = generateNonce()
         def body = '{"events": []}'
-        def signature = generateHmacSignature("POST", path, timestamp, nonce, TEST_DEVICE_ID, body, TEST_SECRET_BASE64)
+        def signature = generateHmacSignature("POST", path, timestamp, nonce, DEVICE_ID, body, SECRET_BASE64)
 
         when: "I submit the request with text/plain Content-Type"
         def response = RestAssured.given()
                 .contentType("text/plain")
-                .header("X-Device-Id", TEST_DEVICE_ID)
+                .header("X-Device-Id", DEVICE_ID)
                 .header("X-Timestamp", timestamp)
                 .header("X-Nonce", nonce)
                 .header("X-Signature", signature)
@@ -211,7 +214,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         def body = """{"events": [${events}]}"""
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()
@@ -232,7 +235,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         def invalidJson = '{"events": [{'
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, invalidJson)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, invalidJson)
                 .post(path)
                 .then()
                 .extract()
@@ -257,12 +260,12 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         def path = "/v1/health-events"
         def timestamp = generateTimestamp()
         def nonce = generateNonce()
-        def signature = generateHmacSignature("POST", path, timestamp, nonce, TEST_DEVICE_ID, "", TEST_SECRET_BASE64)
+        def signature = generateHmacSignature("POST", path, timestamp, nonce, DEVICE_ID, "", SECRET_BASE64)
 
         when: "I submit the request without body"
         def response = RestAssured.given()
                 .contentType(ContentType.JSON)
-                .header("X-Device-Id", TEST_DEVICE_ID)
+                .header("X-Device-Id", DEVICE_ID)
                 .header("X-Timestamp", timestamp)
                 .header("X-Nonce", nonce)
                 .header("X-Signature", signature)
@@ -281,7 +284,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         def body = '{"events": null}'
 
         when: "I submit the request"
-        def response = authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, path, body)
+        def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, path, body)
                 .post(path)
                 .then()
                 .extract()

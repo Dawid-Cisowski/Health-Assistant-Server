@@ -34,9 +34,17 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*
 @ActiveProfiles("test")
 abstract class BaseIntegrationSpec extends Specification {
 
-    static final String TEST_DEVICE_ID = "test-device"
+    // Each test class gets a unique device ID based on class name for parallel test isolation
     static final String TEST_SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     static final String DIFFERENT_DEVICE_SECRET_BASE64 = "ZGlmZmVyZW50LXNlY3JldC0xMjM="
+
+    // Legacy constant for backward compatibility - use getTestDeviceId() instead
+    static final String TEST_DEVICE_ID = "test-device"
+
+    // Generate unique device ID per test class for parallel isolation
+    String getTestDeviceId() {
+        return "test-${this.class.simpleName.toLowerCase().hashCode().abs() % 10000}"
+    }
 
     @LocalServerPort
     int port
@@ -63,11 +71,38 @@ abstract class BaseIntegrationSpec extends Specification {
         postgres.start()
         wireMockServer.start()
 
+        // Generate HMAC devices config with all test devices for parallel execution
+        // Named devices used by test specs (all using same secret for simplicity)
+        def namedDevices = [
+            "test-device",
+            // Projection specs
+            "test-steps", "test-meals", "test-workout-proj", "test-workout-import",
+            "test-sleep-proj", "test-calories", "test-activity", "test-daily",
+            "test-workout", "test-sleep-import", "test-meal-import", "test-assistant",
+            "test-batch", "test-ai-summary", "test-ai-cache", "test-convo", "test-admin",
+            // Event validation specs
+            "test-steps-valid", "test-sleep-valid", "test-meal-event",
+            "test-heartrate", "test-active-cal", "test-active-min",
+            "test-distance", "test-walking", "test-exception",
+            // Import and other specs
+            "test-meal-draft", "test-gfit"
+        ]
+        def devicesMap = new StringBuilder('{')
+        def first = true
+        namedDevices.each { device ->
+            if (!first) devicesMap.append(',')
+            first = false
+            devicesMap.append('"').append(device).append('":"dGVzdC1zZWNyZXQtMTIz"')
+        }
+        // Add different-device-id with different secret (for authentication tests)
+        devicesMap.append(',"different-device-id":"ZGlmZmVyZW50LXNlY3JldC0xMjM="')
+        devicesMap.append('}')
+
         // Configure properties using System.setProperty (works better with Spock)
         System.setProperty("spring.datasource.url", postgres.getJdbcUrl())
         System.setProperty("spring.datasource.username", postgres.getUsername())
         System.setProperty("spring.datasource.password", postgres.getPassword())
-        System.setProperty("app.hmac.devices-json", '{"test-device":"dGVzdC1zZWNyZXQtMTIz","different-device-id":"ZGlmZmVyZW50LXNlY3JldC0xMjM="}')
+        System.setProperty("app.hmac.devices-json", devicesMap.toString())
         System.setProperty("app.hmac.tolerance-seconds", "600")
         System.setProperty("app.nonce.cache-ttl-seconds", "600")
 
@@ -82,6 +117,15 @@ abstract class BaseIntegrationSpec extends Specification {
         // Configure Spring AI Google GenAI to use WireMock
         System.setProperty("spring.ai.google.genai.base-url", wireMockUrl)
         System.setProperty("spring.ai.google.genai.api-key", "test-gemini-key")
+
+        // Setup OAuth mock once (stateless, same for all tests)
+        wireMockServer.stubFor(com.github.tomakehurst.wiremock.client.WireMock.post(
+                com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo("/token"))
+                .atPriority(100) // Low priority so test-specific stubs can override
+                .willReturn(com.github.tomakehurst.wiremock.client.WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody('{"access_token":"test-access-token","expires_in":3600,"token_type":"Bearer"}')))
     }
 
     def setupSpec() {
@@ -93,18 +137,13 @@ abstract class BaseIntegrationSpec extends Specification {
         RestAssured.port = port
         RestAssured.baseURI = "http://localhost"
 
-        // Reset WireMock
-        wireMockServer.resetAll()
+        // NOTE: WireMock stubs are NOT reset between tests for parallel execution safety.
+        // OAuth mock is set up once in static block with low priority.
+        // Test-specific mocks should use higher priority (lower number) to override.
 
-        // Setup default OAuth mock
-        setupOAuthMock()
-
-        if (healthEventsFacade != null) {
-            healthEventsFacade.deleteAllEvents() // Clean DB before each test
-        }
-        if (stepsFacade != null) {
-            stepsFacade.deleteAllProjections() // Clean steps projections before each test
-        }
+        // NOTE: No global database cleanup needed!
+        // Tests are isolated by unique deviceId per test class.
+        // Each test class uses getTestDeviceId() which returns a unique ID.
     }
 
     void setupOAuthMock() {
@@ -464,7 +503,8 @@ abstract class BaseIntegrationSpec extends Specification {
     }
 
 
-    String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z", String deviceId = TEST_DEVICE_ID) {
+    String createStepsEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:00:00Z", String deviceId = null) {
+        deviceId = deviceId ?: getTestDeviceId()
         return """
         {
             "events": [
@@ -485,7 +525,8 @@ abstract class BaseIntegrationSpec extends Specification {
         """.stripIndent().trim()
     }
 
-    String createHeartRateEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:15:00Z", String deviceId = TEST_DEVICE_ID) {
+    String createHeartRateEvent(String idempotencyKey, String occurredAt = "2025-11-10T07:15:00Z", String deviceId = null) {
+        deviceId = deviceId ?: getTestDeviceId()
         return """
         {
             "events": [
@@ -577,7 +618,8 @@ abstract class BaseIntegrationSpec extends Specification {
         """.stripIndent().trim()
     }
 
-    String createSleepSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T08:00:00Z", String sleepId = "sleep-session-default", String deviceId = TEST_DEVICE_ID) {
+    String createSleepSessionEvent(String idempotencyKey, String occurredAt = "2025-11-10T08:00:00Z", String sleepId = "sleep-session-default", String deviceId = null) {
+        deviceId = deviceId ?: getTestDeviceId()
         return """
         {
             "events": [
@@ -691,7 +733,8 @@ abstract class BaseIntegrationSpec extends Specification {
         return result
     }
 
-    def waitForApiResponse(String path, String deviceId = TEST_DEVICE_ID, String secretBase64 = TEST_SECRET_BASE64, int timeoutSeconds = 5) {
+    def waitForApiResponse(String path, String deviceId = null, String secretBase64 = TEST_SECRET_BASE64, int timeoutSeconds = 5) {
+        deviceId = deviceId ?: getTestDeviceId()
         def result = null
         Awaitility.await()
                 .atMost(timeoutSeconds, TimeUnit.SECONDS)
@@ -710,7 +753,8 @@ abstract class BaseIntegrationSpec extends Specification {
         return result
     }
 
-    boolean apiReturns404(String path, String deviceId = TEST_DEVICE_ID, String secretBase64 = TEST_SECRET_BASE64) {
+    boolean apiReturns404(String path, String deviceId = null, String secretBase64 = TEST_SECRET_BASE64) {
+        deviceId = deviceId ?: getTestDeviceId()
         def response = authenticatedGetRequest(deviceId, secretBase64, path)
                 .get(path)
                 .then()
@@ -719,13 +763,30 @@ abstract class BaseIntegrationSpec extends Specification {
     }
 
     /**
+     * Clean up all health events for a specific device.
+     * Use this in spec setup() methods for test isolation.
+     */
+    void cleanupEventsForDevice(String deviceId) {
+        healthEventsFacade.deleteEventsByDeviceId(deviceId)
+    }
+
+    /**
      * Find all events using facade (with a wide time range).
      * Returns list of EventData objects.
+     * WARNING: In parallel tests, use findEventsForDevice() instead to avoid cross-test pollution.
      */
     List findAllEvents() {
         def start = Instant.parse("2020-01-01T00:00:00Z")
         def end = Instant.parse("2030-12-31T23:59:59Z")
         return healthEventsFacade.findEventsByOccurredAtBetween(start, end)
+    }
+
+    /**
+     * Find events for a specific device.
+     * Use this in tests for parallel test isolation.
+     */
+    List findEventsForDevice(String deviceId) {
+        return healthEventsFacade.findEventsByDeviceId(deviceId)
     }
 
     /**

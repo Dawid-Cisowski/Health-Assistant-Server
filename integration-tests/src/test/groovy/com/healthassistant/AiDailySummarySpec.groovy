@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter
 @Title("Feature: AI Daily Summary")
 class AiDailySummarySpec extends BaseIntegrationSpec {
 
-    private static final String DEVICE_ID = "test-device"
+    private static final String DEVICE_ID = "test-ai-summary"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     def cleanup() {
