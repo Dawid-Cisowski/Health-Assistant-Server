@@ -25,13 +25,13 @@ public class SleepService implements SleepFacade {
     private final SleepSessionProjectionJpaRepository sessionRepository;
 
     @Override
-    public SleepDailyDetailResponse getDailyDetail(LocalDate date) {
-        Optional<SleepDailyDetailResponse> result = getDailyDetailInternal(date);
+    public SleepDailyDetailResponse getDailyDetail(String deviceId, LocalDate date) {
+        Optional<SleepDailyDetailResponse> result = getDailyDetailInternal(deviceId, date);
         return result.orElseGet(() -> createEmptyDetail(date));
     }
 
-    private Optional<SleepDailyDetailResponse> getDailyDetailInternal(LocalDate date) {
-        Optional<SleepDailyProjectionJpaEntity> dailyOpt = dailyRepository.findByDate(date);
+    private Optional<SleepDailyDetailResponse> getDailyDetailInternal(String deviceId, LocalDate date) {
+        Optional<SleepDailyProjectionJpaEntity> dailyOpt = dailyRepository.findByDeviceIdAndDate(deviceId, date);
 
         if (dailyOpt.isEmpty()) {
             return Optional.empty();
@@ -39,7 +39,7 @@ public class SleepService implements SleepFacade {
 
         SleepDailyProjectionJpaEntity daily = dailyOpt.get();
         List<SleepSessionProjectionJpaEntity> sessions =
-            sessionRepository.findByDateOrderBySessionNumberAsc(date);
+            sessionRepository.findByDeviceIdAndDateOrderBySessionNumberAsc(deviceId, date);
 
         List<SleepDailyDetailResponse.SleepSession> sessionResponses = sessions.stream()
             .map(s -> new SleepDailyDetailResponse.SleepSession(
@@ -62,9 +62,9 @@ public class SleepService implements SleepFacade {
     }
 
     @Override
-    public SleepRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate) {
+    public SleepRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate) {
         List<SleepDailyProjectionJpaEntity> dailyData =
-            dailyRepository.findByDateBetweenOrderByDateAsc(startDate, endDate);
+            dailyRepository.findByDeviceIdAndDateBetweenOrderByDateAsc(deviceId, startDate, endDate);
 
         Map<LocalDate, SleepDailyProjectionJpaEntity> dataByDate = dailyData.stream()
             .collect(Collectors.toMap(SleepDailyProjectionJpaEntity::getDate, d -> d));

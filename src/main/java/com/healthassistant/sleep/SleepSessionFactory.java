@@ -50,6 +50,7 @@ class SleepSessionFactory {
         }
 
         return Optional.of(SleepSession.create(
+                eventData.deviceId().value(),
                 payload.sleepId(),
                 eventData.eventId().value(),
                 payload.sleepStart(),

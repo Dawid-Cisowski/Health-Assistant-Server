@@ -93,7 +93,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${workout1}, ${workout2}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -337,7 +337,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def request = """
         {
             "events": [${workout1}, ${workout2}, ${workout3}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """
 
@@ -417,7 +417,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         return """
         {
             "events": [${event}],
-            "deviceId": "gymrun-app"
+            "deviceId": "${DEVICE_ID}"
         }
         """.stripIndent().trim()
     }

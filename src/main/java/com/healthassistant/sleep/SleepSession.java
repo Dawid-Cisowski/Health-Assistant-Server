@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.util.Objects;
 
 record SleepSession(
+        String deviceId,
         String sleepId,
         String eventId,
         LocalDate date,
@@ -20,6 +21,7 @@ record SleepSession(
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     SleepSession {
+        Objects.requireNonNull(deviceId, "deviceId cannot be null");
         Objects.requireNonNull(sleepId, "sleepId cannot be null");
         Objects.requireNonNull(eventId, "eventId cannot be null");
         Objects.requireNonNull(date, "date cannot be null");
@@ -32,6 +34,7 @@ record SleepSession(
     }
 
     static SleepSession create(
+            String deviceId,
             String sleepId,
             String eventId,
             Instant sleepStart,
@@ -41,10 +44,11 @@ record SleepSession(
     ) {
         LocalDate date = sleepEnd.atZone(POLAND_ZONE).toLocalDate();
         SleepDuration duration = SleepDuration.of(totalMinutes);
-        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, SleepStages.EMPTY, null, originPackage);
+        return new SleepSession(deviceId, sleepId, eventId, date, sleepStart, sleepEnd, duration, SleepStages.EMPTY, null, originPackage);
     }
 
     static SleepSession create(
+            String deviceId,
             String sleepId,
             String eventId,
             Instant sleepStart,
@@ -55,10 +59,11 @@ record SleepSession(
     ) {
         LocalDate date = sleepEnd.atZone(POLAND_ZONE).toLocalDate();
         SleepDuration duration = SleepDuration.of(totalMinutes);
-        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, stages, null, originPackage);
+        return new SleepSession(deviceId, sleepId, eventId, date, sleepStart, sleepEnd, duration, stages, null, originPackage);
     }
 
     static SleepSession create(
+            String deviceId,
             String sleepId,
             String eventId,
             Instant sleepStart,
@@ -70,7 +75,7 @@ record SleepSession(
     ) {
         LocalDate date = sleepEnd.atZone(POLAND_ZONE).toLocalDate();
         SleepDuration duration = SleepDuration.of(totalMinutes);
-        return new SleepSession(sleepId, eventId, date, sleepStart, sleepEnd, duration, stages, sleepScore, originPackage);
+        return new SleepSession(deviceId, sleepId, eventId, date, sleepStart, sleepEnd, duration, stages, sleepScore, originPackage);
     }
 
     boolean hasValidDuration() {

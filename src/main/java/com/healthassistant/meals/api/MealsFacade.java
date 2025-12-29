@@ -7,9 +7,9 @@ import java.time.LocalDate;
 
 public interface MealsFacade {
 
-    MealDailyDetailResponse getDailyDetail(LocalDate date);
+    MealDailyDetailResponse getDailyDetail(String deviceId, LocalDate date);
 
-    MealsRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate);
+    MealsRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteAllProjections();
 }

@@ -10,9 +10,9 @@ public interface DailySummaryFacade {
 
     void generateDailySummary(String deviceId, LocalDate date);
 
-    Optional<DailySummary> getDailySummary(LocalDate date);
+    Optional<DailySummary> getDailySummary(String deviceId, LocalDate date);
 
-    DailySummaryRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate);
+    DailySummaryRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteAllSummaries();
 }

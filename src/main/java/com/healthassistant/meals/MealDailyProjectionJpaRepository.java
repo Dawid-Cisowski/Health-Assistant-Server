@@ -10,7 +10,8 @@ import java.util.Optional;
 @Repository
 interface MealDailyProjectionJpaRepository extends JpaRepository<MealDailyProjectionJpaEntity, Long> {
 
-    Optional<MealDailyProjectionJpaEntity> findByDate(LocalDate date);
+    Optional<MealDailyProjectionJpaEntity> findByDeviceIdAndDate(String deviceId, LocalDate date);
 
-    List<MealDailyProjectionJpaEntity> findByDateBetweenOrderByDateAsc(LocalDate startDate, LocalDate endDate);
+    List<MealDailyProjectionJpaEntity> findByDeviceIdAndDateBetweenOrderByDateAsc(
+            String deviceId, LocalDate startDate, LocalDate endDate);
 }

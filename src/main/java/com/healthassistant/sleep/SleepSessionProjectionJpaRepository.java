@@ -12,6 +12,6 @@ interface SleepSessionProjectionJpaRepository extends JpaRepository<SleepSession
 
     Optional<SleepSessionProjectionJpaEntity> findByEventId(String eventId);
 
-    List<SleepSessionProjectionJpaEntity> findByDateOrderBySessionNumberAsc(LocalDate date);
+    List<SleepSessionProjectionJpaEntity> findByDeviceIdAndDateOrderBySessionNumberAsc(String deviceId, LocalDate date);
 
 }

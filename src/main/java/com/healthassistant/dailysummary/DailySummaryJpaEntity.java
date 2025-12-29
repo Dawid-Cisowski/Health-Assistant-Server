@@ -11,7 +11,6 @@ import java.util.Map;
 
 @Entity
 @Table(name = "daily_summaries", indexes = {
-        @Index(name = "idx_daily_summaries_date", columnList = "date", unique = true),
         @Index(name = "idx_daily_summaries_created_at", columnList = "created_at")
 })
 @Getter
@@ -25,7 +24,10 @@ class DailySummaryJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "date", nullable = false, unique = true)
+    @Column(name = "device_id", nullable = false)
+    private String deviceId;
+
+    @Column(name = "date", nullable = false)
     private LocalDate date;
 
     @JdbcTypeCode(SqlTypes.JSON)

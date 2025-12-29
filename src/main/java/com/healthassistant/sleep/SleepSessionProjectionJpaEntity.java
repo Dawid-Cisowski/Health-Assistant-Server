@@ -19,6 +19,9 @@ class SleepSessionProjectionJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "device_id", nullable = false)
+    private String deviceId;
+
     @Column(name = "event_id", nullable = false, unique = true)
     private String eventId;
 
@@ -78,6 +81,7 @@ class SleepSessionProjectionJpaEntity {
 
     static SleepSessionProjectionJpaEntity from(SleepSession session, int sessionNumber) {
         return SleepSessionProjectionJpaEntity.builder()
+                .deviceId(session.deviceId())
                 .eventId(session.eventId())
                 .date(session.date())
                 .sessionNumber(sessionNumber)

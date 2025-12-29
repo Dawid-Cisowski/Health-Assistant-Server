@@ -10,7 +10,7 @@ public interface WorkoutFacade {
 
     Optional<WorkoutDetailResponse> getWorkoutDetails(String workoutId);
 
-    List<WorkoutDetailResponse> getWorkoutsByDateRange(LocalDate startDate, LocalDate endDate);
+    List<WorkoutDetailResponse> getWorkoutsByDateRange(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteAllProjections();
 }

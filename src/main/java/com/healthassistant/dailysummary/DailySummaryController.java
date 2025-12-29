@@ -42,10 +42,11 @@ class DailySummaryController {
             @ApiResponse(responseCode = "404", description = "Summary not found for the specified date")
     })
     ResponseEntity<DailySummaryResponse> getByDate(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving daily summary for date: {}", date);
-        return dailySummaryFacade.getDailySummary(date)
+        log.info("Retrieving daily summary for device {} and date: {}", deviceId, date);
+        return dailySummaryFacade.getDailySummary(deviceId, date)
                 .map(summary -> ResponseEntity.ok(DailySummaryMapper.INSTANCE.toResponse(summary)))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -63,15 +64,16 @@ class DailySummaryController {
     })
     ResponseEntity<DailySummaryRangeSummaryResponse> getRangeSummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestHeader("X-Device-Id") String deviceId
     ) {
         if (startDate.isAfter(endDate)) {
             log.warn("Invalid date range: start {} is after end {}", startDate, endDate);
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving daily summaries range for {} to {}", startDate, endDate);
-        DailySummaryRangeSummaryResponse summary = dailySummaryFacade.getRangeSummary(startDate, endDate);
+        log.info("Retrieving daily summaries range for device {} from {} to {}", deviceId, startDate, endDate);
+        DailySummaryRangeSummaryResponse summary = dailySummaryFacade.getRangeSummary(deviceId, startDate, endDate);
         return ResponseEntity.ok(summary);
     }
 
@@ -87,9 +89,10 @@ class DailySummaryController {
             @ApiResponse(responseCode = "503", description = "AI service unavailable")
     })
     ResponseEntity<AiDailySummaryResponse> getAiSummary(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Generating AI summary for date: {}", date);
+        log.info("Generating AI summary for device {} date: {}", deviceId, date);
 
         if (aiDailySummaryService.isEmpty()) {
             log.warn("AI service is not available");
@@ -97,10 +100,10 @@ class DailySummaryController {
         }
 
         try {
-            AiDailySummaryResponse response = aiDailySummaryService.get().generateSummary(date);
+            AiDailySummaryResponse response = aiDailySummaryService.get().generateSummary(deviceId, date);
             return ResponseEntity.ok(response);
         } catch (AiSummaryGenerationException e) {
-            log.error("AI summary generation failed for date: {}", date, e);
+            log.error("AI summary generation failed for device {} date: {}", deviceId, date, e);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
     }

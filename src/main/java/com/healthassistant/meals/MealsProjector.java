@@ -33,36 +33,39 @@ class MealsProjector {
         }
     }
 
-    private synchronized void saveProjection(Meal meal) {
-        Optional<MealProjectionJpaEntity> existingOpt = mealRepository.findByEventId(meal.eventId());
+    private void saveProjection(Meal meal) {
+        String lockKey = meal.deviceId() + "|" + meal.date();
+        synchronized (lockKey.intern()) {
+            Optional<MealProjectionJpaEntity> existingOpt = mealRepository.findByEventId(meal.eventId());
 
-        MealProjectionJpaEntity entity;
+            MealProjectionJpaEntity entity;
 
-        if (existingOpt.isPresent()) {
-            entity = existingOpt.get();
-            entity.updateFrom(meal);
-            log.debug("Updating existing meal projection for event {}", meal.eventId());
-        } else {
-            int mealNumber = calculateNextMealNumber(meal.date());
-            entity = MealProjectionJpaEntity.from(meal, mealNumber);
-            log.debug("Creating new meal projection #{} for date {} from event {}",
-                    mealNumber, meal.date(), meal.eventId());
+            if (existingOpt.isPresent()) {
+                entity = existingOpt.get();
+                entity.updateFrom(meal);
+                log.debug("Updating existing meal projection for event {}", meal.eventId());
+            } else {
+                int mealNumber = calculateNextMealNumber(meal.deviceId(), meal.date());
+                entity = MealProjectionJpaEntity.from(meal, mealNumber);
+                log.debug("Creating new meal projection #{} for date {} from event {}",
+                        mealNumber, meal.date(), meal.eventId());
+            }
+
+            mealRepository.save(entity);
+            updateDailyProjection(meal.deviceId(), meal.date());
         }
-
-        mealRepository.save(entity);
-        updateDailyProjection(meal.date());
     }
 
-    private int calculateNextMealNumber(LocalDate date) {
+    private int calculateNextMealNumber(String deviceId, LocalDate date) {
         List<MealProjectionJpaEntity> existingMeals =
-                mealRepository.findByDateOrderByMealNumberAsc(date);
+                mealRepository.findByDeviceIdAndDateOrderByMealNumberAsc(deviceId, date);
         return existingMeals.isEmpty() ? 1 :
                 existingMeals.getLast().getMealNumber() + 1;
     }
 
-    private void updateDailyProjection(LocalDate date) {
+    private void updateDailyProjection(String deviceId, LocalDate date) {
         List<MealProjectionJpaEntity> meals =
-                mealRepository.findByDateOrderByMealNumberAsc(date);
+                mealRepository.findByDeviceIdAndDateOrderByMealNumberAsc(deviceId, date);
 
         if (meals.isEmpty()) {
             return;
@@ -94,8 +97,9 @@ class MealsProjector {
                 .max(Instant::compareTo)
                 .orElse(null);
 
-        MealDailyProjectionJpaEntity daily = dailyRepository.findByDate(date)
+        MealDailyProjectionJpaEntity daily = dailyRepository.findByDeviceIdAndDate(deviceId, date)
                 .orElseGet(() -> MealDailyProjectionJpaEntity.builder()
+                        .deviceId(deviceId)
                         .date(date)
                         .build());
 

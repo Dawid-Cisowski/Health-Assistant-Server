@@ -55,10 +55,11 @@ class WorkoutController {
     })
     ResponseEntity<List<WorkoutDetailResponse>> getWorkoutsByDateRange(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving workouts for date range: {} to {}", from, to);
-        List<WorkoutDetailResponse> workouts = workoutFacade.getWorkoutsByDateRange(from, to);
+        log.info("Retrieving workouts for device {} date range: {} to {}", deviceId, from, to);
+        List<WorkoutDetailResponse> workouts = workoutFacade.getWorkoutsByDateRange(deviceId, from, to);
         return ResponseEntity.ok(workouts);
     }
 }

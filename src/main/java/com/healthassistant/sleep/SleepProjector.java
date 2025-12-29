@@ -31,36 +31,39 @@ class SleepProjector {
         }
     }
 
-    private synchronized void saveProjection(SleepSession session) {
-        Optional<SleepSessionProjectionJpaEntity> existingOpt = sessionRepository.findByEventId(session.eventId());
+    private void saveProjection(SleepSession session) {
+        String lockKey = session.deviceId() + "|" + session.date();
+        synchronized (lockKey.intern()) {
+            Optional<SleepSessionProjectionJpaEntity> existingOpt = sessionRepository.findByEventId(session.eventId());
 
-        SleepSessionProjectionJpaEntity entity;
+            SleepSessionProjectionJpaEntity entity;
 
-        if (existingOpt.isPresent()) {
-            entity = existingOpt.get();
-            entity.updateFrom(session);
-            log.debug("Updating existing sleep session for event {}", session.eventId());
-        } else {
-            int sessionNumber = calculateNextSessionNumber(session.date());
-            entity = SleepSessionProjectionJpaEntity.from(session, sessionNumber);
-            log.debug("Creating new sleep session #{} for date {} from event {}",
-                    sessionNumber, session.date(), session.eventId());
+            if (existingOpt.isPresent()) {
+                entity = existingOpt.get();
+                entity.updateFrom(session);
+                log.debug("Updating existing sleep session for event {}", session.eventId());
+            } else {
+                int sessionNumber = calculateNextSessionNumber(session.deviceId(), session.date());
+                entity = SleepSessionProjectionJpaEntity.from(session, sessionNumber);
+                log.debug("Creating new sleep session #{} for date {} from event {}",
+                        sessionNumber, session.date(), session.eventId());
+            }
+
+            sessionRepository.save(entity);
+            updateDailyProjection(session.deviceId(), session.date());
         }
-
-        sessionRepository.save(entity);
-        updateDailyProjection(session.date());
     }
 
-    private int calculateNextSessionNumber(LocalDate date) {
+    private int calculateNextSessionNumber(String deviceId, LocalDate date) {
         List<SleepSessionProjectionJpaEntity> existingSessions =
-                sessionRepository.findByDateOrderBySessionNumberAsc(date);
+                sessionRepository.findByDeviceIdAndDateOrderBySessionNumberAsc(deviceId, date);
         return existingSessions.isEmpty() ? 1 :
                 existingSessions.getLast().getSessionNumber() + 1;
     }
 
-    private void updateDailyProjection(LocalDate date) {
+    private void updateDailyProjection(String deviceId, LocalDate date) {
         List<SleepSessionProjectionJpaEntity> sessions =
-                sessionRepository.findByDateOrderBySessionNumberAsc(date);
+                sessionRepository.findByDeviceIdAndDateOrderBySessionNumberAsc(deviceId, date);
 
         if (sessions.isEmpty()) {
             return;
@@ -121,8 +124,9 @@ class SleepProjector {
         Integer averageSleepScore = scores.isEmpty() ? null :
                 (int) scores.stream().mapToInt(Integer::intValue).average().orElse(0);
 
-        SleepDailyProjectionJpaEntity daily = dailyRepository.findByDate(date)
+        SleepDailyProjectionJpaEntity daily = dailyRepository.findByDeviceIdAndDate(deviceId, date)
                 .orElseGet(() -> SleepDailyProjectionJpaEntity.builder()
+                        .deviceId(deviceId)
                         .date(date)
                         .build());
 

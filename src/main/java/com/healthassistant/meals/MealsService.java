@@ -25,13 +25,13 @@ class MealsService implements MealsFacade {
     private final MealProjectionJpaRepository mealRepository;
 
     @Override
-    public MealDailyDetailResponse getDailyDetail(LocalDate date) {
-        Optional<MealDailyDetailResponse> result = getDailyDetailInternal(date);
+    public MealDailyDetailResponse getDailyDetail(String deviceId, LocalDate date) {
+        Optional<MealDailyDetailResponse> result = getDailyDetailInternal(deviceId, date);
         return result.orElseGet(() -> createEmptyDetail(date));
     }
 
-    private Optional<MealDailyDetailResponse> getDailyDetailInternal(LocalDate date) {
-        Optional<MealDailyProjectionJpaEntity> dailyOpt = dailyRepository.findByDate(date);
+    private Optional<MealDailyDetailResponse> getDailyDetailInternal(String deviceId, LocalDate date) {
+        Optional<MealDailyProjectionJpaEntity> dailyOpt = dailyRepository.findByDeviceIdAndDate(deviceId, date);
 
         if (dailyOpt.isEmpty()) {
             return Optional.empty();
@@ -39,7 +39,7 @@ class MealsService implements MealsFacade {
 
         MealDailyProjectionJpaEntity daily = dailyOpt.get();
         List<MealProjectionJpaEntity> meals =
-            mealRepository.findByDateOrderByMealNumberAsc(date);
+            mealRepository.findByDeviceIdAndDateOrderByMealNumberAsc(deviceId, date);
 
         List<MealDailyDetailResponse.MealDetail> mealDetails = meals.stream()
             .map(m -> new MealDailyDetailResponse.MealDetail(
@@ -74,9 +74,9 @@ class MealsService implements MealsFacade {
     }
 
     @Override
-    public MealsRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate) {
+    public MealsRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate) {
         List<MealDailyProjectionJpaEntity> dailyData =
-            dailyRepository.findByDateBetweenOrderByDateAsc(startDate, endDate);
+            dailyRepository.findByDeviceIdAndDateBetweenOrderByDateAsc(deviceId, startDate, endDate);
 
         Map<LocalDate, MealDailyProjectionJpaEntity> dataByDate = dailyData.stream()
             .collect(Collectors.toMap(MealDailyProjectionJpaEntity::getDate, d -> d));

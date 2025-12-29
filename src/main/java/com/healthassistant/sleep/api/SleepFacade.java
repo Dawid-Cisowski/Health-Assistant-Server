@@ -7,9 +7,9 @@ import java.time.LocalDate;
 
 public interface SleepFacade {
 
-    SleepDailyDetailResponse getDailyDetail(LocalDate date);
+    SleepDailyDetailResponse getDailyDetail(String deviceId, LocalDate date);
 
-    SleepRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate);
+    SleepRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteAllProjections();
 }

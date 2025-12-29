@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.util.Objects;
 
 record Meal(
+        String deviceId,
         String eventId,
         LocalDate date,
         Instant occurredAt,
@@ -21,6 +22,7 @@ record Meal(
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     Meal {
+        Objects.requireNonNull(deviceId, "deviceId cannot be null");
         Objects.requireNonNull(eventId, "eventId cannot be null");
         Objects.requireNonNull(date, "date cannot be null");
         Objects.requireNonNull(occurredAt, "occurredAt cannot be null");
@@ -31,6 +33,7 @@ record Meal(
     }
 
     static Meal create(
+            String deviceId,
             String eventId,
             Instant occurredAt,
             String title,
@@ -43,7 +46,7 @@ record Meal(
     ) {
         LocalDate date = occurredAt.atZone(POLAND_ZONE).toLocalDate();
         Macros macros = Macros.of(caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams);
-        return new Meal(eventId, date, occurredAt, title, mealType, macros, healthRating);
+        return new Meal(deviceId, eventId, date, occurredAt, title, mealType, macros, healthRating);
     }
 
     String mealTypeName() {

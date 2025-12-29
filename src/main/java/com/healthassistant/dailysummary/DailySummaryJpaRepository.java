@@ -15,12 +15,16 @@ import java.util.Set;
 
 @Repository
 interface DailySummaryJpaRepository extends JpaRepository<DailySummaryJpaEntity, Long> {
-    Optional<DailySummaryJpaEntity> findByDate(LocalDate date);
+    Optional<DailySummaryJpaEntity> findByDeviceIdAndDate(String deviceId, LocalDate date);
 
-    List<DailySummaryJpaEntity> findByDateBetweenOrderByDateAsc(LocalDate startDate, LocalDate endDate);
+    List<DailySummaryJpaEntity> findByDeviceIdAndDateBetweenOrderByDateAsc(
+            String deviceId, LocalDate startDate, LocalDate endDate);
 
     @Modifying
     @Transactional
-    @Query("UPDATE DailySummaryJpaEntity d SET d.lastEventAt = :timestamp WHERE d.date IN :dates")
-    void updateLastEventAtForDates(@Param("dates") Set<LocalDate> dates, @Param("timestamp") Instant timestamp);
+    @Query("UPDATE DailySummaryJpaEntity d SET d.lastEventAt = :timestamp WHERE d.deviceId = :deviceId AND d.date IN :dates")
+    void updateLastEventAtForDates(
+            @Param("deviceId") String deviceId,
+            @Param("dates") Set<LocalDate> dates,
+            @Param("timestamp") Instant timestamp);
 }

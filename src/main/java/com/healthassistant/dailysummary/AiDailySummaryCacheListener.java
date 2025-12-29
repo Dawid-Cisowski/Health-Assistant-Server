@@ -21,8 +21,8 @@ class AiDailySummaryCacheListener {
             return;
         }
 
-        log.debug("Updating last_event_at for {} dates due to new events", event.affectedDates().size());
-        repository.updateLastEventAtForDates(event.affectedDates(), Instant.now());
-        log.debug("Updated last_event_at for dates: {}", event.affectedDates());
+        log.debug("Updating last_event_at for device {} {} dates due to new events", event.deviceId(), event.affectedDates().size());
+        repository.updateLastEventAtForDates(event.deviceId(), event.affectedDates(), Instant.now());
+        log.debug("Updated last_event_at for device {} dates: {}", event.deviceId(), event.affectedDates());
     }
 }

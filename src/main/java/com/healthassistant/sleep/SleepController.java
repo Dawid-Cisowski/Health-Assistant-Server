@@ -37,10 +37,11 @@ class SleepController {
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
     ResponseEntity<SleepDailyDetailResponse> getDailyDetail(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving daily sleep detail for date: {}", date);
-        SleepDailyDetailResponse detail = sleepFacade.getDailyDetail(date);
+        log.info("Retrieving daily sleep detail for device {} and date: {}", deviceId, date);
+        SleepDailyDetailResponse detail = sleepFacade.getDailyDetail(deviceId, date);
 
         if (detail.totalSleepMinutes() == 0) {
             return ResponseEntity.notFound().build();
@@ -62,15 +63,16 @@ class SleepController {
     })
     ResponseEntity<SleepRangeSummaryResponse> getRangeSummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestHeader("X-Device-Id") String deviceId
     ) {
         if (startDate.isAfter(endDate)) {
             log.warn("Invalid date range: start {} is after end {}", startDate, endDate);
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving sleep range summary for {} to {}", startDate, endDate);
-        SleepRangeSummaryResponse summary = sleepFacade.getRangeSummary(startDate, endDate);
+        log.info("Retrieving sleep range summary for device {} from {} to {}", deviceId, startDate, endDate);
+        SleepRangeSummaryResponse summary = sleepFacade.getRangeSummary(deviceId, startDate, endDate);
         return ResponseEntity.ok(summary);
     }
 }

@@ -74,25 +74,25 @@ class AiDailySummaryService {
         """;
 
     @Transactional
-    public AiDailySummaryResponse generateSummary(LocalDate date) {
-        log.info("Generating AI daily summary for date: {}", date);
+    public AiDailySummaryResponse generateSummary(String deviceId, LocalDate date) {
+        log.info("Generating AI daily summary for device {} date: {}", deviceId, date);
 
-        var entityOpt = repository.findByDate(date);
+        var entityOpt = repository.findByDeviceIdAndDate(deviceId, date);
         if (entityOpt.isEmpty()) {
-            log.info("No daily summary entity found for date: {}", date);
+            log.info("No daily summary entity found for device {} date: {}", deviceId, date);
             return AiDailySummaryResponse.noData(date);
         }
 
         DailySummaryJpaEntity entity = entityOpt.get();
 
         if (isCacheValid(entity)) {
-            log.info("Returning cached AI summary for date: {} (generated at: {})",
-                    date, entity.getAiSummaryGeneratedAt());
+            log.info("Returning cached AI summary for device {} date: {} (generated at: {})",
+                    deviceId, date, entity.getAiSummaryGeneratedAt());
             return new AiDailySummaryResponse(date, entity.getAiSummary(), true);
         }
 
         String timeOfDay = getTimeOfDayContext();
-        return dailySummaryFacade.getDailySummary(date)
+        return dailySummaryFacade.getDailySummary(deviceId, date)
                 .map(summary -> {
                     String aiText = generateFromData(summary, timeOfDay);
                     cacheAiSummary(entity, aiText);

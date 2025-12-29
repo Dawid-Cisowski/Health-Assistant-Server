@@ -12,7 +12,8 @@ interface MealProjectionJpaRepository extends JpaRepository<MealProjectionJpaEnt
 
     Optional<MealProjectionJpaEntity> findByEventId(String eventId);
 
-    List<MealProjectionJpaEntity> findByDateOrderByMealNumberAsc(LocalDate date);
+    List<MealProjectionJpaEntity> findByDeviceIdAndDateOrderByMealNumberAsc(String deviceId, LocalDate date);
 
-    List<MealProjectionJpaEntity> findByDateBetweenOrderByDateAscMealNumberAsc(LocalDate startDate, LocalDate endDate);
+    List<MealProjectionJpaEntity> findByDeviceIdAndDateBetweenOrderByDateAscMealNumberAsc(
+            String deviceId, LocalDate startDate, LocalDate endDate);
 }

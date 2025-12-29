@@ -30,14 +30,14 @@ class DailySummaryService implements DailySummaryFacade {
     }
 
     @Override
-    public Optional<DailySummary> getDailySummary(LocalDate date) {
-        return jpaRepository.findByDate(date)
+    public Optional<DailySummary> getDailySummary(String deviceId, LocalDate date) {
+        return jpaRepository.findByDeviceIdAndDate(deviceId, date)
                 .map(entity -> objectMapper.convertValue(entity.getSummary(), DailySummary.class));
     }
 
     @Override
-    public DailySummaryRangeSummaryResponse getRangeSummary(LocalDate startDate, LocalDate endDate) {
-        List<DailySummaryJpaEntity> entities = jpaRepository.findByDateBetweenOrderByDateAsc(startDate, endDate);
+    public DailySummaryRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate) {
+        List<DailySummaryJpaEntity> entities = jpaRepository.findByDeviceIdAndDateBetweenOrderByDateAsc(deviceId, startDate, endDate);
 
         RangeSummaryAggregator agg = new RangeSummaryAggregator();
         List<DailySummaryResponse> dailyStats = new ArrayList<>(entities.size());

@@ -19,6 +19,9 @@ class MealProjectionJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "device_id", nullable = false)
+    private String deviceId;
+
     @Column(name = "event_id", nullable = false, unique = true)
     private String eventId;
 
@@ -79,6 +82,7 @@ class MealProjectionJpaEntity {
 
     static MealProjectionJpaEntity from(Meal meal, int mealNumber) {
         return MealProjectionJpaEntity.builder()
+                .deviceId(meal.deviceId())
                 .eventId(meal.eventId())
                 .date(meal.date())
                 .mealNumber(mealNumber)

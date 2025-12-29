@@ -57,7 +57,7 @@ class MealImportService implements MealImportFacade {
         }
 
         try {
-            MealTimeContext timeContext = buildMealTimeContext();
+            MealTimeContext timeContext = buildMealTimeContext(deviceId.value());
             ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
@@ -199,7 +199,7 @@ class MealImportService implements MealImportFacade {
         }
 
         try {
-            MealTimeContext timeContext = buildMealTimeContext();
+            MealTimeContext timeContext = buildMealTimeContext(deviceId.value());
             ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
@@ -431,11 +431,11 @@ class MealImportService implements MealImportFacade {
         );
     }
 
-    private MealTimeContext buildMealTimeContext() {
+    private MealTimeContext buildMealTimeContext(String deviceId) {
         LocalDate today = LocalDate.now(MealTimeContext.POLAND_ZONE);
         LocalTime now = LocalTime.now(MealTimeContext.POLAND_ZONE);
 
-        MealDailyDetailResponse todayMeals = mealsFacade.getDailyDetail(today);
+        MealDailyDetailResponse todayMeals = mealsFacade.getDailyDetail(deviceId, today);
 
         List<MealTimeContext.TodaysMeal> meals = todayMeals.meals().stream()
             .map(m -> new MealTimeContext.TodaysMeal(

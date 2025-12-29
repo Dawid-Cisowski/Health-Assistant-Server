@@ -68,8 +68,9 @@ public class WorkoutService implements WorkoutFacade {
     }
 
     @Override
-    public List<WorkoutDetailResponse> getWorkoutsByDateRange(LocalDate startDate, LocalDate endDate) {
-        List<WorkoutProjectionJpaEntity> workouts = workoutRepository.findByPerformedDateBetweenOrderByPerformedAtDesc(
+    public List<WorkoutDetailResponse> getWorkoutsByDateRange(String deviceId, LocalDate startDate, LocalDate endDate) {
+        List<WorkoutProjectionJpaEntity> workouts = workoutRepository.findByDeviceIdAndPerformedDateBetweenOrderByPerformedAtDesc(
+                deviceId,
                 startDate,
                 endDate
         );

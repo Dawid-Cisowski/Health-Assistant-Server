@@ -16,12 +16,14 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
 
     boolean existsByWorkoutId(String workoutId);
 
-    List<WorkoutProjectionJpaEntity> findByPerformedDateBetweenOrderByPerformedAtDesc(
+    List<WorkoutProjectionJpaEntity> findByDeviceIdAndPerformedDateBetweenOrderByPerformedAtDesc(
+            String deviceId,
             LocalDate startDate,
             LocalDate endDate
     );
 
-    List<WorkoutProjectionJpaEntity> findByPerformedDateOrderByPerformedAtDesc(LocalDate date);
+    List<WorkoutProjectionJpaEntity> findByDeviceIdAndPerformedDateOrderByPerformedAtDesc(
+            String deviceId, LocalDate date);
 
     @Query("SELECT w FROM WorkoutProjectionJpaEntity w " +
            "LEFT JOIN FETCH w.exercises e " +
@@ -30,8 +32,9 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
     Optional<WorkoutProjectionJpaEntity> findByWorkoutIdWithExercises(@Param("workoutId") String workoutId);
 
     @Query("SELECT COUNT(w) FROM WorkoutProjectionJpaEntity w " +
-           "WHERE w.performedDate BETWEEN :startDate AND :endDate")
-    long countByPerformedDateBetween(
+           "WHERE w.deviceId = :deviceId AND w.performedDate BETWEEN :startDate AND :endDate")
+    long countByDeviceIdAndPerformedDateBetween(
+            @Param("deviceId") String deviceId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );

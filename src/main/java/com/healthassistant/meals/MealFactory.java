@@ -24,6 +24,7 @@ class MealFactory {
         }
 
         return Optional.of(Meal.create(
+                eventData.deviceId().value(),
                 eventData.eventId().value(),
                 eventData.occurredAt(),
                 payload.title(),

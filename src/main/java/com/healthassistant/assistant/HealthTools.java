@@ -55,7 +55,7 @@ class HealthTools {
 
         var start = LocalDate.parse(startDate);
         var end = LocalDate.parse(endDate);
-        var result = sleepFacade.getRangeSummary(start, end);
+        var result = sleepFacade.getRangeSummary(deviceId, start, end);
 
         log.info("Sleep data fetched: {} total minutes over {} days", result.totalSleepMinutes(), result.daysWithData());
         return result;
@@ -70,7 +70,7 @@ class HealthTools {
 
         var start = LocalDate.parse(startDate);
         var end = LocalDate.parse(endDate);
-        var result = workoutFacade.getWorkoutsByDateRange(start, end);
+        var result = workoutFacade.getWorkoutsByDateRange(deviceId, start, end);
 
         log.info("Workout data fetched: {} workouts", result.size());
         return result;
@@ -84,7 +84,7 @@ class HealthTools {
         log.info("Fetching daily summary for device {} for date {}", deviceId, date);
 
         var localDate = LocalDate.parse(date);
-        var result = dailySummaryFacade.getDailySummary(localDate);
+        var result = dailySummaryFacade.getDailySummary(deviceId, localDate);
 
         log.info("Daily summary fetched: {}", result.isPresent() ? "found" : "not found");
         return result;
@@ -99,7 +99,7 @@ class HealthTools {
 
         var start = LocalDate.parse(startDate);
         var end = LocalDate.parse(endDate);
-        var result = mealsFacade.getRangeSummary(start, end);
+        var result = mealsFacade.getRangeSummary(deviceId, start, end);
 
         log.info("Meals data fetched: {} total meals over {} days", result.totalMealCount(), result.daysWithData());
         return result;
