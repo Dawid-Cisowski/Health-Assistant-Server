@@ -3,6 +3,7 @@ package com.healthassistant.healthevents.api;
 import com.healthassistant.healthevents.api.dto.EventData;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 
@@ -16,6 +17,10 @@ public interface HealthEventsFacade {
     List<EventData> findEventsByOccurredAtBetween(Instant start, Instant end);
 
     List<EventData> findEventsByDeviceId(String deviceId);
+
+    List<StoredEventData> findEventsForReprojection(int page, int size);
+
+    long countAllEvents();
 
     void deleteAllEvents();
 

@@ -193,10 +193,39 @@ class HealthEventsService implements HealthEventsFacade {
         );
     }
 
+    private StoredEventData toStoredEventData(HealthEventJpaEntity entity) {
+        return new StoredEventData(
+                new IdempotencyKey(entity.getIdempotencyKey()),
+                EventType.from(entity.getEventType()),
+                entity.getOccurredAt(),
+                toPayload(entity.getEventType(), entity.getPayload()),
+                new DeviceId(entity.getDeviceId()),
+                new com.healthassistant.healthevents.api.model.EventId(entity.getEventId())
+        );
+    }
+
     private EventPayload toPayload(String eventTypeStr, Map<String, Object> map) {
         EventType eventType = EventType.from(eventTypeStr);
         Class<? extends EventPayload> clazz = EventPayload.payloadClassFor(eventType);
         return objectMapper.convertValue(map, clazz);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoredEventData> findEventsForReprojection(int page, int size) {
+        return healthEventJpaRepository.findAllByOrderByIdAsc(
+                org.springframework.data.domain.PageRequest.of(page, size)
+        )
+                .getContent()
+                .stream()
+                .map(this::toStoredEventData)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countAllEvents() {
+        return healthEventJpaRepository.count();
     }
 
     @Override

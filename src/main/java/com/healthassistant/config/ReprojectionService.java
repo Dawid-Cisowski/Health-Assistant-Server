@@ -1,0 +1,214 @@
+package com.healthassistant.config;
+
+import com.healthassistant.activity.api.ActivityFacade;
+import com.healthassistant.calories.api.CaloriesFacade;
+import com.healthassistant.dailysummary.api.DailySummaryFacade;
+import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.events.*;
+import com.healthassistant.meals.api.MealsFacade;
+import com.healthassistant.sleep.api.SleepFacade;
+import com.healthassistant.steps.api.StepsFacade;
+import com.healthassistant.workout.api.WorkoutFacade;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ReprojectionService {
+
+    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+    private static final int BATCH_SIZE = 500;
+
+    private static final String STEPS_BUCKETED_V1 = "StepsBucketedRecorded.v1";
+    private static final String WORKOUT_V1 = "WorkoutRecorded.v1";
+    private static final String SLEEP_SESSION_V1 = "SleepSessionRecorded.v1";
+    private static final String ACTIVE_MINUTES_V1 = "ActiveMinutesRecorded.v1";
+    private static final String ACTIVE_CALORIES_V1 = "ActiveCaloriesBurnedRecorded.v1";
+    private static final String MEAL_V1 = "MealRecorded.v1";
+
+    private final HealthEventsFacade healthEventsFacade;
+    private final StepsFacade stepsFacade;
+    private final WorkoutFacade workoutFacade;
+    private final SleepFacade sleepFacade;
+    private final CaloriesFacade caloriesFacade;
+    private final ActivityFacade activityFacade;
+    private final MealsFacade mealsFacade;
+    private final DailySummaryFacade dailySummaryFacade;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public ReprojectionResult reprojectAll() {
+        log.info("Starting full reprojection of all events");
+
+        // 1. Delete all existing projections (in separate transaction)
+        deleteAllProjections();
+
+        // 2. Count total events
+        long totalEvents = healthEventsFacade.countAllEvents();
+        log.info("Total events to reproject: {}", totalEvents);
+
+        if (totalEvents == 0) {
+            return new ReprojectionResult(0, 0, 0, 0, 0, 0, 0);
+        }
+
+        // 3. Process in batches
+        int stepsCount = 0;
+        int workoutsCount = 0;
+        int sleepCount = 0;
+        int activityCount = 0;
+        int caloriesCount = 0;
+        int mealsCount = 0;
+
+        Set<LocalDate> allAffectedDates = new HashSet<>();
+        Set<String> allEventTypes = new HashSet<>();
+        String deviceId = null;
+
+        int page = 0;
+        int processedTotal = 0;
+
+        while (processedTotal < totalEvents) {
+            log.info("Processing batch {} (offset: {}, batch size: {})", page + 1, processedTotal, BATCH_SIZE);
+
+            List<StoredEventData> batch = healthEventsFacade.findEventsForReprojection(page, BATCH_SIZE);
+
+            if (batch.isEmpty()) {
+                break;
+            }
+
+            if (deviceId == null && !batch.isEmpty()) {
+                deviceId = batch.getFirst().deviceId().value();
+            }
+
+            // Group by type
+            Map<String, List<StoredEventData>> eventsByType = batch.stream()
+                    .collect(Collectors.groupingBy(e -> e.eventType().value()));
+
+            // Process each type
+            stepsCount += processBatchForType(eventsByType, STEPS_BUCKETED_V1, this::publishStepsEvents);
+            workoutsCount += processBatchForType(eventsByType, WORKOUT_V1, this::publishWorkoutEvents);
+            sleepCount += processBatchForType(eventsByType, SLEEP_SESSION_V1, this::publishSleepEvents);
+            activityCount += processBatchForType(eventsByType, ACTIVE_MINUTES_V1, this::publishActivityEvents);
+            caloriesCount += processBatchForType(eventsByType, ACTIVE_CALORIES_V1, this::publishCaloriesEvents);
+            mealsCount += processBatchForType(eventsByType, MEAL_V1, this::publishMealsEvents);
+
+            // Collect dates and types for daily summary
+            batch.forEach(e -> {
+                allAffectedDates.add(e.occurredAt().atZone(POLAND_ZONE).toLocalDate());
+                allEventTypes.add(e.eventType().value());
+            });
+
+            processedTotal += batch.size();
+            page++;
+
+            log.info("Processed {}/{} events", processedTotal, totalEvents);
+        }
+
+        // 4. Trigger daily summary aggregation
+        if (deviceId != null && !allAffectedDates.isEmpty()) {
+            log.info("Publishing AllEventsStoredEvent for {} affected dates", allAffectedDates.size());
+            eventPublisher.publishEvent(new AllEventsStoredEvent(deviceId, allAffectedDates, allEventTypes));
+        }
+
+        log.info("Reprojection completed: steps={}, workouts={}, sleep={}, activity={}, calories={}, meals={}",
+                stepsCount, workoutsCount, sleepCount, activityCount, caloriesCount, mealsCount);
+
+        return new ReprojectionResult(
+                processedTotal,
+                stepsCount,
+                workoutsCount,
+                sleepCount,
+                activityCount,
+                caloriesCount,
+                mealsCount
+        );
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void deleteAllProjections() {
+        log.info("Deleting all existing projections");
+        stepsFacade.deleteAllProjections();
+        workoutFacade.deleteAllProjections();
+        sleepFacade.deleteAllProjections();
+        caloriesFacade.deleteAllProjections();
+        activityFacade.deleteAllProjections();
+        mealsFacade.deleteAllProjections();
+        dailySummaryFacade.deleteAllSummaries();
+        log.info("All projections deleted");
+    }
+
+    private int processBatchForType(
+            Map<String, List<StoredEventData>> eventsByType,
+            String eventType,
+            java.util.function.Consumer<List<StoredEventData>> publisher
+    ) {
+        List<StoredEventData> events = eventsByType.getOrDefault(eventType, List.of());
+        if (!events.isEmpty()) {
+            publisher.accept(events);
+        }
+        return events.size();
+    }
+
+    private void publishStepsEvents(List<StoredEventData> events) {
+        Set<LocalDate> dates = extractAffectedDates(events);
+        log.debug("Publishing StepsEventsStoredEvent with {} events", events.size());
+        eventPublisher.publishEvent(new StepsEventsStoredEvent(events, dates));
+    }
+
+    private void publishWorkoutEvents(List<StoredEventData> events) {
+        Set<LocalDate> dates = extractAffectedDates(events);
+        log.debug("Publishing WorkoutEventsStoredEvent with {} events", events.size());
+        eventPublisher.publishEvent(new WorkoutEventsStoredEvent(events, dates));
+    }
+
+    private void publishSleepEvents(List<StoredEventData> events) {
+        Set<LocalDate> dates = extractAffectedDates(events);
+        log.debug("Publishing SleepEventsStoredEvent with {} events", events.size());
+        eventPublisher.publishEvent(new SleepEventsStoredEvent(events, dates));
+    }
+
+    private void publishActivityEvents(List<StoredEventData> events) {
+        Set<LocalDate> dates = extractAffectedDates(events);
+        log.debug("Publishing ActivityEventsStoredEvent with {} events", events.size());
+        eventPublisher.publishEvent(new ActivityEventsStoredEvent(events, dates));
+    }
+
+    private void publishCaloriesEvents(List<StoredEventData> events) {
+        Set<LocalDate> dates = extractAffectedDates(events);
+        log.debug("Publishing CaloriesEventsStoredEvent with {} events", events.size());
+        eventPublisher.publishEvent(new CaloriesEventsStoredEvent(events, dates));
+    }
+
+    private void publishMealsEvents(List<StoredEventData> events) {
+        Set<LocalDate> dates = extractAffectedDates(events);
+        log.debug("Publishing MealsEventsStoredEvent with {} events", events.size());
+        eventPublisher.publishEvent(new MealsEventsStoredEvent(events, dates));
+    }
+
+    private Set<LocalDate> extractAffectedDates(List<StoredEventData> events) {
+        return events.stream()
+                .map(StoredEventData::occurredAt)
+                .filter(Objects::nonNull)
+                .map(instant -> instant.atZone(POLAND_ZONE).toLocalDate())
+                .collect(Collectors.toSet());
+    }
+
+    public record ReprojectionResult(
+            int totalEvents,
+            int stepsEvents,
+            int workoutEvents,
+            int sleepEvents,
+            int activityEvents,
+            int caloriesEvents,
+            int mealsEvents
+    ) {}
+}
