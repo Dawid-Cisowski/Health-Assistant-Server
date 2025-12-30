@@ -112,9 +112,15 @@ class GoogleFitSyncService implements GoogleFitFacade {
                 ? sessionsResponse.sessions()
                 : List.of();
 
+        log.info("Google Fit sessions response: total={} sessions", allSessions.size());
+        allSessions.forEach(s -> log.info("  Session: id={} activityType={} name={} package={}",
+                s.id(), s.activityType(), s.name(), s.getPackageName()));
+
         List<GoogleFitSession> sleepSessions = allSessions.stream()
                 .filter(GoogleFitSession::isSleepSession)
                 .toList();
+
+        log.info("Filtered sleep sessions (activityType=72): {}", sleepSessions.size());
 
         List<GoogleFitSession> walkingSessions = allSessions.stream()
                 .filter(GoogleFitSession::isWalkingSession)
