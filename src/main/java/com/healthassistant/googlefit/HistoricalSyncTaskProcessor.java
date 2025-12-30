@@ -1,5 +1,6 @@
 package com.healthassistant.googlefit;
 
+import com.healthassistant.config.ReprojectionService;
 import com.healthassistant.googlefit.HistoricalSyncTask.SyncTaskStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -24,11 +25,14 @@ class HistoricalSyncTaskProcessor {
 
     private final HistoricalSyncTaskRepository taskRepository;
     private final GoogleFitSyncService googleFitSyncService;
+    private final ReprojectionService reprojectionService;
 
     HistoricalSyncTaskProcessor(HistoricalSyncTaskRepository taskRepository,
-                                @Lazy GoogleFitSyncService googleFitSyncService) {
+                                @Lazy GoogleFitSyncService googleFitSyncService,
+                                ReprojectionService reprojectionService) {
         this.taskRepository = taskRepository;
         this.googleFitSyncService = googleFitSyncService;
+        this.reprojectionService = reprojectionService;
     }
 
     /**
@@ -60,6 +64,17 @@ class HistoricalSyncTaskProcessor {
                     .toList();
 
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        }
+
+        // After all sync tasks complete, rebuild all projections to ensure consistency
+        log.info("All sync tasks completed, triggering full reprojection");
+        try {
+            var result = reprojectionService.reprojectAll();
+            log.info("Reprojection completed: {} total events, steps={}, workouts={}, sleep={}, activity={}, calories={}, meals={}",
+                    result.totalEvents(), result.stepsEvents(), result.workoutEvents(),
+                    result.sleepEvents(), result.activityEvents(), result.caloriesEvents(), result.mealsEvents());
+        } catch (Exception e) {
+            log.error("Reprojection failed after sync: {}", e.getMessage(), e);
         }
     }
 
