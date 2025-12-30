@@ -1,5 +1,6 @@
 package com.healthassistant.googlefit;
 
+import com.healthassistant.config.AppProperties;
 import com.healthassistant.googlefit.api.GoogleFitFacade;
 import com.healthassistant.googlefit.api.HistoricalSyncResult;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
@@ -25,7 +26,6 @@ import java.util.Set;
 class GoogleFitSyncService implements GoogleFitFacade {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final DeviceId GOOGLE_FIT_DEVICE_ID = DeviceId.of("google-fit");
     private static final DateTimeFormatter RFC3339_FORMATTER = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC);
 
     private final GoogleFitClient googleFitClient;
@@ -34,6 +34,7 @@ class GoogleFitSyncService implements GoogleFitFacade {
     private final HealthEventsFacade healthEventsFacade;
     private final HistoricalSyncTaskRepository historicalSyncTaskRepository;
     private final HistoricalSyncTaskProcessor historicalSyncTaskProcessor;
+    private final AppProperties appProperties;
 
     @Override
     public HistoricalSyncResult syncHistory(int days) {
@@ -129,7 +130,8 @@ class GoogleFitSyncService implements GoogleFitFacade {
             return 0;
         }
 
-        StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, GOOGLE_FIT_DEVICE_ID);
+        DeviceId deviceId = DeviceId.of(appProperties.getGoogleFit().getDeviceId());
+        StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, deviceId);
         healthEventsFacade.storeHealthEvents(command);
 
         return eventEnvelopes.size();

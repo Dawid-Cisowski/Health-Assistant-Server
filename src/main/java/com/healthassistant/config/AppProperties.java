@@ -75,6 +75,7 @@ public class AppProperties {
         private String refreshToken;
         private String apiUrl;
         private String oauthUrl;
+        private String deviceId = "google-fit";
     }
 }
 
