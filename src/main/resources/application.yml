@@ -112,6 +112,7 @@ app:
     client-id: ${GOOGLE_FIT_CLIENT_ID}
     client-secret: ${GOOGLE_FIT_CLIENT_SECRET}
     refresh-token: ${GOOGLE_FIT_REFRESH_TOKEN}
+    device-id: ${GOOGLE_FIT_DEVICE_ID:google-fit}
   assistant:
     max-iterations: ${ASSISTANT_MAX_ITERATIONS:5}
 
