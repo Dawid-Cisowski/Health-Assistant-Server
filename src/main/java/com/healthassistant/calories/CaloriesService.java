@@ -3,6 +3,7 @@ package com.healthassistant.calories;
 import com.healthassistant.calories.api.CaloriesFacade;
 import com.healthassistant.calories.api.dto.CaloriesDailyBreakdownResponse;
 import com.healthassistant.calories.api.dto.CaloriesRangeSummaryResponse;
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ class CaloriesService implements CaloriesFacade {
 
     private final CaloriesDailyProjectionJpaRepository dailyRepository;
     private final CaloriesHourlyProjectionJpaRepository hourlyRepository;
+    private final CaloriesProjector caloriesProjector;
 
     @Override
     public CaloriesDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date) {
@@ -120,5 +122,18 @@ class CaloriesService implements CaloriesFacade {
     public void deleteProjectionsByDeviceId(String deviceId) {
         hourlyRepository.deleteByDeviceId(deviceId);
         dailyRepository.deleteByDeviceId(deviceId);
+    }
+
+    @Override
+    @Transactional
+    public void projectEvents(List<StoredEventData> events) {
+        log.debug("Projecting {} calories events directly", events.size());
+        for (StoredEventData event : events) {
+            try {
+                caloriesProjector.projectCalories(event);
+            } catch (Exception e) {
+                log.error("Failed to project calories event: {}", event.eventId().value(), e);
+            }
+        }
     }
 }

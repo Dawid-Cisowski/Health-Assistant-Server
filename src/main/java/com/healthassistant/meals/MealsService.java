@@ -1,5 +1,6 @@
 package com.healthassistant.meals;
 
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
@@ -23,6 +24,7 @@ class MealsService implements MealsFacade {
 
     private final MealDailyProjectionJpaRepository dailyRepository;
     private final MealProjectionJpaRepository mealRepository;
+    private final MealsProjector mealsProjector;
 
     @Override
     public MealDailyDetailResponse getDailyDetail(String deviceId, LocalDate date) {
@@ -160,5 +162,18 @@ class MealsService implements MealsFacade {
         log.warn("Deleting meal projections for device: {}", deviceId);
         mealRepository.deleteByDeviceId(deviceId);
         dailyRepository.deleteByDeviceId(deviceId);
+    }
+
+    @Override
+    @Transactional
+    public void projectEvents(List<StoredEventData> events) {
+        log.debug("Projecting {} meal events directly", events.size());
+        for (StoredEventData event : events) {
+            try {
+                mealsProjector.projectMeal(event);
+            } catch (Exception e) {
+                log.error("Failed to project meal event: {}", event.eventId().value(), e);
+            }
+        }
     }
 }

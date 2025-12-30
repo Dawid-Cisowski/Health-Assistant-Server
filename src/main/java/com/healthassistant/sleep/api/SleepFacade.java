@@ -1,9 +1,11 @@
 package com.healthassistant.sleep.api;
 
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.sleep.api.dto.SleepDailyDetailResponse;
 import com.healthassistant.sleep.api.dto.SleepRangeSummaryResponse;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface SleepFacade {
 
@@ -23,4 +25,6 @@ public interface SleepFacade {
      * @return the number of projections rebuilt
      */
     int rebuildProjections(String deviceId);
+
+    void projectEvents(List<StoredEventData> events);
 }

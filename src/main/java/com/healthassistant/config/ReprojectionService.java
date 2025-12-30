@@ -5,7 +5,7 @@ import com.healthassistant.calories.api.CaloriesFacade;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import com.healthassistant.healthevents.api.dto.events.*;
+import com.healthassistant.healthevents.api.dto.events.AllEventsStoredEvent;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.steps.api.StepsFacade;
@@ -93,13 +93,13 @@ public class ReprojectionService {
             Map<String, List<StoredEventData>> eventsByType = batch.stream()
                     .collect(Collectors.groupingBy(e -> e.eventType().value()));
 
-            // Process each type
-            stepsCount += processBatchForType(eventsByType, STEPS_BUCKETED_V1, this::publishStepsEvents);
-            workoutsCount += processBatchForType(eventsByType, WORKOUT_V1, this::publishWorkoutEvents);
-            sleepCount += processBatchForType(eventsByType, SLEEP_SESSION_V1, this::publishSleepEvents);
-            activityCount += processBatchForType(eventsByType, ACTIVE_MINUTES_V1, this::publishActivityEvents);
-            caloriesCount += processBatchForType(eventsByType, ACTIVE_CALORIES_V1, this::publishCaloriesEvents);
-            mealsCount += processBatchForType(eventsByType, MEAL_V1, this::publishMealsEvents);
+            // Process each type - call projectors directly via facades
+            stepsCount += processBatchForType(eventsByType, STEPS_BUCKETED_V1, stepsFacade::projectEvents);
+            workoutsCount += processBatchForType(eventsByType, WORKOUT_V1, workoutFacade::projectEvents);
+            sleepCount += processBatchForType(eventsByType, SLEEP_SESSION_V1, sleepFacade::projectEvents);
+            activityCount += processBatchForType(eventsByType, ACTIVE_MINUTES_V1, activityFacade::projectEvents);
+            caloriesCount += processBatchForType(eventsByType, ACTIVE_CALORIES_V1, caloriesFacade::projectEvents);
+            mealsCount += processBatchForType(eventsByType, MEAL_V1, mealsFacade::projectEvents);
 
             // Collect dates and types for daily summary
             batch.forEach(e -> {
@@ -149,57 +149,13 @@ public class ReprojectionService {
     private int processBatchForType(
             Map<String, List<StoredEventData>> eventsByType,
             String eventType,
-            java.util.function.Consumer<List<StoredEventData>> publisher
+            java.util.function.Consumer<List<StoredEventData>> projector
     ) {
         List<StoredEventData> events = eventsByType.getOrDefault(eventType, List.of());
         if (!events.isEmpty()) {
-            publisher.accept(events);
+            projector.accept(events);
         }
         return events.size();
-    }
-
-    private void publishStepsEvents(List<StoredEventData> events) {
-        Set<LocalDate> dates = extractAffectedDates(events);
-        log.debug("Publishing StepsEventsStoredEvent with {} events", events.size());
-        eventPublisher.publishEvent(new StepsEventsStoredEvent(events, dates));
-    }
-
-    private void publishWorkoutEvents(List<StoredEventData> events) {
-        Set<LocalDate> dates = extractAffectedDates(events);
-        log.debug("Publishing WorkoutEventsStoredEvent with {} events", events.size());
-        eventPublisher.publishEvent(new WorkoutEventsStoredEvent(events, dates));
-    }
-
-    private void publishSleepEvents(List<StoredEventData> events) {
-        Set<LocalDate> dates = extractAffectedDates(events);
-        log.debug("Publishing SleepEventsStoredEvent with {} events", events.size());
-        eventPublisher.publishEvent(new SleepEventsStoredEvent(events, dates));
-    }
-
-    private void publishActivityEvents(List<StoredEventData> events) {
-        Set<LocalDate> dates = extractAffectedDates(events);
-        log.debug("Publishing ActivityEventsStoredEvent with {} events", events.size());
-        eventPublisher.publishEvent(new ActivityEventsStoredEvent(events, dates));
-    }
-
-    private void publishCaloriesEvents(List<StoredEventData> events) {
-        Set<LocalDate> dates = extractAffectedDates(events);
-        log.debug("Publishing CaloriesEventsStoredEvent with {} events", events.size());
-        eventPublisher.publishEvent(new CaloriesEventsStoredEvent(events, dates));
-    }
-
-    private void publishMealsEvents(List<StoredEventData> events) {
-        Set<LocalDate> dates = extractAffectedDates(events);
-        log.debug("Publishing MealsEventsStoredEvent with {} events", events.size());
-        eventPublisher.publishEvent(new MealsEventsStoredEvent(events, dates));
-    }
-
-    private Set<LocalDate> extractAffectedDates(List<StoredEventData> events) {
-        return events.stream()
-                .map(StoredEventData::occurredAt)
-                .filter(Objects::nonNull)
-                .map(instant -> instant.atZone(POLAND_ZONE).toLocalDate())
-                .collect(Collectors.toSet());
     }
 
     public record ReprojectionResult(

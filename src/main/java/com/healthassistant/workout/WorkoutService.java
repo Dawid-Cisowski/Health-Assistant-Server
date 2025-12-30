@@ -1,5 +1,6 @@
 package com.healthassistant.workout;
 
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class WorkoutService implements WorkoutFacade {
     private final WorkoutProjectionJpaRepository workoutRepository;
     private final WorkoutExerciseProjectionJpaRepository exerciseRepository;
     private final WorkoutSetProjectionJpaRepository setRepository;
+    private final WorkoutProjector workoutProjector;
 
     @Override
     public Optional<WorkoutDetailResponse> getWorkoutDetails(String workoutId) {
@@ -108,5 +110,18 @@ public class WorkoutService implements WorkoutFacade {
     public void deleteProjectionsByDeviceId(String deviceId) {
         log.warn("Deleting workout projections for deviceId: {}", deviceId);
         workoutRepository.deleteByDeviceId(deviceId);
+    }
+
+    @Override
+    @Transactional
+    public void projectEvents(List<StoredEventData> events) {
+        log.debug("Projecting {} workout events directly", events.size());
+        for (StoredEventData event : events) {
+            try {
+                workoutProjector.projectWorkout(event);
+            } catch (Exception e) {
+                log.error("Failed to project workout event: {}", event.eventId().value(), e);
+            }
+        }
     }
 }

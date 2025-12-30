@@ -1,9 +1,11 @@
 package com.healthassistant.meals.api;
 
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface MealsFacade {
 
@@ -14,4 +16,6 @@ public interface MealsFacade {
     void deleteAllProjections();
 
     void deleteProjectionsByDeviceId(String deviceId);
+
+    void projectEvents(List<StoredEventData> events);
 }

@@ -1,5 +1,6 @@
 package com.healthassistant.workout.api;
 
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 
 import java.time.LocalDate;
@@ -15,4 +16,6 @@ public interface WorkoutFacade {
     void deleteAllProjections();
 
     void deleteProjectionsByDeviceId(String deviceId);
+
+    void projectEvents(List<StoredEventData> events);
 }

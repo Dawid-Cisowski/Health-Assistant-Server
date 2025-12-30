@@ -189,4 +189,17 @@ public class SleepService implements SleepFacade {
         log.info("Rebuilt {} sleep projections for device: {}", rebuiltCount, deviceId);
         return rebuiltCount;
     }
+
+    @Override
+    @Transactional
+    public void projectEvents(List<StoredEventData> events) {
+        log.debug("Projecting {} sleep events directly", events.size());
+        for (StoredEventData event : events) {
+            try {
+                sleepProjector.projectSleep(event);
+            } catch (Exception e) {
+                log.error("Failed to project sleep event: {}", event.eventId().value(), e);
+            }
+        }
+    }
 }

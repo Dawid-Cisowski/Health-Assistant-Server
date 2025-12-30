@@ -1,5 +1,6 @@
 package com.healthassistant.steps;
 
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.steps.api.StepsFacade;
 import com.healthassistant.steps.api.dto.StepsDailyBreakdownResponse;
 import com.healthassistant.steps.api.dto.StepsRangeSummaryResponse;
@@ -24,6 +25,7 @@ public class StepsService implements StepsFacade {
 
     private final StepsDailyProjectionJpaRepository dailyRepository;
     private final StepsHourlyProjectionJpaRepository hourlyRepository;
+    private final StepsProjector stepsProjector;
 
     @Override
     public StepsDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date) {
@@ -123,5 +125,18 @@ public class StepsService implements StepsFacade {
         log.debug("Deleting steps projections for device: {}", deviceId);
         hourlyRepository.deleteByDeviceId(deviceId);
         dailyRepository.deleteByDeviceId(deviceId);
+    }
+
+    @Override
+    @Transactional
+    public void projectEvents(List<StoredEventData> events) {
+        log.debug("Projecting {} steps events directly", events.size());
+        for (StoredEventData event : events) {
+            try {
+                stepsProjector.projectSteps(event);
+            } catch (Exception e) {
+                log.error("Failed to project steps event: {}", event.eventId().value(), e);
+            }
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.healthassistant.activity;
 import com.healthassistant.activity.api.ActivityFacade;
 import com.healthassistant.activity.api.dto.ActivityDailyBreakdownResponse;
 import com.healthassistant.activity.api.dto.ActivityRangeSummaryResponse;
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class ActivityService implements ActivityFacade {
 
     private final ActivityDailyProjectionJpaRepository dailyRepository;
     private final ActivityHourlyProjectionJpaRepository hourlyRepository;
+    private final ActivityProjector activityProjector;
 
     @Override
     public ActivityDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date) {
@@ -108,5 +110,18 @@ public class ActivityService implements ActivityFacade {
     public void deleteProjectionsByDeviceId(String deviceId) {
         hourlyRepository.deleteByDeviceId(deviceId);
         dailyRepository.deleteByDeviceId(deviceId);
+    }
+
+    @Override
+    @Transactional
+    public void projectEvents(List<StoredEventData> events) {
+        log.debug("Projecting {} activity events directly", events.size());
+        for (StoredEventData event : events) {
+            try {
+                activityProjector.projectActivity(event);
+            } catch (Exception e) {
+                log.error("Failed to project activity event: {}", event.eventId().value(), e);
+            }
+        }
     }
 }

@@ -2,8 +2,10 @@ package com.healthassistant.calories.api;
 
 import com.healthassistant.calories.api.dto.CaloriesDailyBreakdownResponse;
 import com.healthassistant.calories.api.dto.CaloriesRangeSummaryResponse;
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface CaloriesFacade {
 
@@ -14,4 +16,6 @@ public interface CaloriesFacade {
     void deleteAllProjections();
 
     void deleteProjectionsByDeviceId(String deviceId);
+
+    void projectEvents(List<StoredEventData> events);
 }
