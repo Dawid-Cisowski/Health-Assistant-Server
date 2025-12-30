@@ -58,11 +58,11 @@ class HealthEventsService implements HealthEventsFacade {
     @Override
     @Transactional
     public StoreHealthEventsResult storeHealthEvents(StoreHealthEventsCommand command) {
-        log.debug("Storing {} health events", command.events().size());
+        log.debug("Storing {} health events (skipProjections={})", command.events().size(), command.skipProjections());
 
         StoreHealthEventsResult result = commandHandler.handle(command);
 
-        if (!result.affectedDates().isEmpty()) {
+        if (!command.skipProjections() && !result.affectedDates().isEmpty()) {
             publishTypedEvents(result);
         }
 

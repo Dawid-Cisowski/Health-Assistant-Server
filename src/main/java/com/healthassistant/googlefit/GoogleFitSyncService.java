@@ -137,7 +137,8 @@ class GoogleFitSyncService implements GoogleFitFacade {
         }
 
         DeviceId deviceId = DeviceId.of(appProperties.getGoogleFit().getDeviceId());
-        StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, deviceId);
+        // Skip projections during sync - reprojectAll() will be called at the end
+        StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, deviceId, true);
         healthEventsFacade.storeHealthEvents(command);
 
         return eventEnvelopes.size();
