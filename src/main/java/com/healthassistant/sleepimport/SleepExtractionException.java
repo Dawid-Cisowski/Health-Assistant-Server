@@ -2,6 +2,8 @@ package com.healthassistant.sleepimport;
 
 class SleepExtractionException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     SleepExtractionException(String message) {
         super(message);
     }

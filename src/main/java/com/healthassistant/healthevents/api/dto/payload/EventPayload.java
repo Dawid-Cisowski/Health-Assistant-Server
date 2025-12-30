@@ -8,17 +8,17 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Map;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "@type")
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = StepsPayload.class),
-    @JsonSubTypes.Type(value = DistanceBucketPayload.class),
-    @JsonSubTypes.Type(value = HeartRatePayload.class),
-    @JsonSubTypes.Type(value = SleepSessionPayload.class),
-    @JsonSubTypes.Type(value = ActiveCaloriesPayload.class),
-    @JsonSubTypes.Type(value = ActiveMinutesPayload.class),
-    @JsonSubTypes.Type(value = WalkingSessionPayload.class),
-    @JsonSubTypes.Type(value = WorkoutPayload.class),
-    @JsonSubTypes.Type(value = MealRecordedPayload.class)
+    @JsonSubTypes.Type(value = StepsPayload.class, name = "steps"),
+    @JsonSubTypes.Type(value = DistanceBucketPayload.class, name = "distance"),
+    @JsonSubTypes.Type(value = HeartRatePayload.class, name = "heartRate"),
+    @JsonSubTypes.Type(value = SleepSessionPayload.class, name = "sleep"),
+    @JsonSubTypes.Type(value = ActiveCaloriesPayload.class, name = "calories"),
+    @JsonSubTypes.Type(value = ActiveMinutesPayload.class, name = "activeMinutes"),
+    @JsonSubTypes.Type(value = WalkingSessionPayload.class, name = "walking"),
+    @JsonSubTypes.Type(value = WorkoutPayload.class, name = "workout"),
+    @JsonSubTypes.Type(value = MealRecordedPayload.class, name = "meal")
 })
 @Schema(
     description = "Event payload - structure depends on event type. The payload type is determined by the 'type' field in the parent EventEnvelope.",

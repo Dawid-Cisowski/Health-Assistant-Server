@@ -54,21 +54,31 @@ class DailySummaryService implements DailySummaryFacade {
 
     private static class RangeSummaryAggregator {
         int daysWithData;
-        int totalSteps, totalActiveMinutes, totalActiveCalories;
+        int totalSteps;
+        int totalActiveMinutes;
+        int totalActiveCalories;
         long totalDistanceMeters;
         int daysWithSteps;
 
-        int totalSleepMinutes, daysWithSleep;
+        int totalSleepMinutes;
+        int daysWithSleep;
 
-        int sumRestingBpm, daysWithRestingBpm;
-        int sumAvgBpm, daysWithAvgBpm;
+        int sumRestingBpm;
+        int daysWithRestingBpm;
+        int sumAvgBpm;
+        int daysWithAvgBpm;
         Integer maxBpmOverall;
         int daysWithHeartData;
 
-        int totalCalories, totalProtein, totalFat, totalCarbs, totalMeals;
+        int totalCalories;
+        int totalProtein;
+        int totalFat;
+        int totalCarbs;
+        int totalMeals;
         int daysWithNutrition;
 
-        int totalWorkouts, daysWithWorkouts;
+        int totalWorkouts;
+        int daysWithWorkouts;
         List<DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo> workoutList = new ArrayList<>();
 
         void aggregate(DailySummary s) {

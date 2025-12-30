@@ -228,7 +228,7 @@ class SleepImageExtractor {
 
     private LocalDate parsePolishDate(String dateStr) {
         try {
-            String[] parts = dateStr.toLowerCase().split("\\s+");
+            String[] parts = dateStr.toLowerCase(java.util.Locale.ROOT).split("\\s+");
             if (parts.length >= 2) {
                 int day = Integer.parseInt(parts[0]);
                 String monthStr = parts[1].replace(",", "");
@@ -238,7 +238,7 @@ class SleepImageExtractor {
                     return LocalDate.of(year, month, day);
                 }
             }
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             log.warn("Could not parse Polish date: {}", dateStr);
         }
         return LocalDate.now(POLAND_ZONE);
