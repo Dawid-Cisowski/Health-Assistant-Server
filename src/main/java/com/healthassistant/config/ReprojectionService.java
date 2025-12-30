@@ -17,8 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -144,6 +146,50 @@ public class ReprojectionService {
         mealsFacade.deleteAllProjections();
         dailySummaryFacade.deleteAllSummaries();
         log.info("All projections deleted");
+    }
+
+    @Transactional
+    public void reprojectForDate(String deviceId, LocalDate date) {
+        log.info("Reprojecting events for device {} date {}", deviceId, date);
+
+        // 1. Delete projections for this date
+        stepsFacade.deleteProjectionsForDate(deviceId, date);
+        sleepFacade.deleteProjectionsForDate(deviceId, date);
+        workoutFacade.deleteProjectionsForDate(deviceId, date);
+        caloriesFacade.deleteProjectionsForDate(deviceId, date);
+        activityFacade.deleteProjectionsForDate(deviceId, date);
+        mealsFacade.deleteProjectionsForDate(deviceId, date);
+        dailySummaryFacade.deleteSummaryForDate(deviceId, date);
+
+        // 2. Find events for this date
+        ZonedDateTime dayStart = date.atStartOfDay(POLAND_ZONE);
+        ZonedDateTime dayEnd = date.plusDays(1).atStartOfDay(POLAND_ZONE);
+        Instant from = dayStart.toInstant();
+        Instant to = dayEnd.toInstant();
+
+        List<StoredEventData> events = healthEventsFacade.findEventsForDateRange(deviceId, from, to);
+        log.debug("Found {} events for device {} date {}", events.size(), deviceId, date);
+
+        if (events.isEmpty()) {
+            return;
+        }
+
+        // 3. Project events
+        Map<String, List<StoredEventData>> eventsByType = events.stream()
+                .collect(Collectors.groupingBy(e -> e.eventType().value()));
+
+        int stepsCount = processBatchForType(eventsByType, STEPS_BUCKETED_V1, stepsFacade::projectEvents);
+        int workoutsCount = processBatchForType(eventsByType, WORKOUT_V1, workoutFacade::projectEvents);
+        int sleepCount = processBatchForType(eventsByType, SLEEP_SESSION_V1, sleepFacade::projectEvents);
+        int activityCount = processBatchForType(eventsByType, ACTIVE_MINUTES_V1, activityFacade::projectEvents);
+        int caloriesCount = processBatchForType(eventsByType, ACTIVE_CALORIES_V1, caloriesFacade::projectEvents);
+        int mealsCount = processBatchForType(eventsByType, MEAL_V1, mealsFacade::projectEvents);
+
+        // 4. Generate daily summary
+        dailySummaryFacade.generateDailySummary(deviceId, date);
+
+        log.info("Reprojection for date {} completed: steps={}, workouts={}, sleep={}, activity={}, calories={}, meals={}",
+                date, stepsCount, workoutsCount, sleepCount, activityCount, caloriesCount, mealsCount);
     }
 
     private int processBatchForType(

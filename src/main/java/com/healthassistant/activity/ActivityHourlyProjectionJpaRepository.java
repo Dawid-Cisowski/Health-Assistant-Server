@@ -15,4 +15,6 @@ interface ActivityHourlyProjectionJpaRepository extends JpaRepository<ActivityHo
     List<ActivityHourlyProjectionJpaEntity> findByDeviceIdAndDateOrderByHourAsc(String deviceId, LocalDate date);
 
     void deleteByDeviceId(String deviceId);
+
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
 }

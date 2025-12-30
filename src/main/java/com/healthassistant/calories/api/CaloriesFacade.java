@@ -17,5 +17,7 @@ public interface CaloriesFacade {
 
     void deleteProjectionsByDeviceId(String deviceId);
 
+    void deleteProjectionsForDate(String deviceId, LocalDate date);
+
     void projectEvents(List<StoredEventData> events);
 }

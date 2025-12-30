@@ -40,4 +40,6 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
     );
 
     void deleteByDeviceId(String deviceId);
+
+    void deleteByDeviceIdAndPerformedDate(String deviceId, LocalDate performedDate);
 }

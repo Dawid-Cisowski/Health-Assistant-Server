@@ -227,6 +227,15 @@ class HealthEventsService implements HealthEventsFacade {
 
     @Override
     @Transactional(readOnly = true)
+    public List<StoredEventData> findEventsForDateRange(String deviceId, Instant start, Instant end) {
+        return healthEventJpaRepository.findByDeviceIdAndOccurredAtBetween(deviceId, start, end)
+                .stream()
+                .map(this::toStoredEventData)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public long countAllEvents() {
         return healthEventJpaRepository.count();
     }

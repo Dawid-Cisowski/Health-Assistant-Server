@@ -20,4 +20,6 @@ interface StepsDailyProjectionJpaRepository extends JpaRepository<StepsDailyProj
 
     void deleteByDeviceId(String deviceId);
 
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
+
 }

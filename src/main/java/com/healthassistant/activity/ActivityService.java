@@ -114,6 +114,14 @@ public class ActivityService implements ActivityFacade {
 
     @Override
     @Transactional
+    public void deleteProjectionsForDate(String deviceId, LocalDate date) {
+        log.debug("Deleting activity projections for device {} date {}", deviceId, date);
+        hourlyRepository.deleteByDeviceIdAndDate(deviceId, date);
+        dailyRepository.deleteByDeviceIdAndDate(deviceId, date);
+    }
+
+    @Override
+    @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} activity events directly", events.size());
         for (StoredEventData event : events) {

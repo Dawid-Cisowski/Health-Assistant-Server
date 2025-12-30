@@ -19,4 +19,6 @@ public interface ActivityDailyProjectionJpaRepository extends JpaRepository<Acti
     );
 
     void deleteByDeviceId(String deviceId);
+
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
 }

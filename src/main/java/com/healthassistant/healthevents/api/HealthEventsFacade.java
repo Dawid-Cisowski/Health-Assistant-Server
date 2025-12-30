@@ -20,6 +20,8 @@ public interface HealthEventsFacade {
 
     List<StoredEventData> findEventsForReprojection(int page, int size);
 
+    List<StoredEventData> findEventsForDateRange(String deviceId, Instant start, Instant end);
+
     long countAllEvents();
 
     void deleteAllEvents();

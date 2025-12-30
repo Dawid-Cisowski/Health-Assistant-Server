@@ -202,4 +202,11 @@ class DailySummaryService implements DailySummaryFacade {
         log.warn("Deleting all daily summaries for deviceId: {}", deviceId);
         jpaRepository.deleteByDeviceId(deviceId);
     }
+
+    @Override
+    @Transactional
+    public void deleteSummaryForDate(String deviceId, LocalDate date) {
+        log.debug("Deleting daily summary for device {} date {}", deviceId, date);
+        jpaRepository.deleteByDeviceIdAndDate(deviceId, date);
+    }
 }

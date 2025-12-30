@@ -15,4 +15,6 @@ interface CaloriesHourlyProjectionJpaRepository extends JpaRepository<CaloriesHo
     List<CaloriesHourlyProjectionJpaEntity> findByDeviceIdAndDateOrderByHourAsc(String deviceId, LocalDate date);
 
     void deleteByDeviceId(String deviceId);
+
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
 }

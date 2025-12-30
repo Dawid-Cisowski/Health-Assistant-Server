@@ -114,6 +114,13 @@ public class WorkoutService implements WorkoutFacade {
 
     @Override
     @Transactional
+    public void deleteProjectionsForDate(String deviceId, LocalDate date) {
+        log.debug("Deleting workout projections for device {} date {}", deviceId, date);
+        workoutRepository.deleteByDeviceIdAndPerformedDate(deviceId, date);
+    }
+
+    @Override
+    @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} workout events directly", events.size());
         for (StoredEventData event : events) {

@@ -18,4 +18,6 @@ interface MealProjectionJpaRepository extends JpaRepository<MealProjectionJpaEnt
             String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteByDeviceId(String deviceId);
+
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
 }

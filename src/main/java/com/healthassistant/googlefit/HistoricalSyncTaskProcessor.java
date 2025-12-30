@@ -1,5 +1,6 @@
 package com.healthassistant.googlefit;
 
+import com.healthassistant.config.AppProperties;
 import com.healthassistant.config.ReprojectionService;
 import com.healthassistant.googlefit.HistoricalSyncTask.SyncTaskStatus;
 import lombok.extern.slf4j.Slf4j;
@@ -26,13 +27,16 @@ class HistoricalSyncTaskProcessor {
     private final HistoricalSyncTaskRepository taskRepository;
     private final GoogleFitSyncService googleFitSyncService;
     private final ReprojectionService reprojectionService;
+    private final AppProperties appProperties;
 
     HistoricalSyncTaskProcessor(HistoricalSyncTaskRepository taskRepository,
                                 @Lazy GoogleFitSyncService googleFitSyncService,
-                                ReprojectionService reprojectionService) {
+                                ReprojectionService reprojectionService,
+                                AppProperties appProperties) {
         this.taskRepository = taskRepository;
         this.googleFitSyncService = googleFitSyncService;
         this.reprojectionService = reprojectionService;
+        this.appProperties = appProperties;
     }
 
     /**
@@ -66,16 +70,7 @@ class HistoricalSyncTaskProcessor {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         }
 
-        // After all sync tasks complete, rebuild all projections to ensure consistency
-        log.info("All sync tasks completed, triggering full reprojection");
-        try {
-            var result = reprojectionService.reprojectAll();
-            log.info("Reprojection completed: {} total events, steps={}, workouts={}, sleep={}, activity={}, calories={}, meals={}",
-                    result.totalEvents(), result.stepsEvents(), result.workoutEvents(),
-                    result.sleepEvents(), result.activityEvents(), result.caloriesEvents(), result.mealsEvents());
-        } catch (Exception e) {
-            log.error("Reprojection failed after sync: {}", e.getMessage(), e);
-        }
+        log.info("All sync tasks completed");
     }
 
     @Transactional
@@ -98,8 +93,12 @@ class HistoricalSyncTaskProcessor {
 
             int eventsSynced = googleFitSyncService.syncTimeWindow(from, to);
 
+            // Reproject for this specific date
+            String deviceId = appProperties.getGoogleFit().getDeviceId();
+            reprojectionService.reprojectForDate(deviceId, date);
+
             markTaskCompleted(task, eventsSynced);
-            log.info("Successfully synced date {}: {} events", date, eventsSynced);
+            log.info("Successfully synced and reprojected date {}: {} events", date, eventsSynced);
 
         } catch (Exception e) {
             log.error("Failed to sync date {}: {}", date, e.getMessage(), e);

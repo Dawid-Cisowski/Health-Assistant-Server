@@ -16,4 +16,6 @@ interface SleepSessionProjectionJpaRepository extends JpaRepository<SleepSession
 
     void deleteByDeviceId(String deviceId);
 
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
+
 }

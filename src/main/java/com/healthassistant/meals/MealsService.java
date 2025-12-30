@@ -166,6 +166,14 @@ class MealsService implements MealsFacade {
 
     @Override
     @Transactional
+    public void deleteProjectionsForDate(String deviceId, LocalDate date) {
+        log.debug("Deleting meal projections for device {} date {}", deviceId, date);
+        mealRepository.deleteByDeviceIdAndDate(deviceId, date);
+        dailyRepository.deleteByDeviceIdAndDate(deviceId, date);
+    }
+
+    @Override
+    @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} meal events directly", events.size());
         for (StoredEventData event : events) {

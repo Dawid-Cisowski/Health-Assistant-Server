@@ -16,4 +16,6 @@ interface SleepDailyProjectionJpaRepository extends JpaRepository<SleepDailyProj
             String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteByDeviceId(String deviceId);
+
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
 }

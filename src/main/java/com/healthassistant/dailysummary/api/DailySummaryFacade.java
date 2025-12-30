@@ -17,4 +17,6 @@ public interface DailySummaryFacade {
     void deleteAllSummaries();
 
     void deleteSummariesByDeviceId(String deviceId);
+
+    void deleteSummaryForDate(String deviceId, LocalDate date);
 }

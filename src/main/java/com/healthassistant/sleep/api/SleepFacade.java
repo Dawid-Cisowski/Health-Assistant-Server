@@ -17,6 +17,8 @@ public interface SleepFacade {
 
     void deleteProjectionsByDeviceId(String deviceId);
 
+    void deleteProjectionsForDate(String deviceId, LocalDate date);
+
     /**
      * Rebuilds sleep projections from existing events for a specific device.
      * Useful for repairing projections that were not created due to duplicate event handling.

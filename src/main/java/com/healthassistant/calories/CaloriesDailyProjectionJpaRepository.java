@@ -19,4 +19,6 @@ interface CaloriesDailyProjectionJpaRepository extends JpaRepository<CaloriesDai
     );
 
     void deleteByDeviceId(String deviceId);
+
+    void deleteByDeviceIdAndDate(String deviceId, LocalDate date);
 }

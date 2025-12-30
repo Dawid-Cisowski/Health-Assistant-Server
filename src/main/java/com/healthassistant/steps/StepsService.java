@@ -129,6 +129,14 @@ public class StepsService implements StepsFacade {
 
     @Override
     @Transactional
+    public void deleteProjectionsForDate(String deviceId, LocalDate date) {
+        log.debug("Deleting steps projections for device {} date {}", deviceId, date);
+        hourlyRepository.deleteByDeviceIdAndDate(deviceId, date);
+        dailyRepository.deleteByDeviceIdAndDate(deviceId, date);
+    }
+
+    @Override
+    @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} steps events directly", events.size());
         for (StoredEventData event : events) {

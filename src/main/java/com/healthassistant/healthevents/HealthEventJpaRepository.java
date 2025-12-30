@@ -18,6 +18,8 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
 
     List<HealthEventJpaEntity> findByOccurredAtBetween(Instant start, Instant end);
 
+    List<HealthEventJpaEntity> findByDeviceIdAndOccurredAtBetween(String deviceId, Instant start, Instant end);
+
     List<HealthEventJpaEntity> findByDeviceIdAndEventType(String deviceId, String eventType);
 
     List<HealthEventJpaEntity> findByDeviceId(String deviceId);
