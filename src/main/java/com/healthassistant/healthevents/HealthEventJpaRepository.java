@@ -37,6 +37,4 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
     void deleteByDeviceId(String deviceId);
 
     Page<HealthEventJpaEntity> findAllByOrderByIdAsc(Pageable pageable);
-
-    long count();
 }
