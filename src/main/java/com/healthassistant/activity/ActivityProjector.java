@@ -3,7 +3,10 @@ package com.healthassistant.activity;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -11,23 +14,54 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 class ActivityProjector {
 
+    private static final int MAX_RETRIES = 3;
+    private static final long BASE_DELAY_MS = 50;
+
     private final ActivityDailyProjectionJpaRepository dailyRepository;
     private final ActivityHourlyProjectionJpaRepository hourlyRepository;
     private final ActivityBucketFactory activityBucketFactory;
 
-    @Transactional
     public void projectActivity(StoredEventData eventData) {
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                doProjectActivity(eventData);
+                return;
+            } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
+                if (attempt == MAX_RETRIES) {
+                    log.error("Deadlock persists after {} retries for activity event {}, giving up",
+                            MAX_RETRIES, eventData.eventId().value());
+                    throw e;
+                }
+                long delay = BASE_DELAY_MS * attempt + ThreadLocalRandom.current().nextLong(50);
+                log.warn("Deadlock detected for activity event {} (attempt {}/{}), retrying in {}ms",
+                        eventData.eventId().value(), attempt, MAX_RETRIES, delay);
+                sleep(delay);
+            }
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void doProjectActivity(StoredEventData eventData) {
         try {
             activityBucketFactory.createFromEvent(eventData)
                     .ifPresent(this::saveProjection);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             log.warn("Race condition during activity projection for event {}, skipping", eventData.eventId().value());
+        }
+    }
+
+    private void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
