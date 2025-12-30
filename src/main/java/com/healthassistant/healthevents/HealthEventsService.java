@@ -103,6 +103,9 @@ class HealthEventsService implements HealthEventsFacade {
 
     private void publishSleepEvents(Map<String, List<StoredEventData>> eventsByType) {
         List<StoredEventData> events = eventsByType.getOrDefault(SLEEP_SESSION_V1, List.of());
+        int totalStoredEvents = eventsByType.values().stream().mapToInt(List::size).sum();
+        log.debug("publishSleepEvents: totalStoredEvents={} sleepEvents={}", totalStoredEvents, events.size());
+
         if (!events.isEmpty()) {
             Set<LocalDate> dates = extractAffectedDates(events);
             log.info("Publishing SleepEventsStoredEvent with {} events for {} dates", events.size(), dates.size());

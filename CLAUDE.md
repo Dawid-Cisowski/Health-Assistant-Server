@@ -59,7 +59,7 @@ docker rm postgres-dev
 ### Modular Architecture by Feature
 The codebase follows a modular architecture organized by feature/bounded context:
 
-**Package Structure**:
+**Package Structure** (16 modules verified by Spring Modulith):
 - `appevents/` - App-facing health events submission API
 - `healthevents/` - Core event storage and management (event log, validation)
 - `dailysummary/` - Daily aggregated summaries from health events
@@ -67,10 +67,11 @@ The codebase follows a modular architecture organized by feature/bounded context
 - `workout/` - Workout projections and queries
 - `workoutimport/` - Workout import from external sources
 - `sleep/` - Sleep data projections and queries
+- `sleepimport/` - Sleep data import from external sources
 - `calories/` - Calories tracking projections
 - `activity/` - Activity minutes projections
 - `meals/` - Meal tracking projections and queries
-- `mealimport/` - Meal import from external sources
+- `mealimport/` - Meal import from external sources (with AI-powered drafts)
 - `googlefit/` - Google Fit synchronization and OAuth
 - `assistant/` - AI health assistant with Gemini integration (SSE streaming)
 - `security/` - HMAC authentication filters
@@ -253,20 +254,21 @@ export NONCE_CACHE_TTL_SEC=600
 
 **Core Tables**:
 - `health_events` - Append-only event log (JSONB payload, GIN indexed)
-- `daily_summaries` - Aggregated daily metrics (JSONB summary)
+- `daily_summaries` - Aggregated daily metrics (JSONB summary, V17 adds ai_summary_cache, V22 adds device_id)
 - `conversations` - AI assistant conversation tracking (V8)
 - `conversation_messages` - Message history per conversation (V8)
 - `historical_sync_tasks` - Track historical sync jobs (V12)
 
 **Projection Tables**:
-- `steps_hourly_projections`, `steps_daily_projections` (V6)
+- `steps_hourly_projections`, `steps_daily_projections` (V6, V20 adds device_id)
 - `workout_projections`, `workout_exercise_projections`, `workout_set_projections` (V5)
-- `sleep_projections` (V7)
+- `sleep_projections` (V7, V18 adds sleep_score, V21 adds device_id)
 - `calories_hourly_projections`, `calories_daily_projections` (V10)
 - `activity_hourly_projections`, `activity_daily_projections` (V11)
-- `meal_projections` (V13)
+- `meal_projections` (V13, V21 adds device_id)
+- `meal_import_drafts` (V15-V16, AI-powered meal import)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V14)
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V22)
 
 ## Event Types
 
@@ -309,9 +311,10 @@ See `EventValidator.java` for detailed validation rules.
 **Test Spec Files**:
 - Event validation: `StepsEventValidationSpec`, `SleepEventValidationSpec`, `WorkoutSpec`, `MealEventSpec`, `HeartRateEventSpec`, `DistanceEventSpec`, `WalkingSessionEventSpec`, `ActiveMinutesEventSpec`, `ActiveCaloriesEventSpec`
 - Projections: `StepsProjectionSpec`, `SleepProjectionSpec`, `WorkoutProjectionSpec`, `CaloriesProjectionSpec`, `ActivityProjectionSpec`, `MealProjectionSpec`
-- Features: `DailySummarySpec`, `AssistantSpec`, `ConversationHistorySpec`, `GoogleFitSyncSpec`
-- Import: `WorkoutImportSpec`, `MealImportSpec`
-- AI Evaluation: `evaluation/AiHallucinationSpec` (LLM-as-a-Judge tests)
+- Features: `DailySummarySpec`, `AssistantSpec`, `ConversationHistorySpec`, `GoogleFitSyncSpec`, `HmacAuthenticationSpec`, `BatchEventIngestionSpec`
+- Import: `WorkoutImportSpec`, `MealImportSpec`, `SleepImportSpec`, `MealImportDraftSpec`
+- AI Evaluation: `evaluation/AiHallucinationSpec`, `AiDateRecognitionSpec`, `AiToolErrorHandlingSpec`, `AiConversationAccuracySpec`
+- AI Features: `AiDailySummarySpec`, `AiDailySummaryCacheSpec`
 
 **Running Tests**:
 ```bash
@@ -347,6 +350,13 @@ open integration-tests/build/reports/tests/test/index.html
 - `@EnableFeignClients` - Google Fit API client
 - `@EnableJpaRepositories` - Spring Data JPA
 - Spring AI with Google Gemini - AI assistant with function calling
+- Spring Modulith for modular architecture verification
+
+### Code Quality Tools
+- **SpotBugs**: Static analysis (`./gradlew spotbugsMain`, config: `config/spotbugs/exclude.xml`)
+- **PMD**: Code style checking (`./gradlew pmdMain`, config: `config/pmd/ruleset.xml`)
+- **JaCoCo**: Code coverage (`./gradlew jacocoTestReport`, reports in `build/reports/jacoco/`)
+- **Modularity Tests**: `ModularityTests.java` verifies module boundaries (16 modules)
 
 ## API Endpoints
 
@@ -438,14 +448,17 @@ SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 - **Java 21** with virtual threads (Project Loom)
 - **Spring Boot 3.3.5** (Web, Data JPA, Actuator, Validation)
 - **Spring AI 1.1.0** with Google Gemini integration
+- **Spring Modulith 1.3.1** for modular architecture
 - **PostgreSQL 16** with JSONB
 - **Gradle 8.5+** with Kotlin DSL
 - **Flyway** for database migrations
 - **Caffeine** for in-memory caching
 - **Feign** for Google Fit API client
+- **MapStruct** for object mapping
 - **Testcontainers** for integration testing
-- **Spock** for test specifications
+- **Spock** (Groovy) for test specifications
 - **Docker & Docker Compose** for containerization
+- **SpotBugs + PMD + JaCoCo** for code quality
 
 ## Additional Documentation
 

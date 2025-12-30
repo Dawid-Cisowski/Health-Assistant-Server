@@ -1,5 +1,7 @@
 package com.healthassistant.sleep;
 
+import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.sleep.api.dto.SleepDailyDetailResponse;
 import com.healthassistant.sleep.api.dto.SleepRangeSummaryResponse;
@@ -21,8 +23,12 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class SleepService implements SleepFacade {
 
+    private static final String SLEEP_SESSION_V1 = "SleepSessionRecorded.v1";
+
     private final SleepDailyProjectionJpaRepository dailyRepository;
     private final SleepSessionProjectionJpaRepository sessionRepository;
+    private final HealthEventsFacade healthEventsFacade;
+    private final SleepProjector sleepProjector;
 
     @Override
     public SleepDailyDetailResponse getDailyDetail(String deviceId, LocalDate date) {
@@ -147,5 +153,40 @@ public class SleepService implements SleepFacade {
         log.debug("Deleting sleep projections for device: {}", deviceId);
         sessionRepository.deleteByDeviceId(deviceId);
         dailyRepository.deleteByDeviceId(deviceId);
+    }
+
+    @Override
+    @Transactional
+    public int rebuildProjections(String deviceId) {
+        log.info("Rebuilding sleep projections for device: {}", deviceId);
+
+        int rebuiltCount = 0;
+        int page = 0;
+        int pageSize = 100;
+        List<StoredEventData> events;
+
+        do {
+            events = healthEventsFacade.findEventsForReprojection(page, pageSize);
+
+            List<StoredEventData> sleepEvents = events.stream()
+                    .filter(e -> SLEEP_SESSION_V1.equals(e.eventType().value()))
+                    .filter(e -> deviceId.equals(e.deviceId().value()))
+                    .toList();
+
+            for (StoredEventData event : sleepEvents) {
+                try {
+                    sleepProjector.projectSleep(event);
+                    rebuiltCount++;
+                    log.debug("Rebuilt projection for sleep event: {}", event.eventId().value());
+                } catch (Exception e) {
+                    log.error("Failed to rebuild projection for sleep event: {}", event.eventId().value(), e);
+                }
+            }
+
+            page++;
+        } while (events.size() == pageSize);
+
+        log.info("Rebuilt {} sleep projections for device: {}", rebuiltCount, deviceId);
+        return rebuiltCount;
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/sleep")
@@ -74,5 +75,31 @@ class SleepController {
         log.info("Retrieving sleep range summary for device {} from {} to {}", deviceId, startDate, endDate);
         SleepRangeSummaryResponse summary = sleepFacade.getRangeSummary(deviceId, startDate, endDate);
         return ResponseEntity.ok(summary);
+    }
+
+    @PostMapping("/admin/rebuild-projections")
+    @Operation(
+            summary = "Rebuild sleep projections",
+            description = "Rebuilds sleep projections from existing events for a specific device. " +
+                    "Useful for repairing projections that were not created due to duplicate event handling."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Projections rebuilt successfully"),
+            @ApiResponse(responseCode = "400", description = "Missing device ID")
+    })
+    ResponseEntity<Map<String, Object>> rebuildProjections(
+            @RequestParam String deviceId
+    ) {
+        if (deviceId == null || deviceId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "deviceId is required"));
+        }
+
+        log.info("Admin request to rebuild sleep projections for device: {}", deviceId);
+        int rebuiltCount = sleepFacade.rebuildProjections(deviceId);
+
+        return ResponseEntity.ok(Map.of(
+                "deviceId", deviceId,
+                "rebuiltProjections", rebuiltCount
+        ));
     }
 }

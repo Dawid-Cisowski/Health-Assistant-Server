@@ -25,6 +25,7 @@ import java.util.stream.IntStream;
 class StoreHealthEventsCommandHandler {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+    private static final String SLEEP_SESSION_V1 = "SleepSessionRecorded.v1";
 
     private final EventRepository eventRepository;
     private final HealthEventFactory eventFactory;
@@ -111,6 +112,12 @@ class StoreHealthEventsCommandHandler {
                     Event savedEvent = savedEventsByIndex.get(index);
                     if (savedEvent != null) {
                         boolean isDuplicate = updatedEventKeys.contains(savedEvent.idempotencyKey().value());
+
+                        if (savedEvent.eventType().value().equals("SleepSessionRecorded.v1")) {
+                            log.info("Sleep event index={} status={} idempotencyKey={}",
+                                    index, isDuplicate ? "duplicate" : "stored", savedEvent.idempotencyKey().value());
+                        }
+
                         return new StoreHealthEventsResult.EventResult(
                                 index,
                                 isDuplicate ? StoreHealthEventsResult.EventStatus.duplicate : StoreHealthEventsResult.EventStatus.stored,
@@ -135,7 +142,17 @@ class StoreHealthEventsCommandHandler {
             Map<Integer, Event> savedEventsByIndex
     ) {
         return IntStream.range(0, results.size())
-                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
+                .filter(index -> {
+                    var status = results.get(index).status();
+                    if (status == StoreHealthEventsResult.EventStatus.stored) {
+                        return true;
+                    }
+                    if (status == StoreHealthEventsResult.EventStatus.duplicate) {
+                        Event event = savedEventsByIndex.get(index);
+                        return event != null && SLEEP_SESSION_V1.equals(event.eventType().value());
+                    }
+                    return false;
+                })
                 .mapToObj(savedEventsByIndex::get)
                 .filter(event -> event != null)
                 .map(event -> new com.healthassistant.healthevents.api.dto.StoredEventData(
