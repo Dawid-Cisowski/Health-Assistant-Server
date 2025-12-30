@@ -1,19 +1,17 @@
 package com.healthassistant.workout;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 class WorkoutProjector {
 
@@ -23,11 +21,27 @@ class WorkoutProjector {
     private final WorkoutProjectionJpaRepository workoutRepository;
     private final WorkoutSetProjectionJpaRepository setRepository;
     private final WorkoutFactory workoutFactory;
+    private final TransactionTemplate transactionTemplate;
+
+    WorkoutProjector(WorkoutProjectionJpaRepository workoutRepository,
+                     WorkoutSetProjectionJpaRepository setRepository,
+                     WorkoutFactory workoutFactory,
+                     PlatformTransactionManager transactionManager) {
+        this.workoutRepository = workoutRepository;
+        this.setRepository = setRepository;
+        this.workoutFactory = workoutFactory;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     public void projectWorkout(StoredEventData eventData) {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                doProjectWorkout(eventData);
+                transactionTemplate.executeWithoutResult(status ->
+                    workoutFactory.createFromEvent(eventData).ifPresentOrElse(
+                            this::saveProjection,
+                            () -> log.warn("Could not create Workout from event, skipping projection")
+                    )
+                );
                 return;
             } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
                 if (attempt == MAX_RETRIES) {
@@ -41,14 +55,6 @@ class WorkoutProjector {
                 sleep(delay);
             }
         }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void doProjectWorkout(StoredEventData eventData) {
-        workoutFactory.createFromEvent(eventData).ifPresentOrElse(
-                this::saveProjection,
-                () -> log.warn("Could not create Workout from event, skipping projection")
-        );
     }
 
     private void sleep(long ms) {

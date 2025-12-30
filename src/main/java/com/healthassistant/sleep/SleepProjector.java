@@ -1,13 +1,12 @@
 package com.healthassistant.sleep;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +16,6 @@ import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 class SleepProjector {
 
@@ -27,11 +25,29 @@ class SleepProjector {
     private final SleepSessionProjectionJpaRepository sessionRepository;
     private final SleepDailyProjectionJpaRepository dailyRepository;
     private final SleepSessionFactory sleepSessionFactory;
+    private final TransactionTemplate transactionTemplate;
+
+    SleepProjector(SleepSessionProjectionJpaRepository sessionRepository,
+                   SleepDailyProjectionJpaRepository dailyRepository,
+                   SleepSessionFactory sleepSessionFactory,
+                   PlatformTransactionManager transactionManager) {
+        this.sessionRepository = sessionRepository;
+        this.dailyRepository = dailyRepository;
+        this.sleepSessionFactory = sleepSessionFactory;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     public void projectSleep(StoredEventData eventData) {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                doProjectSleep(eventData);
+                transactionTemplate.executeWithoutResult(status -> {
+                    try {
+                        sleepSessionFactory.createFromEvent(eventData)
+                                .ifPresent(this::saveProjection);
+                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                        log.warn("Race condition during sleep projection for event {}, skipping", eventData.eventId().value());
+                    }
+                });
                 return;
             } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
                 if (attempt == MAX_RETRIES) {
@@ -44,16 +60,6 @@ class SleepProjector {
                         eventData.eventId().value(), attempt, MAX_RETRIES, delay);
                 sleep(delay);
             }
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void doProjectSleep(StoredEventData eventData) {
-        try {
-            sleepSessionFactory.createFromEvent(eventData)
-                    .ifPresent(this::saveProjection);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.warn("Race condition during sleep projection for event {}, skipping", eventData.eventId().value());
         }
     }
 

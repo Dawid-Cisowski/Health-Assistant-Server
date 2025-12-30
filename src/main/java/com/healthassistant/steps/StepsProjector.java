@@ -6,8 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +17,6 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 class StepsProjector {
 
@@ -27,11 +26,29 @@ class StepsProjector {
     private final StepsDailyProjectionJpaRepository dailyRepository;
     private final StepsHourlyProjectionJpaRepository hourlyRepository;
     private final StepsBucketFactory stepsBucketFactory;
+    private final TransactionTemplate transactionTemplate;
+
+    StepsProjector(StepsDailyProjectionJpaRepository dailyRepository,
+                   StepsHourlyProjectionJpaRepository hourlyRepository,
+                   StepsBucketFactory stepsBucketFactory,
+                   PlatformTransactionManager transactionManager) {
+        this.dailyRepository = dailyRepository;
+        this.hourlyRepository = hourlyRepository;
+        this.stepsBucketFactory = stepsBucketFactory;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     public void projectSteps(StoredEventData eventData) {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                doProjectSteps(eventData);
+                transactionTemplate.executeWithoutResult(status -> {
+                    try {
+                        stepsBucketFactory.createFromEvent(eventData)
+                                .ifPresent(this::saveProjection);
+                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                        log.warn("Race condition during steps projection for event {}, skipping", eventData.eventId().value());
+                    }
+                });
                 return;
             } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
                 if (attempt == MAX_RETRIES) {
@@ -44,16 +61,6 @@ class StepsProjector {
                         eventData.eventId().value(), attempt, MAX_RETRIES, delay);
                 sleep(delay);
             }
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void doProjectSteps(StoredEventData eventData) {
-        try {
-            stepsBucketFactory.createFromEvent(eventData)
-                    .ifPresent(this::saveProjection);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.warn("Race condition during steps projection for event {}, skipping", eventData.eventId().value());
         }
     }
 

@@ -1,13 +1,12 @@
 package com.healthassistant.calories;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +16,6 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 class CaloriesProjector {
 
@@ -27,11 +25,29 @@ class CaloriesProjector {
     private final CaloriesDailyProjectionJpaRepository dailyRepository;
     private final CaloriesHourlyProjectionJpaRepository hourlyRepository;
     private final CaloriesBucketFactory caloriesBucketFactory;
+    private final TransactionTemplate transactionTemplate;
+
+    CaloriesProjector(CaloriesDailyProjectionJpaRepository dailyRepository,
+                      CaloriesHourlyProjectionJpaRepository hourlyRepository,
+                      CaloriesBucketFactory caloriesBucketFactory,
+                      PlatformTransactionManager transactionManager) {
+        this.dailyRepository = dailyRepository;
+        this.hourlyRepository = hourlyRepository;
+        this.caloriesBucketFactory = caloriesBucketFactory;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     public void projectCalories(StoredEventData eventData) {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                doProjectCalories(eventData);
+                transactionTemplate.executeWithoutResult(status -> {
+                    try {
+                        caloriesBucketFactory.createFromEvent(eventData)
+                                .ifPresent(this::saveProjection);
+                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                        log.warn("Race condition during calories projection for event {}, skipping", eventData.eventId().value());
+                    }
+                });
                 return;
             } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
                 if (attempt == MAX_RETRIES) {
@@ -44,16 +60,6 @@ class CaloriesProjector {
                         eventData.eventId().value(), attempt, MAX_RETRIES, delay);
                 sleep(delay);
             }
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void doProjectCalories(StoredEventData eventData) {
-        try {
-            caloriesBucketFactory.createFromEvent(eventData)
-                    .ifPresent(this::saveProjection);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.warn("Race condition during calories projection for event {}, skipping", eventData.eventId().value());
         }
     }
 

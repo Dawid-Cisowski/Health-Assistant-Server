@@ -1,13 +1,12 @@
 package com.healthassistant.meals;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -19,7 +18,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 class MealsProjector {
 
@@ -29,11 +27,29 @@ class MealsProjector {
     private final MealProjectionJpaRepository mealRepository;
     private final MealDailyProjectionJpaRepository dailyRepository;
     private final MealFactory mealFactory;
+    private final TransactionTemplate transactionTemplate;
+
+    MealsProjector(MealProjectionJpaRepository mealRepository,
+                   MealDailyProjectionJpaRepository dailyRepository,
+                   MealFactory mealFactory,
+                   PlatformTransactionManager transactionManager) {
+        this.mealRepository = mealRepository;
+        this.dailyRepository = dailyRepository;
+        this.mealFactory = mealFactory;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     public void projectMeal(StoredEventData eventData) {
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                doProjectMeal(eventData);
+                transactionTemplate.executeWithoutResult(status -> {
+                    try {
+                        mealFactory.createFromEvent(eventData)
+                                .ifPresent(this::saveProjection);
+                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                        log.warn("Race condition during meal projection for event {}, skipping", eventData.eventId().value());
+                    }
+                });
                 return;
             } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
                 if (attempt == MAX_RETRIES) {
@@ -46,16 +62,6 @@ class MealsProjector {
                         eventData.eventId().value(), attempt, MAX_RETRIES, delay);
                 sleep(delay);
             }
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void doProjectMeal(StoredEventData eventData) {
-        try {
-            mealFactory.createFromEvent(eventData)
-                    .ifPresent(this::saveProjection);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.warn("Race condition during meal projection for event {}, skipping", eventData.eventId().value());
         }
     }
 
