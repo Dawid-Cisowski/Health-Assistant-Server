@@ -150,9 +150,10 @@ public class ReprojectionService {
 
     @Transactional
     public void reprojectForDate(String deviceId, LocalDate date) {
-        log.info("Reprojecting events for device {} date {}", deviceId, date);
+        log.info("[REPROJECT {}] Starting reprojection for device={}", date, deviceId);
 
         // 1. Delete projections for this date
+        log.info("[REPROJECT {}] Deleting existing projections...", date);
         stepsFacade.deleteProjectionsForDate(deviceId, date);
         sleepFacade.deleteProjectionsForDate(deviceId, date);
         workoutFacade.deleteProjectionsForDate(deviceId, date);
@@ -160,6 +161,7 @@ public class ReprojectionService {
         activityFacade.deleteProjectionsForDate(deviceId, date);
         mealsFacade.deleteProjectionsForDate(deviceId, date);
         dailySummaryFacade.deleteSummaryForDate(deviceId, date);
+        log.info("[REPROJECT {}] Existing projections deleted", date);
 
         // 2. Find events for this date
         ZonedDateTime dayStart = date.atStartOfDay(POLAND_ZONE);
@@ -167,10 +169,12 @@ public class ReprojectionService {
         Instant from = dayStart.toInstant();
         Instant to = dayEnd.toInstant();
 
+        log.info("[REPROJECT {}] Finding events in range {} to {}", date, from, to);
         List<StoredEventData> events = healthEventsFacade.findEventsForDateRange(deviceId, from, to);
-        log.debug("Found {} events for device {} date {}", events.size(), deviceId, date);
+        log.info("[REPROJECT {}] Found {} events for device {}", date, events.size(), deviceId);
 
         if (events.isEmpty()) {
+            log.info("[REPROJECT {}] No events found, skipping projection", date);
             return;
         }
 
@@ -178,6 +182,11 @@ public class ReprojectionService {
         Map<String, List<StoredEventData>> eventsByType = events.stream()
                 .collect(Collectors.groupingBy(e -> e.eventType().value()));
 
+        log.info("[REPROJECT {}] Events by type: {}", date,
+                eventsByType.entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size())));
+
+        log.info("[REPROJECT {}] Projecting events...", date);
         int stepsCount = processBatchForType(eventsByType, STEPS_BUCKETED_V1, stepsFacade::projectEvents);
         int workoutsCount = processBatchForType(eventsByType, WORKOUT_V1, workoutFacade::projectEvents);
         int sleepCount = processBatchForType(eventsByType, SLEEP_SESSION_V1, sleepFacade::projectEvents);
@@ -186,9 +195,10 @@ public class ReprojectionService {
         int mealsCount = processBatchForType(eventsByType, MEAL_V1, mealsFacade::projectEvents);
 
         // 4. Generate daily summary
+        log.info("[REPROJECT {}] Generating daily summary...", date);
         dailySummaryFacade.generateDailySummary(deviceId, date);
 
-        log.info("Reprojection for date {} completed: steps={}, workouts={}, sleep={}, activity={}, calories={}, meals={}",
+        log.info("[REPROJECT {}] COMPLETED: steps={}, workouts={}, sleep={}, activity={}, calories={}, meals={}",
                 date, stepsCount, workoutsCount, sleepCount, activityCount, caloriesCount, mealsCount);
     }
 

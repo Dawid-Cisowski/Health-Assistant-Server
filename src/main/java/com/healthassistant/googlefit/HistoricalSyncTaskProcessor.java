@@ -61,33 +61,57 @@ class HistoricalSyncTaskProcessor {
     }
 
     private void processTasks(List<HistoricalSyncTask> tasks) {
-        for (HistoricalSyncTask task : tasks) {
-            self.markTaskInProgress(task);
+        log.info("=== STARTING BATCH PROCESSING OF {} TASKS ===", tasks.size());
+
+        // Extract task info before async processing (tasks may become detached)
+        record TaskInfo(Long id, LocalDate date) {}
+        List<TaskInfo> taskInfos = tasks.stream()
+                .map(t -> new TaskInfo(t.getId(), t.getSyncDate()))
+                .toList();
+
+        log.info("Task IDs to process: {}", taskInfos.stream().map(TaskInfo::id).toList());
+        log.info("Task dates to process: {}", taskInfos.stream().map(TaskInfo::date).toList());
+
+        for (TaskInfo taskInfo : taskInfos) {
+            log.info("Marking task {} (date={}) as IN_PROGRESS...", taskInfo.id(), taskInfo.date());
+            self.markTaskInProgress(taskInfo.id());
         }
+
+        log.info("All {} tasks marked as IN_PROGRESS, starting async processing...", taskInfos.size());
 
         // Process tasks asynchronously - don't block the HTTP request
         Thread.startVirtualThread(() -> {
+            log.info("Virtual thread started for batch processing");
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                List<CompletableFuture<Void>> futures = tasks.stream()
-                        .map(task -> CompletableFuture.runAsync(() -> processTask(task), executor))
+                List<CompletableFuture<Void>> futures = taskInfos.stream()
+                        .map(taskInfo -> CompletableFuture.runAsync(
+                                () -> processTask(taskInfo.id(), taskInfo.date()), executor))
                         .toList();
 
+                log.info("Waiting for {} parallel tasks to complete...", futures.size());
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            } catch (Exception e) {
+                log.error("Error in batch processing virtual thread: {}", e.getMessage(), e);
             }
-            log.info("All sync tasks completed");
+            log.info("=== ALL {} SYNC TASKS COMPLETED ===", taskInfos.size());
         });
+
+        log.info("Batch processing started in background, returning to caller");
     }
 
     @Transactional
-    protected void markTaskInProgress(HistoricalSyncTask task) {
+    protected void markTaskInProgress(Long taskId) {
+        log.info("[TASK {}] Loading from DB to mark IN_PROGRESS", taskId);
+        HistoricalSyncTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalStateException("Task not found: " + taskId));
+        log.info("[TASK {}] Current status: {}, date: {}", taskId, task.getStatus(), task.getSyncDate());
         task.markInProgress();
         taskRepository.save(task);
-        log.debug("Marked task {} for date {} as IN_PROGRESS", task.getId(), task.getSyncDate());
+        log.info("[TASK {}] Saved as IN_PROGRESS", taskId);
     }
 
-    private void processTask(HistoricalSyncTask task) {
-        LocalDate date = task.getSyncDate();
-        log.info("Processing historical sync for date: {}", date);
+    private void processTask(Long taskId, LocalDate date) {
+        log.info("[TASK {}] ========== PROCESSING START (date={}) ==========", taskId, date);
 
         try {
             ZonedDateTime dayStart = date.atStartOfDay(POLAND_ZONE);
@@ -96,39 +120,57 @@ class HistoricalSyncTaskProcessor {
             Instant from = dayStart.toInstant();
             Instant to = dayEnd.toInstant();
 
+            log.info("[TASK {}] Syncing time window: {} to {}", taskId, from, to);
             int eventsSynced = googleFitSyncService.syncTimeWindow(from, to);
+            log.info("[TASK {}] Sync complete: {} events synced", taskId, eventsSynced);
 
             // Reproject for this specific date
             String deviceId = appProperties.getGoogleFit().getDeviceId();
+            log.info("[TASK {}] Starting reprojection for device={} date={}", taskId, deviceId, date);
             reprojectionService.reprojectForDate(deviceId, date);
+            log.info("[TASK {}] Reprojection complete", taskId);
 
-            self.markTaskCompleted(task, eventsSynced);
-            log.info("Successfully synced and reprojected date {}: {} events", date, eventsSynced);
+            log.info("[TASK {}] Marking as COMPLETED...", taskId);
+            self.markTaskCompleted(taskId, eventsSynced);
+            log.info("[TASK {}] ========== PROCESSING SUCCESS (date={}, events={}) ==========", taskId, date, eventsSynced);
 
         } catch (Exception e) {
-            log.error("Failed to sync date {}: {}", date, e.getMessage(), e);
-            self.markTaskFailed(task, e.getMessage());
+            log.error("[TASK {}] ========== PROCESSING FAILED (date={}) ==========", taskId, date);
+            log.error("[TASK {}] Error: {}", taskId, e.getMessage(), e);
+            try {
+                self.markTaskFailed(taskId, e.getMessage());
+            } catch (Exception markError) {
+                log.error("[TASK {}] Failed to mark task as failed: {}", taskId, markError.getMessage(), markError);
+            }
         }
     }
 
     @Transactional
-    protected void markTaskCompleted(HistoricalSyncTask task, int eventsSynced) {
+    protected void markTaskCompleted(Long taskId, int eventsSynced) {
+        log.info("[TASK {}] Loading from DB to mark COMPLETED", taskId);
+        HistoricalSyncTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalStateException("Task not found: " + taskId));
+        log.info("[TASK {}] Current status before completion: {}", taskId, task.getStatus());
         task.markCompleted(eventsSynced);
         taskRepository.save(task);
-        log.debug("Marked task {} as COMPLETED with {} events", task.getId(), eventsSynced);
+        log.info("[TASK {}] Saved as COMPLETED with {} events", taskId, eventsSynced);
     }
 
     @Transactional
-    protected void markTaskFailed(HistoricalSyncTask task, String errorMessage) {
+    protected void markTaskFailed(Long taskId, String errorMessage) {
+        log.info("[TASK {}] Loading from DB to mark FAILED", taskId);
+        HistoricalSyncTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalStateException("Task not found: " + taskId));
+        log.info("[TASK {}] Current status before failure: {}, retryCount: {}", taskId, task.getStatus(), task.getRetryCount());
         task.markFailed(errorMessage);
         taskRepository.save(task);
 
         if (task.getStatus() == SyncTaskStatus.FAILED) {
-            log.warn("Task {} for date {} permanently FAILED after {} retries",
-                    task.getId(), task.getSyncDate(), MAX_RETRIES);
+            log.warn("[TASK {}] Permanently FAILED after {} retries. Error: {}",
+                    taskId, MAX_RETRIES, errorMessage);
         } else {
-            log.info("Task {} for date {} will be retried (attempt {}/{})",
-                    task.getId(), task.getSyncDate(), task.getRetryCount(), MAX_RETRIES);
+            log.info("[TASK {}] Will be retried (attempt {}/{}). Error: {}",
+                    taskId, task.getRetryCount(), MAX_RETRIES, errorMessage);
         }
     }
 }

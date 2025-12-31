@@ -5,6 +5,7 @@ import com.healthassistant.googlefit.api.GoogleFitFacade;
 import com.healthassistant.googlefit.api.HistoricalSyncResult;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -101,10 +102,48 @@ class GoogleFitSyncService implements GoogleFitFacade {
     }
 
     int syncTimeWindow(Instant from, Instant to) {
+        log.info("=== SYNC TIME WINDOW: {} to {} ===", from, to);
+
+        // 1. Fetch aggregated data (steps, distance, calories, heart rate)
+        log.info("Fetching aggregated data from Google Fit...");
         var aggregateRequest = getAggregateRequest(from, to);
         var aggregateResponse = googleFitClient.fetchAggregated(aggregateRequest);
-        List<GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
 
+        log.info("Aggregate response buckets count: {}",
+                aggregateResponse.buckets() != null ? aggregateResponse.buckets().size() : 0);
+
+        List<GoogleFitBucketData> buckets = bucketMapper.mapBuckets(aggregateResponse);
+        log.info("Mapped {} buckets from aggregate response", buckets.size());
+
+        // Log bucket statistics
+        int bucketsWithSteps = 0;
+        int bucketsWithCalories = 0;
+        int bucketsWithDistance = 0;
+        int bucketsWithHeartRate = 0;
+        int totalSteps = 0;
+        double totalCalories = 0;
+
+        for (GoogleFitBucketData bucket : buckets) {
+            if (bucket.steps() != null && bucket.steps() > 0) {
+                bucketsWithSteps++;
+                totalSteps += bucket.steps();
+            }
+            if (bucket.calories() != null && bucket.calories() > 0) {
+                bucketsWithCalories++;
+                totalCalories += bucket.calories();
+            }
+            if (bucket.distance() != null && bucket.distance() > 0) {
+                bucketsWithDistance++;
+            }
+            if (bucket.heartRates() != null && !bucket.heartRates().isEmpty()) {
+                bucketsWithHeartRate++;
+            }
+        }
+        log.info("Bucket stats: steps={} buckets (total={}), calories={} buckets (total={}), distance={} buckets, heartRate={} buckets",
+                bucketsWithSteps, totalSteps, bucketsWithCalories, totalCalories, bucketsWithDistance, bucketsWithHeartRate);
+
+        // 2. Fetch sessions (sleep, walking)
+        log.info("Fetching sessions from Google Fit...");
         String startTimeRfc3339 = RFC3339_FORMATTER.format(from);
         String endTimeRfc3339 = RFC3339_FORMATTER.format(to);
         var sessionsResponse = googleFitClient.fetchSessions(startTimeRfc3339, endTimeRfc3339, false);
@@ -112,35 +151,63 @@ class GoogleFitSyncService implements GoogleFitFacade {
                 ? sessionsResponse.sessions()
                 : List.of();
 
-        log.info("Google Fit sessions response: total={} sessions", allSessions.size());
-        allSessions.forEach(s -> log.info("  Session: id={} activityType={} name={} package={}",
-                s.id(), s.activityType(), s.name(), s.getPackageName()));
+        log.info("Sessions response: total={} sessions", allSessions.size());
+        allSessions.forEach(s -> log.info("  Session: id={} activityType={} name={} package={} start={} end={}",
+                s.id(), s.activityType(), s.name(), s.getPackageName(), s.startTimeMillis(), s.endTimeMillis()));
 
         List<GoogleFitSession> sleepSessions = allSessions.stream()
                 .filter(GoogleFitSession::isSleepSession)
                 .toList();
-
         log.info("Filtered sleep sessions (activityType=72): {}", sleepSessions.size());
 
         List<GoogleFitSession> walkingSessions = allSessions.stream()
                 .filter(GoogleFitSession::isWalkingSession)
                 .toList();
+        log.info("Filtered walking sessions: {}", walkingSessions.size());
 
+        // 3. Map to event envelopes
+        log.info("Mapping to event envelopes...");
         List<StoreHealthEventsCommand.EventEnvelope> eventEnvelopes = new ArrayList<>();
 
-        eventEnvelopes.addAll(eventMapper.mapToEventEnvelopes(buckets));
-        eventEnvelopes.addAll(eventMapper.mapSleepSessionsToEnvelopes(sleepSessions));
-        eventEnvelopes.addAll(eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, buckets));
+        var bucketEnvelopes = eventMapper.mapToEventEnvelopes(buckets);
+        log.info("Mapped {} envelopes from buckets", bucketEnvelopes.size());
+        eventEnvelopes.addAll(bucketEnvelopes);
+
+        var sleepEnvelopes = eventMapper.mapSleepSessionsToEnvelopes(sleepSessions);
+        log.info("Mapped {} envelopes from sleep sessions", sleepEnvelopes.size());
+        eventEnvelopes.addAll(sleepEnvelopes);
+
+        var walkingEnvelopes = eventMapper.mapWalkingSessionsToEnvelopes(walkingSessions, buckets);
+        log.info("Mapped {} envelopes from walking sessions", walkingEnvelopes.size());
+        eventEnvelopes.addAll(walkingEnvelopes);
+
+        // Log envelope types breakdown
+        var envelopesByType = eventEnvelopes.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        StoreHealthEventsCommand.EventEnvelope::eventType,
+                        java.util.stream.Collectors.counting()));
+        log.info("Event envelopes by type: {}", envelopesByType);
 
         if (eventEnvelopes.isEmpty()) {
+            log.warn("No events to store for time window {} to {}", from, to);
             return 0;
         }
 
+        // 4. Store events
+        log.info("Storing {} events (skipProjections=true)...", eventEnvelopes.size());
         DeviceId deviceId = DeviceId.of(appProperties.getGoogleFit().getDeviceId());
-        // Skip projections during sync - reprojectAll() will be called at the end
         StoreHealthEventsCommand command = new StoreHealthEventsCommand(eventEnvelopes, deviceId, true);
-        healthEventsFacade.storeHealthEvents(command);
+        var result = healthEventsFacade.storeHealthEvents(command);
 
+        long storedCount = result.results().stream()
+                .filter(r -> r.status() == StoreHealthEventsResult.EventStatus.stored).count();
+        long duplicateCount = result.results().stream()
+                .filter(r -> r.status() == StoreHealthEventsResult.EventStatus.duplicate).count();
+        long invalidCount = result.results().stream()
+                .filter(r -> r.status() == StoreHealthEventsResult.EventStatus.invalid).count();
+        log.info("Store result: stored={}, duplicates={}, invalid={}", storedCount, duplicateCount, invalidCount);
+
+        log.info("=== SYNC TIME WINDOW COMPLETE: {} events ===", eventEnvelopes.size());
         return eventEnvelopes.size();
     }
 
