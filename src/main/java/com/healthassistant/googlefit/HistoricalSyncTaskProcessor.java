@@ -28,15 +28,18 @@ class HistoricalSyncTaskProcessor {
     private final GoogleFitSyncService googleFitSyncService;
     private final ReprojectionService reprojectionService;
     private final AppProperties appProperties;
+    private final HistoricalSyncTaskProcessor self;
 
     HistoricalSyncTaskProcessor(HistoricalSyncTaskRepository taskRepository,
                                 @Lazy GoogleFitSyncService googleFitSyncService,
                                 ReprojectionService reprojectionService,
-                                AppProperties appProperties) {
+                                AppProperties appProperties,
+                                @Lazy HistoricalSyncTaskProcessor self) {
         this.taskRepository = taskRepository;
         this.googleFitSyncService = googleFitSyncService;
         this.reprojectionService = reprojectionService;
         this.appProperties = appProperties;
+        this.self = self;
     }
 
     /**
@@ -59,18 +62,20 @@ class HistoricalSyncTaskProcessor {
 
     private void processTasks(List<HistoricalSyncTask> tasks) {
         for (HistoricalSyncTask task : tasks) {
-            markTaskInProgress(task);
+            self.markTaskInProgress(task);
         }
 
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<CompletableFuture<Void>> futures = tasks.stream()
-                    .map(task -> CompletableFuture.runAsync(() -> processTask(task), executor))
-                    .toList();
+        // Process tasks asynchronously - don't block the HTTP request
+        Thread.startVirtualThread(() -> {
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                List<CompletableFuture<Void>> futures = tasks.stream()
+                        .map(task -> CompletableFuture.runAsync(() -> processTask(task), executor))
+                        .toList();
 
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-        }
-
-        log.info("All sync tasks completed");
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            }
+            log.info("All sync tasks completed");
+        });
     }
 
     @Transactional
@@ -97,12 +102,12 @@ class HistoricalSyncTaskProcessor {
             String deviceId = appProperties.getGoogleFit().getDeviceId();
             reprojectionService.reprojectForDate(deviceId, date);
 
-            markTaskCompleted(task, eventsSynced);
+            self.markTaskCompleted(task, eventsSynced);
             log.info("Successfully synced and reprojected date {}: {} events", date, eventsSynced);
 
         } catch (Exception e) {
             log.error("Failed to sync date {}: {}", date, e.getMessage(), e);
-            markTaskFailed(task, e.getMessage());
+            self.markTaskFailed(task, e.getMessage());
         }
     }
 
