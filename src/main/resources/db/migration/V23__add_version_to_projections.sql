@@ -1,0 +1,11 @@
+ALTER TABLE steps_hourly_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE steps_daily_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE sleep_sessions_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE sleep_daily_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE workout_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE calories_hourly_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE calories_daily_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE activity_hourly_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE activity_daily_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE meal_projections ADD COLUMN version BIGINT DEFAULT 0;
+ALTER TABLE meal_daily_projections ADD COLUMN version BIGINT DEFAULT 0;

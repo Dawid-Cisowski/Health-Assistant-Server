@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -80,6 +81,37 @@ class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+            IllegalArgumentException ex,
+            WebRequest request
+    ) {
+        log.warn("Invalid argument: {}", ex.getMessage());
+
+        ErrorResponse errorResponse = new ErrorResponse("INVALID_ARGUMENT",
+                ex.getMessage(), List.of(ex.getMessage()));
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameterException(
+            MissingServletRequestParameterException ex,
+            WebRequest request
+    ) {
+        log.warn("Missing parameter: {}", ex.getParameterName());
+
+        ErrorResponse errorResponse = new ErrorResponse("MISSING_PARAMETER",
+                "Required parameter '" + ex.getParameterName() + "' is missing",
+                List.of(ex.getMessage()));
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
                 .body(errorResponse);
     }
 

@@ -1,12 +1,10 @@
 package com.healthassistant.meals;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,86 +12,50 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 class MealsProjector {
-
-    private static final int MAX_RETRIES = 3;
-    private static final long BASE_DELAY_MS = 50;
 
     private final MealProjectionJpaRepository mealRepository;
     private final MealDailyProjectionJpaRepository dailyRepository;
     private final MealFactory mealFactory;
-    private final TransactionTemplate transactionTemplate;
-
-    MealsProjector(MealProjectionJpaRepository mealRepository,
-                   MealDailyProjectionJpaRepository dailyRepository,
-                   MealFactory mealFactory,
-                   PlatformTransactionManager transactionManager) {
-        this.mealRepository = mealRepository;
-        this.dailyRepository = dailyRepository;
-        this.mealFactory = mealFactory;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
 
     public void projectMeal(StoredEventData eventData) {
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                transactionTemplate.executeWithoutResult(status -> {
-                    try {
-                        mealFactory.createFromEvent(eventData)
-                                .ifPresent(this::saveProjection);
-                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                        log.warn("Race condition during meal projection for event {}, skipping", eventData.eventId().value());
-                    }
-                });
-                return;
-            } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
-                if (attempt == MAX_RETRIES) {
-                    log.error("Deadlock persists after {} retries for meal event {}, giving up",
-                            MAX_RETRIES, eventData.eventId().value());
-                    throw e;
-                }
-                long delay = BASE_DELAY_MS * attempt + ThreadLocalRandom.current().nextLong(50);
-                log.warn("Deadlock detected for meal event {} (attempt {}/{}), retrying in {}ms",
-                        eventData.eventId().value(), attempt, MAX_RETRIES, delay);
-                sleep(delay);
-            }
-        }
-    }
-
-    private void sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        mealFactory.createFromEvent(eventData)
+                .ifPresent(this::saveProjection);
     }
 
     private void saveProjection(Meal meal) {
-        String lockKey = meal.deviceId() + "|" + meal.date();
-        synchronized (lockKey.intern()) {
-            Optional<MealProjectionJpaEntity> existingOpt = mealRepository.findByEventId(meal.eventId());
-
-            MealProjectionJpaEntity entity;
-
-            if (existingOpt.isPresent()) {
-                entity = existingOpt.get();
-                entity.updateFrom(meal);
-                log.debug("Updating existing meal projection for event {}", meal.eventId());
-            } else {
-                int mealNumber = calculateNextMealNumber(meal.deviceId(), meal.date());
-                entity = MealProjectionJpaEntity.from(meal, mealNumber);
-                log.debug("Creating new meal projection #{} for date {} from event {}",
-                        mealNumber, meal.date(), meal.eventId());
-            }
-
-            mealRepository.save(entity);
-            updateDailyProjection(meal.deviceId(), meal.date());
+        try {
+            doSaveProjection(meal);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Version conflict for meal {}/{}, retrying once",
+                    meal.deviceId(), meal.date());
+            doSaveProjection(meal);
         }
+    }
+
+    private void doSaveProjection(Meal meal) {
+        Optional<MealProjectionJpaEntity> existingOpt = mealRepository.findByEventId(meal.eventId());
+
+        MealProjectionJpaEntity entity;
+
+        if (existingOpt.isPresent()) {
+            entity = existingOpt.get();
+            entity.updateFrom(meal);
+            log.debug("Updating existing meal projection for event {}", meal.eventId());
+        } else {
+            int mealNumber = calculateNextMealNumber(meal.deviceId(), meal.date());
+            entity = MealProjectionJpaEntity.from(meal, mealNumber);
+            log.debug("Creating new meal projection #{} for date {} from event {}",
+                    mealNumber, meal.date(), meal.eventId());
+        }
+
+        mealRepository.save(entity);
+        updateDailyProjection(meal.deviceId(), meal.date());
     }
 
     private int calculateNextMealNumber(String deviceId, LocalDate date) {

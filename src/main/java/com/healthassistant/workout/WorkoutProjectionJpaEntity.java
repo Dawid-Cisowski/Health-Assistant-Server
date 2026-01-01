@@ -61,6 +61,9 @@ class WorkoutProjectionJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Version
+    private Long version;
+
     @OneToMany(mappedBy = "workout", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderInWorkout ASC")
     @Builder.Default

@@ -1,77 +1,42 @@
 package com.healthassistant.calories;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 class CaloriesProjector {
-
-    private static final int MAX_RETRIES = 3;
-    private static final long BASE_DELAY_MS = 50;
 
     private final CaloriesDailyProjectionJpaRepository dailyRepository;
     private final CaloriesHourlyProjectionJpaRepository hourlyRepository;
     private final CaloriesBucketFactory caloriesBucketFactory;
-    private final TransactionTemplate transactionTemplate;
-
-    CaloriesProjector(CaloriesDailyProjectionJpaRepository dailyRepository,
-                      CaloriesHourlyProjectionJpaRepository hourlyRepository,
-                      CaloriesBucketFactory caloriesBucketFactory,
-                      PlatformTransactionManager transactionManager) {
-        this.dailyRepository = dailyRepository;
-        this.hourlyRepository = hourlyRepository;
-        this.caloriesBucketFactory = caloriesBucketFactory;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
 
     public void projectCalories(StoredEventData eventData) {
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                transactionTemplate.executeWithoutResult(status -> {
-                    try {
-                        caloriesBucketFactory.createFromEvent(eventData)
-                                .ifPresent(this::saveProjection);
-                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                        log.warn("Race condition during calories projection for event {}, skipping", eventData.eventId().value());
-                    }
-                });
-                return;
-            } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
-                if (attempt == MAX_RETRIES) {
-                    log.error("Deadlock persists after {} retries for calories event {}, giving up",
-                            MAX_RETRIES, eventData.eventId().value());
-                    throw e;
-                }
-                long delay = BASE_DELAY_MS * attempt + ThreadLocalRandom.current().nextLong(50);
-                log.warn("Deadlock detected for calories event {} (attempt {}/{}), retrying in {}ms",
-                        eventData.eventId().value(), attempt, MAX_RETRIES, delay);
-                sleep(delay);
-            }
-        }
+        caloriesBucketFactory.createFromEvent(eventData)
+                .ifPresent(this::saveProjection);
     }
 
-    private void sleep(long ms) {
+    private void saveProjection(CaloriesBucket bucket) {
         try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            doSaveProjection(bucket);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Version conflict for calories bucket {}/{}/{}, retrying once",
+                    bucket.deviceId(), bucket.date(), bucket.hour());
+            doSaveProjection(bucket);
         }
     }
 
-    private synchronized void saveProjection(CaloriesBucket bucket) {
+    private void doSaveProjection(CaloriesBucket bucket) {
         CaloriesHourlyProjectionJpaEntity hourly = hourlyRepository
                 .findByDeviceIdAndDateAndHour(bucket.deviceId(), bucket.date(), bucket.hour())
                 .map(existing -> {

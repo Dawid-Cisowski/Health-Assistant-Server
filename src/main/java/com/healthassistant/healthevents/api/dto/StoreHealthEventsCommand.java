@@ -9,13 +9,8 @@ import java.util.List;
 
 public record StoreHealthEventsCommand(
         List<EventEnvelope> events,
-        DeviceId deviceId,
-        boolean skipProjections
+        DeviceId deviceId
 ) {
-
-    public StoreHealthEventsCommand(List<EventEnvelope> events, DeviceId deviceId) {
-        this(events, deviceId, false);
-    }
 
     public record EventEnvelope(
             IdempotencyKey idempotencyKey,

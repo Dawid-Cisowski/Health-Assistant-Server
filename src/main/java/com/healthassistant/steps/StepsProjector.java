@@ -3,89 +3,50 @@ package com.healthassistant.steps;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 class StepsProjector {
-
-    private static final int MAX_RETRIES = 3;
-    private static final long BASE_DELAY_MS = 50;
 
     private final StepsDailyProjectionJpaRepository dailyRepository;
     private final StepsHourlyProjectionJpaRepository hourlyRepository;
     private final StepsBucketFactory stepsBucketFactory;
-    private final TransactionTemplate transactionTemplate;
-
-    StepsProjector(StepsDailyProjectionJpaRepository dailyRepository,
-                   StepsHourlyProjectionJpaRepository hourlyRepository,
-                   StepsBucketFactory stepsBucketFactory,
-                   PlatformTransactionManager transactionManager) {
-        this.dailyRepository = dailyRepository;
-        this.hourlyRepository = hourlyRepository;
-        this.stepsBucketFactory = stepsBucketFactory;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
 
     public void projectSteps(StoredEventData eventData) {
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                transactionTemplate.executeWithoutResult(status -> {
-                    try {
-                        stepsBucketFactory.createFromEvent(eventData)
-                                .ifPresent(this::saveProjection);
-                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                        log.warn("Race condition during steps projection for event {}, skipping", eventData.eventId().value());
-                    }
-                });
-                return;
-            } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
-                if (attempt == MAX_RETRIES) {
-                    log.error("Deadlock persists after {} retries for steps event {}, giving up",
-                            MAX_RETRIES, eventData.eventId().value());
-                    throw e;
-                }
-                long delay = BASE_DELAY_MS * attempt + ThreadLocalRandom.current().nextLong(50);
-                log.warn("Deadlock detected for steps event {} (attempt {}/{}), retrying in {}ms",
-                        eventData.eventId().value(), attempt, MAX_RETRIES, delay);
-                sleep(delay);
-            }
-        }
-    }
-
-    private void sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        stepsBucketFactory.createFromEvent(eventData)
+                .ifPresent(this::saveProjection);
     }
 
     private void saveProjection(StepsBucket bucket) {
-        String lockKey = (bucket.deviceId() + "-" + bucket.date() + "-" + bucket.hour()).intern();
-        synchronized (lockKey) {
-            StepsHourlyProjectionJpaEntity hourly = hourlyRepository
-                    .findByDeviceIdAndDateAndHour(bucket.deviceId(), bucket.date(), bucket.hour())
-                    .map(existing -> {
-                        existing.addBucket(bucket);
-                        return existing;
-                    })
-                    .orElseGet(() -> StepsHourlyProjectionJpaEntity.from(bucket));
-
-            hourlyRepository.save(hourly);
-            updateDailyProjection(bucket.deviceId(), bucket.date());
+        try {
+            doSaveProjection(bucket);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Version conflict for steps bucket {}/{}/{}, retrying once",
+                    bucket.deviceId(), bucket.date(), bucket.hour());
+            doSaveProjection(bucket);
         }
+    }
+
+    private void doSaveProjection(StepsBucket bucket) {
+        StepsHourlyProjectionJpaEntity hourly = hourlyRepository
+                .findByDeviceIdAndDateAndHour(bucket.deviceId(), bucket.date(), bucket.hour())
+                .map(existing -> {
+                    existing.addBucket(bucket);
+                    return existing;
+                })
+                .orElseGet(() -> StepsHourlyProjectionJpaEntity.from(bucket));
+
+        hourlyRepository.save(hourly);
+        updateDailyProjection(bucket.deviceId(), bucket.date());
     }
 
     private void updateDailyProjection(String deviceId, LocalDate date) {

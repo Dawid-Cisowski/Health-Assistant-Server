@@ -1,97 +1,59 @@
 package com.healthassistant.sleep;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 class SleepProjector {
-
-    private static final int MAX_RETRIES = 3;
-    private static final long BASE_DELAY_MS = 50;
 
     private final SleepSessionProjectionJpaRepository sessionRepository;
     private final SleepDailyProjectionJpaRepository dailyRepository;
     private final SleepSessionFactory sleepSessionFactory;
-    private final TransactionTemplate transactionTemplate;
-
-    SleepProjector(SleepSessionProjectionJpaRepository sessionRepository,
-                   SleepDailyProjectionJpaRepository dailyRepository,
-                   SleepSessionFactory sleepSessionFactory,
-                   PlatformTransactionManager transactionManager) {
-        this.sessionRepository = sessionRepository;
-        this.dailyRepository = dailyRepository;
-        this.sleepSessionFactory = sleepSessionFactory;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
 
     public void projectSleep(StoredEventData eventData) {
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                transactionTemplate.executeWithoutResult(status -> {
-                    try {
-                        sleepSessionFactory.createFromEvent(eventData)
-                                .ifPresent(this::saveProjection);
-                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                        log.warn("Race condition during sleep projection for event {}, skipping", eventData.eventId().value());
-                    }
-                });
-                return;
-            } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
-                if (attempt == MAX_RETRIES) {
-                    log.error("Deadlock persists after {} retries for sleep event {}, giving up",
-                            MAX_RETRIES, eventData.eventId().value());
-                    throw e;
-                }
-                long delay = BASE_DELAY_MS * attempt + ThreadLocalRandom.current().nextLong(50);
-                log.warn("Deadlock detected for sleep event {} (attempt {}/{}), retrying in {}ms",
-                        eventData.eventId().value(), attempt, MAX_RETRIES, delay);
-                sleep(delay);
-            }
-        }
-    }
-
-    private void sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        sleepSessionFactory.createFromEvent(eventData)
+                .ifPresent(this::saveProjection);
     }
 
     private void saveProjection(SleepSession session) {
-        String lockKey = session.deviceId() + "|" + session.date();
-        synchronized (lockKey.intern()) {
-            Optional<SleepSessionProjectionJpaEntity> existingOpt = sessionRepository.findByEventId(session.eventId());
-
-            SleepSessionProjectionJpaEntity entity;
-
-            if (existingOpt.isPresent()) {
-                entity = existingOpt.get();
-                entity.updateFrom(session);
-                log.debug("Updating existing sleep session for event {}", session.eventId());
-            } else {
-                int sessionNumber = calculateNextSessionNumber(session.deviceId(), session.date());
-                entity = SleepSessionProjectionJpaEntity.from(session, sessionNumber);
-                log.debug("Creating new sleep session #{} for date {} from event {}",
-                        sessionNumber, session.date(), session.eventId());
-            }
-
-            sessionRepository.save(entity);
-            updateDailyProjection(session.deviceId(), session.date());
+        try {
+            doSaveProjection(session);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Version conflict for sleep session {}/{}, retrying once",
+                    session.deviceId(), session.date());
+            doSaveProjection(session);
         }
+    }
+
+    private void doSaveProjection(SleepSession session) {
+        Optional<SleepSessionProjectionJpaEntity> existingOpt = sessionRepository.findByEventId(session.eventId());
+
+        SleepSessionProjectionJpaEntity entity;
+
+        if (existingOpt.isPresent()) {
+            entity = existingOpt.get();
+            entity.updateFrom(session);
+            log.debug("Updating existing sleep session for event {}", session.eventId());
+        } else {
+            int sessionNumber = calculateNextSessionNumber(session.deviceId(), session.date());
+            entity = SleepSessionProjectionJpaEntity.from(session, sessionNumber);
+            log.debug("Creating new sleep session #{} for date {} from event {}",
+                    sessionNumber, session.date(), session.eventId());
+        }
+
+        sessionRepository.save(entity);
+        updateDailyProjection(session.deviceId(), session.date());
     }
 
     private int calculateNextSessionNumber(String deviceId, LocalDate date) {

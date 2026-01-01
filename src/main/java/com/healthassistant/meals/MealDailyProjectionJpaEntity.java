@@ -109,6 +109,9 @@ class MealDailyProjectionJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Version
+    private Long version;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
