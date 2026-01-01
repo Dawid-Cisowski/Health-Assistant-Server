@@ -129,6 +129,12 @@ Events are projected into query-optimized views:
 
 **Important**: Projections are eventually consistent. Projection failures don't block event ingestion.
 
+**Optimistic Locking**: All projection entities use `@Version` for concurrency control:
+- Each projector wraps save in try-catch for `ObjectOptimisticLockingFailureException`
+- On version conflict, single retry is attempted
+- Prevents lost updates when multiple events target the same projection row
+- See `OptimisticLockingSpec` for integration tests
+
 ### AI Health Assistant (Spring AI + Gemini)
 
 **Architecture**: Natural language interface for querying health data using Gemini 2.0 Flash with SSE streaming.
@@ -194,9 +200,9 @@ See `AI_ASSISTANT_README.md` for detailed documentation on date recognition patt
 - Manual sync endpoints still available for historical backfill
 - `POST /v1/google-fit/sync/history?days=N` - Historical sync (1-365 days)
 - Uses virtual threads (Project Loom) for parallel processing
-- Each day synced independently via `HistoricalSyncTask`
+- Automatic reprojection after sync completion
 
-**Key Files**: `GoogleFitSyncService.java`, `HistoricalSyncTaskProcessor.java`
+**Key Files**: `GoogleFitFacade.java`, `GoogleFitSyncService.java`
 
 ### HMAC Authentication
 
@@ -257,18 +263,17 @@ export NONCE_CACHE_TTL_SEC=600
 - `daily_summaries` - Aggregated daily metrics (JSONB summary, V17 adds ai_summary_cache, V22 adds device_id)
 - `conversations` - AI assistant conversation tracking (V8)
 - `conversation_messages` - Message history per conversation (V8)
-- `historical_sync_tasks` - Track historical sync jobs (V12)
 
-**Projection Tables**:
+**Projection Tables** (all have `version` column for optimistic locking, V23):
 - `steps_hourly_projections`, `steps_daily_projections` (V6, V20 adds device_id)
 - `workout_projections`, `workout_exercise_projections`, `workout_set_projections` (V5)
 - `sleep_projections` (V7, V18 adds sleep_score, V21 adds device_id)
 - `calories_hourly_projections`, `calories_daily_projections` (V10)
 - `activity_hourly_projections`, `activity_daily_projections` (V11)
-- `meal_projections` (V13, V21 adds device_id)
+- `meal_projections`, `meal_daily_projections` (V13, V21 adds device_id)
 - `meal_import_drafts` (V15-V16, AI-powered meal import)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V22)
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V24)
 
 ## Event Types
 
@@ -303,7 +308,7 @@ See `EventValidator.java` for detailed validation rules.
 **Test Framework**: Spock (Groovy) with Spring Boot Test + Testcontainers
 
 **Integration Tests** (`integration-tests/` module):
-- 250+ Spock specifications
+- 366 Spock specifications
 - PostgreSQL via Testcontainers
 - REST Assured for API testing
 - WireMock for mocking external APIs
@@ -314,6 +319,7 @@ See `EventValidator.java` for detailed validation rules.
 - Features: `DailySummarySpec`, `AssistantSpec`, `ConversationHistorySpec`, `GoogleFitSyncSpec`, `HmacAuthenticationSpec`, `BatchEventIngestionSpec`
 - Import: `WorkoutImportSpec`, `MealImportSpec`, `SleepImportSpec`, `MealImportDraftSpec`
 - AI Evaluation: `evaluation/AiHallucinationSpec`, `AiDateRecognitionSpec`, `AiToolErrorHandlingSpec`, `AiConversationAccuracySpec`
+- Concurrency: `OptimisticLockingSpec`
 - AI Features: `AiDailySummarySpec`, `AiDailySummaryCacheSpec`
 
 **Running Tests**:

@@ -71,7 +71,7 @@ health-assistant-server/
 ├── src/main/resources/
 │   ├── application.yml
 │   └── db/migration/           # Flyway migrations
-├── integration-tests/          # Integration tests (228 Spock tests)
+├── integration-tests/          # Integration tests (366 Spock tests)
 ├── docker-compose.yml
 ├── Dockerfile
 └── README.md
@@ -211,12 +211,6 @@ See [Swagger UI](http://localhost:8080/swagger-ui.html) for detailed documentati
 - `activity_time_minutes` (INTEGER): Time spent active (calculated from steps)
 - `updated_at` (TIMESTAMPTZ): Last update time
 
-**`historical_sync_tasks`** - Historical sync job tracking
-- `id` (BIGSERIAL): Primary key
-- `date` (DATE): Date being synced
-- `status` (VARCHAR): Task status (pending, processing, completed, failed)
-- `created_at` (TIMESTAMPTZ): Task creation time
-
 ## 🔄 Health Data Synchronization
 
 ### Push Model (Health Connect)
@@ -233,7 +227,7 @@ curl -X POST http://localhost:8080/v1/google-fit/sync/history?days=30
 - Processes each day in parallel using virtual threads
 - Safe for large date ranges (1-365 days)
 - Idempotent - can be run multiple times
-- Tracked via `historical_sync_tasks` table
+- Automatic reprojection after sync completion
 
 ### Activity Detection
 - Automatically calculates activity time from step patterns
@@ -253,12 +247,13 @@ curl -X POST http://localhost:8080/v1/google-fit/sync/history?days=30
 open integration-tests/build/reports/tests/test/index.html
 ```
 
-**Test Coverage**: 250+ integration tests covering:
+**Test Coverage**: 366 integration tests covering:
 - Event validation (Steps, Sleep, Workout, Meal, Heart Rate, Distance, Walking Session, Active Minutes, Active Calories)
 - Projections (Steps, Sleep, Workout, Calories, Activity, Meals)
 - Features (Daily Summaries, AI Assistant, Conversation History, Google Fit Sync)
-- Import (Workout Import, Meal Import)
+- Import (Workout Import, Meal Import, Sleep Import)
 - AI Evaluation (LLM-as-a-Judge hallucination tests)
+- Concurrency (Optimistic Locking)
 
 ## 📈 Monitoring
 
@@ -295,7 +290,9 @@ curl http://localhost:8080/actuator/prometheus
 
 ## 🚧 Recent Updates
 
-- ✅ **Comprehensive Test Coverage** - 228 integration tests covering all 9 event types with validation
+- ✅ **Optimistic Locking** - @Version-based concurrency control for all projections with automatic retry
+- ✅ **Simplified Google Fit Sync** - Streamlined historical sync with automatic reprojection
+- ✅ **Comprehensive Test Coverage** - 366 integration tests covering all 9 event types with validation
 - ✅ **Conversation History** - Multi-turn AI conversations with context retention
 - ✅ **AI Health Assistant** - Natural language chat interface with Gemini 2.0 Flash
 - ✅ **Smart Date Recognition** - Automatic interpretation of "dzisiaj", "ostatni tydzień", etc.

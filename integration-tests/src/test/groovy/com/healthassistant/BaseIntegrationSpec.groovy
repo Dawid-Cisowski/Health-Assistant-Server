@@ -85,7 +85,9 @@ abstract class BaseIntegrationSpec extends Specification {
             "test-heartrate", "test-active-cal", "test-active-min",
             "test-distance", "test-walking", "test-exception",
             // Import and other specs
-            "test-meal-draft", "test-gfit"
+            "test-meal-draft", "test-gfit",
+            // Concurrency specs
+            "test-optlock"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
