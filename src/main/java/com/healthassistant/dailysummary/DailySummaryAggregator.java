@@ -40,7 +40,7 @@ class DailySummaryAggregator {
 
         log.info("Aggregating {} events for device {} date {}", events.size(), deviceId, date);
 
-        Activity activity = aggregateActivity(deviceId, events, date);
+        Activity activity = aggregateActivity(events);
         List<Exercise> exercises = aggregateExercises(events);
         List<Workout> workouts = aggregateWorkouts(events);
         List<Sleep> sleep = aggregateSleep(events);
@@ -60,7 +60,7 @@ class DailySummaryAggregator {
         );
     }
 
-    private Activity aggregateActivity(String deviceId, List<EventData> events, LocalDate date) {
+    private Activity aggregateActivity(List<EventData> events) {
         int totalSteps = 0;
         int totalActiveMinutes = 0;
         int totalActiveCalories = 0;
