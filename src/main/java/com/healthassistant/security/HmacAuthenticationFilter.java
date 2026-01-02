@@ -67,10 +67,6 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean requiresAuthentication(String path) {
-        // Temporarily open for reprojection and google fit sync
-        if (path.equals("/v1/admin/reproject") || path.startsWith("/v1/google-fit/sync")) {
-            return false;
-        }
         return path.startsWith("/v1/health-events")
             || path.startsWith("/v1/daily-summaries")
             || path.startsWith("/v1/google-fit/sync")
