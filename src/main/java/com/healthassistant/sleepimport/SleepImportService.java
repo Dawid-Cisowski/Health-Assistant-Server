@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.MessageDigest;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
@@ -39,11 +40,13 @@ class SleepImportService implements SleepImportFacade {
     private final HealthEventsFacade healthEventsFacade;
 
     @Override
-    public SleepImportResponse importFromImage(MultipartFile image, DeviceId deviceId) {
+    public SleepImportResponse importFromImage(MultipartFile image, DeviceId deviceId, Integer year) {
         validateImage(image);
 
+        int effectiveYear = year != null ? year : LocalDate.now(POLAND_ZONE).getYear();
+
         try {
-            ExtractedSleepData extractedData = imageExtractor.extract(image);
+            ExtractedSleepData extractedData = imageExtractor.extract(image, effectiveYear);
 
             if (!extractedData.isValid()) {
                 log.warn("Sleep extraction invalid for device {}: {}",

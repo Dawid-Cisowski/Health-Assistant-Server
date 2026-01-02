@@ -41,14 +41,15 @@ class SleepImportController {
     })
     ResponseEntity<SleepImportResponse> importSleepFromImage(
             @RequestParam("image") MultipartFile image,
+            @RequestParam(required = false) Integer year,
             @RequestAttribute("deviceId") String deviceId
     ) {
-        log.info("Sleep image import request from device {}, file: {}, size: {} bytes",
-                deviceId, image.getOriginalFilename(), image.getSize());
+        log.info("Sleep image import request from device {}, file: {}, size: {} bytes, year: {}",
+                deviceId, image.getOriginalFilename(), image.getSize(), year);
 
         try {
             SleepImportResponse response = sleepImportFacade.importFromImage(
-                    image, DeviceId.of(deviceId)
+                    image, DeviceId.of(deviceId), year
             );
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {

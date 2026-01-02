@@ -6,5 +6,5 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface SleepImportFacade {
 
-    SleepImportResponse importFromImage(MultipartFile image, DeviceId deviceId);
+    SleepImportResponse importFromImage(MultipartFile image, DeviceId deviceId, Integer year);
 }

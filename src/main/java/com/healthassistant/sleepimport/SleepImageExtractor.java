@@ -37,7 +37,7 @@ class SleepImageExtractor {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
 
-    ExtractedSleepData extract(MultipartFile image) throws SleepExtractionException {
+    ExtractedSleepData extract(MultipartFile image, int year) throws SleepExtractionException {
         try {
             byte[] imageBytes = image.getBytes();
             String contentType = image.getContentType();
@@ -45,7 +45,7 @@ class SleepImageExtractor {
                     ? "image/jpeg"
                     : contentType;
 
-            log.info("Extracting sleep data from image: {} bytes, type: {}", imageBytes.length, mimeType);
+            log.info("Extracting sleep data from image: {} bytes, type: {}, year: {}", imageBytes.length, mimeType, year);
 
             String response = chatClient.prompt()
                     .system(buildSystemPrompt())
@@ -62,7 +62,7 @@ class SleepImageExtractor {
 
             log.debug("AI response: {}", response);
 
-            return parseExtractionResponse(response);
+            return parseExtractionResponse(response, year);
 
         } catch (IOException e) {
             throw new SleepExtractionException("Failed to read image: " + e.getMessage(), e);
@@ -85,7 +85,7 @@ class SleepImageExtractor {
             2. If the image is NOT a sleep summary screenshot, return JSON with "isSleepScreenshot": false
             3. All numeric fields must be numbers (not strings)
             4. Time values should be in 24-hour format (HH:MM)
-            5. Date should be in ISO format (YYYY-MM-DD)
+            5. Date: extract ONLY day and month as "DD-MM" (e.g., "25-12" for December 25). Do NOT guess the year.
             6. Report your confidence level (0.0 to 1.0)
             7. Sleep phases are shown as a visual chart - estimate proportions carefully
 
@@ -121,7 +121,7 @@ class SleepImageExtractor {
             {
               "isSleepScreenshot": boolean,
               "confidence": number (0.0-1.0),
-              "sleepDate": "YYYY-MM-DD" or null,
+              "sleepDate": "DD-MM" (day-month only, e.g., "25-12") or null,
               "sleepStart": "HH:MM" (local time, 24h format) or null,
               "wakeTime": "HH:MM" (local time, 24h format) or null,
               "totalSleepMinutes": number or null,
@@ -154,7 +154,7 @@ class SleepImageExtractor {
             """;
     }
 
-    private ExtractedSleepData parseExtractionResponse(String response) throws SleepExtractionException {
+    private ExtractedSleepData parseExtractionResponse(String response, int year) throws SleepExtractionException {
         try {
             String cleanedResponse = cleanJsonResponse(response);
             JsonNode root = objectMapper.readTree(cleanedResponse);
@@ -167,7 +167,7 @@ class SleepImageExtractor {
                 return ExtractedSleepData.invalid(error, confidence);
             }
 
-            LocalDate sleepDate = parseSleepDate(root.path("sleepDate").asText(null));
+            LocalDate sleepDate = parseSleepDate(root.path("sleepDate").asText(null), year);
             String sleepStartStr = root.path("sleepStart").asText(null);
             String wakeTimeStr = root.path("wakeTime").asText(null);
 
@@ -214,19 +214,33 @@ class SleepImageExtractor {
                 .trim();
     }
 
-    private LocalDate parseSleepDate(String dateStr) {
+    private LocalDate parseSleepDate(String dateStr, int year) {
         if (dateStr == null || dateStr.isBlank()) {
-            return LocalDate.now(POLAND_ZONE);
+            return LocalDate.now(POLAND_ZONE).withYear(year);
         }
 
+        // Try DD-MM format (expected from AI)
+        if (dateStr.matches("\\d{1,2}-\\d{1,2}")) {
+            try {
+                String[] parts = dateStr.split("-");
+                int day = Integer.parseInt(parts[0]);
+                int month = Integer.parseInt(parts[1]);
+                return LocalDate.of(year, month, day);
+            } catch (Exception e) {
+                log.warn("Could not parse DD-MM date: {}", dateStr);
+            }
+        }
+
+        // Try full ISO format (backward compatibility)
         try {
             return LocalDate.parse(dateStr);
         } catch (DateTimeParseException e) {
-            return parsePolishDate(dateStr);
+            // Try Polish format as fallback
+            return parsePolishDate(dateStr, year);
         }
     }
 
-    private LocalDate parsePolishDate(String dateStr) {
+    private LocalDate parsePolishDate(String dateStr, int year) {
         try {
             String[] parts = dateStr.toLowerCase(java.util.Locale.ROOT).split("\\s+");
             if (parts.length >= 2) {
@@ -234,14 +248,13 @@ class SleepImageExtractor {
                 String monthStr = parts[1].replace(",", "");
                 Integer month = POLISH_MONTHS.get(monthStr);
                 if (month != null) {
-                    int year = LocalDate.now(POLAND_ZONE).getYear();
                     return LocalDate.of(year, month, day);
                 }
             }
         } catch (NumberFormatException e) {
             log.warn("Could not parse Polish date: {}", dateStr);
         }
-        return LocalDate.now(POLAND_ZONE);
+        return LocalDate.now(POLAND_ZONE).withYear(year);
     }
 
     private Instant parseLocalTimeToInstant(LocalDate date, String timeStr, boolean isSleepStart) {
