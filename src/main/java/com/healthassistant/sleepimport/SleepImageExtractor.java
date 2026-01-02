@@ -226,7 +226,7 @@ class SleepImageExtractor {
                 int day = Integer.parseInt(parts[0]);
                 int month = Integer.parseInt(parts[1]);
                 return LocalDate.of(year, month, day);
-            } catch (Exception e) {
+            } catch (NumberFormatException | java.time.DateTimeException e) {
                 log.warn("Could not parse DD-MM date: {}", dateStr);
             }
         }
