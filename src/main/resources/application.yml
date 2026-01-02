@@ -37,6 +37,7 @@ spring:
     baseline-on-migrate: true
     locations: classpath:db/migration
     validate-on-migrate: true
+    lock-retry-count: 50
 
   modulith:
     events:
