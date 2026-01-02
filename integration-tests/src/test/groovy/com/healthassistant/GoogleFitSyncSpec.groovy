@@ -87,15 +87,15 @@ class GoogleFitSyncSpec extends BaseIntegrationSpec {
         response.statusCode() == 400
     }
 
-    def "Scenario 4: Sync day rejects date older than 365 days"() {
+    def "Scenario 4: Sync day rejects date older than 5 years"() {
         given: "authenticated device"
         def deviceId = DEVICE_ID
         def secretBase64 = SECRET_BASE64
 
         and: "a very old date"
-        def oldDate = LocalDate.now(POLAND_ZONE).minusDays(400)
+        def oldDate = LocalDate.now(POLAND_ZONE).minusYears(6)
 
-        when: "I try to sync a date older than 365 days"
+        when: "I try to sync a date older than 5 years"
         def response = authenticatedPostRequest(deviceId, secretBase64, "/v1/google-fit/sync/day?date=${oldDate}")
                 .post("/v1/google-fit/sync/day?date=${oldDate}")
                 .then()

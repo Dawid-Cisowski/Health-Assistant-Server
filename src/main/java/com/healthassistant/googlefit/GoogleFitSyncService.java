@@ -91,9 +91,9 @@ class GoogleFitSyncService implements GoogleFitFacade {
         if (date.isAfter(today)) {
             throw new IllegalArgumentException("Date " + date + " is in the future");
         }
-        LocalDate earliestAllowed = today.minusDays(365);
+        LocalDate earliestAllowed = today.minusYears(5);
         if (date.isBefore(earliestAllowed)) {
-            throw new IllegalArgumentException("Date " + date + " is more than 365 days in the past");
+            throw new IllegalArgumentException("Date " + date + " is more than 5 years in the past");
         }
     }
 
