@@ -198,7 +198,7 @@ See `AI_ASSISTANT_README.md` for detailed documentation on date recognition patt
 
 **Google Fit Module** (Legacy/Optional):
 - Manual sync endpoints still available for historical backfill
-- `POST /v1/google-fit/sync/history?days=N` - Historical sync (1-365 days)
+- `POST /v1/google-fit/sync/day?date=YYYY-MM-DD` - Sync specific day (up to 5 years back)
 - Uses virtual threads (Project Loom) for parallel processing
 - Automatic reprojection after sync completion
 
@@ -379,13 +379,18 @@ open integration-tests/build/reports/tests/test/index.html
 - `GET /v1/daily-summaries/range?from={date}&to={date}` - Get daily summary range (HMAC auth required)
 
 ### Google Fit Sync (Historical/Legacy)
-- `POST /v1/google-fit/sync/history?days=N` - Historical sync (1-365 days)
+- `POST /v1/google-fit/sync/day?date=YYYY-MM-DD` - Sync specific day (up to 5 years back)
+
+### Import APIs
+- `POST /v1/sleep/import-image?year=YYYY` - Import sleep from screenshot (year optional, default: current year)
+- `POST /v1/workouts/import-image` - Import workout from screenshot
+- `POST /v1/meals/import-image` - Import meal from image (returns draft for confirmation)
 
 ### Query APIs
 - `GET /v1/steps/daily/{date}` - Daily step breakdown
 - `GET /v1/steps/daily/range?from={date}&to={date}` - Step range summary
 - `GET /v1/workouts/{workoutId}` - Workout details
-- `GET /v1/workouts/date/{date}` - Workouts on date
+- `GET /v1/workouts?from={date}&to={date}` - Workouts by date range
 - `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
 - `GET /v1/meals/range?from={date}&to={date}` - Meals data range
 

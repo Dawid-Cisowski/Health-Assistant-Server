@@ -157,7 +157,12 @@ Configure via environment variables:
 - `POST /v1/health-events` - Batch event ingestion (HMAC auth required)
 
 ### Google Fit Sync (Historical/Legacy)
-- `POST /v1/google-fit/sync/history?days=7` - Sync historical data from Google Fit
+- `POST /v1/google-fit/sync/day?date=YYYY-MM-DD` - Sync specific day from Google Fit (up to 5 years back)
+
+### Import APIs (AI-powered)
+- `POST /v1/sleep/import-image?year=YYYY` - Import sleep from screenshot (year optional, default: current year)
+- `POST /v1/workouts/import-image` - Import workout from screenshot
+- `POST /v1/meals/import-image` - Import meal from image (returns draft for confirmation)
 
 ### Daily Summaries
 - `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
@@ -167,7 +172,7 @@ Configure via environment variables:
 - `GET /v1/steps/daily/{date}` - Daily step breakdown
 - `GET /v1/steps/daily/range?from={date}&to={date}` - Step range summary
 - `GET /v1/workouts/{workoutId}` - Workout details
-- `GET /v1/workouts/date/{date}` - Workouts on date
+- `GET /v1/workouts?from={date}&to={date}` - Workouts by date range
 - `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
 - `GET /v1/meals/range?from={date}&to={date}` - Meals data range
 
@@ -222,10 +227,9 @@ Health data is pushed directly from the mobile app via Health Connect:
 ### Historical Google Fit Sync (Optional)
 For backfilling historical data from Google Fit:
 ```bash
-curl -X POST http://localhost:8080/v1/google-fit/sync/history?days=30
+curl -X POST "http://localhost:8080/v1/google-fit/sync/day?date=2025-01-15"
 ```
-- Processes each day in parallel using virtual threads
-- Safe for large date ranges (1-365 days)
+- Sync specific day up to 5 years back
 - Idempotent - can be run multiple times
 - Automatic reprojection after sync completion
 
@@ -290,8 +294,9 @@ curl http://localhost:8080/actuator/prometheus
 
 ## 🚧 Recent Updates
 
+- ✅ **Sleep Import Year Parameter** - Optional year parameter for AI sleep import to handle screenshots without year
+- ✅ **Extended Google Fit Sync** - Sync up to 5 years of historical data (previously 1 year)
 - ✅ **Optimistic Locking** - @Version-based concurrency control for all projections with automatic retry
-- ✅ **Simplified Google Fit Sync** - Streamlined historical sync with automatic reprojection
 - ✅ **Comprehensive Test Coverage** - 366 integration tests covering all 9 event types with validation
 - ✅ **Conversation History** - Multi-turn AI conversations with context retention
 - ✅ **AI Health Assistant** - Natural language chat interface with Gemini 2.0 Flash
@@ -299,13 +304,12 @@ curl http://localhost:8080/actuator/prometheus
 - ✅ **Real-time SSE Streaming** - Word-by-word AI responses via Server-Sent Events
 - ✅ **Meal Tracking** - MealRecorded events with nutrition and health ratings
 - ✅ **Workout Projections** - Pre-calculated workout metrics and volumes
-- ✅ Historical sync with parallel processing
 - ✅ Walking session tracking with step attribution
 - ✅ Activity time calculation from step patterns
 
 ## 📝 License
 
-Copyright © 2025. All rights reserved.
+Copyright © 2026. All rights reserved.
 
 ---
 
