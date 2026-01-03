@@ -75,7 +75,8 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/v1/meals")
             || path.startsWith("/v1/sleep")
             || path.startsWith("/v1/admin")
-            || path.startsWith("/v1/assistant");
+            || path.startsWith("/v1/assistant")
+            || path.startsWith("/v1/routines");
     }
 
     private DeviceId validateHmacAuthentication(HttpServletRequest request)

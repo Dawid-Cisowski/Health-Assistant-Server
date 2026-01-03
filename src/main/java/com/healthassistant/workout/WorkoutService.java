@@ -2,6 +2,7 @@ package com.healthassistant.workout;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.workout.api.WorkoutFacade;
+import com.healthassistant.workout.api.dto.ExerciseDefinition;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class WorkoutService implements WorkoutFacade {
     private final WorkoutExerciseProjectionJpaRepository exerciseRepository;
     private final WorkoutSetProjectionJpaRepository setRepository;
     private final WorkoutProjector workoutProjector;
+    private final ExerciseCatalog exerciseCatalog;
 
     @Override
     public Optional<WorkoutDetailResponse> getWorkoutDetails(String workoutId) {
@@ -131,4 +133,10 @@ public class WorkoutService implements WorkoutFacade {
             }
         }
     }
+
+    @Override
+    public List<ExerciseDefinition> getAllExercises() {
+        return exerciseCatalog.getAllExercises();
+    }
+
 }

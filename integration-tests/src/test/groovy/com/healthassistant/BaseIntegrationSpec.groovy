@@ -89,7 +89,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Concurrency specs
             "test-optlock",
             // Exercise catalog specs
-            "test-exercises"
+            "test-exercises",
+            // Routine specs
+            "test-routines"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
