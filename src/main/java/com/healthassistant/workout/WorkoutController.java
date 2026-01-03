@@ -1,6 +1,7 @@
 package com.healthassistant.workout;
 
 import com.healthassistant.workout.api.WorkoutFacade;
+import com.healthassistant.workout.api.dto.ExerciseDefinition;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,6 +25,7 @@ import java.util.List;
 class WorkoutController {
 
     private final WorkoutFacade workoutFacade;
+    private final ExerciseCatalog exerciseCatalog;
 
     @GetMapping("/{workoutId}")
     @Operation(
@@ -61,5 +63,40 @@ class WorkoutController {
         log.info("Retrieving workouts for device {} date range: {} to {}", deviceId, from, to);
         List<WorkoutDetailResponse> workouts = workoutFacade.getWorkoutsByDateRange(deviceId, from, to);
         return ResponseEntity.ok(workouts);
+    }
+
+    @GetMapping("/exercises")
+    @Operation(
+            summary = "Get all exercises",
+            description = "Returns the complete catalog of available exercises with muscle mappings"
+    )
+    @ApiResponse(responseCode = "200", description = "Exercise catalog retrieved successfully")
+    ResponseEntity<List<ExerciseDefinition>> getAllExercises() {
+        log.info("Retrieving exercise catalog");
+        return ResponseEntity.ok(exerciseCatalog.getAllExercises());
+    }
+
+    @GetMapping("/exercises/muscles")
+    @Operation(
+            summary = "Get all muscle groups",
+            description = "Returns the list of all available muscle groups for filtering exercises"
+    )
+    @ApiResponse(responseCode = "200", description = "Muscle groups retrieved successfully")
+    ResponseEntity<List<String>> getMuscleGroups() {
+        log.info("Retrieving muscle groups");
+        return ResponseEntity.ok(exerciseCatalog.getMuscleGroups());
+    }
+
+    @GetMapping("/exercises/muscle/{muscle}")
+    @Operation(
+            summary = "Get exercises by muscle",
+            description = "Returns all exercises that engage the specified muscle group"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Exercises retrieved successfully")
+    })
+    ResponseEntity<List<ExerciseDefinition>> getExercisesByMuscle(@PathVariable String muscle) {
+        log.info("Retrieving exercises for muscle: {}", muscle);
+        return ResponseEntity.ok(exerciseCatalog.getExercisesByMuscle(muscle));
     }
 }
