@@ -36,7 +36,16 @@ class DailySummaryAggregator {
         Instant dayStart = date.atStartOfDay(POLAND_ZONE).toInstant();
         Instant dayEnd = date.plusDays(1).atStartOfDay(POLAND_ZONE).toInstant();
 
-        List<EventData> events = healthEventsFacade.findEventsByOccurredAtBetween(dayStart, dayEnd);
+        List<EventData> events = healthEventsFacade.findEventsForDateRange(deviceId, dayStart, dayEnd)
+                .stream()
+                .map(stored -> new EventData(
+                        stored.eventType().value(),
+                        stored.occurredAt(),
+                        stored.payload(),
+                        stored.deviceId().value(),
+                        stored.idempotencyKey().value()
+                ))
+                .toList();
 
         log.info("Aggregating {} events for device {} date {}", events.size(), deviceId, date);
 

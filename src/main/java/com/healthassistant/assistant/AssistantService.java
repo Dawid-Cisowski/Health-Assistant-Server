@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +22,8 @@ import java.util.UUID;
 @Slf4j
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
 class AssistantService implements AssistantFacade {
+
+    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final ChatClient chatClient;
     private final ConversationService conversationService;
@@ -71,23 +74,27 @@ class AssistantService implements AssistantFacade {
               Never use words like "today", "yesterday" in tool parameters.
 
             Time interpretation:
-            - Recognize natural time expressions such as:
-              "last night", "yesterday", "today", "last week",
-              "last month", "this week", "this month", "last 7 days", "last 30 days",
-              "previous night", "last sleep", "this week", "this month".
+            - Recognize natural time expressions in both English and Polish:
+              EN: "today", "yesterday", "last night", "last week", "last month", "this week", "this month", "last 7 days", "last 30 days"
+              PL: "dzisiaj", "dziś", "wczoraj", "przedwczoraj", "ostatnia noc", "ostatni tydzień", "ostatni miesiąc", "w tym tygodniu", "w tym miesiącu", "ostatnie 7 dni", "ostatnie 30 dni", "X dni temu"
             - Automatically convert them to actual date ranges in YYYY-MM-DD format based on the CURRENT DATE.
             - Never ask the user for a date if it can be unambiguously determined from the CURRENT DATE.
             - If the expression is ambiguous - choose the most natural interpretation,
               and only ask for clarification if inference is impossible.
 
             Conversion examples (assuming CURRENT DATE: 2025-11-24):
-            - "today" → startDate: "2025-11-24", endDate: "2025-11-24"
-            - "yesterday" → startDate: "2025-11-23", endDate: "2025-11-23"
-            - "last week" / "last 7 days" → startDate: "2025-11-17", endDate: "2025-11-24" (7 days back)
-            - "last month" / "last 30 days" → startDate: "2025-10-25", endDate: "2025-11-24" (30 days back)
-            - "this week" → startDate: "2025-11-18" (Monday), endDate: "2025-11-24"
-            - "this month" → startDate: "2025-11-01", endDate: "2025-11-24"
-            - "last 14 days" / "last two weeks" → startDate: "2025-11-10", endDate: "2025-11-24"
+            - "today" / "dzisiaj" / "dziś" → startDate: "2025-11-24", endDate: "2025-11-24"
+            - "yesterday" / "wczoraj" → startDate: "2025-11-23", endDate: "2025-11-23"
+            - "day before yesterday" / "przedwczoraj" → startDate: "2025-11-22", endDate: "2025-11-22"
+            - "3 days ago" / "3 dni temu" → startDate: "2025-11-21", endDate: "2025-11-21"
+            - "last week" / "ostatni tydzień" / "last 7 days" → startDate: "2025-11-17", endDate: "2025-11-24" (7 days back INCLUDING today)
+            - "last month" / "ostatni miesiąc" / "last 30 days" → startDate: "2025-10-25", endDate: "2025-11-24" (30 days back INCLUDING today)
+            - "this week" / "w tym tygodniu" → startDate: "2025-11-18" (Monday), endDate: "2025-11-24"
+            - "this month" / "w tym miesiącu" → startDate: "2025-11-01", endDate: "2025-11-24"
+            - "last 14 days" / "ostatnie 14 dni" → startDate: "2025-11-10", endDate: "2025-11-24"
+
+            IMPORTANT: Date ranges ALWAYS include CURRENT DATE as the end date unless explicitly asking about past periods.
+            When user asks "ostatni miesiąc" (last month), include today's date in the range - end date = CURRENT DATE.
             """.formatted(currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
     }
 
@@ -96,12 +103,12 @@ class AssistantService implements AssistantFacade {
         log.info("Processing streaming chat request for device {}: {} (conversationId: {})",
                 deviceId, request.message(), request.conversationId());
 
-        AssistantContext.setDeviceId(deviceId);
-
         return Mono.fromCallable(() -> {
+                    // Set deviceId on the boundedElastic thread where tools will be called
+                    AssistantContext.setDeviceId(deviceId);
                     var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
                     var history = conversationService.loadConversationHistory(conversationId);
-                    var currentDate = LocalDate.now();
+                    var currentDate = LocalDate.now(POLAND_ZONE);
                     var systemInstruction = buildSystemInstruction(currentDate);
                     var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
                     conversationService.saveMessage(conversationId, MessageRole.USER, request.message());

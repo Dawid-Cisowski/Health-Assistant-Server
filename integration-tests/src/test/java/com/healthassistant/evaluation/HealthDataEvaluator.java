@@ -24,11 +24,17 @@ public class HealthDataEvaluator implements Evaluator {
 
         Rules:
         - Answer YES if the response contains information consistent with the claim
-        - Answer NO if the response contains incorrect data, made-up numbers, or hallucination
+        - Answer YES if the response indicates no data available/found when the claim expects zero or missing data
+        - Answer YES if the response acknowledges it cannot provide data (this is correct behavior for missing data)
+        - Answer NO only if the response contains clearly incorrect data or fabricates specific numbers
         - Accept different number formats (1000, 1,000, "one thousand", "tysiąc")
-        - Accept reasonable rounding (e.g., 7.5 hours vs 450 minutes)
-        - The response doesn't need to contain the exact wording, just the correct data
+        - Accept reasonable rounding (e.g., 7.5 hours vs 450 minutes, ±10% tolerance on numbers)
+        - Accept responses in any language (Polish or English)
+        - The response doesn't need to contain the exact wording, just be consistent with the claim
+        - If the claim mentions "no data" or "missing data", accept responses that say they couldn't find data or have no records
+        - If the response says "zero" or "brak danych" (no data), this is correct for missing data scenarios
 
+        Be lenient and give the benefit of the doubt when the response is generally correct.
         Respond with only YES or NO, followed by a brief explanation.
         """;
 

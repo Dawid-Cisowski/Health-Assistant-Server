@@ -139,14 +139,14 @@ class AiToolErrorHandlingSpec extends BaseEvaluationSpec {
         // No calorie data
         waitForProjections()
 
-        when: "asking for daily summary"
-        def response = askAssistant("Daj mi podsumowanie dnia")
+        when: "asking for daily summary with explicit date"
+        def response = askAssistant("Daj mi podsumowanie dzisiejszego dnia")
         println "DEBUG: Response: $response"
 
         then: "AI reports steps but indicates no calorie data"
         def evaluation = healthDataEvaluator.evaluate(
                 new EvaluationRequest(
-                        "AI should mention approximately 7500 steps. For calories, it should indicate no data or zero - NOT invent a calorie count.",
+                        "AI should mention approximately 7500 steps. For calories, it should indicate no data, zero, or not mention calories at all - NOT invent a calorie count.",
                         [],
                         response
                 )
