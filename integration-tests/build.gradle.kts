@@ -102,8 +102,8 @@ tasks.test {
     ignoreFailures = true  // Allow coverage report even when tests fail
     finalizedBy(tasks.jacocoTestReport)
 
-    // Exclude evaluation tests from regular test run (they require real Gemini API)
-    exclude("**/*HallucinationSpec.class", "**/*EvaluationSpec.class")
+    // Exclude AI evaluation tests from regular test run (they require real Gemini API)
+    exclude("**/evaluation/**")
 
     // Enable parallel test execution
     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
@@ -122,8 +122,8 @@ tasks.register<Test>("evaluationTest") {
 
     useJUnitPlatform()
 
-    // Only run evaluation specs
-    include("**/*HallucinationSpec.class", "**/*EvaluationSpec.class")
+    // Only run evaluation tests from evaluation package
+    include("**/evaluation/**")
 
     // Set profiles - evaluation profile uses real Gemini, not mock
     systemProperty("spring.profiles.active", "test,evaluation")
