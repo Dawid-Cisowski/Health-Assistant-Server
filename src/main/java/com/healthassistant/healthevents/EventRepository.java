@@ -17,7 +17,9 @@ interface EventRepository {
 
     Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart);
 
-    Optional<CompensationTargetInfo> markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt);
+    Optional<CompensationTargetInfo> markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt, String requestingDeviceId);
 
-    Optional<CompensationTargetInfo> markAsSuperseded(String targetEventId, String supersededByEventId);
+    Optional<CompensationTargetInfo> markAsSuperseded(String targetEventId, String supersededByEventId, String requestingDeviceId);
+
+    Optional<Event> findByEventIdAndDeviceId(String eventId, String deviceId);
 }

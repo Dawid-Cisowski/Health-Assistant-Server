@@ -73,6 +73,11 @@ class SleepProjector {
         });
     }
 
+    public void projectCorrectedSleep(String deviceId, java.util.Map<String, Object> payload, java.time.Instant occurredAt) {
+        sleepSessionFactory.createFromCorrectionPayload(deviceId, payload, occurredAt)
+                .ifPresent(this::saveProjection);
+    }
+
     private void updateDailyProjection(String deviceId, LocalDate date) {
         List<SleepSessionProjectionJpaEntity> sessions =
                 sessionRepository.findByDeviceIdAndDateOrderBySessionNumberAsc(deviceId, date);

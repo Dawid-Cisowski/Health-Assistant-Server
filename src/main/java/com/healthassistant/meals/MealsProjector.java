@@ -75,6 +75,11 @@ class MealsProjector {
         });
     }
 
+    public void projectCorrectedMeal(String deviceId, java.util.Map<String, Object> payload, Instant occurredAt) {
+        mealFactory.createFromCorrectionPayload(deviceId, payload, occurredAt)
+                .ifPresent(this::saveProjection);
+    }
+
     private void updateDailyProjection(String deviceId, LocalDate date) {
         List<MealProjectionJpaEntity> meals =
                 mealRepository.findByDeviceIdAndDateOrderByMealNumberAsc(deviceId, date);

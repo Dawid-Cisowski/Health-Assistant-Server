@@ -41,7 +41,7 @@ class MealsEventsListener {
                 .toList();
 
         var mealCorrections = event.corrections().stream()
-                .filter(c -> MEAL_V1.equals(c.targetEventType()))
+                .filter(c -> MEAL_V1.equals(c.targetEventType()) || MEAL_V1.equals(c.correctedEventType()))
                 .toList();
 
         if (mealDeletions.isEmpty() && mealCorrections.isEmpty()) {
@@ -62,8 +62,15 @@ class MealsEventsListener {
         mealCorrections.forEach(correction -> {
             try {
                 mealsProjector.deleteByEventId(correction.targetEventId());
+                if (MEAL_V1.equals(correction.correctedEventType()) && correction.correctedPayload() != null) {
+                    mealsProjector.projectCorrectedMeal(
+                            event.deviceId(),
+                            correction.correctedPayload(),
+                            correction.correctedOccurredAt()
+                    );
+                }
             } catch (Exception e) {
-                log.error("Failed to delete superseded meal projection for eventId: {}", correction.targetEventId(), e);
+                log.error("Failed to process correction for meal eventId: {}", correction.targetEventId(), e);
             }
         });
     }

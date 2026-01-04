@@ -57,4 +57,9 @@ class WorkoutProjector {
             log.info("Deleted workout projection for eventId: {} (workoutId: {})", eventId, workoutId);
         });
     }
+
+    public void projectCorrectedWorkout(String deviceId, java.util.Map<String, Object> payload, java.time.Instant occurredAt) {
+        workoutFactory.createFromCorrectionPayload(deviceId, payload, occurredAt)
+                .ifPresent(this::saveProjection);
+    }
 }

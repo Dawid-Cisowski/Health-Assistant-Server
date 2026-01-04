@@ -44,6 +44,8 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
 
     Optional<HealthEventJpaEntity> findByEventId(String eventId);
 
+    Optional<HealthEventJpaEntity> findByEventIdAndDeviceId(String eventId, String deviceId);
+
     @Query("SELECT e FROM HealthEventJpaEntity e WHERE e.deviceId = :deviceId " +
            "AND e.occurredAt BETWEEN :start AND :end " +
            "AND e.deletedAt IS NULL AND e.supersededByEventId IS NULL")

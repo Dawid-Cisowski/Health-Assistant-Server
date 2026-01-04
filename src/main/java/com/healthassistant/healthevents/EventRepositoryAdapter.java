@@ -73,8 +73,8 @@ class EventRepositoryAdapter implements EventRepository {
 
     @Override
     @Transactional
-    public Optional<CompensationTargetInfo> markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt) {
-        return jpaRepository.findByEventId(targetEventId).map(entity -> {
+    public Optional<CompensationTargetInfo> markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt, String requestingDeviceId) {
+        return jpaRepository.findByEventIdAndDeviceId(targetEventId, requestingDeviceId).map(entity -> {
             entity.setDeletedAt(deletedAt);
             entity.setDeletedByEventId(deletedByEventId);
             jpaRepository.save(entity);
@@ -90,8 +90,8 @@ class EventRepositoryAdapter implements EventRepository {
 
     @Override
     @Transactional
-    public Optional<CompensationTargetInfo> markAsSuperseded(String targetEventId, String supersededByEventId) {
-        return jpaRepository.findByEventId(targetEventId).map(entity -> {
+    public Optional<CompensationTargetInfo> markAsSuperseded(String targetEventId, String supersededByEventId, String requestingDeviceId) {
+        return jpaRepository.findByEventIdAndDeviceId(targetEventId, requestingDeviceId).map(entity -> {
             entity.setSupersededByEventId(supersededByEventId);
             jpaRepository.save(entity);
             log.info("Marked event {} as superseded by {}", targetEventId, supersededByEventId);
@@ -102,6 +102,13 @@ class EventRepositoryAdapter implements EventRepository {
                     entity.getDeviceId()
             );
         });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Event> findByEventIdAndDeviceId(String eventId, String deviceId) {
+        return jpaRepository.findByEventIdAndDeviceId(eventId, deviceId)
+                .map(this::toEvent);
     }
 
     private Map<String, Object> toMap(EventPayload payload) {

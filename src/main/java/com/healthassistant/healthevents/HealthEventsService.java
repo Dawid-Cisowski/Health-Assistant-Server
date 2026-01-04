@@ -167,27 +167,36 @@ class HealthEventsService implements HealthEventsFacade {
 
     private void publishCompensationEvents(StoreHealthEventsResult result, String deviceId) {
         List<CompensationEventsStoredEvent.CompensationEventData> deletions = new ArrayList<>();
-        List<CompensationEventsStoredEvent.CompensationEventData> corrections = new ArrayList<>();
+        List<CompensationEventsStoredEvent.CorrectionEventData> corrections = new ArrayList<>();
 
-        for (StoreHealthEventsResult.CompensationTarget target : result.compensationTargets()) {
+        result.compensationTargets().forEach(target -> {
             Set<LocalDate> affectedDates = target.targetOccurredAt() != null
                     ? Set.of(toLocalDate(target.targetOccurredAt()))
                     : Set.of();
 
-            CompensationEventsStoredEvent.CompensationEventData data =
-                    new CompensationEventsStoredEvent.CompensationEventData(
-                            null, // compensationEventId not needed for reprojection
-                            target.targetEventId(),
-                            target.targetEventType(),
-                            affectedDates
-                    );
-
             if (target.compensationType() == StoreHealthEventsResult.CompensationType.DELETED) {
-                deletions.add(data);
+                deletions.add(new CompensationEventsStoredEvent.CompensationEventData(
+                        null,
+                        target.targetEventId(),
+                        target.targetEventType(),
+                        affectedDates
+                ));
             } else {
-                corrections.add(data);
+                Set<LocalDate> correctedDates = target.correctedOccurredAt() != null
+                        ? Set.of(toLocalDate(target.correctedOccurredAt()))
+                        : affectedDates;
+
+                corrections.add(new CompensationEventsStoredEvent.CorrectionEventData(
+                        null,
+                        target.targetEventId(),
+                        target.targetEventType(),
+                        correctedDates,
+                        target.correctedEventType(),
+                        target.correctedPayload(),
+                        target.correctedOccurredAt()
+                ));
             }
-        }
+        });
 
         CompensationEventsStoredEvent event = new CompensationEventsStoredEvent(deviceId, deletions, corrections);
 

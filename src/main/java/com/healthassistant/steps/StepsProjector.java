@@ -5,11 +5,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Component
@@ -24,6 +26,19 @@ class StepsProjector {
     public void projectSteps(StoredEventData eventData) {
         stepsBucketFactory.createFromEvent(eventData)
                 .ifPresent(this::saveProjection);
+    }
+
+    public void projectCorrectedSteps(String deviceId, Map<String, Object> payload, Instant occurredAt) {
+        stepsBucketFactory.createFromCorrectionPayload(deviceId, payload)
+                .ifPresent(this::saveProjection);
+    }
+
+    @Transactional
+    public void reprojectForDate(String deviceId, LocalDate date) {
+        log.info("Reprojecting steps for device {} on date {}", deviceId, date);
+        hourlyRepository.deleteByDeviceIdAndDate(deviceId, date);
+        dailyRepository.deleteByDeviceIdAndDate(deviceId, date);
+        log.info("Deleted projections for device {} on date {} - events will be reprojected on next sync", deviceId, date);
     }
 
     private void saveProjection(StepsBucket bucket) {

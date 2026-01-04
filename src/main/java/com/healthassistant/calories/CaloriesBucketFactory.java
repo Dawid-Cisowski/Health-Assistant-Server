@@ -5,6 +5,8 @@ import com.healthassistant.healthevents.api.dto.payload.ActiveCaloriesPayload;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 @Component
@@ -34,5 +36,38 @@ class CaloriesBucketFactory {
                 payload.bucketEnd(),
                 payload.energyKcal()
         ));
+    }
+
+    Optional<CaloriesBucket> createFromCorrectionPayload(String deviceId, Map<String, Object> payload) {
+        Instant bucketStart = parseInstant(payload.get("bucketStart"));
+        Instant bucketEnd = parseInstant(payload.get("bucketEnd"));
+        Double energyKcal = parseDouble(payload.get("energyKcal"));
+
+        if (bucketStart == null || bucketEnd == null) {
+            log.warn("Corrected calories payload missing bucketStart or bucketEnd, skipping");
+            return Optional.empty();
+        }
+
+        if (energyKcal == null || energyKcal <= 0) {
+            log.debug("Corrected calories has zero or negative energy, skipping");
+            return Optional.empty();
+        }
+
+        return Optional.of(CaloriesBucket.create(deviceId, bucketStart, bucketEnd, energyKcal));
+    }
+
+    private Instant parseInstant(Object value) {
+        if (value == null) return null;
+        if (value instanceof Instant instant) return instant;
+        return Instant.parse(value.toString());
+    }
+
+    private Double parseDouble(Object value) {
+        return switch (value) {
+            case null -> null;
+            case Double d -> d;
+            case Number n -> n.doubleValue();
+            default -> Double.parseDouble(value.toString());
+        };
     }
 }

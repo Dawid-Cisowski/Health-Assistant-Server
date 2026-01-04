@@ -37,6 +37,7 @@ class StoreHealthEventsCommandHandler {
     @Transactional
     public StoreHealthEventsResult handle(StoreHealthEventsCommand command) {
         List<StoreHealthEventsCommand.EventEnvelope> events = command.events();
+        String deviceId = command.deviceId().value();
 
         List<StoreHealthEventsResult.EventResult> validationResults = IntStream.range(0, events.size())
                 .mapToObj(index -> {
@@ -64,7 +65,6 @@ class StoreHealthEventsCommandHandler {
         List<StoreHealthEventsResult.EventResult> duplicateResults = new ArrayList<>();
 
         validIndices
-//                .mapToInt(validIndex -> validIndex)
                 .forEach(index -> {
                     var envelope = events.get(index);
                     String idempotencyKeyValue = envelope.idempotencyKey().value();
@@ -85,7 +85,7 @@ class StoreHealthEventsCommandHandler {
             eventRepository.saveAll(eventsToSave);
             log.info("Stored {} new events in batch", eventsToSave.size());
 
-            compensationTargets.addAll(handleCompensationEvents(eventsToSave));
+            compensationTargets.addAll(handleCompensationEvents(eventsToSave, deviceId));
         }
 
         Map<String, Event> allProcessedEvents = new java.util.HashMap<>();
@@ -261,41 +261,56 @@ class StoreHealthEventsCommandHandler {
         );
     }
 
-    private List<StoreHealthEventsResult.CompensationTarget> handleCompensationEvents(List<Event> savedEvents) {
+    private List<StoreHealthEventsResult.CompensationTarget> handleCompensationEvents(List<Event> savedEvents, String requestingDeviceId) {
         List<StoreHealthEventsResult.CompensationTarget> compensations = new ArrayList<>();
 
-        for (Event event : savedEvents) {
-            if (event.payload() instanceof EventDeletedPayload deletedPayload) {
-                eventRepository.markAsDeleted(
-                        deletedPayload.targetEventId(),
-                        event.eventId().value(),
-                        Instant.now()
-                ).ifPresent(info -> {
-                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
-                            info.targetEventId(),
-                            info.targetEventType(),
-                            info.targetOccurredAt(),
-                            info.deviceId(),
-                            StoreHealthEventsResult.CompensationType.DELETED
-                    ));
-                    log.info("Processed EventDeleted.v1: marked event {} as deleted", deletedPayload.targetEventId());
+        savedEvents.stream()
+                .filter(event -> event.payload() instanceof EventDeletedPayload || event.payload() instanceof EventCorrectedPayload)
+                .forEach(event -> {
+                    if (event.payload() instanceof EventDeletedPayload deletedPayload) {
+                        eventRepository.markAsDeleted(
+                                deletedPayload.targetEventId(),
+                                event.eventId().value(),
+                                Instant.now(),
+                                requestingDeviceId
+                        ).ifPresentOrElse(
+                                info -> {
+                                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
+                                            info.targetEventId(),
+                                            info.targetEventType(),
+                                            info.targetOccurredAt(),
+                                            info.deviceId(),
+                                            StoreHealthEventsResult.CompensationType.DELETED
+                                    ));
+                                    log.info("Processed EventDeleted.v1: marked event {} as deleted", deletedPayload.targetEventId());
+                                },
+                                () -> log.warn("EventDeleted.v1: target event {} not found or not owned by device {}",
+                                        deletedPayload.targetEventId(), requestingDeviceId)
+                        );
+                    } else if (event.payload() instanceof EventCorrectedPayload correctedPayload) {
+                        eventRepository.markAsSuperseded(
+                                correctedPayload.targetEventId(),
+                                event.eventId().value(),
+                                requestingDeviceId
+                        ).ifPresentOrElse(
+                                info -> {
+                                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
+                                            info.targetEventId(),
+                                            info.targetEventType(),
+                                            info.targetOccurredAt(),
+                                            info.deviceId(),
+                                            StoreHealthEventsResult.CompensationType.CORRECTED,
+                                            correctedPayload.correctedEventType(),
+                                            correctedPayload.correctedPayload(),
+                                            correctedPayload.correctedOccurredAt()
+                                    ));
+                                    log.info("Processed EventCorrected.v1: marked event {} as superseded", correctedPayload.targetEventId());
+                                },
+                                () -> log.warn("EventCorrected.v1: target event {} not found or not owned by device {}",
+                                        correctedPayload.targetEventId(), requestingDeviceId)
+                        );
+                    }
                 });
-            } else if (event.payload() instanceof EventCorrectedPayload correctedPayload) {
-                eventRepository.markAsSuperseded(
-                        correctedPayload.targetEventId(),
-                        event.eventId().value()
-                ).ifPresent(info -> {
-                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
-                            info.targetEventId(),
-                            info.targetEventType(),
-                            info.targetOccurredAt(),
-                            info.deviceId(),
-                            StoreHealthEventsResult.CompensationType.CORRECTED
-                    ));
-                    log.info("Processed EventCorrected.v1: marked event {} as superseded", correctedPayload.targetEventId());
-                });
-            }
-        }
 
         return compensations;
     }

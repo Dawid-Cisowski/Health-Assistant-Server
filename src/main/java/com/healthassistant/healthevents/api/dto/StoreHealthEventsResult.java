@@ -6,6 +6,7 @@ import com.healthassistant.healthevents.api.model.EventType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public record StoreHealthEventsResult(
@@ -30,8 +31,21 @@ public record StoreHealthEventsResult(
             String targetEventType,
             Instant targetOccurredAt,
             String deviceId,
-            CompensationType compensationType
-    ) {}
+            CompensationType compensationType,
+            String correctedEventType,
+            Map<String, Object> correctedPayload,
+            Instant correctedOccurredAt
+    ) {
+        public CompensationTarget(
+                String targetEventId,
+                String targetEventType,
+                Instant targetOccurredAt,
+                String deviceId,
+                CompensationType compensationType
+        ) {
+            this(targetEventId, targetEventType, targetOccurredAt, deviceId, compensationType, null, null, null);
+        }
+    }
 
     public enum CompensationType {
         DELETED,

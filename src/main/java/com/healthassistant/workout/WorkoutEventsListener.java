@@ -41,7 +41,7 @@ class WorkoutEventsListener {
                 .toList();
 
         var workoutCorrections = event.corrections().stream()
-                .filter(c -> WORKOUT_V1.equals(c.targetEventType()))
+                .filter(c -> WORKOUT_V1.equals(c.targetEventType()) || WORKOUT_V1.equals(c.correctedEventType()))
                 .toList();
 
         if (workoutDeletions.isEmpty() && workoutCorrections.isEmpty()) {
@@ -62,8 +62,15 @@ class WorkoutEventsListener {
         workoutCorrections.forEach(correction -> {
             try {
                 workoutProjector.deleteByEventId(correction.targetEventId());
+                if (WORKOUT_V1.equals(correction.correctedEventType()) && correction.correctedPayload() != null) {
+                    workoutProjector.projectCorrectedWorkout(
+                            event.deviceId(),
+                            correction.correctedPayload(),
+                            correction.correctedOccurredAt()
+                    );
+                }
             } catch (Exception e) {
-                log.error("Failed to delete superseded workout projection for eventId: {}", correction.targetEventId(), e);
+                log.error("Failed to process correction for workout eventId: {}", correction.targetEventId(), e);
             }
         });
     }

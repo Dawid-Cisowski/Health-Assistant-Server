@@ -41,7 +41,7 @@ class SleepEventsListener {
                 .toList();
 
         var sleepCorrections = event.corrections().stream()
-                .filter(c -> SLEEP_SESSION_V1.equals(c.targetEventType()))
+                .filter(c -> SLEEP_SESSION_V1.equals(c.targetEventType()) || SLEEP_SESSION_V1.equals(c.correctedEventType()))
                 .toList();
 
         if (sleepDeletions.isEmpty() && sleepCorrections.isEmpty()) {
@@ -62,8 +62,15 @@ class SleepEventsListener {
         sleepCorrections.forEach(correction -> {
             try {
                 sleepProjector.deleteByEventId(correction.targetEventId());
+                if (SLEEP_SESSION_V1.equals(correction.correctedEventType()) && correction.correctedPayload() != null) {
+                    sleepProjector.projectCorrectedSleep(
+                            event.deviceId(),
+                            correction.correctedPayload(),
+                            correction.correctedOccurredAt()
+                    );
+                }
             } catch (Exception e) {
-                log.error("Failed to delete superseded sleep projection for eventId: {}", correction.targetEventId(), e);
+                log.error("Failed to process correction for sleep eventId: {}", correction.targetEventId(), e);
             }
         });
     }
