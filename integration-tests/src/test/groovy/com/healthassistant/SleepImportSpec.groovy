@@ -100,16 +100,16 @@ class SleepImportSpec extends BaseIntegrationSpec {
         body.getString("status") == "success"
         body.getBoolean("overwrote") == true
 
-        and: "three events exist (original + EventDeleted + new import) - event sourcing with compensation"
+        and: "two active events exist (EventDeleted + new import) - original is soft-deleted"
         def events = findEventsForDevice(DEVICE_ID)
-        events.size() == 3
+        events.size() == 2
 
         and: "one is the EventDeleted compensation event"
         def deletedEvents = events.findAll { it.eventType() == "EventDeleted.v1" }
         deletedEvents.size() == 1
 
         and: "the new sleep event has phase data from import"
-        def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" && it.payload().source() == "OHEALTH_SCREENSHOT" }
+        def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" }
         sleepEvents.size() == 1
         def payload = sleepEvents.first().payload()
         payload.lightSleepMinutes() == 180
@@ -285,17 +285,17 @@ class SleepImportSpec extends BaseIntegrationSpec {
         secondResponse.body().jsonPath().getString("sleepId") == firstSleepId
         secondResponse.body().jsonPath().getBoolean("overwrote") == true
 
-        and: "three events exist (first import + EventDeleted + second import) - event sourcing with compensation"
+        and: "two active events exist (EventDeleted + second import) - first import is soft-deleted"
         def events = findEventsForDevice(DEVICE_ID)
-        events.size() == 3
+        events.size() == 2
 
         and: "one EventDeleted compensation event exists"
         def deletedEvents = events.findAll { it.eventType() == "EventDeleted.v1" }
         deletedEvents.size() == 1
 
-        and: "two sleep events exist (first one is deleted, second is active)"
+        and: "only the second (active) sleep event is visible"
         def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" }
-        sleepEvents.size() == 2
+        sleepEvents.size() == 1
     }
 
     def "Scenario 12: PNG image is accepted"() {

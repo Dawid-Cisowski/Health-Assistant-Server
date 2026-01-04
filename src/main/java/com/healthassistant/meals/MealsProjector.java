@@ -65,11 +65,26 @@ class MealsProjector {
                 existingMeals.getLast().getMealNumber() + 1;
     }
 
+    public void deleteByEventId(String eventId) {
+        mealRepository.findByEventId(eventId).ifPresent(entity -> {
+            String deviceId = entity.getDeviceId();
+            LocalDate date = entity.getDate();
+            mealRepository.deleteByEventId(eventId);
+            log.info("Deleted meal projection for eventId: {}", eventId);
+            updateDailyProjection(deviceId, date);
+        });
+    }
+
     private void updateDailyProjection(String deviceId, LocalDate date) {
         List<MealProjectionJpaEntity> meals =
                 mealRepository.findByDeviceIdAndDateOrderByMealNumberAsc(deviceId, date);
 
         if (meals.isEmpty()) {
+            dailyRepository.findByDeviceIdAndDate(deviceId, date)
+                    .ifPresent(daily -> {
+                        dailyRepository.delete(daily);
+                        log.debug("Deleted empty daily meal projection for {}/{}", deviceId, date);
+                    });
             return;
         }
 

@@ -11,4 +11,6 @@ import java.util.List;
 interface WorkoutSetProjectionJpaRepository extends JpaRepository<WorkoutSetProjectionJpaEntity, Long> {
 
     List<WorkoutSetProjectionJpaEntity> findByWorkoutIdOrderByExerciseNameAscSetNumberAsc(String workoutId);
+
+    void deleteByWorkoutId(String workoutId);
 }

@@ -63,11 +63,26 @@ class SleepProjector {
                 existingSessions.getLast().getSessionNumber() + 1;
     }
 
+    public void deleteByEventId(String eventId) {
+        sessionRepository.findByEventId(eventId).ifPresent(entity -> {
+            String deviceId = entity.getDeviceId();
+            LocalDate date = entity.getDate();
+            sessionRepository.deleteByEventId(eventId);
+            log.info("Deleted sleep projection for eventId: {}", eventId);
+            updateDailyProjection(deviceId, date);
+        });
+    }
+
     private void updateDailyProjection(String deviceId, LocalDate date) {
         List<SleepSessionProjectionJpaEntity> sessions =
                 sessionRepository.findByDeviceIdAndDateOrderBySessionNumberAsc(deviceId, date);
 
         if (sessions.isEmpty()) {
+            dailyRepository.findByDeviceIdAndDate(deviceId, date)
+                    .ifPresent(daily -> {
+                        dailyRepository.delete(daily);
+                        log.debug("Deleted empty daily sleep projection for {}/{}", deviceId, date);
+                    });
             return;
         }
 

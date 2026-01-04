@@ -91,7 +91,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Exercise catalog specs
             "test-exercises",
             // Routine specs
-            "test-routines"
+            "test-routines",
+            // Compensation events specs
+            "test-deletion", "test-correction"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true

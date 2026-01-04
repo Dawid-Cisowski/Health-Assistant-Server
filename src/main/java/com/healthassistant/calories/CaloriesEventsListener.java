@@ -2,6 +2,7 @@ package com.healthassistant.calories;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.dto.events.CaloriesEventsStoredEvent;
+import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 class CaloriesEventsListener {
+
+    private static final String ACTIVE_CALORIES_V1 = "ActiveCaloriesBurnedRecorded.v1";
 
     private final CaloriesProjector caloriesProjector;
 
@@ -29,5 +32,21 @@ class CaloriesEventsListener {
         }
 
         log.info("Calories listener completed processing {} events", event.events().size());
+    }
+
+    @ApplicationModuleListener
+    public void onCompensationEventsStored(CompensationEventsStoredEvent event) {
+        var caloriesCompensations = event.deletions().stream()
+                .filter(d -> ACTIVE_CALORIES_V1.equals(d.targetEventType()))
+                .count();
+
+        caloriesCompensations += event.corrections().stream()
+                .filter(c -> ACTIVE_CALORIES_V1.equals(c.targetEventType()))
+                .count();
+
+        if (caloriesCompensations > 0) {
+            log.warn("Calories compensation events received ({} events) - full reprojection needed for affected dates",
+                    caloriesCompensations);
+        }
     }
 }

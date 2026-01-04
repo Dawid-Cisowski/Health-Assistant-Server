@@ -10,6 +10,7 @@ import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.dto.events.ActivityEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.AllEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.CaloriesEventsStoredEvent;
+import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.MealsEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.SleepEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +67,10 @@ class HealthEventsService implements HealthEventsFacade {
 
         if (!result.affectedDates().isEmpty()) {
             publishTypedEvents(result);
+        }
+
+        if (!result.compensationTargets().isEmpty()) {
+            publishCompensationEvents(result, command.deviceId().value());
         }
 
         return result;
@@ -159,6 +165,38 @@ class HealthEventsService implements HealthEventsFacade {
         );
     }
 
+    private void publishCompensationEvents(StoreHealthEventsResult result, String deviceId) {
+        List<CompensationEventsStoredEvent.CompensationEventData> deletions = new ArrayList<>();
+        List<CompensationEventsStoredEvent.CompensationEventData> corrections = new ArrayList<>();
+
+        for (StoreHealthEventsResult.CompensationTarget target : result.compensationTargets()) {
+            Set<LocalDate> affectedDates = target.targetOccurredAt() != null
+                    ? Set.of(toLocalDate(target.targetOccurredAt()))
+                    : Set.of();
+
+            CompensationEventsStoredEvent.CompensationEventData data =
+                    new CompensationEventsStoredEvent.CompensationEventData(
+                            null, // compensationEventId not needed for reprojection
+                            target.targetEventId(),
+                            target.targetEventType(),
+                            affectedDates
+                    );
+
+            if (target.compensationType() == StoreHealthEventsResult.CompensationType.DELETED) {
+                deletions.add(data);
+            } else {
+                corrections.add(data);
+            }
+        }
+
+        CompensationEventsStoredEvent event = new CompensationEventsStoredEvent(deviceId, deletions, corrections);
+
+        log.info("Publishing CompensationEventsStoredEvent for device {} with {} deletions, {} corrections, affected types: {}",
+                deviceId, deletions.size(), corrections.size(), event.affectedEventTypes());
+
+        eventPublisher.publishEvent(event);
+    }
+
     private Set<LocalDate> extractAffectedDates(List<StoredEventData> events) {
         return events.stream()
                 .map(StoredEventData::occurredAt)
@@ -181,7 +219,7 @@ class HealthEventsService implements HealthEventsFacade {
 
     @Override
     public List<EventData> findEventsByDeviceId(String deviceId) {
-        return healthEventJpaRepository.findByDeviceId(deviceId)
+        return healthEventJpaRepository.findActiveByDeviceId(deviceId)
                 .stream()
                 .map(this::toEventData)
                 .toList();

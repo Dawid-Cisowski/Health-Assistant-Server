@@ -64,6 +64,12 @@ class EventValidator {
 
     private List<EventValidationError> validateEventCorrected(EventCorrectedPayload payload) {
         List<EventValidationError> errors = new ArrayList<>();
+
+        if (payload.correctedEventType() == null || payload.correctedEventType().isBlank()) {
+            errors.add(EventValidationError.missingField("correctedEventType"));
+            return errors;
+        }
+
         try {
             com.healthassistant.healthevents.api.model.EventType.from(payload.correctedEventType());
         } catch (IllegalArgumentException e) {

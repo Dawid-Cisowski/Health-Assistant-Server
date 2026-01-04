@@ -56,12 +56,18 @@ class HealthEventsController {
                     - For workouts: `{deviceId}|workout|{workoutId}`
                     - For other events: `{deviceId}|{eventType}|{occurredAt}-{index}`
 
-                    Duplicate submissions (same idempotencyKey) will update the existing event.
+                    ## Modifying Events
+
+                    Events are immutable. To modify an existing event:
+                    - **Delete**: Submit `EventDeleted.v1` with `targetEventId`
+                    - **Correct**: Submit `EventCorrected.v1` with `targetEventId` and corrected data
+
+                    Submitting with the same `idempotencyKey` will NOT update the event - use compensation events instead.
 
                     ## Response Status Codes
 
                     - `stored` - Event was successfully stored
-                    - `duplicate` - Event with same idempotencyKey already exists (updated)
+                    - `duplicate` - Event with same idempotencyKey already exists (use EventCorrected.v1 to modify)
                     - `invalid` - Event failed validation
                     """,
             security = @SecurityRequirement(name = "HmacHeaderAuth")

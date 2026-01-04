@@ -1,6 +1,7 @@
 package com.healthassistant.steps;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 class StepsEventsListener {
+
+    private static final String STEPS_BUCKETED_V1 = "StepsBucketedRecorded.v1";
 
     private final StepsProjector stepsProjector;
 
@@ -29,5 +32,21 @@ class StepsEventsListener {
         }
 
         log.info("Steps listener completed processing {} events", event.events().size());
+    }
+
+    @ApplicationModuleListener
+    public void onCompensationEventsStored(CompensationEventsStoredEvent event) {
+        var stepsCompensations = event.deletions().stream()
+                .filter(d -> STEPS_BUCKETED_V1.equals(d.targetEventType()))
+                .count();
+
+        stepsCompensations += event.corrections().stream()
+                .filter(c -> STEPS_BUCKETED_V1.equals(c.targetEventType()))
+                .count();
+
+        if (stepsCompensations > 0) {
+            log.warn("Steps compensation events received ({} events) - full reprojection needed for affected dates",
+                    stepsCompensations);
+        }
     }
 }

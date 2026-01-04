@@ -48,4 +48,13 @@ class WorkoutProjector {
 
         log.info("Created workout projection for workoutId: {}", workout.workoutId());
     }
+
+    public void deleteByEventId(String eventId) {
+        workoutRepository.findByEventId(eventId).ifPresent(entity -> {
+            String workoutId = entity.getWorkoutId();
+            setRepository.deleteByWorkoutId(workoutId);
+            workoutRepository.deleteByEventId(eventId);
+            log.info("Deleted workout projection for eventId: {} (workoutId: {})", eventId, workoutId);
+        });
+    }
 }

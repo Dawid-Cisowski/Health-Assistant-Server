@@ -79,11 +79,13 @@ class StoreHealthEventsCommandHandler {
                     eventsToSave.add(event);
                 });
 
+        List<StoreHealthEventsResult.CompensationTarget> compensationTargets = new ArrayList<>();
+
         if (!eventsToSave.isEmpty()) {
             eventRepository.saveAll(eventsToSave);
             log.info("Stored {} new events in batch", eventsToSave.size());
 
-            handleCompensationEvents(eventsToSave);
+            compensationTargets.addAll(handleCompensationEvents(eventsToSave));
         }
 
         Map<String, Event> allProcessedEvents = new java.util.HashMap<>();
@@ -138,7 +140,7 @@ class StoreHealthEventsCommandHandler {
         Set<EventType> eventTypes = extractEventTypes(command, results);
         List<com.healthassistant.healthevents.api.dto.StoredEventData> storedEventData = extractStoredEvents(results, savedEventsByIndex);
 
-        return new StoreHealthEventsResult(results, affectedDates, eventTypes, storedEventData);
+        return new StoreHealthEventsResult(results, affectedDates, eventTypes, storedEventData, compensationTargets);
     }
 
     private List<com.healthassistant.healthevents.api.dto.StoredEventData> extractStoredEvents(
@@ -259,22 +261,42 @@ class StoreHealthEventsCommandHandler {
         );
     }
 
-    private void handleCompensationEvents(List<Event> savedEvents) {
+    private List<StoreHealthEventsResult.CompensationTarget> handleCompensationEvents(List<Event> savedEvents) {
+        List<StoreHealthEventsResult.CompensationTarget> compensations = new ArrayList<>();
+
         for (Event event : savedEvents) {
             if (event.payload() instanceof EventDeletedPayload deletedPayload) {
                 eventRepository.markAsDeleted(
                         deletedPayload.targetEventId(),
                         event.eventId().value(),
                         Instant.now()
-                );
-                log.info("Processed EventDeleted.v1: marked event {} as deleted", deletedPayload.targetEventId());
+                ).ifPresent(info -> {
+                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
+                            info.targetEventId(),
+                            info.targetEventType(),
+                            info.targetOccurredAt(),
+                            info.deviceId(),
+                            StoreHealthEventsResult.CompensationType.DELETED
+                    ));
+                    log.info("Processed EventDeleted.v1: marked event {} as deleted", deletedPayload.targetEventId());
+                });
             } else if (event.payload() instanceof EventCorrectedPayload correctedPayload) {
                 eventRepository.markAsSuperseded(
                         correctedPayload.targetEventId(),
                         event.eventId().value()
-                );
-                log.info("Processed EventCorrected.v1: marked event {} as superseded", correctedPayload.targetEventId());
+                ).ifPresent(info -> {
+                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
+                            info.targetEventId(),
+                            info.targetEventType(),
+                            info.targetOccurredAt(),
+                            info.deviceId(),
+                            StoreHealthEventsResult.CompensationType.CORRECTED
+                    ));
+                    log.info("Processed EventCorrected.v1: marked event {} as superseded", correctedPayload.targetEventId());
+                });
             }
         }
+
+        return compensations;
     }
 }

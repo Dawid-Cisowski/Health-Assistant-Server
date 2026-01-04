@@ -73,22 +73,34 @@ class EventRepositoryAdapter implements EventRepository {
 
     @Override
     @Transactional
-    public void markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt) {
-        jpaRepository.findByEventId(targetEventId).ifPresent(entity -> {
+    public Optional<CompensationTargetInfo> markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt) {
+        return jpaRepository.findByEventId(targetEventId).map(entity -> {
             entity.setDeletedAt(deletedAt);
             entity.setDeletedByEventId(deletedByEventId);
             jpaRepository.save(entity);
             log.info("Marked event {} as deleted by {}", targetEventId, deletedByEventId);
+            return new CompensationTargetInfo(
+                    entity.getEventId(),
+                    entity.getEventType(),
+                    entity.getOccurredAt(),
+                    entity.getDeviceId()
+            );
         });
     }
 
     @Override
     @Transactional
-    public void markAsSuperseded(String targetEventId, String supersededByEventId) {
-        jpaRepository.findByEventId(targetEventId).ifPresent(entity -> {
+    public Optional<CompensationTargetInfo> markAsSuperseded(String targetEventId, String supersededByEventId) {
+        return jpaRepository.findByEventId(targetEventId).map(entity -> {
             entity.setSupersededByEventId(supersededByEventId);
             jpaRepository.save(entity);
             log.info("Marked event {} as superseded by {}", targetEventId, supersededByEventId);
+            return new CompensationTargetInfo(
+                    entity.getEventId(),
+                    entity.getEventType(),
+                    entity.getOccurredAt(),
+                    entity.getDeviceId()
+            );
         });
     }
 
