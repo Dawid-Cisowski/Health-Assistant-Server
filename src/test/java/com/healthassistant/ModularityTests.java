@@ -1,11 +1,17 @@
 package com.healthassistant;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.modulith.core.ApplicationModule;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 class ModularityTests {
 
@@ -13,15 +19,92 @@ class ModularityTests {
 
     @Test
     void verifyModularStructure() {
-        // verify() throws exception if violations found (e.g., illegal cross-module dependencies)
+        // verify() throws exception if violations found (e.g., illegal cross-module dependencies, cycles)
         modules.verify();
     }
 
     @Test
-    void shouldDetectAllModules() {
-        long moduleCount = modules.stream().count();
-        assertEquals(16, moduleCount,
-                "Expected 16 modules but found " + moduleCount + ": " + modules.stream().toList());
+    void shouldDetectAllExpectedModules() {
+        var expectedModules = Set.of(
+                "appevents", "healthevents", "dailysummary", "steps", "workout",
+                "workoutimport", "sleep", "sleepimport", "calories", "activity",
+                "meals", "mealimport", "googlefit", "assistant", "security", "config"
+        );
+
+        var actualModules = modules.stream()
+                .map(ApplicationModule::getName)
+                .collect(Collectors.toSet());
+
+        assertThat(actualModules).containsExactlyInAnyOrderElementsOf(expectedModules);
+    }
+
+    @Test
+    void shouldHaveNoViolations() {
+        // detectViolations() returns violations, throwIfPresent() throws if any exist
+        var violations = modules.detectViolations();
+        violations.throwIfPresent();
+        // PMD requires explicit assertion
+        assertThat(true).isTrue();
+    }
+
+    @Test
+    void projectionModulesShouldNotDependOnImportModules() {
+        var projectionModules = List.of("steps", "workout", "sleep", "calories", "activity", "meals");
+        var importModules = Set.of("mealimport", "sleepimport", "workoutimport", "googlefit");
+
+        for (String projName : projectionModules) {
+            var module = modules.getModuleByName(projName).orElseThrow();
+            var dependencies = module.getBootstrapDependencies(modules)
+                    .map(ApplicationModule::getName)
+                    .collect(Collectors.toSet());
+
+            assertThat(dependencies)
+                    .as("Module %s should not depend on import modules", projName)
+                    .doesNotContainAnyElementsOf(importModules);
+        }
+    }
+
+    @Test
+    void healthEventsShouldNotDependOnProjectionModules() {
+        var projectionModules = Set.of("steps", "workout", "sleep", "calories", "activity", "meals", "dailysummary");
+
+        var module = modules.getModuleByName("healthevents").orElseThrow();
+        var dependencies = module.getBootstrapDependencies(modules)
+                .map(ApplicationModule::getName)
+                .collect(Collectors.toSet());
+
+        assertThat(dependencies)
+                .as("healthevents should not depend on projection modules")
+                .doesNotContainAnyElementsOf(projectionModules);
+    }
+
+    @Test
+    void modulesShouldHaveProperlyNamedFacades() {
+        var modulesWithFacades = Map.ofEntries(
+                Map.entry("steps", "StepsFacade"),
+                Map.entry("workout", "WorkoutFacade"),
+                Map.entry("sleep", "SleepFacade"),
+                Map.entry("calories", "CaloriesFacade"),
+                Map.entry("activity", "ActivityFacade"),
+                Map.entry("meals", "MealsFacade"),
+                Map.entry("healthevents", "HealthEventsFacade"),
+                Map.entry("dailysummary", "DailySummaryFacade"),
+                Map.entry("assistant", "AssistantFacade"),
+                Map.entry("googlefit", "GoogleFitFacade"),
+                Map.entry("mealimport", "MealImportFacade"),
+                Map.entry("sleepimport", "SleepImportFacade"),
+                Map.entry("workoutimport", "WorkoutImportFacade")
+        );
+
+        for (var entry : modulesWithFacades.entrySet()) {
+            String moduleName = entry.getKey();
+            String facadeName = entry.getValue();
+            String fullClassName = "com.healthassistant.%s.api.%s".formatted(moduleName, facadeName);
+
+            assertThatCode(() -> Class.forName(fullClassName))
+                    .as("Module %s should have facade %s", moduleName, facadeName)
+                    .doesNotThrowAnyException();
+        }
     }
 
     @Test
@@ -30,9 +113,7 @@ class ModularityTests {
                 .writeModuleCanvases()
                 .writeModulesAsPlantUml()
                 .writeIndividualModulesAsPlantUml();
-
-        // Verify documentation options were applied
-        assertTrue(documenter.toString().contains("Documenter"),
-                "Documenter should be properly initialized");
+        // PMD requires explicit assertion
+        assertThat(documenter).isNotNull();
     }
 }

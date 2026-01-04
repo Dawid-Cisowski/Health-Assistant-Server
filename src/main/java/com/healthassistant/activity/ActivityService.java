@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class ActivityService implements ActivityFacade {
+class ActivityService implements ActivityFacade {
 
     private final ActivityDailyProjectionJpaRepository dailyRepository;
     private final ActivityHourlyProjectionJpaRepository hourlyRepository;

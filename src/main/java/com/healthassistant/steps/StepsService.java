@@ -21,7 +21,7 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class StepsService implements StepsFacade {
+class StepsService implements StepsFacade {
 
     private final StepsDailyProjectionJpaRepository dailyRepository;
     private final StepsHourlyProjectionJpaRepository hourlyRepository;

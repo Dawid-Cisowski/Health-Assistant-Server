@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class WorkoutService implements WorkoutFacade {
+class WorkoutService implements WorkoutFacade {
 
     private final WorkoutProjectionJpaRepository workoutRepository;
     private final WorkoutExerciseProjectionJpaRepository exerciseRepository;

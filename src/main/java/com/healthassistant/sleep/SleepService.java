@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class SleepService implements SleepFacade {
+class SleepService implements SleepFacade {
 
     private static final String SLEEP_SESSION_V1 = "SleepSessionRecorded.v1";
 
