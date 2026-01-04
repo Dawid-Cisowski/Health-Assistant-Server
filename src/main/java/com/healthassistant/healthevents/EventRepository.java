@@ -1,5 +1,6 @@
 package com.healthassistant.healthevents;
 
+import com.healthassistant.healthevents.api.dto.ExistingSleepInfo;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 
@@ -12,9 +13,11 @@ interface EventRepository {
 
     void saveAll(List<Event> events);
 
-    void updateAll(List<Event> events);
-
     Map<String, Event> findExistingEventsByIdempotencyKeys(List<IdempotencyKey> idempotencyKeys);
 
-    Optional<IdempotencyKey> findSleepIdempotencyKeyByDeviceIdAndSleepStart(DeviceId deviceId, Instant sleepStart);
+    Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart);
+
+    void markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt);
+
+    void markAsSuperseded(String targetEventId, String supersededByEventId);
 }

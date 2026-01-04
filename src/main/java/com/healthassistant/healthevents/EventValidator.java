@@ -51,7 +51,26 @@ class EventValidator {
             case WalkingSessionPayload p -> validateTimeRange(p.start(), p.end(), "end", "start");
             case WorkoutPayload p -> validateWorkoutStructure(p);
             case MealRecordedPayload meal -> List.of();
+            case EventDeletedPayload p -> validateEventDeleted(p);
+            case EventCorrectedPayload p -> validateEventCorrected(p);
         };
+    }
+
+    @SuppressWarnings("PMD.UnusedFormalParameter")
+    private List<EventValidationError> validateEventDeleted(EventDeletedPayload payload) {
+        // Bean validation handles @NotBlank on targetEventId
+        return List.of();
+    }
+
+    private List<EventValidationError> validateEventCorrected(EventCorrectedPayload payload) {
+        List<EventValidationError> errors = new ArrayList<>();
+        try {
+            com.healthassistant.healthevents.api.model.EventType.from(payload.correctedEventType());
+        } catch (IllegalArgumentException e) {
+            errors.add(EventValidationError.invalidValue("correctedEventType", "invalid event type: " + payload.correctedEventType()));
+        }
+
+        return errors;
     }
 
     private List<EventValidationError> validateTimeRange(java.time.Instant start, java.time.Instant end, String endField, String startField) {

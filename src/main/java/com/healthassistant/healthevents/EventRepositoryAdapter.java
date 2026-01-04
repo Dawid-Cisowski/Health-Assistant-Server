@@ -2,6 +2,7 @@ package com.healthassistant.healthevents;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.healthassistant.healthevents.api.dto.ExistingSleepInfo;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.EventId;
@@ -72,37 +73,23 @@ class EventRepositoryAdapter implements EventRepository {
 
     @Override
     @Transactional
-    public void updateAll(List<Event> events) {
-        List<String> idempotencyKeys = events.stream()
-                .map(e -> e.idempotencyKey().value())
-                .toList();
+    public void markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt) {
+        jpaRepository.findByEventId(targetEventId).ifPresent(entity -> {
+            entity.setDeletedAt(deletedAt);
+            entity.setDeletedByEventId(deletedByEventId);
+            jpaRepository.save(entity);
+            log.info("Marked event {} as deleted by {}", targetEventId, deletedByEventId);
+        });
+    }
 
-        Map<String, HealthEventJpaEntity> existingEntities = jpaRepository.findByIdempotencyKeyIn(idempotencyKeys)
-                .stream()
-                .collect(Collectors.toMap(
-                        HealthEventJpaEntity::getIdempotencyKey,
-                        entity -> entity,
-                        (existing, replacement) -> existing.getCreatedAt().isAfter(replacement.getCreatedAt()) ? existing : replacement
-                ));
-
-        List<HealthEventJpaEntity> entitiesToUpdate = events.stream()
-                .map(event -> {
-                    HealthEventJpaEntity existing = existingEntities.get(event.idempotencyKey().value());
-                    if (existing == null) {
-                        throw new IllegalArgumentException("Event with idempotency key " + event.idempotencyKey().value() + " not found for update");
-                    }
-
-                    existing.setEventType(event.eventType().value());
-                    existing.setOccurredAt(event.occurredAt());
-                    existing.setPayload(toMap(event.payload()));
-                    existing.setDeviceId(event.deviceId().value());
-
-                    return existing;
-                })
-                .toList();
-
-        jpaRepository.saveAll(entitiesToUpdate);
-        jpaRepository.flush();
+    @Override
+    @Transactional
+    public void markAsSuperseded(String targetEventId, String supersededByEventId) {
+        jpaRepository.findByEventId(targetEventId).ifPresent(entity -> {
+            entity.setSupersededByEventId(supersededByEventId);
+            jpaRepository.save(entity);
+            log.info("Marked event {} as superseded by {}", targetEventId, supersededByEventId);
+        });
     }
 
     private Map<String, Object> toMap(EventPayload payload) {
@@ -116,13 +103,16 @@ class EventRepositoryAdapter implements EventRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<IdempotencyKey> findSleepIdempotencyKeyByDeviceIdAndSleepStart(DeviceId deviceId, Instant sleepStart) {
+    public Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart) {
         log.debug("Looking for sleep event with deviceId={}, sleepStart={}", deviceId.value(), sleepStart);
 
-        return jpaRepository.findSleepIdempotencyKeyByDeviceIdAndSleepStart(
+        return jpaRepository.findSleepInfoByDeviceIdAndSleepStart(
                         deviceId.value(),
                         sleepStart.toString()
                 )
-                .map(IdempotencyKey::of);
+                .map(projection -> new ExistingSleepInfo(
+                        IdempotencyKey.of(projection.getIdempotencyKey()),
+                        EventId.of(projection.getEventId())
+                ));
     }
 }

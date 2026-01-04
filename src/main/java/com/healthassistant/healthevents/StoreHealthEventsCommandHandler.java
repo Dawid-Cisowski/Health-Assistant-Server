@@ -2,6 +2,8 @@ package com.healthassistant.healthevents;
 
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
+import com.healthassistant.healthevents.api.dto.payload.EventCorrectedPayload;
+import com.healthassistant.healthevents.api.dto.payload.EventDeletedPayload;
 import com.healthassistant.healthevents.api.model.EventType;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,50 +60,48 @@ class StoreHealthEventsCommandHandler {
 
         Map<String, Event> existingEvents = eventRepository.findExistingEventsByIdempotencyKeys(idempotencyKeys);
 
-        List<Event> eventsToSave = new java.util.ArrayList<>();
-        List<Event> eventsToUpdate = new java.util.ArrayList<>();
+        List<Event> eventsToSave = new ArrayList<>();
+        List<StoreHealthEventsResult.EventResult> duplicateResults = new ArrayList<>();
 
-        validIndices.stream()
-                .map(events::get)
-                .forEach(envelope -> {
+        validIndices
+//                .mapToInt(validIndex -> validIndex)
+                .forEach(index -> {
+                    var envelope = events.get(index);
                     String idempotencyKeyValue = envelope.idempotencyKey().value();
                     Event existingEvent = existingEvents.get(idempotencyKeyValue);
                     EventType eventType = EventType.from(envelope.eventType());
-
-                    Event event = existingEvent != null
-                            ? eventFactory.createUpdate(existingEvent, eventType, envelope.occurredAt(), envelope.payload(), command.deviceId())
-                            : eventFactory.createNew(envelope.idempotencyKey(), eventType, envelope.occurredAt(), envelope.payload(), command.deviceId());
-
                     if (existingEvent != null) {
-                        eventsToUpdate.add(event);
-                    } else {
-                        eventsToSave.add(event);
+                        duplicateResults.add(createDuplicateError(index,
+                                "Event with this idempotency key already exists. Use EventCorrected.v1 to modify events."));
+                        return;
                     }
+                    Event event = eventFactory.createNew(envelope.idempotencyKey(), eventType, envelope.occurredAt(), envelope.payload(), command.deviceId());
+                    eventsToSave.add(event);
                 });
 
         if (!eventsToSave.isEmpty()) {
             eventRepository.saveAll(eventsToSave);
             log.info("Stored {} new events in batch", eventsToSave.size());
-        }
 
-        if (!eventsToUpdate.isEmpty()) {
-            eventRepository.updateAll(eventsToUpdate);
-            log.info("Updated {} existing events in batch", eventsToUpdate.size());
+            handleCompensationEvents(eventsToSave);
         }
 
         Map<String, Event> allProcessedEvents = new java.util.HashMap<>();
         eventsToSave.forEach(e -> allProcessedEvents.put(e.idempotencyKey().value(), e));
-        eventsToUpdate.forEach(e -> allProcessedEvents.put(e.idempotencyKey().value(), e));
 
-        Set<String> updatedEventKeys = eventsToUpdate.stream()
-                .map(e -> e.idempotencyKey().value())
+        Set<String> duplicateKeys = duplicateResults.stream()
+                .map(r -> events.get(r.index()).idempotencyKey().value())
                 .collect(Collectors.toSet());
 
         Map<Integer, Event> savedEventsByIndex = validIndices.stream()
+                .filter(index -> !duplicateKeys.contains(events.get(index).idempotencyKey().value()))
                 .collect(Collectors.toMap(
                         index -> index,
                         index -> allProcessedEvents.get(events.get(index).idempotencyKey().value())
                 ));
+
+        Map<Integer, StoreHealthEventsResult.EventResult> duplicateResultsByIndex = duplicateResults.stream()
+                .collect(Collectors.toMap(StoreHealthEventsResult.EventResult::index, r -> r));
 
         List<StoreHealthEventsResult.EventResult> results = IntStream.range(0, events.size())
                 .mapToObj(index -> {
@@ -109,18 +110,21 @@ class StoreHealthEventsCommandHandler {
                         return validationResult;
                     }
 
+                    StoreHealthEventsResult.EventResult duplicateResult = duplicateResultsByIndex.get(index);
+                    if (duplicateResult != null) {
+                        return duplicateResult;
+                    }
+
                     Event savedEvent = savedEventsByIndex.get(index);
                     if (savedEvent != null) {
-                        boolean isDuplicate = updatedEventKeys.contains(savedEvent.idempotencyKey().value());
-
                         if (savedEvent.eventType().value().equals("SleepSessionRecorded.v1")) {
-                            log.info("Sleep event index={} status={} idempotencyKey={}",
-                                    index, isDuplicate ? "duplicate" : "stored", savedEvent.idempotencyKey().value());
+                            log.info("Sleep event index={} status=stored idempotencyKey={}",
+                                    index, savedEvent.idempotencyKey().value());
                         }
 
                         return new StoreHealthEventsResult.EventResult(
                                 index,
-                                isDuplicate ? StoreHealthEventsResult.EventStatus.duplicate : StoreHealthEventsResult.EventStatus.stored,
+                                StoreHealthEventsResult.EventStatus.stored,
                                 savedEvent.eventId(),
                                 null
                         );
@@ -142,19 +146,9 @@ class StoreHealthEventsCommandHandler {
             Map<Integer, Event> savedEventsByIndex
     ) {
         return IntStream.range(0, results.size())
-                .filter(index -> {
-                    var status = results.get(index).status();
-                    if (status == StoreHealthEventsResult.EventStatus.stored) {
-                        return true;
-                    }
-                    if (status == StoreHealthEventsResult.EventStatus.duplicate) {
-                        Event event = savedEventsByIndex.get(index);
-                        return event != null && SLEEP_SESSION_V1.equals(event.eventType().value());
-                    }
-                    return false;
-                })
+                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
                 .mapToObj(savedEventsByIndex::get)
-                .filter(event -> event != null)
+                .filter(Objects::nonNull)
                 .map(event -> new com.healthassistant.healthevents.api.dto.StoredEventData(
                         event.idempotencyKey(),
                         event.eventType(),
@@ -168,11 +162,7 @@ class StoreHealthEventsCommandHandler {
 
     private Set<LocalDate> extractAffectedDates(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
         return IntStream.range(0, results.size())
-                .filter(index -> {
-                    var status = results.get(index).status();
-                    return status == StoreHealthEventsResult.EventStatus.stored ||
-                            status == StoreHealthEventsResult.EventStatus.duplicate;
-                })
+                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
                 .mapToObj(index -> {
                     var envelope = command.events().get(index);
                     Instant occurredAt = envelope.occurredAt();
@@ -184,11 +174,7 @@ class StoreHealthEventsCommandHandler {
 
     private Set<EventType> extractEventTypes(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
         return IntStream.range(0, results.size())
-                .filter(index -> {
-                    var status = results.get(index).status();
-                    return status == StoreHealthEventsResult.EventStatus.stored ||
-                            status == StoreHealthEventsResult.EventStatus.duplicate;
-                })
+                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
                 .mapToObj(index -> {
                     var envelope = command.events().get(index);
                     try {
@@ -262,5 +248,33 @@ class StoreHealthEventsCommandHandler {
                 null,
                 new StoreHealthEventsResult.EventError("payload", errorMessage)
         );
+    }
+
+    private StoreHealthEventsResult.EventResult createDuplicateError(int index, String message) {
+        return new StoreHealthEventsResult.EventResult(
+                index,
+                StoreHealthEventsResult.EventStatus.duplicate,
+                null,
+                new StoreHealthEventsResult.EventError("idempotencyKey", message)
+        );
+    }
+
+    private void handleCompensationEvents(List<Event> savedEvents) {
+        for (Event event : savedEvents) {
+            if (event.payload() instanceof EventDeletedPayload deletedPayload) {
+                eventRepository.markAsDeleted(
+                        deletedPayload.targetEventId(),
+                        event.eventId().value(),
+                        Instant.now()
+                );
+                log.info("Processed EventDeleted.v1: marked event {} as deleted", deletedPayload.targetEventId());
+            } else if (event.payload() instanceof EventCorrectedPayload correctedPayload) {
+                eventRepository.markAsSuperseded(
+                        correctedPayload.targetEventId(),
+                        event.eventId().value()
+                );
+                log.info("Processed EventCorrected.v1: marked event {} as superseded", correctedPayload.targetEventId());
+            }
+        }
     }
 }

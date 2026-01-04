@@ -8,7 +8,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Map;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.DEDUCTION)
+// Type deduction removed - we use explicit mapping via payloadClassFor() method
+// The event type is determined by the 'type' field in EventEnvelope, not by JSON structure
 @JsonSubTypes({
     @JsonSubTypes.Type(value = StepsPayload.class),
     @JsonSubTypes.Type(value = DistanceBucketPayload.class),
@@ -18,7 +19,9 @@ import java.util.Map;
     @JsonSubTypes.Type(value = ActiveMinutesPayload.class),
     @JsonSubTypes.Type(value = WalkingSessionPayload.class),
     @JsonSubTypes.Type(value = WorkoutPayload.class),
-    @JsonSubTypes.Type(value = MealRecordedPayload.class)
+    @JsonSubTypes.Type(value = MealRecordedPayload.class),
+    @JsonSubTypes.Type(value = EventDeletedPayload.class),
+    @JsonSubTypes.Type(value = EventCorrectedPayload.class)
 })
 @Schema(
     description = "Event payload - structure depends on event type. The payload type is determined by the 'type' field in the parent EventEnvelope.",
@@ -31,7 +34,9 @@ import java.util.Map;
         ActiveMinutesPayload.class,
         WalkingSessionPayload.class,
         WorkoutPayload.class,
-        MealRecordedPayload.class
+        MealRecordedPayload.class,
+        EventDeletedPayload.class,
+        EventCorrectedPayload.class
     }
 )
 public sealed interface EventPayload permits
@@ -43,7 +48,9 @@ public sealed interface EventPayload permits
     ActiveMinutesPayload,
     WalkingSessionPayload,
     WorkoutPayload,
-    MealRecordedPayload {
+    MealRecordedPayload,
+    EventDeletedPayload,
+    EventCorrectedPayload {
 
     static Class<? extends EventPayload> payloadClassFor(EventType eventType) {
         return payloadClassForType(eventType.value());
@@ -60,6 +67,8 @@ public sealed interface EventPayload permits
             case "WalkingSessionRecorded.v1" -> WalkingSessionPayload.class;
             case "WorkoutRecorded.v1" -> WorkoutPayload.class;
             case "MealRecorded.v1" -> MealRecordedPayload.class;
+            case "EventDeleted.v1" -> EventDeletedPayload.class;
+            case "EventCorrected.v1" -> EventCorrectedPayload.class;
             default -> throw new IllegalArgumentException("Unknown event type: " + eventTypeValue);
         };
     }

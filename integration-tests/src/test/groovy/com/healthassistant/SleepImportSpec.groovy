@@ -100,12 +100,18 @@ class SleepImportSpec extends BaseIntegrationSpec {
         body.getString("status") == "success"
         body.getBoolean("overwrote") == true
 
-        and: "only one sleep event exists (overwritten)"
+        and: "three events exist (original + EventDeleted + new import) - event sourcing with compensation"
         def events = findEventsForDevice(DEVICE_ID)
-        events.size() == 1
+        events.size() == 3
 
-        and: "the event now has phase data from import"
-        def payload = events.first().payload()
+        and: "one is the EventDeleted compensation event"
+        def deletedEvents = events.findAll { it.eventType() == "EventDeleted.v1" }
+        deletedEvents.size() == 1
+
+        and: "the new sleep event has phase data from import"
+        def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" && it.payload().source() == "OHEALTH_SCREENSHOT" }
+        sleepEvents.size() == 1
+        def payload = sleepEvents.first().payload()
         payload.lightSleepMinutes() == 180
         payload.deepSleepMinutes() == 120
         payload.remSleepMinutes() == 90
@@ -279,9 +285,17 @@ class SleepImportSpec extends BaseIntegrationSpec {
         secondResponse.body().jsonPath().getString("sleepId") == firstSleepId
         secondResponse.body().jsonPath().getBoolean("overwrote") == true
 
-        and: "only one event is stored in database"
+        and: "three events exist (first import + EventDeleted + second import) - event sourcing with compensation"
         def events = findEventsForDevice(DEVICE_ID)
-        events.size() == 1
+        events.size() == 3
+
+        and: "one EventDeleted compensation event exists"
+        def deletedEvents = events.findAll { it.eventType() == "EventDeleted.v1" }
+        deletedEvents.size() == 1
+
+        and: "two sleep events exist (first one is deleted, second is active)"
+        def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 2
     }
 
     def "Scenario 12: PNG image is accepted"() {

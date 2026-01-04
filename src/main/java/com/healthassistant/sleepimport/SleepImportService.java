@@ -1,8 +1,10 @@
 package com.healthassistant.sleepimport;
 
 import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.healthevents.api.dto.ExistingSleepInfo;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
+import com.healthassistant.healthevents.api.dto.payload.EventDeletedPayload;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.sleepimport.api.SleepImportFacade;
@@ -13,8 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -56,48 +60,64 @@ class SleepImportService implements SleepImportFacade {
                 );
             }
 
-            Optional<IdempotencyKey> existingKey = healthEventsFacade.findExistingSleepIdempotencyKey(
+            Optional<ExistingSleepInfo> existingInfo = healthEventsFacade.findExistingSleepInfo(
                     deviceId, extractedData.sleepStart()
             );
 
-            boolean overwrote = existingKey.isPresent();
-            IdempotencyKey idempotencyKey;
+            boolean overwrote = existingInfo.isPresent();
+            List<StoreHealthEventsCommand.EventEnvelope> envelopes = new ArrayList<>();
 
             if (overwrote) {
-                idempotencyKey = existingKey.get();
-                log.info("Found existing sleep with same start time, will overwrite: {}", idempotencyKey.value());
-            } else {
-                idempotencyKey = generateNewIdempotencyKey(deviceId, extractedData);
-                log.info("No existing sleep found, creating new with key: {}", idempotencyKey.value());
+                String targetEventId = existingInfo.get().eventId().value();
+                log.info("Found existing sleep with same start time, will delete and recreate: eventId={}",
+                        targetEventId);
+
+                EventDeletedPayload deletePayload = new EventDeletedPayload(
+                        targetEventId,
+                        existingInfo.get().idempotencyKey().value(),
+                        "Replaced by oHealth sleep import"
+                );
+
+                IdempotencyKey deleteIdempotencyKey = IdempotencyKey.of(
+                        String.format("%s|delete|%s", deviceId.value(), targetEventId)
+                );
+
+                envelopes.add(new StoreHealthEventsCommand.EventEnvelope(
+                        deleteIdempotencyKey,
+                        "EventDeleted.v1",
+                        Instant.now(),
+                        deletePayload
+                ));
             }
 
+            IdempotencyKey newIdempotencyKey = generateNewIdempotencyKey(deviceId, extractedData);
             String sleepId = generateSleepId(image, extractedData);
+            log.info("Creating new sleep event with key: {}", newIdempotencyKey.value());
 
-            StoreHealthEventsCommand.EventEnvelope envelope = eventMapper.mapToEventEnvelope(
-                    extractedData, sleepId, idempotencyKey, deviceId
+            StoreHealthEventsCommand.EventEnvelope sleepEnvelope = eventMapper.mapToEventEnvelope(
+                    extractedData, sleepId, newIdempotencyKey, deviceId
             );
+            envelopes.add(sleepEnvelope);
 
-            StoreHealthEventsCommand command = new StoreHealthEventsCommand(
-                    List.of(envelope), deviceId
-            );
+            StoreHealthEventsCommand command = new StoreHealthEventsCommand(envelopes, deviceId);
             StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-            var eventResult = result.results().getFirst();
-            if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
-                String errorMessage = eventResult.error() != null
-                        ? eventResult.error().message()
+            var sleepEventResult = result.results().getLast();
+            if (sleepEventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
+                String errorMessage = sleepEventResult.error() != null
+                        ? sleepEventResult.error().message()
                         : "Validation failed";
                 log.warn("Sleep event validation failed: {}", errorMessage);
                 return SleepImportResponse.failure("Validation error: " + errorMessage);
             }
 
-            String eventId = eventResult.eventId() != null
-                    ? eventResult.eventId().value()
+            String eventId = sleepEventResult.eventId() != null
+                    ? sleepEventResult.eventId().value()
                     : null;
 
             log.info("Successfully imported sleep {} for device {}: {}min, score={}, status={}, overwrote={}",
                     sleepId, deviceId.value(), extractedData.totalSleepMinutes(),
-                    extractedData.sleepScore(), eventResult.status(), overwrote);
+                    extractedData.sleepScore(), sleepEventResult.status(), overwrote);
 
             return SleepImportResponse.success(
                     sleepId,
@@ -176,9 +196,10 @@ class SleepImportService implements SleepImportFacade {
     }
 
     private IdempotencyKey generateNewIdempotencyKey(DeviceId deviceId, ExtractedSleepData data) {
-        String keyValue = String.format("%s|sleep-import|%s",
+        String keyValue = String.format("%s|sleep-import|%s|%d",
                 deviceId.value(),
-                data.sleepStart().toString()
+                data.sleepStart().toString(),
+                Instant.now().toEpochMilli()
         );
         return IdempotencyKey.of(keyValue);
     }

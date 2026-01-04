@@ -1,11 +1,11 @@
 package com.healthassistant.healthevents.api;
 
 import com.healthassistant.healthevents.api.dto.EventData;
+import com.healthassistant.healthevents.api.dto.ExistingSleepInfo;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.model.DeviceId;
-import com.healthassistant.healthevents.api.model.IdempotencyKey;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,5 +28,5 @@ public interface HealthEventsFacade {
 
     void deleteEventsByDeviceId(String deviceId);
 
-    Optional<IdempotencyKey> findExistingSleepIdempotencyKey(DeviceId deviceId, Instant sleepStart);
+    Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart);
 }

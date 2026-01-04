@@ -52,6 +52,15 @@ class HealthEventJpaEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deleted_by_event_id", length = 32)
+    private String deletedByEventId;
+
+    @Column(name = "superseded_by_event_id", length = 32)
+    private String supersededByEventId;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

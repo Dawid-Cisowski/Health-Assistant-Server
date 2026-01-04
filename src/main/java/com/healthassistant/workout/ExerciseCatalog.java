@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
@@ -38,7 +39,7 @@ class ExerciseCatalog {
     }
 
     List<ExerciseDefinition> getExercisesByMuscle(String muscle) {
-        String normalizedMuscle = muscle.toUpperCase();
+        String normalizedMuscle = muscle.toUpperCase(Locale.ROOT);
         return repository.findByMuscle(normalizedMuscle).stream()
                 .map(this::toDto)
                 .toList();

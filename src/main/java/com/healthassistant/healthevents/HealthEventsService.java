@@ -3,6 +3,7 @@ package com.healthassistant.healthevents;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.EventData;
+import com.healthassistant.healthevents.api.dto.ExistingSleepInfo;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
@@ -216,7 +217,7 @@ class HealthEventsService implements HealthEventsFacade {
     @Override
     @Transactional(readOnly = true)
     public List<StoredEventData> findEventsForReprojection(int page, int size) {
-        return healthEventJpaRepository.findAllByOrderByIdAsc(
+        return healthEventJpaRepository.findAllActiveOrderByIdAsc(
                 org.springframework.data.domain.PageRequest.of(page, size)
         )
                 .getContent()
@@ -228,7 +229,7 @@ class HealthEventsService implements HealthEventsFacade {
     @Override
     @Transactional(readOnly = true)
     public List<StoredEventData> findEventsForDateRange(String deviceId, Instant start, Instant end) {
-        return healthEventJpaRepository.findByDeviceIdAndOccurredAtBetween(deviceId, start, end)
+        return healthEventJpaRepository.findActiveByDeviceIdAndOccurredAtBetween(deviceId, start, end)
                 .stream()
                 .map(this::toStoredEventData)
                 .toList();
@@ -256,7 +257,7 @@ class HealthEventsService implements HealthEventsFacade {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<IdempotencyKey> findExistingSleepIdempotencyKey(DeviceId deviceId, Instant sleepStart) {
-        return eventRepository.findSleepIdempotencyKeyByDeviceIdAndSleepStart(deviceId, sleepStart);
+    public Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart) {
+        return eventRepository.findExistingSleepInfo(deviceId, sleepStart);
     }
 }
