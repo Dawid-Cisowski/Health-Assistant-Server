@@ -1,5 +1,6 @@
 package com.healthassistant.dailysummary;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import lombok.RequiredArgsConstructor;
@@ -14,17 +15,19 @@ import java.util.Map;
 @Slf4j
 class GenerateDailySummaryCommandHandler {
 
+    private static final TypeReference<Map<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() {};
+
     private final DailySummaryAggregator aggregator;
     private final DailySummaryJpaRepository jpaRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
     public void handle(GenerateDailySummaryCommand command) {
-        log.info("Generating daily summary for device: {} date: {}", command.deviceId(), command.date());
+        log.info("Generating daily summary for device: {} date: {}", maskDeviceId(command.deviceId()), command.date());
 
         DailySummary summary = aggregator.aggregate(command.deviceId(), command.date());
 
-        Map<String, Object> summaryMap = objectMapper.convertValue(summary, Map.class);
+        Map<String, Object> summaryMap = objectMapper.convertValue(summary, MAP_TYPE_REFERENCE);
 
         DailySummaryJpaEntity entity = jpaRepository.findByDeviceIdAndDate(command.deviceId(), summary.date())
                 .map(existing -> {
@@ -39,6 +42,13 @@ class GenerateDailySummaryCommandHandler {
 
         jpaRepository.save(entity);
 
-        log.info("Daily summary generated and saved for device: {} date: {}", command.deviceId(), command.date());
+        log.info("Daily summary generated and saved for device: {} date: {}", maskDeviceId(command.deviceId()), command.date());
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
     }
 }

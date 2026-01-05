@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -28,17 +29,19 @@ class AiDailySummaryService {
     private static final int GOAL_CALORIES = 2500;
     private static final int GOAL_ACTIVITY_MINUTES = 300;
 
+    private static final int MAX_USER_INPUT_LENGTH = 100;
+    private static final Pattern PROMPT_INJECTION_PATTERN = Pattern.compile(
+            "(?i)(ignore|disregard|forget).{0,20}(previous|instruction|above|system|prompt)",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern CONTROL_CHARS_PATTERN = Pattern.compile("[\\p{Cntrl}&&[^\t]]");
+
     private final DailySummaryFacade dailySummaryFacade;
     private final DailySummaryJpaRepository repository;
     private final ChatClient chatClient;
 
     private static final String SYSTEM_PROMPT = """
         You are a health assistant that writes very short daily summaries.
-
-        USER PROFILE:
-        - Male, 21 years old
-        - Height: 178 cm, Weight: 73 kg
-        - Goals: Maintain healthy lifestyle and build muscle mass
 
         RULES:
         - Write in Polish, informal, friendly tone
@@ -48,11 +51,10 @@ class AiDailySummaryService {
         - You can use emojis (sparingly)
         - DO NOT use words: "podsumowanie", "dzisiaj", "twoje dane"
         - DO NOT start with "Hej" or "Czesc"
-        - Consider user's muscle building goal when commenting on workouts and nutrition
 
         GOAL EVALUATION (IMPORTANT):
-        - User goals: Steps=10000, Sleep=7h, Calories=2500kcal, Activity=5h
-        - TOLERANCE: ±10% from goal is "achieved" (e.g., 6h50m sleep vs 7h goal = OK, don't criticize!)
+        - Default goals: Steps=10000, Sleep=7h, Calories=2500kcal, Activity=5h
+        - TOLERANCE: +/-10% from goal is "achieved" (e.g., 6h50m sleep vs 7h goal = OK, don't criticize!)
         - Sleep is ALWAYS evaluated independently of time of day (previous night)
 
         TIME-AWARE EVALUATION (for steps, calories, activity - NOT sleep):
@@ -62,10 +64,10 @@ class AiDailySummaryService {
         - NIGHT: full day evaluation
 
         EXAMPLES:
-        - Morning + 2000 steps + 1 meal → "niezly start! dzien dopiero sie rozkreca"
-        - Evening + 3000 steps + 1 meal → "slabo... malo krokow jak na te pore, daj z siebie wiecej"
-        - Sleep 6h50m (goal 7h) → "sen ok" (within tolerance, don't criticize)
-        - Sleep 5h → "za malo snu, jutro sie odśpisz?"
+        - Morning + 2000 steps + 1 meal -> "niezly start! dzien dopiero sie rozkreca"
+        - Evening + 3000 steps + 1 meal -> "slabo... malo krokow jak na te pore, daj z siebie wiecej"
+        - Sleep 6h50m (goal 7h) -> "sen ok" (within tolerance, don't criticize)
+        - Sleep 5h -> "za malo snu, jutro sie odśpisz?"
 
         STYLE EXAMPLES:
         - "super dzien! wyspales sie, zdrowe jedzenie i duzo krokow - szacun"
@@ -75,11 +77,11 @@ class AiDailySummaryService {
 
     @Transactional
     public AiDailySummaryResponse generateSummary(String deviceId, LocalDate date) {
-        log.info("Generating AI daily summary for device {} date: {}", deviceId, date);
+        log.info("Generating AI daily summary for device {} date: {}", maskDeviceId(deviceId), date);
 
         var entityOpt = repository.findByDeviceIdAndDate(deviceId, date);
         if (entityOpt.isEmpty()) {
-            log.info("No daily summary entity found for device {} date: {}", deviceId, date);
+            log.info("No daily summary entity found for device {} date: {}", maskDeviceId(deviceId), date);
             return AiDailySummaryResponse.noData(date);
         }
 
@@ -87,7 +89,7 @@ class AiDailySummaryService {
 
         if (isCacheValid(entity)) {
             log.info("Returning cached AI summary for device {} date: {} (generated at: {})",
-                    deviceId, date, entity.getAiSummaryGeneratedAt());
+                    maskDeviceId(deviceId), date, entity.getAiSummaryGeneratedAt());
             return new AiDailySummaryResponse(date, entity.getAiSummary(), true);
         }
 
@@ -178,7 +180,7 @@ class AiDailySummaryService {
             sb.append("Workouts: ").append(summary.workouts().size()).append("\n");
             summary.workouts().forEach(w -> {
                 if (w.note() != null && !w.note().isBlank()) {
-                    sb.append("  - ").append(w.note()).append("\n");
+                    sb.append("  - ").append(sanitizeForPrompt(w.note())).append("\n");
                 }
             });
         }
@@ -232,5 +234,25 @@ class AiDailySummaryService {
         }
 
         return sb.toString();
+    }
+
+    private static String sanitizeForPrompt(String input) {
+        if (input == null) {
+            return "";
+        }
+        String sanitized = CONTROL_CHARS_PATTERN.matcher(input).replaceAll("");
+        sanitized = sanitized.replace("\n", " ").replace("\r", " ");
+        sanitized = PROMPT_INJECTION_PATTERN.matcher(sanitized).replaceAll("[filtered]");
+        if (sanitized.length() > MAX_USER_INPUT_LENGTH) {
+            sanitized = sanitized.substring(0, MAX_USER_INPUT_LENGTH) + "...";
+        }
+        return sanitized.trim();
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
     }
 }

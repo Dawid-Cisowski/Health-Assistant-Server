@@ -12,13 +12,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
-
-import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/v1/daily-summaries")
@@ -26,6 +26,8 @@ import org.springframework.http.HttpStatus;
 @Slf4j
 @Tag(name = "Daily Summaries", description = "Daily health summaries aggregated from events")
 class DailySummaryController {
+
+    private static final int MAX_RANGE_DAYS = 365;
 
     private final DailySummaryFacade dailySummaryFacade;
     private final Optional<AiDailySummaryService> aiDailySummaryService;
@@ -45,10 +47,16 @@ class DailySummaryController {
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving daily summary for device {} and date: {}", deviceId, date);
+        log.info("Retrieving daily summary for device {} and date: {}", maskDeviceId(deviceId), date);
+
+        if (date.isAfter(LocalDate.now())) {
+            log.warn("Requested future date: {}", date);
+            return ResponseEntity.badRequest().build();
+        }
+
         return dailySummaryFacade.getDailySummary(deviceId, date)
                 .map(summary -> ResponseEntity.ok(DailySummaryMapper.INSTANCE.toResponse(summary)))
-                .orElse(ResponseEntity.notFound().build());
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/range")
@@ -72,7 +80,18 @@ class DailySummaryController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving daily summaries range for device {} from {} to {}", deviceId, startDate, endDate);
+        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+        if (daysBetween > MAX_RANGE_DAYS) {
+            log.warn("Date range exceeds maximum {} days: {} to {} ({} days)", MAX_RANGE_DAYS, startDate, endDate, daysBetween);
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (endDate.isAfter(LocalDate.now())) {
+            log.warn("End date is in the future: {}", endDate);
+            return ResponseEntity.badRequest().build();
+        }
+
+        log.info("Retrieving daily summaries range for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
         DailySummaryRangeSummaryResponse summary = dailySummaryFacade.getRangeSummary(deviceId, startDate, endDate);
         return ResponseEntity.ok(summary);
     }
@@ -92,7 +111,7 @@ class DailySummaryController {
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Generating AI summary for device {} date: {}", deviceId, date);
+        log.info("Generating AI summary for device {} date: {}", maskDeviceId(deviceId), date);
 
         if (aiDailySummaryService.isEmpty()) {
             log.warn("AI service is not available");
@@ -103,8 +122,15 @@ class DailySummaryController {
             AiDailySummaryResponse response = aiDailySummaryService.get().generateSummary(deviceId, date);
             return ResponseEntity.ok(response);
         } catch (AiSummaryGenerationException e) {
-            log.error("AI summary generation failed for device {} date: {}", deviceId, date, e);
+            log.error("AI summary generation failed for device {} date: {}", maskDeviceId(deviceId), date, e);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
     }
 }

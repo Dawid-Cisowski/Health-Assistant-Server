@@ -11,9 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -39,127 +40,158 @@ class DailySummaryService implements DailySummaryFacade {
     public DailySummaryRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate) {
         List<DailySummaryJpaEntity> entities = jpaRepository.findByDeviceIdAndDateBetweenOrderByDateAsc(deviceId, startDate, endDate);
 
-        RangeSummaryAggregator agg = new RangeSummaryAggregator();
-        List<DailySummaryResponse> dailyStats = new ArrayList<>(entities.size());
-
-        entities.stream()
+        List<DailySummary> summaries = entities.stream()
                 .map(entity -> objectMapper.convertValue(entity.getSummary(), DailySummary.class))
-                .forEach(s -> {
-                    agg.aggregate(s);
-                    dailyStats.add(DailySummaryMapper.INSTANCE.toResponse(s));
-        });
+                .toList();
 
-        return agg.buildResponse(startDate, endDate, dailyStats);
+        List<DailySummaryResponse> dailyStats = summaries.stream()
+                .map(DailySummaryMapper.INSTANCE::toResponse)
+                .toList();
+
+        RangeSummaryAccumulator accumulated = summaries.stream()
+                .reduce(RangeSummaryAccumulator.empty(), RangeSummaryAccumulator::aggregate, RangeSummaryAccumulator::merge);
+
+        return accumulated.buildResponse(startDate, endDate, dailyStats);
     }
 
-    private static class RangeSummaryAggregator {
-        int daysWithData;
-        int totalSteps;
-        int totalActiveMinutes;
-        int totalActiveCalories;
-        long totalDistanceMeters;
-        int daysWithSteps;
+    private record RangeSummaryAccumulator(
+            int daysWithData,
+            int totalSteps,
+            int totalActiveMinutes,
+            int totalActiveCalories,
+            long totalDistanceMeters,
+            int daysWithSteps,
+            int totalSleepMinutes,
+            int daysWithSleep,
+            int sumRestingBpm,
+            int daysWithRestingBpm,
+            int sumAvgBpm,
+            int daysWithAvgBpm,
+            Integer maxBpmOverall,
+            int daysWithHeartData,
+            int totalCalories,
+            int totalProtein,
+            int totalFat,
+            int totalCarbs,
+            int totalMeals,
+            int daysWithNutrition,
+            int totalWorkouts,
+            int daysWithWorkouts,
+            List<DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo> workoutList
+    ) {
+        static RangeSummaryAccumulator empty() {
+            return new RangeSummaryAccumulator(
+                    0, 0, 0, 0, 0L, 0, 0, 0, 0, 0, 0, 0, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, List.of()
+            );
+        }
 
-        int totalSleepMinutes;
-        int daysWithSleep;
-
-        int sumRestingBpm;
-        int daysWithRestingBpm;
-        int sumAvgBpm;
-        int daysWithAvgBpm;
-        Integer maxBpmOverall;
-        int daysWithHeartData;
-
-        int totalCalories;
-        int totalProtein;
-        int totalFat;
-        int totalCarbs;
-        int totalMeals;
-        int daysWithNutrition;
-
-        int totalWorkouts;
-        int daysWithWorkouts;
-        List<DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo> workoutList = new ArrayList<>();
-
-        void aggregate(DailySummary s) {
-            daysWithData++;
-
+        RangeSummaryAccumulator aggregate(DailySummary s) {
             Integer steps = s.activity().steps();
-            if (steps != null) {
-                totalSteps += steps;
-                if (steps > 0) daysWithSteps++;
-            }
             Integer activeMinutes = s.activity().activeMinutes();
-            if (activeMinutes != null) totalActiveMinutes += activeMinutes;
             Integer activeCalories = s.activity().activeCalories();
-            if (activeCalories != null) totalActiveCalories += activeCalories;
             Long distance = s.activity().distanceMeters();
-            if (distance != null) totalDistanceMeters += distance;
 
-            if (!s.sleep().isEmpty()) {
-                daysWithSleep++;
-                for (DailySummary.Sleep sleep : s.sleep()) {
-                    if (sleep.totalMinutes() != null) totalSleepMinutes += sleep.totalMinutes();
-                }
-            }
+            int sleepMins = s.sleep().stream()
+                    .map(DailySummary.Sleep::totalMinutes)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
 
             Integer restingBpm = s.heart().restingBpm();
             Integer avgBpm = s.heart().avgBpm();
             Integer maxBpm = s.heart().maxBpm();
-            if (restingBpm != null) {
-                sumRestingBpm += restingBpm;
-                daysWithRestingBpm++;
-            }
-            if (avgBpm != null) {
-                sumAvgBpm += avgBpm;
-                daysWithAvgBpm++;
-            }
-            if (maxBpm != null && (maxBpmOverall == null || maxBpm > maxBpmOverall)) {
-                maxBpmOverall = maxBpm;
-            }
-            if (restingBpm != null || avgBpm != null || maxBpm != null) {
-                daysWithHeartData++;
-            }
 
             Integer cal = s.nutrition().totalCalories();
             Integer prot = s.nutrition().totalProtein();
             Integer fat = s.nutrition().totalFat();
             Integer carbs = s.nutrition().totalCarbs();
             Integer meals = s.nutrition().mealCount();
-            if (cal != null) totalCalories += cal;
-            if (prot != null) totalProtein += prot;
-            if (fat != null) totalFat += fat;
-            if (carbs != null) totalCarbs += carbs;
-            if (meals != null) {
-                totalMeals += meals;
-                if (meals > 0) daysWithNutrition++;
-            }
 
-            if (!s.workouts().isEmpty()) {
-                daysWithWorkouts++;
-                totalWorkouts += s.workouts().size();
-                for (DailySummary.Workout w : s.workouts()) {
-                    workoutList.add(new DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo(
-                            w.workoutId(), w.note(), s.date()));
-                }
-            }
+            List<DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo> newWorkouts = s.workouts().isEmpty()
+                    ? workoutList
+                    : Stream.concat(
+                            workoutList.stream(),
+                            s.workouts().stream().map(w -> new DailySummaryRangeSummaryResponse.WorkoutSummary.WorkoutInfo(
+                                    w.workoutId(), w.note(), s.date()))
+                    ).toList();
+
+            Integer newMaxBpm = maxBpm != null && (maxBpmOverall == null || maxBpm > maxBpmOverall)
+                    ? maxBpm : maxBpmOverall;
+
+            return new RangeSummaryAccumulator(
+                    daysWithData + 1,
+                    totalSteps + orZero(steps),
+                    totalActiveMinutes + orZero(activeMinutes),
+                    totalActiveCalories + orZero(activeCalories),
+                    totalDistanceMeters + orZeroLong(distance),
+                    daysWithSteps + (steps != null && steps > 0 ? 1 : 0),
+                    totalSleepMinutes + sleepMins,
+                    daysWithSleep + (!s.sleep().isEmpty() ? 1 : 0),
+                    sumRestingBpm + orZero(restingBpm),
+                    daysWithRestingBpm + (restingBpm != null ? 1 : 0),
+                    sumAvgBpm + orZero(avgBpm),
+                    daysWithAvgBpm + (avgBpm != null ? 1 : 0),
+                    newMaxBpm,
+                    daysWithHeartData + (restingBpm != null || avgBpm != null || maxBpm != null ? 1 : 0),
+                    totalCalories + orZero(cal),
+                    totalProtein + orZero(prot),
+                    totalFat + orZero(fat),
+                    totalCarbs + orZero(carbs),
+                    totalMeals + orZero(meals),
+                    daysWithNutrition + (meals != null && meals > 0 ? 1 : 0),
+                    totalWorkouts + s.workouts().size(),
+                    daysWithWorkouts + (!s.workouts().isEmpty() ? 1 : 0),
+                    newWorkouts
+            );
+        }
+
+        RangeSummaryAccumulator merge(RangeSummaryAccumulator other) {
+            Integer mergedMax = Optional.ofNullable(maxBpmOverall)
+                    .map(m -> Optional.ofNullable(other.maxBpmOverall).map(o -> Math.max(m, o)).orElse(m))
+                    .orElse(other.maxBpmOverall);
+
+            return new RangeSummaryAccumulator(
+                    daysWithData + other.daysWithData,
+                    totalSteps + other.totalSteps,
+                    totalActiveMinutes + other.totalActiveMinutes,
+                    totalActiveCalories + other.totalActiveCalories,
+                    totalDistanceMeters + other.totalDistanceMeters,
+                    daysWithSteps + other.daysWithSteps,
+                    totalSleepMinutes + other.totalSleepMinutes,
+                    daysWithSleep + other.daysWithSleep,
+                    sumRestingBpm + other.sumRestingBpm,
+                    daysWithRestingBpm + other.daysWithRestingBpm,
+                    sumAvgBpm + other.sumAvgBpm,
+                    daysWithAvgBpm + other.daysWithAvgBpm,
+                    mergedMax,
+                    daysWithHeartData + other.daysWithHeartData,
+                    totalCalories + other.totalCalories,
+                    totalProtein + other.totalProtein,
+                    totalFat + other.totalFat,
+                    totalCarbs + other.totalCarbs,
+                    totalMeals + other.totalMeals,
+                    daysWithNutrition + other.daysWithNutrition,
+                    totalWorkouts + other.totalWorkouts,
+                    daysWithWorkouts + other.daysWithWorkouts,
+                    Stream.concat(workoutList.stream(), other.workoutList.stream()).toList()
+            );
         }
 
         DailySummaryRangeSummaryResponse buildResponse(LocalDate startDate, LocalDate endDate,
                                                         List<DailySummaryResponse> dailyStats) {
             var activity = new DailySummaryRangeSummaryResponse.ActivitySummary(
                     totalSteps,
-                    daysWithSteps > 0 ? totalSteps / daysWithSteps : 0,
+                    safeDivide(totalSteps, daysWithSteps),
                     totalActiveMinutes,
-                    daysWithData > 0 ? totalActiveMinutes / daysWithData : 0,
+                    safeDivide(totalActiveMinutes, daysWithData),
                     totalActiveCalories,
-                    daysWithData > 0 ? totalActiveCalories / daysWithData : 0,
+                    safeDivide(totalActiveCalories, daysWithData),
                     totalDistanceMeters,
-                    daysWithData > 0 ? totalDistanceMeters / daysWithData : 0L);
+                    safeDivideLong(totalDistanceMeters, daysWithData));
 
             var sleep = new DailySummaryRangeSummaryResponse.SleepSummary(
                     totalSleepMinutes,
-                    daysWithSleep > 0 ? totalSleepMinutes / daysWithSleep : 0,
+                    safeDivide(totalSleepMinutes, daysWithSleep),
                     daysWithSleep);
 
             var heart = new DailySummaryRangeSummaryResponse.HeartSummary(
@@ -170,15 +202,15 @@ class DailySummaryService implements DailySummaryFacade {
 
             var nutrition = new DailySummaryRangeSummaryResponse.NutritionSummary(
                     totalCalories,
-                    daysWithNutrition > 0 ? totalCalories / daysWithNutrition : 0,
+                    safeDivide(totalCalories, daysWithNutrition),
                     totalProtein,
-                    daysWithNutrition > 0 ? totalProtein / daysWithNutrition : 0,
+                    safeDivide(totalProtein, daysWithNutrition),
                     totalFat,
-                    daysWithNutrition > 0 ? totalFat / daysWithNutrition : 0,
+                    safeDivide(totalFat, daysWithNutrition),
                     totalCarbs,
-                    daysWithNutrition > 0 ? totalCarbs / daysWithNutrition : 0,
+                    safeDivide(totalCarbs, daysWithNutrition),
                     totalMeals,
-                    daysWithNutrition > 0 ? totalMeals / daysWithNutrition : 0,
+                    safeDivide(totalMeals, daysWithNutrition),
                     daysWithNutrition);
 
             var workouts = new DailySummaryRangeSummaryResponse.WorkoutSummary(
@@ -186,6 +218,22 @@ class DailySummaryService implements DailySummaryFacade {
 
             return new DailySummaryRangeSummaryResponse(
                     startDate, endDate, daysWithData, activity, sleep, heart, nutrition, workouts, dailyStats);
+        }
+
+        private static int safeDivide(int numerator, int denominator) {
+            return denominator > 0 ? numerator / denominator : 0;
+        }
+
+        private static long safeDivideLong(long numerator, int denominator) {
+            return denominator > 0 ? numerator / denominator : 0L;
+        }
+
+        private static int orZero(Integer value) {
+            return value != null ? value : 0;
+        }
+
+        private static long orZeroLong(Long value) {
+            return value != null ? value : 0L;
         }
     }
 
@@ -199,14 +247,32 @@ class DailySummaryService implements DailySummaryFacade {
     @Override
     @Transactional
     public void deleteSummariesByDeviceId(String deviceId) {
-        log.warn("Deleting all daily summaries for deviceId: {}", deviceId);
+        Objects.requireNonNull(deviceId, "deviceId must not be null");
+        if (deviceId.isBlank()) {
+            throw new IllegalArgumentException("deviceId must not be blank");
+        }
+        // TODO: Add authorization check - verify caller is allowed to delete data for this deviceId
+        log.warn("Deleting all daily summaries for deviceId: {}", maskDeviceId(deviceId));
         jpaRepository.deleteByDeviceId(deviceId);
     }
 
     @Override
     @Transactional
     public void deleteSummaryForDate(String deviceId, LocalDate date) {
-        log.debug("Deleting daily summary for device {} date {}", deviceId, date);
+        Objects.requireNonNull(deviceId, "deviceId must not be null");
+        Objects.requireNonNull(date, "date must not be null");
+        if (deviceId.isBlank()) {
+            throw new IllegalArgumentException("deviceId must not be blank");
+        }
+        // TODO: Add authorization check - verify caller is allowed to delete data for this deviceId
+        log.debug("Deleting daily summary for device {} date {}", maskDeviceId(deviceId), date);
         jpaRepository.deleteByDeviceIdAndDate(deviceId, date);
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
     }
 }

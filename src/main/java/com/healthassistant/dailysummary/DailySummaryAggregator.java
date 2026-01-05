@@ -12,9 +12,9 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.healthassistant.dailysummary.api.dto.DailySummary.Exercise;
 import static com.healthassistant.dailysummary.api.dto.DailySummary.Heart;
@@ -47,7 +47,7 @@ class DailySummaryAggregator {
                 ))
                 .toList();
 
-        log.info("Aggregating {} events for device {} date {}", events.size(), deviceId, date);
+        log.info("Aggregating {} events for device {} date {}", events.size(), maskDeviceId(deviceId), date);
 
         Activity activity = aggregateActivity(events);
         List<Exercise> exercises = aggregateExercises(events);
@@ -70,29 +70,65 @@ class DailySummaryAggregator {
     }
 
     private Activity aggregateActivity(List<EventData> events) {
-        int totalSteps = 0;
-        int totalActiveMinutes = 0;
-        int totalActiveCalories = 0;
-        long totalDistanceMeters = 0L;
-
-        for (EventData event : events) {
-            EventPayload payload = event.payload();
-
-            switch (payload) {
-                case StepsPayload steps -> totalSteps += steps.count() != null ? steps.count() : 0;
-                case ActiveMinutesPayload am -> totalActiveMinutes += am.activeMinutes() != null ? am.activeMinutes() : 0;
-                case ActiveCaloriesPayload ac -> totalActiveCalories += ac.energyKcal() != null ? ac.energyKcal().intValue() : 0;
-                case DistanceBucketPayload dist -> totalDistanceMeters += dist.distanceMeters() != null ? Math.round(dist.distanceMeters()) : 0L;
-                default -> { }
-            }
-        }
+        var accumulated = events.stream()
+                .map(EventData::payload)
+                .reduce(
+                        new ActivityAccumulator(0, 0, 0, 0L),
+                        (acc, payload) -> switch (payload) {
+                            case StepsPayload steps -> acc.addSteps(orZero(steps.count()));
+                            case ActiveMinutesPayload am -> acc.addActiveMinutes(orZero(am.activeMinutes()));
+                            case ActiveCaloriesPayload ac -> acc.addActiveCalories(orZeroInt(ac.energyKcal()));
+                            case DistanceBucketPayload dist -> acc.addDistance(orZeroLong(dist.distanceMeters()));
+                            default -> acc;
+                        },
+                        ActivityAccumulator::merge
+                );
 
         return new Activity(
-                nullIfZero(totalSteps),
-                nullIfZero(totalActiveMinutes),
-                nullIfZero(totalActiveCalories),
-                nullIfZero(totalDistanceMeters)
+                nullIfZero(accumulated.steps()),
+                nullIfZero(accumulated.activeMinutes()),
+                nullIfZero(accumulated.activeCalories()),
+                nullIfZero(accumulated.distanceMeters())
         );
+    }
+
+    private record ActivityAccumulator(int steps, int activeMinutes, int activeCalories, long distanceMeters) {
+        ActivityAccumulator addSteps(int value) {
+            return new ActivityAccumulator(steps + value, activeMinutes, activeCalories, distanceMeters);
+        }
+
+        ActivityAccumulator addActiveMinutes(int value) {
+            return new ActivityAccumulator(steps, activeMinutes + value, activeCalories, distanceMeters);
+        }
+
+        ActivityAccumulator addActiveCalories(int value) {
+            return new ActivityAccumulator(steps, activeMinutes, activeCalories + value, distanceMeters);
+        }
+
+        ActivityAccumulator addDistance(long value) {
+            return new ActivityAccumulator(steps, activeMinutes, activeCalories, distanceMeters + value);
+        }
+
+        ActivityAccumulator merge(ActivityAccumulator other) {
+            return new ActivityAccumulator(
+                    steps + other.steps,
+                    activeMinutes + other.activeMinutes,
+                    activeCalories + other.activeCalories,
+                    distanceMeters + other.distanceMeters
+            );
+        }
+    }
+
+    private static int orZero(Integer value) {
+        return value != null ? value : 0;
+    }
+
+    private static int orZeroInt(Double value) {
+        return value != null ? value.intValue() : 0;
+    }
+
+    private static long orZeroLong(Double value) {
+        return value != null ? Math.round(value) : 0L;
     }
 
     private <T extends Number> T nullIfZero(T value) {
@@ -119,14 +155,6 @@ class DailySummaryAggregator {
         try {
             Instant start = walking.start();
             Instant end = walking.end();
-            Integer durationMinutes = walking.durationMinutes();
-            Long distanceMeters = walking.totalDistanceMeters();
-            Integer steps = walking.totalSteps();
-            Integer avgHr = walking.avgHeartRate();
-            Integer energyKcal = walking.totalCalories();
-            if (energyKcal == null && avgHr != null && durationMinutes != null) {
-                energyKcal = calculateWorkoutCalories(avgHr, durationMinutes);
-            }
 
             if (start == null || end == null) {
                 return null;
@@ -136,11 +164,11 @@ class DailySummaryAggregator {
                     "WALK",
                     start,
                     end,
-                    durationMinutes,
-                    distanceMeters,
-                    steps,
-                    avgHr,
-                    energyKcal
+                    walking.durationMinutes(),
+                    walking.totalDistanceMeters(),
+                    walking.totalSteps(),
+                    walking.avgHeartRate(),
+                    walking.totalCalories()
             );
         } catch (Exception e) {
             log.warn("Failed to convert event to workout: {}", e.getMessage());
@@ -186,69 +214,87 @@ class DailySummaryAggregator {
     }
 
     private Heart aggregateHeart(List<EventData> events) {
-        List<Integer> heartRates = new ArrayList<>();
-        Integer maxHr = null;
+        var accumulated = events.stream()
+                .map(EventData::payload)
+                .reduce(
+                        new HeartAccumulator(List.of(), null),
+                        (acc, payload) -> switch (payload) {
+                            case HeartRatePayload hr -> acc.addHeartRate(
+                                    hr.avg() != null ? hr.avg().intValue() : null,
+                                    hr.max()
+                            );
+                            case WalkingSessionPayload walking -> acc.addHeartRate(
+                                    walking.avgHeartRate(),
+                                    walking.maxHeartRate()
+                            );
+                            default -> acc;
+                        },
+                        HeartAccumulator::merge
+                );
 
-        for (EventData event : events) {
-            EventPayload payload = event.payload();
-
-            switch (payload) {
-                case HeartRatePayload hr -> {
-                    Integer avg = hr.avg() != null ? hr.avg().intValue() : null;
-                    Integer max = hr.max();
-                    if (avg != null) {
-                        heartRates.add(avg);
-                    }
-                    if (max != null && (maxHr == null || max > maxHr)) {
-                        maxHr = max;
-                    }
-                }
-                case WalkingSessionPayload walking -> {
-                    Integer avg = walking.avgHeartRate();
-                    Integer max = walking.maxHeartRate();
-                    if (avg != null) {
-                        heartRates.add(avg);
-                    }
-                    if (max != null && (maxHr == null || max > maxHr)) {
-                        maxHr = max;
-                    }
-                }
-                default -> { }
-            }
-        }
-
+        List<Integer> heartRates = accumulated.avgRates();
         Integer avgBpm = heartRates.isEmpty() ? null :
                 (int) heartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0);
         Integer restingBpm = heartRates.isEmpty() ? null :
                 heartRates.stream().mapToInt(Integer::intValue).min().orElse(0);
 
-        return new Heart(restingBpm, avgBpm, maxHr);
+        return new Heart(restingBpm, avgBpm, accumulated.maxHr());
+    }
+
+    private record HeartAccumulator(List<Integer> avgRates, Integer maxHr) {
+        HeartAccumulator addHeartRate(Integer avg, Integer max) {
+            List<Integer> newRates = avg != null
+                    ? java.util.stream.Stream.concat(avgRates.stream(), java.util.stream.Stream.of(avg)).toList()
+                    : avgRates;
+            Integer newMax = max != null && (maxHr == null || max > maxHr) ? max : maxHr;
+            return new HeartAccumulator(newRates, newMax);
+        }
+
+        HeartAccumulator merge(HeartAccumulator other) {
+            List<Integer> mergedRates = java.util.stream.Stream.concat(avgRates.stream(), other.avgRates.stream()).toList();
+            Integer mergedMax = Optional.ofNullable(maxHr)
+                    .map(m -> Optional.ofNullable(other.maxHr).map(o -> Math.max(m, o)).orElse(m))
+                    .orElse(other.maxHr);
+            return new HeartAccumulator(mergedRates, mergedMax);
+        }
     }
 
     private Nutrition aggregateNutrition(List<EventData> events) {
-        int totalCalories = 0;
-        int totalProtein = 0;
-        int totalFat = 0;
-        int totalCarbs = 0;
-        int mealCount = 0;
-
-        for (EventData event : events) {
-            if (event.payload() instanceof MealRecordedPayload meal) {
-                totalCalories += meal.caloriesKcal() != null ? meal.caloriesKcal() : 0;
-                totalProtein += meal.proteinGrams() != null ? meal.proteinGrams() : 0;
-                totalFat += meal.fatGrams() != null ? meal.fatGrams() : 0;
-                totalCarbs += meal.carbohydratesGrams() != null ? meal.carbohydratesGrams() : 0;
-                mealCount++;
-            }
-        }
+        var accumulated = events.stream()
+                .map(EventData::payload)
+                .filter(MealRecordedPayload.class::isInstance)
+                .map(MealRecordedPayload.class::cast)
+                .reduce(
+                        new NutritionAccumulator(0, 0, 0, 0, 0),
+                        (acc, meal) -> new NutritionAccumulator(
+                                acc.calories() + orZero(meal.caloriesKcal()),
+                                acc.protein() + orZero(meal.proteinGrams()),
+                                acc.fat() + orZero(meal.fatGrams()),
+                                acc.carbs() + orZero(meal.carbohydratesGrams()),
+                                acc.mealCount() + 1
+                        ),
+                        NutritionAccumulator::merge
+                );
 
         return new Nutrition(
-                nullIfZero(totalCalories),
-                nullIfZero(totalProtein),
-                nullIfZero(totalFat),
-                nullIfZero(totalCarbs),
-                nullIfZero(mealCount)
+                nullIfZero(accumulated.calories()),
+                nullIfZero(accumulated.protein()),
+                nullIfZero(accumulated.fat()),
+                nullIfZero(accumulated.carbs()),
+                nullIfZero(accumulated.mealCount())
         );
+    }
+
+    private record NutritionAccumulator(int calories, int protein, int fat, int carbs, int mealCount) {
+        NutritionAccumulator merge(NutritionAccumulator other) {
+            return new NutritionAccumulator(
+                    calories + other.calories,
+                    protein + other.protein,
+                    fat + other.fat,
+                    carbs + other.carbs,
+                    mealCount + other.mealCount
+            );
+        }
     }
 
     private List<Meal> aggregateMeals(List<EventData> events) {
@@ -281,22 +327,10 @@ class DailySummaryAggregator {
         }
     }
 
-    private Integer calculateWorkoutCalories(Integer avgHr, Integer durationMinutes) {
-        if (durationMinutes == null || durationMinutes == 0) return null;
-        if (avgHr == null) return null;
-
-        double mets = estimateMets(avgHr);
-        double weightKg = 70.0;
-        double caloriesPerMinute = (mets * weightKg * 3.5) / 200.0;
-
-        return (int) Math.round(caloriesPerMinute * durationMinutes);
-    }
-
-    private double estimateMets(int heartRate) {
-        if (heartRate < 100) return 3.0;
-        if (heartRate < 120) return 5.0;
-        if (heartRate < 140) return 7.0;
-        if (heartRate < 160) return 9.0;
-        return 11.0;
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
     }
 }

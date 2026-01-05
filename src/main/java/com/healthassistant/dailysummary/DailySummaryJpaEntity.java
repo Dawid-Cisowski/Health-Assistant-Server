@@ -10,9 +10,14 @@ import java.time.LocalDate;
 import java.util.Map;
 
 @Entity
-@Table(name = "daily_summaries", indexes = {
-        @Index(name = "idx_daily_summaries_created_at", columnList = "created_at")
-})
+@Table(name = "daily_summaries",
+        indexes = {
+                @Index(name = "idx_daily_summaries_created_at", columnList = "created_at")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_daily_summaries_device_date", columnNames = {"device_id", "date"})
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
