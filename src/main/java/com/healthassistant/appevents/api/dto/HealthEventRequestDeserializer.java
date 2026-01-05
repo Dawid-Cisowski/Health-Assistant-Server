@@ -11,9 +11,14 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealthEventsRequest.HealthEventRequest> {
+
+    private static final Pattern TYPE_NAME_PATTERN = Pattern.compile("`([^`]+)`");
 
     @Override
     public SubmitHealthEventsRequest.HealthEventRequest deserialize(JsonParser p, DeserializationContext ctxt)
@@ -21,21 +26,15 @@ public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealt
         ObjectMapper mapper = (ObjectMapper) p.getCodec();
         JsonNode node = mapper.readTree(p);
 
-        String idempotencyKey = node.has("idempotencyKey") && !node.get("idempotencyKey").isNull()
-                ? node.get("idempotencyKey").asText()
-                : null;
-
-        String type = node.has("type") && !node.get("type").isNull()
-                ? node.get("type").asText()
-                : null;
-
-        Instant occurredAt = node.has("occurredAt") && !node.get("occurredAt").isNull()
-                ? Instant.parse(node.get("occurredAt").asText())
-                : null;
+        String idempotencyKey = extractStringField(node, "idempotencyKey").orElse(null);
+        String type = extractStringField(node, "type").orElse(null);
+        Instant occurredAt = extractStringField(node, "occurredAt")
+                .map(Instant::parse)
+                .orElse(null);
 
         EventPayload payload = null;
         String deserializationError = null;
-        if (node.has("payload") && !node.get("payload").isNull() && type != null) {
+        if (hasNonNullField(node, "payload") && type != null) {
             try {
                 EventType eventType = EventType.from(type);
                 Class<? extends EventPayload> payloadClass = EventPayload.payloadClassFor(eventType);
@@ -52,23 +51,38 @@ public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealt
         return new SubmitHealthEventsRequest.HealthEventRequest(idempotencyKey, type, occurredAt, payload, deserializationError);
     }
 
+    private Optional<String> extractStringField(JsonNode node, String fieldName) {
+        return Optional.of(node)
+                .filter(n -> n.has(fieldName))
+                .map(n -> n.get(fieldName))
+                .filter(n -> !n.isNull())
+                .map(JsonNode::asText);
+    }
+
+    private boolean hasNonNullField(JsonNode node, String fieldName) {
+        return node.has(fieldName) && !node.get(fieldName).isNull();
+    }
+
     private String extractMeaningfulError(Exception e) {
-        String message = e.getMessage();
-        if (message == null) {
-            return "Invalid payload";
-        }
-        if (message.contains("Cannot deserialize value of type")) {
-            int fieldStart = message.indexOf("`");
-            int fieldEnd = message.indexOf("`", fieldStart + 1);
-            if (fieldStart >= 0 && fieldEnd > fieldStart) {
-                String fullTypeName = message.substring(fieldStart + 1, fieldEnd);
-                String simpleName = fullTypeName.contains(".")
-                        ? fullTypeName.substring(fullTypeName.lastIndexOf('.') + 1)
-                        : fullTypeName;
-                String fieldName = Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
-                return "Invalid value for " + fieldName;
-            }
-        }
-        return "Invalid payload: " + message;
+        return Optional.ofNullable(e.getMessage())
+                .filter(msg -> msg.contains("Cannot deserialize value of type"))
+                .flatMap(this::extractTypeNameFromMessage)
+                .map(this::toFieldName)
+                .map(fieldName -> "Invalid value for " + fieldName)
+                .orElseGet(() -> Optional.ofNullable(e.getMessage())
+                        .map(msg -> "Invalid payload: " + msg)
+                        .orElse("Invalid payload"));
+    }
+
+    private Optional<String> extractTypeNameFromMessage(String message) {
+        Matcher matcher = TYPE_NAME_PATTERN.matcher(message);
+        return matcher.find() ? Optional.of(matcher.group(1)) : Optional.empty();
+    }
+
+    private String toFieldName(String fullTypeName) {
+        String simpleName = fullTypeName.contains(".")
+                ? fullTypeName.substring(fullTypeName.lastIndexOf('.') + 1)
+                : fullTypeName;
+        return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
     }
 }

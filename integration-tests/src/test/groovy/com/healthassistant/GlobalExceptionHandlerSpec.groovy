@@ -14,7 +14,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
     // Validation Errors (MethodArgumentNotValidException)
     // ===========================================
 
-    def "Scenario 1: Empty events array returns error status"() {
+    def "Scenario 1: Empty events array returns batch size error"() {
         given: "a request with empty events array"
         def path = "/v1/health-events"
         def body = '{"events": []}'
@@ -25,9 +25,9 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "I get 400 Bad Request with error status"
-        response.statusCode() == 400
-        response.body().jsonPath().getString("status") == "error"
+        then: "I get 413 Payload Too Large with batch size error"
+        response.statusCode() == 413
+        response.body().jsonPath().getString("code") == "BATCH_TOO_LARGE"
     }
 
     def "Scenario 2: Missing required field in event payload returns validation error with field name"() {
@@ -278,7 +278,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("code") in ["MALFORMED_REQUEST", "VALIDATION_ERROR"]
     }
 
-    def "Scenario 10: Null events field returns error status"() {
+    def "Scenario 10: Null events field returns validation error"() {
         given: "a request with null events"
         def path = "/v1/health-events"
         def body = '{"events": null}'
@@ -289,8 +289,8 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "I get 400 Bad Request with error status"
+        then: "I get 400 Bad Request with validation error"
         response.statusCode() == 400
-        response.body().jsonPath().getString("status") == "error"
+        response.body().jsonPath().getString("code") == "VALIDATION_ERROR"
     }
 }

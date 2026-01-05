@@ -16,8 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -32,55 +36,46 @@ class AppEventsService implements AppEventsFacade {
                 request.deviceId() != null ? request.deviceId() : "mobile-app"
         );
 
-        List<EventResult> deserializationErrorResults = new ArrayList<>();
-        List<EventEnvelope> validEventEnvelopes = new ArrayList<>();
-        Map<Integer, Integer> validIndexMapping = new HashMap<>();
+        List<IndexedEvent> indexedEvents = IntStream.range(0, request.events().size())
+                .mapToObj(i -> new IndexedEvent(i, request.events().get(i)))
+                .toList();
 
-        IntStream.range(0, request.events().size()).forEach(i -> {
-            HealthEventRequest eventRequest = request.events().get(i);
-            if (eventRequest.deserializationError() != null) {
-                deserializationErrorResults.add(new EventResult(
-                        i,
+        Map<Boolean, List<IndexedEvent>> partitionedEvents = indexedEvents.stream()
+                .collect(Collectors.partitioningBy(ie -> ie.event().deserializationError() != null));
+
+        List<EventResult> deserializationErrors = partitionedEvents.get(true).stream()
+                .map(ie -> new EventResult(
+                        ie.index(),
                         EventStatus.invalid,
                         null,
-                        new EventError("payload", eventRequest.deserializationError())
-                ));
-            } else {
-                IdempotencyKey idempotencyKey = IdempotencyKey.from(
-                        eventRequest.idempotencyKey(),
-                        deviceId.value(),
-                        eventRequest.type(),
-                        eventRequest.payload(),
-                        i
-                );
+                        new EventError("payload", ie.event().deserializationError())
+                ))
+                .toList();
 
-                validIndexMapping.put(validEventEnvelopes.size(), i);
-                validEventEnvelopes.add(new EventEnvelope(
-                        idempotencyKey,
-                        eventRequest.type(),
-                        eventRequest.occurredAt(),
-                        eventRequest.payload()
-                ));
-            }
-        });
+        List<IndexedEvent> validEvents = partitionedEvents.get(false);
+
+        List<EventEnvelope> eventEnvelopes = validEvents.stream()
+                .map(ie -> createEventEnvelope(ie, deviceId))
+                .toList();
 
         StoreHealthEventsResult facadeResult = healthEventsFacade.storeHealthEvents(
-                new StoreHealthEventsCommand(validEventEnvelopes, deviceId)
+                new StoreHealthEventsCommand(eventEnvelopes, deviceId)
         );
 
-        List<EventResult> allResults = new ArrayList<>(deserializationErrorResults);
+        List<EventResult> facadeResults = facadeResult.results().stream().map(eventResult -> {
+                    int originalIndex = validEvents.get(eventResult.index()).index();
+                    return new EventResult(
+                            originalIndex,
+                            eventResult.status(),
+                            eventResult.eventId(),
+                            eventResult.error()
+                    );
+                })
+                .toList();
 
-        facadeResult.results().forEach(facadeRes -> {
-            int originalIndex = validIndexMapping.get(facadeRes.index());
-            allResults.add(new EventResult(
-                    originalIndex,
-                    facadeRes.status(),
-                    facadeRes.eventId(),
-                    facadeRes.error()
-            ));
-        });
-
-        allResults.sort(Comparator.comparingInt(EventResult::index));
+        List<EventResult> allResults = Stream.concat(deserializationErrors.stream(), facadeResults.stream())
+                .sorted(Comparator.comparingInt(EventResult::index))
+                .toList();
 
         return new StoreHealthEventsResult(
                 allResults,
@@ -89,4 +84,24 @@ class AppEventsService implements AppEventsFacade {
                 facadeResult.storedEvents()
         );
     }
+
+    private EventEnvelope createEventEnvelope(IndexedEvent indexedEvent, DeviceId deviceId) {
+        HealthEventRequest event = indexedEvent.event();
+        IdempotencyKey idempotencyKey = IdempotencyKey.from(
+                event.idempotencyKey(),
+                deviceId.value(),
+                event.type(),
+                event.payload(),
+                indexedEvent.index()
+        );
+
+        return new EventEnvelope(
+                idempotencyKey,
+                event.type(),
+                event.occurredAt(),
+                event.payload()
+        );
+    }
+
+    private record IndexedEvent(int index, HealthEventRequest event) {}
 }

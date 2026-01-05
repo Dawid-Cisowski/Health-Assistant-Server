@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,10 +14,13 @@ import java.util.List;
 @Schema(description = "Request to submit health events from mobile applications")
 public record SubmitHealthEventsRequest(
     @JsonProperty("events")
+    @NotNull(message = "Events list is required")
+    @Size(min = 1, max = 100, message = "Events list must contain between 1 and 100 events")
     @Schema(description = "List of health events to submit")
     List<HealthEventRequest> events,
 
     @JsonProperty("deviceId")
+    @Size(max = 255, message = "Device ID must not exceed 255 characters")
     @Schema(description = "Source device/app identifier (optional, defaults to 'mobile-app')",
             example = "gymrun-app",
             nullable = true)
