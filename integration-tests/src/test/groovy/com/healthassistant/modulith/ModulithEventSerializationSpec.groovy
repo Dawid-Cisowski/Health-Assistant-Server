@@ -183,43 +183,48 @@ class ModulithEventSerializationSpec extends BaseIntegrationSpec {
         DistanceBucketPayload    | "DistanceBucketRecorded.v1"      | createDistanceBucketPayload()
     }
 
-    def "should reject unauthorized payload type during deserialization"() {
-        given:
+    def "should ignore malicious @class in payload and deserialize based on eventType"() {
+        given: "JSON with malicious @class that should be ignored"
         def maliciousJson = '''
-        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.lang.Runtime"},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
+        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.lang.Runtime","bucketStart":"2025-01-01T08:00:00Z","bucketEnd":"2025-01-01T09:00:00Z","count":1000,"originPackage":"test"},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
         '''
 
-        when:
-        eventSerializer.deserialize(maliciousJson, StoredEventData)
+        when: "deserializing with malicious @class"
+        def result = eventSerializer.deserialize(maliciousJson, StoredEventData)
 
-        then:
-        thrown(IllegalArgumentException)
+        then: "payload is deserialized as StepsPayload based on eventType, @class is ignored"
+        result.payload() instanceof StepsPayload
+        !(result.payload() instanceof Runtime)
+        (result.payload() as StepsPayload).count() == 1000
     }
 
-    def "should reject ProcessBuilder payload during deserialization"() {
-        given:
+    def "should ignore ProcessBuilder @class in payload and deserialize based on eventType"() {
+        given: "JSON with ProcessBuilder @class that should be ignored"
         def maliciousJson = '''
-        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.lang.ProcessBuilder","command":["cat","/etc/passwd"]},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
+        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.lang.ProcessBuilder","command":["cat","/etc/passwd"],"bucketStart":"2025-01-01T08:00:00Z","bucketEnd":"2025-01-01T09:00:00Z","count":500,"originPackage":"test"},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
         '''
 
-        when:
-        eventSerializer.deserialize(maliciousJson, StoredEventData)
+        when: "deserializing with ProcessBuilder @class"
+        def result = eventSerializer.deserialize(maliciousJson, StoredEventData)
 
-        then:
-        thrown(IllegalArgumentException)
+        then: "payload is deserialized as StepsPayload based on eventType, @class is ignored"
+        result.payload() instanceof StepsPayload
+        !(result.payload() instanceof ProcessBuilder)
+        (result.payload() as StepsPayload).count() == 500
     }
 
-    def "should reject arbitrary classes in payload position during deserialization"() {
-        given:
+    def "should ignore arbitrary @class in payload and deserialize based on eventType"() {
+        given: "JSON with arbitrary @class that should be ignored"
         def maliciousJson = '''
-        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.util.concurrent.ForkJoinPool"},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
+        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.util.concurrent.ForkJoinPool","bucketStart":"2025-01-01T08:00:00Z","bucketEnd":"2025-01-01T09:00:00Z","count":750,"originPackage":"test"},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
         '''
 
-        when:
-        eventSerializer.deserialize(maliciousJson, StoredEventData)
+        when: "deserializing with ForkJoinPool @class"
+        def result = eventSerializer.deserialize(maliciousJson, StoredEventData)
 
-        then:
-        thrown(IllegalArgumentException)
+        then: "payload is deserialized as StepsPayload based on eventType, @class is ignored"
+        result.payload() instanceof StepsPayload
+        (result.payload() as StepsPayload).count() == 750
     }
 
     def "should deserialize events without type wrappers on collections (backward compatibility)"() {

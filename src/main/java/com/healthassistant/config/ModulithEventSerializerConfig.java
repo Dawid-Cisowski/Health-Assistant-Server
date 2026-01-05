@@ -1,7 +1,7 @@
 package com.healthassistant.config;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
@@ -48,16 +48,12 @@ class ModulithEventSerializerConfig {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
 
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
         PolymorphicTypeValidator ptv = buildSecureTypeValidator();
         mapper.setPolymorphicTypeValidator(ptv);
 
-        mapper.addMixIn(EventPayload.class, EventPayloadTypingMixIn.class);
-
         return mapper;
-    }
-
-    @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
-    private interface EventPayloadTypingMixIn {
     }
 
     private PolymorphicTypeValidator buildSecureTypeValidator() {
