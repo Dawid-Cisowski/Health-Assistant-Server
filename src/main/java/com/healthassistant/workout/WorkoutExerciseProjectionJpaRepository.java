@@ -68,4 +68,25 @@ interface WorkoutExerciseProjectionJpaRepository extends JpaRepository<WorkoutEx
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate
     );
+
+    @Query("SELECT e FROM WorkoutExerciseProjectionJpaEntity e " +
+           "JOIN FETCH e.workout w " +
+           "WHERE w.deviceId = :deviceId AND e.exerciseId = :exerciseId " +
+           "ORDER BY w.performedAt DESC")
+    List<WorkoutExerciseProjectionJpaEntity> findByDeviceIdAndExerciseIdOrderByPerformedAtDesc(
+            @Param("deviceId") String deviceId,
+            @Param("exerciseId") String exerciseId
+    );
+
+    @Query("SELECT e FROM WorkoutExerciseProjectionJpaEntity e " +
+           "JOIN FETCH e.workout w " +
+           "WHERE w.deviceId = :deviceId AND e.exerciseId = :exerciseId " +
+           "AND w.performedDate BETWEEN :fromDate AND :toDate " +
+           "ORDER BY w.performedAt DESC")
+    List<WorkoutExerciseProjectionJpaEntity> findByDeviceIdAndExerciseIdAndDateRangeOrderByPerformedAtDesc(
+            @Param("deviceId") String deviceId,
+            @Param("exerciseId") String exerciseId,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate
+    );
 }

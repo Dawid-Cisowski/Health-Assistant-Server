@@ -64,6 +64,7 @@ class ModulithEventSerializationSpec extends BaseIntegrationSpec {
         def exerciseSet = new WorkoutPayload.ExerciseSet(1, 80.0, 10, false)
         def exercise = new WorkoutPayload.Exercise(
                 "Bench Press",
+                "chest_1",
                 "Chest",
                 1,
                 List.of(exerciseSet)

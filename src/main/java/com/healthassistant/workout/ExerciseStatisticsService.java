@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 class ExerciseStatisticsService {
 
     private final ExerciseCatalog exerciseCatalog;
-    private final ExerciseNameMappingRepository nameMappingRepository;
     private final WorkoutExerciseProjectionJpaRepository exerciseRepository;
     private final WorkoutSetProjectionJpaRepository setRepository;
 
@@ -45,10 +44,8 @@ class ExerciseStatisticsService {
             return Optional.empty();
         }
 
-        List<String> exerciseNames = getExerciseNames(exerciseId, exercise.name());
-
-        List<WorkoutExerciseProjectionJpaEntity> projections = queryProjections(
-                deviceId, exerciseNames, fromDate, toDate);
+        List<WorkoutExerciseProjectionJpaEntity> projections = queryProjectionsByExerciseId(
+                deviceId, exerciseId, fromDate, toDate);
 
         if (projections.isEmpty()) {
             log.debug("No workout data found for exercise {} and device {}", exerciseId, deviceId);
@@ -60,7 +57,7 @@ class ExerciseStatisticsService {
                 .distinct()
                 .toList();
 
-        Map<String, List<WorkoutSetProjectionJpaEntity>> setsByWorkout = loadSets(workoutIds, exerciseNames);
+        Map<String, List<WorkoutSetProjectionJpaEntity>> setsByWorkout = loadSetsByExerciseId(workoutIds, exerciseId);
 
         ExerciseSummary summary = calculateSummary(projections, setsByWorkout);
         List<WorkoutHistoryEntry> history = buildHistory(projections, setsByWorkout, summary.personalRecordKg());
@@ -75,42 +72,29 @@ class ExerciseStatisticsService {
         ));
     }
 
-    private List<String> getExerciseNames(String exerciseId, String catalogName) {
-        List<String> mappedNames = nameMappingRepository.findAllByCatalogId(exerciseId)
-                .stream()
-                .map(ExerciseNameMappingEntity::getExerciseName)
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        if (!mappedNames.contains(catalogName)) {
-            mappedNames.add(catalogName);
-        }
-
-        return mappedNames;
-    }
-
-    private List<WorkoutExerciseProjectionJpaEntity> queryProjections(
+    private List<WorkoutExerciseProjectionJpaEntity> queryProjectionsByExerciseId(
             String deviceId,
-            List<String> exerciseNames,
+            String exerciseId,
             LocalDate fromDate,
             LocalDate toDate) {
 
         if (fromDate != null && toDate != null) {
-            return exerciseRepository.findByDeviceIdAndExerciseNamesAndDateRangeOrderByPerformedAtDesc(
-                    deviceId, exerciseNames, fromDate, toDate);
+            return exerciseRepository.findByDeviceIdAndExerciseIdAndDateRangeOrderByPerformedAtDesc(
+                    deviceId, exerciseId, fromDate, toDate);
         }
-        return exerciseRepository.findByDeviceIdAndExerciseNamesOrderByPerformedAtDesc(
-                deviceId, exerciseNames);
+        return exerciseRepository.findByDeviceIdAndExerciseIdOrderByPerformedAtDesc(
+                deviceId, exerciseId);
     }
 
-    private Map<String, List<WorkoutSetProjectionJpaEntity>> loadSets(
+    private Map<String, List<WorkoutSetProjectionJpaEntity>> loadSetsByExerciseId(
             List<String> workoutIds,
-            List<String> exerciseNames) {
+            String exerciseId) {
 
         if (workoutIds.isEmpty()) {
             return Collections.emptyMap();
         }
 
-        return setRepository.findByWorkoutIdsAndExerciseNames(workoutIds, exerciseNames)
+        return setRepository.findByWorkoutIdsAndExerciseId(workoutIds, exerciseId)
                 .stream()
                 .collect(Collectors.groupingBy(WorkoutSetProjectionJpaEntity::getWorkoutId));
     }

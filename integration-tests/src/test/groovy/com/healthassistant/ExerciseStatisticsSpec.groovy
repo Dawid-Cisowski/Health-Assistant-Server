@@ -204,16 +204,16 @@ class ExerciseStatisticsSpec extends BaseIntegrationSpec {
         body.getDouble("summary.personalRecordKg") == 85.0
     }
 
-    def "Scenario 9: Statistics works with exercise name variations via mapping"() {
-        given: "workouts using different name variations mapped to same catalog exercise"
+    def "Scenario 9: Statistics aggregates all workouts with same exerciseId"() {
+        given: "workouts using same exerciseId but different display names"
         submitWorkout("workout-v1", "2024-12-01", [
-            [name: "Wyciskanie sztangi leżąc", sets: [[w: 80.0, r: 10]]]
+            [name: "Wyciskanie sztangi leżąc", exerciseId: CHEST_1_ID, sets: [[w: 80.0, r: 10]]]
         ])
         submitWorkout("workout-v2", "2024-12-08", [
-            [name: "Bench press", sets: [[w: 85.0, r: 10]]]
+            [name: "Bench press", exerciseId: CHEST_1_ID, sets: [[w: 85.0, r: 10]]]
         ])
         submitWorkout("workout-v3", "2024-12-15", [
-            [name: BENCH_PRESS_NAME, sets: [[w: 90.0, r: 10]]]
+            [name: BENCH_PRESS_NAME, exerciseId: CHEST_1_ID, sets: [[w: 90.0, r: 10]]]
         ])
 
         when: "I request exercise statistics by catalog ID"
@@ -225,12 +225,12 @@ class ExerciseStatisticsSpec extends BaseIntegrationSpec {
         then: "response status is 200"
         response.statusCode() == 200
 
-        and: "all name variations are included in history"
+        and: "all workouts with same exerciseId are included in history"
         def body = response.body().jsonPath()
         def history = body.getList("history")
         history.size() == 3
 
-        and: "summary aggregates all variations"
+        and: "summary aggregates all workouts"
         body.getInt("summary.totalSets") == 3
         body.getDouble("summary.personalRecordKg") == 90.0
     }
@@ -315,7 +315,8 @@ class ExerciseStatisticsSpec extends BaseIntegrationSpec {
             def setsJson = exercise.sets.collect { set ->
                 """{"setNumber": ${exercise.sets.indexOf(set) + 1}, "weightKg": ${set.w}, "reps": ${set.r}, "isWarmup": ${set.warmup ?: false}}"""
             }.join(',')
-            """{"name": "${exercise.name}", "orderInWorkout": ${exercises.indexOf(exercise) + 1}, "sets": [${setsJson}]}"""
+            def exerciseIdJson = exercise.exerciseId ? """"exerciseId": "${exercise.exerciseId}",""" : """"exerciseId": "${CHEST_1_ID}","""
+            """{${exerciseIdJson} "name": "${exercise.name}", "orderInWorkout": ${exercises.indexOf(exercise) + 1}, "sets": [${setsJson}]}"""
         }.join(',')
 
         def event = """
@@ -344,7 +345,8 @@ class ExerciseStatisticsSpec extends BaseIntegrationSpec {
             def setsJson = exercise.sets.collect { set ->
                 """{"setNumber": ${exercise.sets.indexOf(set) + 1}, "weightKg": ${set.w}, "reps": ${set.r}, "isWarmup": false}"""
             }.join(',')
-            """{"name": "${exercise.name}", "orderInWorkout": ${exercises.indexOf(exercise) + 1}, "sets": [${setsJson}]}"""
+            def exerciseIdJson = exercise.exerciseId ? """"exerciseId": "${exercise.exerciseId}",""" : """"exerciseId": "${CHEST_1_ID}","""
+            """{${exerciseIdJson} "name": "${exercise.name}", "orderInWorkout": ${exercises.indexOf(exercise) + 1}, "sets": [${setsJson}]}"""
         }.join(',')
 
         def event = """

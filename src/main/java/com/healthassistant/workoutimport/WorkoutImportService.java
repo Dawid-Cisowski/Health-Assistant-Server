@@ -11,6 +11,7 @@ import com.healthassistant.workoutimport.api.dto.WorkoutImportResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.MessageDigest;
@@ -41,6 +42,7 @@ class WorkoutImportService implements WorkoutImportFacade {
     private final WorkoutFacade workoutFacade;
 
     @Override
+    @Transactional
     public WorkoutImportResponse importFromImage(MultipartFile image, DeviceId deviceId) {
         validateImage(image);
 

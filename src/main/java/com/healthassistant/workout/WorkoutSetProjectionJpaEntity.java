@@ -25,6 +25,9 @@ class WorkoutSetProjectionJpaEntity {
     @Column(name = "exercise_name", nullable = false)
     private String exerciseName;
 
+    @Column(name = "exercise_id", length = 50)
+    private String exerciseId;
+
     @Column(name = "set_number", nullable = false)
     private Integer setNumber;
 
@@ -50,10 +53,11 @@ class WorkoutSetProjectionJpaEntity {
         }
     }
 
-    static WorkoutSetProjectionJpaEntity from(String workoutId, String exerciseName, ExerciseSet set) {
+    static WorkoutSetProjectionJpaEntity from(String workoutId, String exerciseName, String exerciseId, ExerciseSet set) {
         return WorkoutSetProjectionJpaEntity.builder()
                 .workoutId(workoutId)
                 .exerciseName(exerciseName)
+                .exerciseId(exerciseId)
                 .setNumber(set.setNumber())
                 .weightKg(set.weight().kilograms())
                 .reps(set.reps().count())

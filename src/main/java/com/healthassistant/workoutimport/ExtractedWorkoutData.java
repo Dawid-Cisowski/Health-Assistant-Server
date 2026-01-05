@@ -19,12 +19,31 @@ record ExtractedWorkoutData(
     @SuppressWarnings("PMD.UnusedAssignment")
     record Exercise(
             String name,
+            String exerciseId,
+            double matchConfidence,
+            boolean isNewExercise,
+            String suggestedId,
+            String suggestedPrimaryMuscle,
+            String suggestedDescription,
             String muscleGroup,
             int orderInWorkout,
             List<ExerciseSet> sets
     ) {
         public Exercise {
             sets = sets != null ? List.copyOf(sets) : List.of();
+        }
+
+        static Exercise matched(String name, String exerciseId, double confidence,
+                                String muscleGroup, int orderInWorkout, List<ExerciseSet> sets) {
+            return new Exercise(name, exerciseId, confidence, false, null, null, null,
+                    muscleGroup, orderInWorkout, sets);
+        }
+
+        static Exercise newExercise(String name, String suggestedId, String suggestedPrimaryMuscle,
+                                    String suggestedDescription, String muscleGroup,
+                                    int orderInWorkout, List<ExerciseSet> sets) {
+            return new Exercise(name, null, 0.0, true, suggestedId, suggestedPrimaryMuscle,
+                    suggestedDescription, muscleGroup, orderInWorkout, sets);
         }
     }
 

@@ -26,6 +26,7 @@ class WorkoutService implements WorkoutFacade {
     private final WorkoutSetProjectionJpaRepository setRepository;
     private final WorkoutProjector workoutProjector;
     private final ExerciseCatalog exerciseCatalog;
+    private final ExerciseDefinitionRepository exerciseDefinitionRepository;
 
     @Override
     public Optional<WorkoutDetailResponse> getWorkoutDetails(String workoutId) {
@@ -125,18 +126,38 @@ class WorkoutService implements WorkoutFacade {
     @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} workout events directly", events.size());
-        for (StoredEventData event : events) {
+        events.forEach(event -> {
             try {
                 workoutProjector.projectWorkout(event);
             } catch (Exception e) {
                 log.error("Failed to project workout event: {}", event.eventId().value(), e);
             }
-        }
+        });
     }
 
     @Override
     public List<ExerciseDefinition> getAllExercises() {
         return exerciseCatalog.getAllExercises();
+    }
+
+    @Override
+    public boolean exerciseExists(String exerciseId) {
+        return exerciseDefinitionRepository.existsById(exerciseId);
+    }
+
+    @Override
+    @Transactional
+    public ExerciseDefinition createAutoExercise(String id, String name, String description,
+                                                 String primaryMuscle, List<String> muscles) {
+        ExerciseDefinitionEntity entity = ExerciseDefinitionEntity.createAutoCreated(
+                id, name, description, primaryMuscle, muscles
+        );
+        ExerciseDefinitionEntity saved = exerciseDefinitionRepository.save(entity);
+        log.info("Created auto-generated exercise: id={}, name={}", id, name);
+        return new ExerciseDefinition(
+                saved.getId(), saved.getName(), saved.getDescription(),
+                saved.getPrimaryMuscle(), saved.getMuscles()
+        );
     }
 
 }

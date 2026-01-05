@@ -26,6 +26,9 @@ class WorkoutExerciseProjectionJpaEntity {
     @Column(name = "exercise_name", nullable = false)
     private String exerciseName;
 
+    @Column(name = "exercise_id", length = 50)
+    private String exerciseId;
+
     @Column(name = "muscle_group", length = 128)
     private String muscleGroup;
 
@@ -55,6 +58,7 @@ class WorkoutExerciseProjectionJpaEntity {
         return WorkoutExerciseProjectionJpaEntity.builder()
                 .workout(workoutEntity)
                 .exerciseName(exercise.name())
+                .exerciseId(exercise.exerciseId())
                 .muscleGroup(exercise.muscleGroup())
                 .orderInWorkout(exercise.orderInWorkout())
                 .totalSets(exercise.totalSets())

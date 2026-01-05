@@ -2,6 +2,8 @@ package com.healthassistant.workout;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.dto.payload.WorkoutPayload;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -11,7 +13,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
+@RequiredArgsConstructor
+@Slf4j
 class WorkoutFactory {
+
+    private final ExerciseDefinitionRepository exerciseDefinitionRepository;
 
     Optional<Workout> createFromEvent(StoredEventData eventData) {
         if (!(eventData.payload() instanceof WorkoutPayload payload)) {
@@ -76,8 +82,11 @@ class WorkoutFactory {
     @SuppressWarnings("unchecked")
     private Exercise toExerciseFromMap(Map<String, Object> map) {
         String name = map.get("name") != null ? map.get("name").toString() : "Unknown";
+        String rawExerciseId = map.get("exerciseId") != null ? map.get("exerciseId").toString() : null;
+        String exerciseId = validateExerciseId(rawExerciseId, name);
         String muscleGroup = map.get("muscleGroup") != null ? map.get("muscleGroup").toString() : null;
         Integer order = parseInteger(map.get("orderInWorkout"));
+        int orderValue = order != null ? order : 1;
 
         List<ExerciseSet> sets = List.of();
         Object setsObj = map.get("sets");
@@ -88,7 +97,7 @@ class WorkoutFactory {
                     .toList();
         }
 
-        return new Exercise(name, muscleGroup, order, sets);
+        return new Exercise(name, exerciseId, muscleGroup, orderValue, sets);
     }
 
     private ExerciseSet toSetFromMap(Map<String, Object> map) {
@@ -105,12 +114,27 @@ class WorkoutFactory {
                 ? payload.sets().stream().map(this::toSet).toList()
                 : List.of();
 
+        String validatedExerciseId = validateExerciseId(payload.exerciseId(), payload.name());
+
         return new Exercise(
                 payload.name(),
+                validatedExerciseId,
                 payload.muscleGroup(),
                 payload.orderInWorkout(),
                 sets
         );
+    }
+
+    private String validateExerciseId(String exerciseId, String exerciseName) {
+        if (exerciseId == null || exerciseId.isBlank()) {
+            return null;
+        }
+        if (exerciseDefinitionRepository.existsById(exerciseId)) {
+            return exerciseId;
+        }
+        log.warn("Invalid exerciseId '{}' for exercise '{}' - no matching catalog entry, setting to null",
+                exerciseId, exerciseName);
+        return null;
     }
 
     private ExerciseSet toSet(WorkoutPayload.ExerciseSet payload) {

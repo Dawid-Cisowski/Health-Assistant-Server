@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 
@@ -64,6 +65,11 @@ public record WorkoutPayload(
         @NotBlank(message = "exercise name is required")
         @Schema(description = "Exercise name", example = "Podciąganie się nachwytem (szeroki rozstaw rąk)")
         String name,
+
+        @JsonProperty("exerciseId")
+        @Size(max = 50, message = "exerciseId must not exceed 50 characters")
+        @Schema(description = "Catalog exercise ID (FK to exercises table)", example = "back_2", nullable = true)
+        String exerciseId,
 
         @JsonProperty("muscleGroup")
         @Schema(description = "Target muscle group", example = "Plecy", nullable = true)

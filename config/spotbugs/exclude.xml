@@ -30,6 +30,17 @@
         <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
     </Match>
 
+    <!-- AI prompts need literal newlines, not platform-specific line separators -->
+    <Match>
+        <Class name="com.healthassistant.workoutimport.ExerciseMatcher"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.healthassistant.workoutimport.WorkoutImageExtractor"/>
+        <Method name="buildSystemPrompt"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+
     <!-- Spring Boot config classes need mutable nested objects for property binding -->
     <Match>
         <Class name="com.healthassistant.config.AppProperties"/>
@@ -58,5 +69,17 @@
         <Class name="com.healthassistant.googlefit.GoogleFitSyncService"/>
         <Method name="syncAll"/>
         <Bug pattern="REC_CATCH_EXCEPTION"/>
+    </Match>
+
+    <!-- Local records with combine() for Stream.reduce() - needed for parallel stream contract -->
+    <Match>
+        <Class name="~com\.healthassistant\.workout\.ExerciseStatisticsCalculator\$\d+.*"/>
+        <Method name="combine"/>
+        <Bug pattern="UMAC_UNCALLABLE_METHOD_OF_ANONYMOUS_CLASS"/>
+    </Match>
+    <Match>
+        <Class name="~com\.healthassistant\.workout\.ExerciseStatisticsService\$\d+.*"/>
+        <Method name="combine"/>
+        <Bug pattern="UMAC_UNCALLABLE_METHOD_OF_ANONYMOUS_CLASS"/>
     </Match>
 </FindBugsFilter>

@@ -16,6 +16,8 @@ import java.time.Instant;
 
 public class StoredEventDataDeserializer extends StdDeserializer<StoredEventData> {
 
+    private static final long serialVersionUID = 1L;
+
     public StoredEventDataDeserializer() {
         super(StoredEventData.class);
     }

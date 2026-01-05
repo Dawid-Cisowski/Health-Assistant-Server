@@ -29,6 +29,7 @@ class WorkoutImageExtractor {
 
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
+    private final ExerciseMatcher exerciseMatcher;
 
     ExtractedWorkoutData extract(MultipartFile image) throws WorkoutExtractionException {
         try {
@@ -63,10 +64,22 @@ class WorkoutImageExtractor {
     }
 
     private String buildSystemPrompt() {
+        String catalogSection = exerciseMatcher.buildCatalogPromptSection();
+
         return """
             You are an expert at analyzing workout app screenshots, particularly from GymRun.
 
             Your task is to extract workout data from the screenshot and return it as JSON.
+
+            %s
+
+            EXERCISE MATCHING RULES:
+            1. For each exercise found in the screenshot, try to match it to an exercise in the catalog above
+            2. Match by semantic similarity - exercise names may be abbreviated, in different languages, or use variations
+            3. Common Polish-English matches: "Wyciskanie" = "Press", "Podciąganie" = "Pull ups", "Martwy ciąg" = "Deadlift"
+            4. If you find a confident match (>0.7), set exerciseId to the catalog ID
+            5. If uncertain (0.4-0.7), set exerciseId to your best guess and lower matchConfidence
+            6. If NO match possible, set isNewExercise: true and provide suggested details
 
             IMPORTANT RULES:
             1. Return ONLY valid JSON without any additional text
@@ -85,7 +98,13 @@ class WorkoutImageExtractor {
               "note": "workout title/name" or null,
               "exercises": [
                 {
-                  "name": "exercise name",
+                  "name": "original exercise name from screenshot",
+                  "exerciseId": "catalog_id" or null (if isNewExercise),
+                  "matchConfidence": number (0.0-1.0),
+                  "isNewExercise": boolean,
+                  "suggestedId": "muscle_N" (only if isNewExercise),
+                  "suggestedPrimaryMuscle": "CHEST|UPPER_BACK|LOWER_BACK|QUADS|..." (only if isNewExercise),
+                  "suggestedDescription": "exercise description" (only if isNewExercise),
                   "muscleGroup": "muscle group" or null,
                   "orderInWorkout": number (1-based),
                   "sets": [
@@ -106,7 +125,7 @@ class WorkoutImageExtractor {
             - Exercises are grouped with names and sets below
             - Sets contain: weight (kg) x reps
             - Warmup sets may be marked differently or have lower weight
-            """;
+            """.formatted(catalogSection);
     }
 
     private String buildUserPrompt() {
@@ -183,6 +202,12 @@ class WorkoutImageExtractor {
 
     private ExtractedWorkoutData.Exercise parseExercise(JsonNode node) {
         String name = node.path("name").asText("Unknown Exercise");
+        String exerciseId = parseNullableString(node.path("exerciseId"));
+        double matchConfidence = node.path("matchConfidence").asDouble(0.0);
+        boolean isNewExercise = node.path("isNewExercise").asBoolean(false);
+        String suggestedId = parseNullableString(node.path("suggestedId"));
+        String suggestedPrimaryMuscle = parseNullableString(node.path("suggestedPrimaryMuscle"));
+        String suggestedDescription = parseNullableString(node.path("suggestedDescription"));
         String muscleGroup = parseMuscleGroup(node.path("muscleGroup"));
         int order = node.path("orderInWorkout").asInt(1);
 
@@ -200,7 +225,22 @@ class WorkoutImageExtractor {
             }
         }
 
-        return new ExtractedWorkoutData.Exercise(name, muscleGroup, order, sets);
+        return new ExtractedWorkoutData.Exercise(
+                name, exerciseId, matchConfidence, isNewExercise,
+                suggestedId, suggestedPrimaryMuscle, suggestedDescription,
+                muscleGroup, order, sets
+        );
+    }
+
+    private String parseNullableString(JsonNode node) {
+        if (node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        String value = node.asText();
+        if (value.isEmpty() || "null".equals(value)) {
+            return null;
+        }
+        return value;
     }
 
     private String parseMuscleGroup(JsonNode muscleGroupNode) {

@@ -21,4 +21,12 @@ interface WorkoutSetProjectionJpaRepository extends JpaRepository<WorkoutSetProj
             @Param("workoutIds") List<String> workoutIds,
             @Param("exerciseNames") List<String> exerciseNames
     );
+
+    @Query("SELECT s FROM WorkoutSetProjectionJpaEntity s " +
+           "WHERE s.workoutId IN :workoutIds AND s.exerciseId = :exerciseId " +
+           "ORDER BY s.workoutId, s.setNumber")
+    List<WorkoutSetProjectionJpaEntity> findByWorkoutIdsAndExerciseId(
+            @Param("workoutIds") List<String> workoutIds,
+            @Param("exerciseId") String exerciseId
+    );
 }

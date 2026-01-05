@@ -35,4 +35,15 @@ class ExerciseDefinitionEntity {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "is_auto_created", nullable = false)
+    private Boolean isAutoCreated = false;
+
+    static ExerciseDefinitionEntity createAutoCreated(
+            String id, String name, String description,
+            String primaryMuscle, List<String> muscles) {
+        return new ExerciseDefinitionEntity(
+                id, name, description, primaryMuscle, muscles, Instant.now(), true
+        );
+    }
 }

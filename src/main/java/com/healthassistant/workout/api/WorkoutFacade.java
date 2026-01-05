@@ -24,4 +24,9 @@ public interface WorkoutFacade {
 
     List<ExerciseDefinition> getAllExercises();
 
+    boolean exerciseExists(String exerciseId);
+
+    ExerciseDefinition createAutoExercise(String id, String name, String description,
+                                          String primaryMuscle, List<String> muscles);
+
 }
