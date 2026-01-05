@@ -79,7 +79,8 @@ class HealthTools {
     }
 
     @Tool(name = "getDailySummary",
-          description = "Retrieves complete daily summary for the user. Contains all data: activity (steps, calories), sleep, heart rate, meals and workouts. " +
+          description = "Retrieves complete daily summary for a SINGLE day. Contains all data: activity (steps, calories), sleep, heart rate, meals and workouts. " +
+                        "Use getDailySummaryRange for multi-day queries (last week, last month). " +
                         "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getDailySummary(String date) {
         var deviceId = AssistantContext.getDeviceId();
@@ -88,6 +89,22 @@ class HealthTools {
         return validateAndExecuteSingleDateQuery(date, localDate -> {
             var result = dailySummaryFacade.getDailySummary(deviceId, localDate);
             log.info("Daily summary fetched: {}", result.isPresent() ? "found" : "not found");
+            return result;
+        });
+    }
+
+    @Tool(name = "getDailySummaryRange",
+          description = "Retrieves aggregated daily summaries for a DATE RANGE (week, month, etc.). " +
+                        "Returns totals and averages for: active calories burned, steps, distance, sleep, heart rate, meals. " +
+                        "USE THIS for questions about 'last week', 'last month', or any multi-day period. " +
+                        "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
+    public Object getDailySummaryRange(String startDate, String endDate) {
+        var deviceId = AssistantContext.getDeviceId();
+        log.info("Fetching daily summary range for device {} from {} to {}", deviceId, startDate, endDate);
+
+        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+            var result = dailySummaryFacade.getRangeSummary(deviceId, start, end);
+            log.info("Daily summary range fetched: {} days with data", result.daysWithData());
             return result;
         });
     }

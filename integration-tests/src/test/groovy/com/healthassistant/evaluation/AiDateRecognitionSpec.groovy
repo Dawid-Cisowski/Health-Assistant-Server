@@ -181,25 +181,26 @@ class AiDateRecognitionSpec extends BaseEvaluationSpec {
     // ==================== "Ostatni miesiąc" (Last Month) Tests ====================
 
     def "AI correctly interprets 'ostatni miesiac' for calorie summary"() {
-        given: "calories recorded for several days"
+        given: "calories recorded for several days across the month"
         def today = LocalDate.now(POLAND_ZONE)
         submitActiveCaloriesForDate(today, 400)
         submitActiveCaloriesForDate(today.minusDays(7), 500)
         submitActiveCaloriesForDate(today.minusDays(14), 350)
         submitActiveCaloriesForDate(today.minusDays(21), 600)
         waitForProjections()
-        // Total: 1850 calories
+        // Total: 1850 calories across 4 different days
 
         when: "asking about last month's calories"
         def response = askAssistant("Ile kalorii spaliłem w ostatnim miesiącu? Podaj sumę.")
         println "DEBUG: Response: $response"
 
-        then: "AI returns sum or mentions data from last 30 days"
+        then: "AI returns the TOTAL sum of all calories from the range (1850), not just one day"
         def evaluation = healthDataEvaluator.evaluate(
                 new EvaluationRequest(
-                        "Response should mention calories burned. Accept if it provides a total sum (around 1800-1900), " +
-                        "mentions individual day values (400, 500, 350, 600), or provides partial data. " +
-                        "The key is that AI attempts to answer the question about calories in the last month, not asking for clarification.",
+                        "Response MUST mention a TOTAL sum of approximately 1850 calories (or close: 1800-1900). " +
+                        "REJECT if response only mentions 400 calories (that's just today's data, not the full month). " +
+                        "REJECT if AI says it can only see one day or asks for clarification. " +
+                        "The AI should use getDailySummaryRange tool to fetch all days in the range.",
                         [],
                         response
                 )

@@ -67,8 +67,12 @@ class AssistantService implements AssistantFacade {
               • getStepsData - steps, walking, distance, active hours
               • getWorkoutData - workouts, exercises, strength training
               • getMealsData - meals, food eaten, nutrition, calories from food
-              • getDailySummary - complete daily summary, burned calories, active calories, activity overview
-            - For "calories burned" or "active calories" questions, use getDailySummary (not getMealsData which is for food).
+              • getDailySummary - complete daily summary for a SINGLE day
+              • getDailySummaryRange - aggregated summary for DATE RANGE (week, month) - use for multi-day queries!
+            - For "calories burned" or "active calories" questions:
+              • Single day (today, yesterday): use getDailySummary
+              • Date range (last week, last month): use getDailySummaryRange - it returns totalActiveCalories
+            - IMPORTANT: For questions about "last week", "last month", or any multi-day period, use getDailySummaryRange, NOT multiple getDailySummary calls.
             - If the question requires time calculation - do it yourself based on the CURRENT DATE above.
             - IMPORTANT: All date parameters in tool calls MUST be in ISO-8601 format: YYYY-MM-DD (e.g. 2025-11-24).
               Never use words like "today", "yesterday" in tool parameters.
