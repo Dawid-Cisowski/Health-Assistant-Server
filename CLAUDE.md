@@ -206,7 +206,7 @@ See `AI_ASSISTANT_README.md` for detailed documentation on date recognition patt
 
 ### HMAC Authentication
 
-**Protected Endpoints**: `GET /v1/daily-summaries/{date}` requires HMAC signature
+**Protected Endpoints**: All `/v1/*` endpoints require HMAC signature (including `/v1/daily-summaries`, `/v1/exercises`, `/v1/health-events`, etc.)
 
 **Headers Required**:
 - `X-Device-Id`: Device identifier
@@ -272,8 +272,9 @@ export NONCE_CACHE_TTL_SEC=600
 - `activity_hourly_projections`, `activity_daily_projections` (V11)
 - `meal_projections`, `meal_daily_projections` (V13, V21 adds device_id)
 - `meal_import_drafts` (V15-V16, AI-powered meal import)
+- `exercise_name_mappings` (V28, maps exercise names to catalog IDs for statistics)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V24)
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V28)
 
 ## Event Types
 
@@ -315,7 +316,7 @@ See `EventValidator.java` for detailed validation rules.
 
 **Test Spec Files**:
 - Event validation: `StepsEventValidationSpec`, `SleepEventValidationSpec`, `WorkoutSpec`, `MealEventSpec`, `HeartRateEventSpec`, `DistanceEventSpec`, `WalkingSessionEventSpec`, `ActiveMinutesEventSpec`, `ActiveCaloriesEventSpec`
-- Projections: `StepsProjectionSpec`, `SleepProjectionSpec`, `WorkoutProjectionSpec`, `CaloriesProjectionSpec`, `ActivityProjectionSpec`, `MealProjectionSpec`
+- Projections: `StepsProjectionSpec`, `SleepProjectionSpec`, `WorkoutProjectionSpec`, `CaloriesProjectionSpec`, `ActivityProjectionSpec`, `MealProjectionSpec`, `ExerciseStatisticsSpec`
 - Features: `DailySummarySpec`, `AssistantSpec`, `ConversationHistorySpec`, `GoogleFitSyncSpec`, `HmacAuthenticationSpec`, `BatchEventIngestionSpec`
 - Import: `WorkoutImportSpec`, `MealImportSpec`, `SleepImportSpec`, `MealImportDraftSpec`
 - AI Evaluation: `evaluation/AiHallucinationSpec`, `AiDateRecognitionSpec`, `AiToolErrorHandlingSpec`, `AiConversationAccuracySpec`
@@ -393,6 +394,7 @@ open integration-tests/build/reports/tests/test/index.html
 - `GET /v1/workouts?from={date}&to={date}` - Workouts by date range
 - `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
 - `GET /v1/meals/range?from={date}&to={date}` - Meals data range
+- `GET /v1/exercises/{exerciseId}/statistics?from={date}&to={date}` - Exercise statistics with progression analysis (HMAC auth required)
 
 ### Monitoring
 - `GET /actuator/health` - Health check

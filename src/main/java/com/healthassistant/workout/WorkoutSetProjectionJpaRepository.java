@@ -13,4 +13,12 @@ interface WorkoutSetProjectionJpaRepository extends JpaRepository<WorkoutSetProj
     List<WorkoutSetProjectionJpaEntity> findByWorkoutIdOrderByExerciseNameAscSetNumberAsc(String workoutId);
 
     void deleteByWorkoutId(String workoutId);
+
+    @Query("SELECT s FROM WorkoutSetProjectionJpaEntity s " +
+           "WHERE s.workoutId IN :workoutIds AND s.exerciseName IN :exerciseNames " +
+           "ORDER BY s.workoutId, s.setNumber")
+    List<WorkoutSetProjectionJpaEntity> findByWorkoutIdsAndExerciseNames(
+            @Param("workoutIds") List<String> workoutIds,
+            @Param("exerciseNames") List<String> exerciseNames
+    );
 }

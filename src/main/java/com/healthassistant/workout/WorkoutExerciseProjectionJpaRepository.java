@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface WorkoutExerciseProjectionJpaRepository extends JpaRepository<WorkoutExerciseProjectionJpaEntity, Long> {
+interface WorkoutExerciseProjectionJpaRepository extends JpaRepository<WorkoutExerciseProjectionJpaEntity, Long> {
 
     @Query("SELECT e FROM WorkoutExerciseProjectionJpaEntity e " +
            "JOIN e.workout w " +
@@ -47,4 +47,25 @@ public interface WorkoutExerciseProjectionJpaRepository extends JpaRepository<Wo
            "GROUP BY e.exerciseName " +
            "ORDER BY e.exerciseName")
     List<Object[]> findPersonalRecordsByExercise();
+
+    @Query("SELECT e FROM WorkoutExerciseProjectionJpaEntity e " +
+           "JOIN FETCH e.workout w " +
+           "WHERE w.deviceId = :deviceId AND e.exerciseName IN :exerciseNames " +
+           "ORDER BY w.performedAt DESC")
+    List<WorkoutExerciseProjectionJpaEntity> findByDeviceIdAndExerciseNamesOrderByPerformedAtDesc(
+            @Param("deviceId") String deviceId,
+            @Param("exerciseNames") List<String> exerciseNames
+    );
+
+    @Query("SELECT e FROM WorkoutExerciseProjectionJpaEntity e " +
+           "JOIN FETCH e.workout w " +
+           "WHERE w.deviceId = :deviceId AND e.exerciseName IN :exerciseNames " +
+           "AND w.performedDate BETWEEN :fromDate AND :toDate " +
+           "ORDER BY w.performedAt DESC")
+    List<WorkoutExerciseProjectionJpaEntity> findByDeviceIdAndExerciseNamesAndDateRangeOrderByPerformedAtDesc(
+            @Param("deviceId") String deviceId,
+            @Param("exerciseNames") List<String> exerciseNames,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate
+    );
 }

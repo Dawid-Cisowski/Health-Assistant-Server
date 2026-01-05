@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -47,6 +48,11 @@ class ExerciseCatalog {
 
     List<String> getMuscleGroups() {
         return MUSCLE_GROUPS;
+    }
+
+    Optional<ExerciseDefinition> findById(String exerciseId) {
+        return repository.findById(exerciseId)
+                .map(this::toDto);
     }
 
     private ExerciseDefinition toDto(ExerciseDefinitionEntity entity) {
