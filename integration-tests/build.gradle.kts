@@ -57,6 +57,9 @@ dependencies {
     testImplementation("org.springframework.ai:spring-ai-starter-model-google-genai")
     testCompileOnly("io.projectreactor:reactor-core")
 
+    // Spring Modulith events core for serialization tests
+    testImplementation("org.springframework.modulith:spring-modulith-events-core")
+
     // Testcontainers
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

@@ -93,6 +93,7 @@ dependencies {
     implementation("org.springframework.modulith:spring-modulith-starter-core")
     implementation("org.springframework.modulith:spring-modulith-starter-jdbc")
     implementation("org.springframework.modulith:spring-modulith-actuator")
+    implementation("org.springframework.modulith:spring-modulith-events-jackson")
 
     // Testing (basic unit test support only)
     testImplementation("org.springframework.boot:spring-boot-starter-test")
