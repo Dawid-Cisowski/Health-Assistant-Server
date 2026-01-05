@@ -5,6 +5,9 @@ import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "calories_daily_projections")
@@ -67,5 +70,34 @@ class CaloriesDailyProjectionJpaEntity {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    void updateFromHourlyData(List<CaloriesHourlyProjectionJpaEntity> hourlyData) {
+        this.totalCaloriesKcal = hourlyData.stream()
+                .mapToDouble(CaloriesHourlyProjectionJpaEntity::getCaloriesKcal)
+                .sum();
+
+        this.firstCalorieTime = hourlyData.stream()
+                .map(CaloriesHourlyProjectionJpaEntity::getFirstBucketTime)
+                .filter(Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
+
+        this.lastCalorieTime = hourlyData.stream()
+                .map(CaloriesHourlyProjectionJpaEntity::getLastBucketTime)
+                .filter(Objects::nonNull)
+                .max(Instant::compareTo)
+                .orElse(null);
+
+        this.activeHoursCount = (int) hourlyData.stream()
+                .filter(h -> h.getCaloriesKcal() > 0)
+                .count();
+
+        hourlyData.stream()
+                .max(Comparator.comparingDouble(CaloriesHourlyProjectionJpaEntity::getCaloriesKcal))
+                .ifPresent(mostActive -> {
+                    this.mostActiveHour = mostActive.getHour();
+                    this.mostActiveHourCalories = mostActive.getCaloriesKcal();
+                });
     }
 }

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -15,8 +16,8 @@ class CaloriesBucketFactory {
 
     Optional<CaloriesBucket> createFromEvent(StoredEventData eventData) {
         if (!(eventData.payload() instanceof ActiveCaloriesPayload payload)) {
-            log.warn("Expected ActiveCaloriesPayload but got {}, skipping",
-                    eventData.payload().getClass().getSimpleName());
+            log.warn("Expected ActiveCaloriesPayload but got unexpected payload type for event {}, skipping",
+                    eventData.eventId().value());
             return Optional.empty();
         }
 
@@ -59,7 +60,12 @@ class CaloriesBucketFactory {
     private Instant parseInstant(Object value) {
         if (value == null) return null;
         if (value instanceof Instant instant) return instant;
-        return Instant.parse(value.toString());
+        try {
+            return Instant.parse(value.toString());
+        } catch (DateTimeParseException e) {
+            log.warn("Failed to parse instant from value '{}', returning null", value);
+            return null;
+        }
     }
 
     private Double parseDouble(Object value) {
@@ -67,7 +73,14 @@ class CaloriesBucketFactory {
             case null -> null;
             case Double d -> d;
             case Number n -> n.doubleValue();
-            default -> Double.parseDouble(value.toString());
+            default -> {
+                try {
+                    yield Double.parseDouble(value.toString());
+                } catch (NumberFormatException e) {
+                    log.warn("Failed to parse double from value '{}', returning null", value);
+                    yield null;
+                }
+            }
         };
     }
 }

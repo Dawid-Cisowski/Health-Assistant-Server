@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,8 +28,8 @@ class CaloriesService implements CaloriesFacade {
 
     @Override
     public CaloriesDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date) {
-        Optional<CaloriesDailyBreakdownResponse> result = getDailyBreakdownInternal(deviceId, date);
-        return result.orElseGet(() -> createEmptyBreakdown(date));
+        return getDailyBreakdownInternal(deviceId, date)
+                .orElseGet(() -> createEmptyBreakdown(date));
     }
 
     private Optional<CaloriesDailyBreakdownResponse> getDailyBreakdownInternal(String deviceId, LocalDate date) {
@@ -70,7 +69,7 @@ class CaloriesService implements CaloriesFacade {
             .mapToObj(hour -> new CaloriesDailyBreakdownResponse.HourlyCalories(hour, 0.0))
             .toList();
 
-        return new CaloriesDailyBreakdownResponse(date, 0.0, null, null, null, 0.0, 0, hourlyBreakdown);
+        return new CaloriesDailyBreakdownResponse(date, 0.0, null, null, null, null, 0, hourlyBreakdown);
     }
 
     @Override
@@ -81,20 +80,16 @@ class CaloriesService implements CaloriesFacade {
         Map<LocalDate, CaloriesDailyProjectionJpaEntity> dataByDate = dailyData.stream()
             .collect(Collectors.toMap(CaloriesDailyProjectionJpaEntity::getDate, d -> d));
 
-        List<CaloriesRangeSummaryResponse.DailyStats> dailyStats = new ArrayList<>();
-        LocalDate current = startDate;
-
-        while (!current.isAfter(endDate)) {
-            CaloriesDailyProjectionJpaEntity dayData = dataByDate.get(current);
-
-            dailyStats.add(new CaloriesRangeSummaryResponse.DailyStats(
-                current,
-                dayData != null ? dayData.getTotalCaloriesKcal() : 0.0,
-                dayData != null ? dayData.getActiveHoursCount() : 0
-            ));
-
-            current = current.plusDays(1);
-        }
+        List<CaloriesRangeSummaryResponse.DailyStats> dailyStats = startDate.datesUntil(endDate.plusDays(1))
+            .map(date -> {
+                CaloriesDailyProjectionJpaEntity dayData = dataByDate.get(date);
+                return new CaloriesRangeSummaryResponse.DailyStats(
+                    date,
+                    dayData != null ? dayData.getTotalCaloriesKcal() : 0.0,
+                    dayData != null ? dayData.getActiveHoursCount() : 0
+                );
+            })
+            .toList();
 
         double totalCalories = dailyStats.stream()
             .mapToDouble(CaloriesRangeSummaryResponse.DailyStats::totalCalories)
@@ -136,12 +131,12 @@ class CaloriesService implements CaloriesFacade {
     @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} calories events directly", events.size());
-        for (StoredEventData event : events) {
+        events.forEach(event -> {
             try {
                 caloriesProjector.projectCalories(event);
             } catch (Exception e) {
                 log.error("Failed to project calories event: {}", event.eventId().value(), e);
             }
-        }
+        });
     }
 }

@@ -1,11 +1,12 @@
 package com.healthassistant.calories;
 
-import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.dto.events.CaloriesEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -30,8 +31,13 @@ class CaloriesEventsListener {
             try {
                 log.debug("Processing ActiveCaloriesBurnedRecorded event: {}", eventData.eventId().value());
                 caloriesProjector.projectCalories(eventData);
-            } catch (Exception e) {
-                log.error("Failed to project calories for event: {}", eventData.eventId().value(), e);
+            } catch (ObjectOptimisticLockingFailureException e) {
+                log.warn("Version conflict while projecting calories for event: {}, skipping", eventData.eventId().value());
+            } catch (DataAccessException e) {
+                log.error("Database error while projecting calories for event: {}", eventData.eventId().value(), e);
+            } catch (RuntimeException e) {
+                log.error("Unexpected error while projecting calories for event: {}", eventData.eventId().value(), e);
+                throw e;
             }
         });
 
@@ -70,8 +76,13 @@ class CaloriesEventsListener {
                             correction.correctedPayload(),
                             correction.correctedOccurredAt()
                     );
-                } catch (Exception e) {
-                    log.error("Failed to project corrected calories: {}", e.getMessage(), e);
+                } catch (ObjectOptimisticLockingFailureException e) {
+                    log.warn("Version conflict while projecting corrected calories, skipping");
+                } catch (DataAccessException e) {
+                    log.error("Database error while projecting corrected calories: {}", e.getMessage(), e);
+                } catch (RuntimeException e) {
+                    log.error("Unexpected error while projecting corrected calories: {}", e.getMessage(), e);
+                    throw e;
                 }
             }
         });
@@ -79,8 +90,13 @@ class CaloriesEventsListener {
         affectedDates.forEach(date -> {
             try {
                 caloriesProjector.reprojectForDate(event.deviceId(), date);
-            } catch (Exception e) {
-                log.error("Failed to reproject calories for date {}: {}", date, e.getMessage(), e);
+            } catch (ObjectOptimisticLockingFailureException e) {
+                log.warn("Version conflict while reprojecting calories for date {}, skipping", date);
+            } catch (DataAccessException e) {
+                log.error("Database error while reprojecting calories for date {}: {}", date, e.getMessage(), e);
+            } catch (RuntimeException e) {
+                log.error("Unexpected error while reprojecting calories for date {}: {}", date, e.getMessage(), e);
+                throw e;
             }
         });
     }
