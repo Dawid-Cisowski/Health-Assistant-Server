@@ -23,11 +23,13 @@ class ActivityProjector {
     private final ActivityHourlyProjectionJpaRepository hourlyRepository;
     private final ActivityBucketFactory activityBucketFactory;
 
+    @Transactional
     public void projectActivity(StoredEventData eventData) {
         activityBucketFactory.createFromEvent(eventData)
                 .ifPresent(this::saveProjection);
     }
 
+    @Transactional
     public void projectCorrectedActivity(String deviceId, Map<String, Object> payload, Instant occurredAt) {
         activityBucketFactory.createFromCorrectionPayload(deviceId, payload)
                 .ifPresent(this::saveProjection);

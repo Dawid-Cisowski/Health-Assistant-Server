@@ -8,6 +8,7 @@ import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -69,8 +70,10 @@ class ActivityEventsListener {
                             correction.correctedPayload(),
                             correction.correctedOccurredAt()
                     );
+                } catch (IllegalArgumentException | DateTimeParseException e) {
+                    log.warn("Invalid corrected activity data: {}", e.getMessage());
                 } catch (Exception e) {
-                    log.error("Failed to project corrected activity: {}", e.getMessage(), e);
+                    log.error("Unexpected error projecting corrected activity: {}", e.getMessage(), e);
                 }
             }
         });

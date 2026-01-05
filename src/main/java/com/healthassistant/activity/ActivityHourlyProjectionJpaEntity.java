@@ -79,8 +79,8 @@ class ActivityHourlyProjectionJpaEntity {
     }
 
     void addBucket(ActivityBucket bucket) {
-        this.activeMinutes = this.activeMinutes + bucket.activeMinutes();
-        this.bucketCount = this.bucketCount + 1;
+        this.activeMinutes = Math.addExact(this.activeMinutes, bucket.activeMinutes());
+        this.bucketCount = Math.incrementExact(this.bucketCount);
 
         if (this.firstBucketTime == null || bucket.bucketStart().isBefore(this.firstBucketTime)) {
             this.firstBucketTime = bucket.bucketStart();

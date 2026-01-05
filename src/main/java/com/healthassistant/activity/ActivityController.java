@@ -23,6 +23,8 @@ import java.time.LocalDate;
 @Tag(name = "Activity", description = "Activity (active minutes) tracking and analytics endpoints")
 class ActivityController {
 
+    private static final int MAX_RANGE_DAYS = 365;
+
     private final ActivityFacade activityFacade;
     public static final String DEVICE_ID_HEADER = "X-Device-Id";
 
@@ -69,6 +71,17 @@ class ActivityController {
     ) {
         if (startDate.isAfter(endDate)) {
             log.warn("Invalid date range: start {} is after end {}", startDate, endDate);
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (endDate.isAfter(LocalDate.now())) {
+            log.warn("Future date requested: {}", endDate);
+            return ResponseEntity.badRequest().build();
+        }
+
+        long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate);
+        if (daysBetween > MAX_RANGE_DAYS) {
+            log.warn("Requested range {} days exceeds maximum {}", daysBetween, MAX_RANGE_DAYS);
             return ResponseEntity.badRequest().build();
         }
 

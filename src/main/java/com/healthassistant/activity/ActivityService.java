@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -69,20 +68,16 @@ class ActivityService implements ActivityFacade {
         Map<LocalDate, ActivityDailyProjectionJpaEntity> dataByDate = dailyData.stream()
             .collect(Collectors.toMap(ActivityDailyProjectionJpaEntity::getDate, d -> d));
 
-        List<ActivityRangeSummaryResponse.DailyStats> dailyStats = new ArrayList<>();
-        LocalDate current = startDate;
-
-        while (!current.isAfter(endDate)) {
-            ActivityDailyProjectionJpaEntity dayData = dataByDate.get(current);
-
-            dailyStats.add(new ActivityRangeSummaryResponse.DailyStats(
-                current,
-                dayData != null ? dayData.getTotalActiveMinutes() : 0,
-                dayData != null ? dayData.getActiveHoursCount() : 0
-            ));
-
-            current = current.plusDays(1);
-        }
+        List<ActivityRangeSummaryResponse.DailyStats> dailyStats = startDate.datesUntil(endDate.plusDays(1))
+            .map(date -> {
+                ActivityDailyProjectionJpaEntity dayData = dataByDate.get(date);
+                return new ActivityRangeSummaryResponse.DailyStats(
+                    date,
+                    dayData != null ? dayData.getTotalActiveMinutes() : 0,
+                    dayData != null ? dayData.getActiveHoursCount() : 0
+                );
+            })
+            .toList();
 
         int totalMinutes = dailyStats.stream()
             .mapToInt(ActivityRangeSummaryResponse.DailyStats::totalActiveMinutes)
@@ -124,12 +119,12 @@ class ActivityService implements ActivityFacade {
     @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} activity events directly", events.size());
-        for (StoredEventData event : events) {
+        events.forEach(event -> {
             try {
                 activityProjector.projectActivity(event);
             } catch (Exception e) {
                 log.error("Failed to project activity event: {}", event.eventId().value(), e);
             }
-        }
+        });
     }
 }
