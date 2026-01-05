@@ -15,7 +15,7 @@ import java.util.List;
 public record SubmitHealthEventsRequest(
     @JsonProperty("events")
     @NotNull(message = "Events list is required")
-    @Size(min = 1, max = 100, message = "Events list must contain between 1 and 100 events")
+    @Size(min = 1, max = 1000, message = "Events list must contain between 1 and 1000 events")
     @Schema(description = "List of health events to submit")
     List<HealthEventRequest> events,
 

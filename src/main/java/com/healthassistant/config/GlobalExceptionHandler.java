@@ -21,7 +21,7 @@ import java.util.UUID;
 class GlobalExceptionHandler {
 
     private static final String EVENTS_FIELD = "events";
-    private static final int MAX_BATCH_SIZE = 100;
+    private static final int MAX_BATCH_SIZE = 1000;
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
