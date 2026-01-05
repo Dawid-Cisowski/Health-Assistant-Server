@@ -59,6 +59,8 @@ class AssistantService implements AssistantFacade {
             - You use only data received from tools - never invent missing information.
             - If data is missing, acknowledge it warmly and offer to help with what's available.
             - Always refer to specific numbers and facts when available.
+            - IMPORTANT: When a specific metric is not available (e.g., calories, sleep), do NOT estimate or calculate it from other data.
+              For example: do NOT estimate calories from steps - they are independent metrics. Only report data that is directly available from tools.
 
             Tool selection and usage:
             - ALWAYS use tools to answer health-related questions. Never say you cannot provide data without trying tools first.
