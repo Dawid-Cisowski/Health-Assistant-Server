@@ -12,9 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -36,7 +37,7 @@ class ConversationService {
 
         var conversation = conversationRepository.findByIdAndDeviceId(conversationId, deviceId)
                 .orElseThrow(() -> {
-                    log.warn("Conversation {} not found or doesn't belong to device {}", conversationId, deviceId);
+                    log.warn("SECURITY_EVENT: Unauthorized conversation access. conversationId={}, deviceId={}", conversationId, deviceId);
                     return new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
                 });
 
@@ -46,7 +47,8 @@ class ConversationService {
 
     @Transactional(readOnly = true)
     public List<ConversationMessage> loadConversationHistory(UUID conversationId) {
-        var messages = messageRepository.findLast20ByConversationIdChronological(conversationId);
+        var messages = messageRepository.findTop20ByConversationIdOrderByCreatedAtDesc(conversationId);
+        Collections.reverse(messages);
         log.info("Loaded {} messages from conversation {}", messages.size(), conversationId);
         return messages;
     }
@@ -56,26 +58,29 @@ class ConversationService {
         var message = new ConversationMessage(conversationId, role, content);
         messageRepository.save(message);
 
-        conversationRepository.findById(conversationId).ifPresent(conversationRepository::save);
+        conversationRepository.findById(conversationId).ifPresent(Conversation::touch);
 
         log.info("Saved {} message to conversation {}", role, conversationId);
     }
 
     public List<Message> buildMessageList(List<ConversationMessage> history, String systemPrompt, String currentUserMessage) {
-        var messages = new ArrayList<Message>();
-        messages.add(new SystemMessage(systemPrompt));
+        var result = Stream.concat(
+                Stream.concat(
+                        Stream.of((Message) new SystemMessage(systemPrompt)),
+                        history.stream().map(this::toSpringAiMessage)
+                ),
+                Stream.of((Message) new UserMessage(currentUserMessage))
+        ).toList();
 
-        history.stream()
-                .map(msg -> switch (msg.getRole()) {
-                    case USER -> new UserMessage(msg.getContent());
-                    case ASSISTANT -> new AssistantMessage(msg.getContent());
-                })
-                .forEach(messages::add);
+        log.info("Built message list: 1 system + {} history + 1 current = {} total", history.size(), result.size());
+        return result;
+    }
 
-        messages.add(new UserMessage(currentUserMessage));
-
-        log.info("Built message list: 1 system + {} history + 1 current = {} total", history.size(), messages.size());
-        return messages;
+    private Message toSpringAiMessage(ConversationMessage msg) {
+        return switch (msg.getRole()) {
+            case USER -> new UserMessage(msg.getContent());
+            case ASSISTANT -> new AssistantMessage(msg.getContent());
+        };
     }
 
     @Transactional

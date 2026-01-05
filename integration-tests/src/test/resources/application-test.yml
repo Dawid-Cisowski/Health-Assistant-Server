@@ -24,6 +24,8 @@ spring:
 app:
   assistant:
     enabled: true
+    rate-limit:
+      max-requests-per-minute: 0
 
 logging:
   level:

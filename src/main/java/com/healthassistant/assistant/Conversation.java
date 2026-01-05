@@ -3,7 +3,6 @@ package com.healthassistant.assistant;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,7 +10,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "conversations")
 @Getter
-@Setter
 @NoArgsConstructor
 class Conversation {
 
@@ -42,7 +40,15 @@ class Conversation {
         updatedAt = Instant.now();
     }
 
-    public Conversation(String deviceId) {
+    Conversation(String deviceId) {
         this.deviceId = deviceId;
+    }
+
+    boolean belongsTo(String deviceId) {
+        return this.deviceId.equals(deviceId);
+    }
+
+    void touch() {
+        this.updatedAt = Instant.now();
     }
 }

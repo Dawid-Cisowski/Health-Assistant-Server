@@ -3,7 +3,6 @@ package com.healthassistant.assistant;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,7 +10,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "conversation_messages")
 @Getter
-@Setter
 @NoArgsConstructor
 class ConversationMessage {
 
@@ -37,7 +35,7 @@ class ConversationMessage {
         createdAt = Instant.now();
     }
 
-    public ConversationMessage(UUID conversationId, MessageRole role, String content) {
+    ConversationMessage(UUID conversationId, MessageRole role, String content) {
         this.conversationId = conversationId;
         this.role = role;
         this.content = content;

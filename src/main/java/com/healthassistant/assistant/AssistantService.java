@@ -104,15 +104,19 @@ class AssistantService implements AssistantFacade {
                 deviceId, request.message(), request.conversationId());
 
         return Mono.fromCallable(() -> {
-                    // Set deviceId on the boundedElastic thread where tools will be called
                     AssistantContext.setDeviceId(deviceId);
-                    var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
-                    var history = conversationService.loadConversationHistory(conversationId);
-                    var currentDate = LocalDate.now(POLAND_ZONE);
-                    var systemInstruction = buildSystemInstruction(currentDate);
-                    var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
-                    conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
-                    return new ConversationContext(conversationId, messages);
+                    try {
+                        var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
+                        var history = conversationService.loadConversationHistory(conversationId);
+                        var currentDate = LocalDate.now(POLAND_ZONE);
+                        var systemInstruction = buildSystemInstruction(currentDate);
+                        var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
+                        conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
+                        return new ConversationContext(conversationId, messages);
+                    } catch (Exception e) {
+                        AssistantContext.clear();
+                        throw e;
+                    }
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(ctx -> {
@@ -131,12 +135,20 @@ class AssistantService implements AssistantFacade {
                             .doOnError(error -> log.error("Error in stream chat", error))
                             .onErrorResume(error -> Flux.just(createErrorEvent(error)))
                             .doFinally(signal -> Schedulers.boundedElastic().schedule(() -> {
-                                if (!assistantResponse.isEmpty()) {
-                                    conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, assistantResponse.toString());
-                                    log.info("Saved assistant response ({} chars) to conversation {}", assistantResponse.length(), ctx.conversationId());
+                                try {
+                                    if (!assistantResponse.isEmpty()) {
+                                        conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, assistantResponse.toString());
+                                        log.info("Saved assistant response ({} chars) to conversation {}", assistantResponse.length(), ctx.conversationId());
+                                    }
+                                } finally {
+                                    AssistantContext.clear();
+                                    log.debug("Cleared AssistantContext for device {}", deviceId);
                                 }
-                                AssistantContext.clear();
                             }));
+                })
+                .doOnCancel(() -> {
+                    AssistantContext.clear();
+                    log.debug("Cleared AssistantContext on cancel for device {}", deviceId);
                 });
     }
 
