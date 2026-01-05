@@ -1,5 +1,6 @@
 package com.healthassistant.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
@@ -19,6 +20,8 @@ import java.util.Map;
 @Slf4j
 @Getter
 public class AppProperties {
+
+    private static final int MASKED_DEVICE_ID_PREFIX_LENGTH = 4;
 
     private final HmacConfig hmac = new HmacConfig();
     private final NonceConfig nonce = new NonceConfig();
@@ -43,13 +46,16 @@ public class AppProperties {
             try {
                 Map<String, String> devices = parseDevicesJson(devicesJson);
                 loadDeviceSecrets(devices);
-            } catch (Exception e) {
-                log.error("Failed to parse HMAC devices JSON", e);
-                throw new IllegalStateException("Invalid HMAC_DEVICES_JSON configuration", e);
+            } catch (JsonProcessingException e) {
+                log.error("Failed to parse HMAC devices JSON: invalid JSON format", e);
+                throw new IllegalStateException("Invalid HMAC_DEVICES_JSON configuration: malformed JSON", e);
+            } catch (IllegalArgumentException e) {
+                log.error("Failed to decode base64 secret for device", e);
+                throw new IllegalStateException("Invalid HMAC_DEVICES_JSON configuration: invalid base64 encoding", e);
             }
         }
 
-        private Map<String, String> parseDevicesJson(String json) throws Exception {
+        private Map<String, String> parseDevicesJson(String json) throws JsonProcessingException {
             ObjectMapper mapper = new ObjectMapper();
             return mapper.readValue(json, new TypeReference<>() {});
         }
@@ -58,8 +64,15 @@ public class AppProperties {
             devices.forEach((deviceId, base64Secret) -> {
                 byte[] secret = Base64.getDecoder().decode(base64Secret);
                 deviceSecrets.put(deviceId, secret);
-                log.info("Loaded HMAC secret for device: {}", deviceId);
+                log.info("Loaded HMAC secret for device: {}", maskDeviceId(deviceId));
             });
+        }
+
+        private String maskDeviceId(String deviceId) {
+            if (deviceId == null || deviceId.length() <= MASKED_DEVICE_ID_PREFIX_LENGTH) {
+                return "****";
+            }
+            return deviceId.substring(0, MASKED_DEVICE_ID_PREFIX_LENGTH) + "****";
         }
     }
 
@@ -78,4 +91,3 @@ public class AppProperties {
         private String deviceId = "google-fit";
     }
 }
-

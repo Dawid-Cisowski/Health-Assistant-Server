@@ -14,10 +14,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestControllerAdvice
 @Slf4j
 class GlobalExceptionHandler {
+
+    private static final String EVENTS_FIELD = "events";
+    private static final int MAX_BATCH_SIZE = 100;
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
@@ -28,10 +32,14 @@ class GlobalExceptionHandler {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .toList();
 
-        if (details.stream().anyMatch(d -> d.contains("must contain between 1 and 100"))) {
+        boolean isBatchTooLarge = ex.getBindingResult().getFieldErrors().stream()
+                .anyMatch(error -> EVENTS_FIELD.equals(error.getField()) && isSizeViolation(error.getCode()));
+
+        if (isBatchTooLarge) {
             return ResponseEntity
                     .status(HttpStatus.PAYLOAD_TOO_LARGE)
-                    .body(new ErrorResponse("BATCH_TOO_LARGE", "Too many events in batch", details));
+                    .body(new ErrorResponse("BATCH_TOO_LARGE",
+                            "Too many events in batch (maximum: " + MAX_BATCH_SIZE + ")", details));
         }
 
         ErrorResponse errorResponse = new ErrorResponse("VALIDATION_ERROR", "Request validation failed", details);
@@ -49,19 +57,17 @@ class GlobalExceptionHandler {
         log.warn("Malformed request body: {}", ex.getMessage());
 
         Throwable cause = ex.getCause();
-        if (cause instanceof InvalidFormatException ife) {
-            String message = "Invalid data format: " + ife.getMessage();
+        if (cause instanceof InvalidFormatException) {
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
-                    .body(new ErrorResponse("MALFORMED_REQUEST", message,
-                            List.of(ife.getMessage() != null ? ife.getMessage() : "Invalid request body")));
+                    .body(new ErrorResponse("MALFORMED_REQUEST", "Invalid data format",
+                            List.of("Request contains invalid data format")));
         }
 
         String message = determineErrorMessage(ex.getMessage());
-        String detail = ex.getMessage();
 
         ErrorResponse errorResponse = new ErrorResponse("MALFORMED_REQUEST", message,
-                List.of(detail != null ? detail : "Invalid request body"));
+                List.of("Invalid request body"));
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -77,7 +83,7 @@ class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = new ErrorResponse("UNSUPPORTED_MEDIA_TYPE",
                 "Content-Type must be application/json",
-                List.of("Received: " + ex.getContentType() + ", Expected: application/json"));
+                List.of("Expected: application/json"));
 
         return ResponseEntity
                 .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
@@ -92,7 +98,7 @@ class GlobalExceptionHandler {
         log.warn("Invalid argument: {}", ex.getMessage());
 
         ErrorResponse errorResponse = new ErrorResponse("INVALID_ARGUMENT",
-                ex.getMessage(), List.of(ex.getMessage()));
+                ex.getMessage(), List.of());
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -108,7 +114,7 @@ class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = new ErrorResponse("MISSING_PARAMETER",
                 "Required parameter '" + ex.getParameterName() + "' is missing",
-                List.of(ex.getMessage()));
+                List.of());
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -120,14 +126,23 @@ class GlobalExceptionHandler {
             Exception ex,
             WebRequest request
     ) {
-        log.error("Unexpected error", ex);
+        String requestId = UUID.randomUUID().toString();
+        log.error("Unexpected error [requestId={}]", requestId, ex);
 
-        ErrorResponse errorResponse = new ErrorResponse("INTERNAL_ERROR",
-                "An unexpected error occurred", List.of(ex.getMessage()));
+        ErrorResponse errorResponse = new ErrorResponse(
+                "INTERNAL_ERROR",
+                "An unexpected error occurred",
+                List.of("Please contact support with request ID: " + requestId),
+                requestId
+        );
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(errorResponse);
+    }
+
+    private boolean isSizeViolation(String code) {
+        return "Size".equals(code);
     }
 
     private String determineErrorMessage(String detail) {

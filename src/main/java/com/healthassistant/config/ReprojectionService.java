@@ -19,13 +19,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ReprojectionService {
+class ReprojectionService {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final int BATCH_SIZE = 500;
@@ -47,13 +54,12 @@ public class ReprojectionService {
     private final DailySummaryFacade dailySummaryFacade;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Transactional(timeout = 3600)
     public ReprojectionResult reprojectAll() {
         log.info("Starting full reprojection of all events");
 
-        // 1. Delete all existing projections (in separate transaction)
         deleteAllProjections();
 
-        // 2. Count total events
         long totalEvents = healthEventsFacade.countAllEvents();
         log.info("Total events to reproject: {}", totalEvents);
 
@@ -61,75 +67,69 @@ public class ReprojectionService {
             return new ReprojectionResult(0, 0, 0, 0, 0, 0, 0);
         }
 
-        // 3. Process in batches
-        int stepsCount = 0;
-        int workoutsCount = 0;
-        int sleepCount = 0;
-        int activityCount = 0;
-        int caloriesCount = 0;
-        int mealsCount = 0;
-
         Set<LocalDate> allAffectedDates = new HashSet<>();
         Set<String> allEventTypes = new HashSet<>();
-        String deviceId = null;
+        AtomicReference<String> deviceIdRef = new AtomicReference<>();
 
-        int page = 0;
-        int processedTotal = 0;
+        AtomicInteger stepsCount = new AtomicInteger();
+        AtomicInteger workoutsCount = new AtomicInteger();
+        AtomicInteger sleepCount = new AtomicInteger();
+        AtomicInteger activityCount = new AtomicInteger();
+        AtomicInteger caloriesCount = new AtomicInteger();
+        AtomicInteger mealsCount = new AtomicInteger();
+        AtomicInteger processedTotal = new AtomicInteger();
 
-        while (processedTotal < totalEvents) {
-            log.info("Processing batch {} (offset: {}, batch size: {})", page + 1, processedTotal, BATCH_SIZE);
+        int totalBatches = (int) Math.ceil((double) totalEvents / BATCH_SIZE);
 
-            List<StoredEventData> batch = healthEventsFacade.findEventsForReprojection(page, BATCH_SIZE);
+        IntStream.range(0, totalBatches)
+                .takeWhile(page -> processedTotal.get() < totalEvents)
+                .forEach(page -> {
+                    log.info("Processing batch {} (offset: {}, batch size: {})", page + 1, processedTotal.get(), BATCH_SIZE);
 
-            if (batch.isEmpty()) {
-                break;
-            }
+                    List<StoredEventData> batch = healthEventsFacade.findEventsForReprojection(page, BATCH_SIZE);
 
-            if (deviceId == null && !batch.isEmpty()) {
-                deviceId = batch.getFirst().deviceId().value();
-            }
+                    if (batch.isEmpty()) {
+                        return;
+                    }
 
-            // Group by type
-            Map<String, List<StoredEventData>> eventsByType = batch.stream()
-                    .collect(Collectors.groupingBy(e -> e.eventType().value()));
+                    deviceIdRef.compareAndSet(null, batch.getFirst().deviceId().value());
 
-            // Process each type - call projectors directly via facades
-            stepsCount += processBatchForType(eventsByType, STEPS_BUCKETED_V1, stepsFacade::projectEvents);
-            workoutsCount += processBatchForType(eventsByType, WORKOUT_V1, workoutFacade::projectEvents);
-            sleepCount += processBatchForType(eventsByType, SLEEP_SESSION_V1, sleepFacade::projectEvents);
-            activityCount += processBatchForType(eventsByType, ACTIVE_MINUTES_V1, activityFacade::projectEvents);
-            caloriesCount += processBatchForType(eventsByType, ACTIVE_CALORIES_V1, caloriesFacade::projectEvents);
-            mealsCount += processBatchForType(eventsByType, MEAL_V1, mealsFacade::projectEvents);
+                    Map<String, List<StoredEventData>> eventsByType = batch.stream()
+                            .collect(Collectors.groupingBy(e -> e.eventType().value()));
 
-            // Collect dates and types for daily summary
-            batch.forEach(e -> {
-                allAffectedDates.add(e.occurredAt().atZone(POLAND_ZONE).toLocalDate());
-                allEventTypes.add(e.eventType().value());
-            });
+                    stepsCount.addAndGet(processBatchForType(eventsByType, STEPS_BUCKETED_V1, stepsFacade::projectEvents));
+                    workoutsCount.addAndGet(processBatchForType(eventsByType, WORKOUT_V1, workoutFacade::projectEvents));
+                    sleepCount.addAndGet(processBatchForType(eventsByType, SLEEP_SESSION_V1, sleepFacade::projectEvents));
+                    activityCount.addAndGet(processBatchForType(eventsByType, ACTIVE_MINUTES_V1, activityFacade::projectEvents));
+                    caloriesCount.addAndGet(processBatchForType(eventsByType, ACTIVE_CALORIES_V1, caloriesFacade::projectEvents));
+                    mealsCount.addAndGet(processBatchForType(eventsByType, MEAL_V1, mealsFacade::projectEvents));
 
-            processedTotal += batch.size();
-            page++;
+                    batch.forEach(e -> {
+                        allAffectedDates.add(e.occurredAt().atZone(POLAND_ZONE).toLocalDate());
+                        allEventTypes.add(e.eventType().value());
+                    });
 
-            log.info("Processed {}/{} events", processedTotal, totalEvents);
-        }
+                    processedTotal.addAndGet(batch.size());
+                    log.info("Processed {}/{} events", processedTotal.get(), totalEvents);
+                });
 
-        // 4. Trigger daily summary aggregation
+        String deviceId = deviceIdRef.get();
         if (deviceId != null && !allAffectedDates.isEmpty()) {
             log.info("Publishing AllEventsStoredEvent for {} affected dates", allAffectedDates.size());
             eventPublisher.publishEvent(new AllEventsStoredEvent(deviceId, allAffectedDates, allEventTypes));
         }
 
         log.info("Reprojection completed: steps={}, workouts={}, sleep={}, activity={}, calories={}, meals={}",
-                stepsCount, workoutsCount, sleepCount, activityCount, caloriesCount, mealsCount);
+                stepsCount.get(), workoutsCount.get(), sleepCount.get(), activityCount.get(), caloriesCount.get(), mealsCount.get());
 
         return new ReprojectionResult(
-                processedTotal,
-                stepsCount,
-                workoutsCount,
-                sleepCount,
-                activityCount,
-                caloriesCount,
-                mealsCount
+                processedTotal.get(),
+                stepsCount.get(),
+                workoutsCount.get(),
+                sleepCount.get(),
+                activityCount.get(),
+                caloriesCount.get(),
+                mealsCount.get()
         );
     }
 
@@ -149,7 +149,7 @@ public class ReprojectionService {
     private int processBatchForType(
             Map<String, List<StoredEventData>> eventsByType,
             String eventType,
-            java.util.function.Consumer<List<StoredEventData>> projector
+            Consumer<List<StoredEventData>> projector
     ) {
         List<StoredEventData> events = eventsByType.getOrDefault(eventType, List.of());
         if (!events.isEmpty()) {
