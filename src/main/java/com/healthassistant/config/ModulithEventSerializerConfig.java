@@ -1,5 +1,6 @@
 package com.healthassistant.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
@@ -48,17 +49,32 @@ class ModulithEventSerializerConfig {
         mapper.registerModule(new JavaTimeModule());
 
         PolymorphicTypeValidator ptv = buildSecureTypeValidator();
-        mapper.activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL_AND_ENUMS);
+        mapper.setPolymorphicTypeValidator(ptv);
+
+        mapper.addMixIn(EventPayload.class, EventPayloadTypingMixIn.class);
 
         return mapper;
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
+    private interface EventPayloadTypingMixIn {
     }
 
     private PolymorphicTypeValidator buildSecureTypeValidator() {
         var builder = BasicPolymorphicTypeValidator.builder();
 
-        collectAllowedDomainTypes().forEach(clazz -> builder.allowIfSubType(clazz));
-        collectAllowedJavaTimeTypes().forEach(clazz -> builder.allowIfSubType(clazz));
-        collectAllowedCollectionTypes().forEach(clazz -> builder.allowIfSubType(clazz));
+        collectAllowedDomainTypes().forEach(clazz -> {
+            builder.allowIfSubType(clazz);
+            builder.allowIfBaseType(clazz);
+        });
+        collectAllowedJavaTimeTypes().forEach(clazz -> {
+            builder.allowIfSubType(clazz);
+            builder.allowIfBaseType(clazz);
+        });
+        collectAllowedCollectionTypes().forEach(clazz -> {
+            builder.allowIfSubType(clazz);
+            builder.allowIfBaseType(clazz);
+        });
 
         return builder.build();
     }

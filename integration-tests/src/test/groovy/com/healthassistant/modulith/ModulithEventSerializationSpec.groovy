@@ -183,43 +183,59 @@ class ModulithEventSerializationSpec extends BaseIntegrationSpec {
         DistanceBucketPayload    | "DistanceBucketRecorded.v1"      | createDistanceBucketPayload()
     }
 
-    def "should reject unauthorized types during deserialization"() {
+    def "should reject unauthorized payload type during deserialization"() {
         given:
         def maliciousJson = '''
-        ["java.lang.Runtime", {"@class": "java.lang.Runtime"}]
+        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.lang.Runtime"},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
         '''
 
         when:
-        eventSerializer.deserialize(maliciousJson, Object)
+        eventSerializer.deserialize(maliciousJson, StoredEventData)
 
         then:
         thrown(IllegalArgumentException)
     }
 
-    def "should reject deserialization of ProcessBuilder"() {
+    def "should reject ProcessBuilder payload during deserialization"() {
         given:
         def maliciousJson = '''
-        {"@class": "java.lang.ProcessBuilder", "command": ["cat", "/etc/passwd"]}
+        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.lang.ProcessBuilder","command":["cat","/etc/passwd"]},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
         '''
 
         when:
-        eventSerializer.deserialize(maliciousJson, Object)
+        eventSerializer.deserialize(maliciousJson, StoredEventData)
 
         then:
         thrown(IllegalArgumentException)
     }
 
-    def "should reject deserialization of arbitrary java.util classes not in allowlist"() {
+    def "should reject arbitrary classes in payload position during deserialization"() {
         given:
         def maliciousJson = '''
-        {"@class": "java.util.concurrent.ForkJoinPool"}
+        {"idempotencyKey":{"value":"test"},"eventType":{"value":"StepsBucketedRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"java.util.concurrent.ForkJoinPool"},"deviceId":{"value":"test"},"eventId":{"value":"evt_001"}}
         '''
 
         when:
-        eventSerializer.deserialize(maliciousJson, Object)
+        eventSerializer.deserialize(maliciousJson, StoredEventData)
 
         then:
         thrown(IllegalArgumentException)
+    }
+
+    def "should deserialize events without type wrappers on collections (backward compatibility)"() {
+        given:
+        def legacyJson = '''{"events":[{"idempotencyKey":{"value":"test-key-001"},"eventType":{"value":"SleepSessionRecorded.v1"},"occurredAt":"2025-01-01T09:00:00Z","payload":{"@class":"com.healthassistant.healthevents.api.dto.payload.SleepSessionPayload","sleepId":"sleep-001","sleepStart":"2025-01-01T23:00:00Z","sleepEnd":"2025-01-02T07:00:00Z","totalMinutes":480,"originPackage":"com.google.android.apps.fitness","lightSleepMinutes":null,"deepSleepMinutes":null,"remSleepMinutes":null,"awakeMinutes":null,"sleepScore":85,"source":null},"deviceId":{"value":"test-device"},"eventId":{"value":"evt_001"}}],"affectedDates":["2025-01-02"]}'''
+
+        when:
+        def deserialized = eventSerializer.deserialize(legacyJson, SleepEventsStoredEvent)
+
+        then:
+        deserialized.events().size() == 1
+        deserialized.events()[0].payload() instanceof SleepSessionPayload
+        def payload = deserialized.events()[0].payload() as SleepSessionPayload
+        payload.sleepId() == "sleep-001"
+        payload.totalMinutes() == 480
+        deserialized.affectedDates() == Set.of(LocalDate.of(2025, 1, 2))
     }
 
     def "should handle multiple events in single stored event"() {

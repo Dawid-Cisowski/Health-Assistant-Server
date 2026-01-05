@@ -8,8 +8,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Map;
 
-// Type deduction removed - we use explicit mapping via payloadClassFor() method
-// The event type is determined by the 'type' field in EventEnvelope, not by JSON structure
 @JsonSubTypes({
     @JsonSubTypes.Type(value = StepsPayload.class),
     @JsonSubTypes.Type(value = DistanceBucketPayload.class),
