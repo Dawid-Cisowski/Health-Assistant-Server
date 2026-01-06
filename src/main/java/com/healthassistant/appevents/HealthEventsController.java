@@ -14,9 +14,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/v1/health-events")
@@ -54,18 +57,17 @@ class HealthEventsController {
                     - For workouts: `{deviceId}|workout|{workoutId}`
                     - For other events: `{deviceId}|{eventType}|{occurredAt}-{index}`
 
-                    ## Modifying Events
+                    ## Implicit Event Correction
 
-                    Events are immutable. To modify an existing event:
-                    - **Delete**: Submit `EventDeleted.v1` with `targetEventId`
-                    - **Correct**: Submit `EventCorrected.v1` with `targetEventId` and corrected data
-
-                    Submitting with the same `idempotencyKey` will NOT update the event - use compensation events instead.
+                    Re-submitting an event with the same `idempotencyKey` will UPDATE the existing event's payload.
+                    This allows implicit correction by re-submission:
+                    - First submission: Event stored, returns `stored`
+                    - Subsequent submissions with same key: Payload updated, returns `duplicate`
 
                     ## Response Status Codes
 
-                    - `stored` - Event was successfully stored
-                    - `duplicate` - Event with same idempotencyKey already exists (use EventCorrected.v1 to modify)
+                    - `stored` - Event was successfully stored (first submission)
+                    - `duplicate` - Event with same idempotencyKey existed and payload was updated
                     - `invalid` - Event failed validation
                     """,
             security = @SecurityRequirement(name = "HmacHeaderAuth")
@@ -77,15 +79,29 @@ class HealthEventsController {
             @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     public ResponseEntity<SubmitHealthEventsResponse> submitHealthEvents(
+            @RequestAttribute("deviceId") String authenticatedDeviceId,
             @RequestBody @Valid SubmitHealthEventsRequest request) {
 
-        log.info("Received {} health events from device: {}",
-                request.events().size(),
-                request.deviceId() != null ? request.deviceId() : "mobile-app");
+        Objects.requireNonNull(request, "Request body cannot be null");
+        Objects.requireNonNull(request.events(), "Events list cannot be null");
+        if (request.events().isEmpty()) {
+            throw new IllegalArgumentException("Events list cannot be empty");
+        }
 
-        StoreHealthEventsResult result = appEventsFacade.submitHealthEvents(request);
+        logSecurityContext(authenticatedDeviceId, request.deviceId());
+
+        StoreHealthEventsResult result = appEventsFacade.submitHealthEvents(request, authenticatedDeviceId);
         SubmitHealthEventsResponse response = responseMapper.toResponse(result, request.events().size());
 
         return ResponseEntity.ok(response);
+    }
+
+    private void logSecurityContext(String authenticatedDeviceId, String requestDeviceId) {
+        if (requestDeviceId != null && !requestDeviceId.equals(authenticatedDeviceId)) {
+            log.warn("Device ID mismatch: authenticated={}, request={}", authenticatedDeviceId, requestDeviceId);
+        }
+        log.info("Received health events [authenticatedDevice={}, requestDevice={}]",
+                authenticatedDeviceId,
+                requestDeviceId != null ? requestDeviceId : "not-provided");
     }
 }

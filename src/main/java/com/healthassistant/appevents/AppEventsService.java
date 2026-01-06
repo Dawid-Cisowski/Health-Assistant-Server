@@ -19,8 +19,9 @@ import org.springframework.stereotype.Service;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 @Service
@@ -31,13 +32,13 @@ class AppEventsService implements AppEventsFacade {
     private final HealthEventsFacade healthEventsFacade;
 
     @Override
-    public StoreHealthEventsResult submitHealthEvents(SubmitHealthEventsRequest request) {
-        DeviceId deviceId = new DeviceId(
-                request.deviceId() != null ? request.deviceId() : "mobile-app"
-        );
+    public StoreHealthEventsResult submitHealthEvents(SubmitHealthEventsRequest request, String authenticatedDeviceId) {
+        Objects.requireNonNull(authenticatedDeviceId, "Authenticated device ID cannot be null");
+        DeviceId deviceId = new DeviceId(authenticatedDeviceId);
 
-        List<IndexedEvent> indexedEvents = IntStream.range(0, request.events().size())
-                .mapToObj(i -> new IndexedEvent(i, request.events().get(i)))
+        AtomicInteger index = new AtomicInteger(0);
+        List<IndexedEvent> indexedEvents = request.events().stream()
+                .map(event -> new IndexedEvent(index.getAndIncrement(), event))
                 .toList();
 
         Map<Boolean, List<IndexedEvent>> partitionedEvents = indexedEvents.stream()

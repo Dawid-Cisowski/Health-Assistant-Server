@@ -17,7 +17,8 @@ import java.util.Map;
         @Index(name = "idx_idempotency_key", columnList = "idempotency_key"),
         @Index(name = "idx_occurred_at", columnList = "occurred_at"),
         @Index(name = "idx_event_type", columnList = "event_type"),
-        @Index(name = "idx_created_at", columnList = "created_at")
+        @Index(name = "idx_created_at", columnList = "created_at"),
+        @Index(name = "idx_device_occurred", columnList = "device_id,occurred_at")
 })
 @Getter
 @Setter
@@ -29,6 +30,9 @@ class HealthEventJpaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    private Long version;
 
     @Column(name = "event_id", nullable = false, unique = true, length = 32)
     private String eventId;

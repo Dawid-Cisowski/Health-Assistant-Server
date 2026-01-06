@@ -87,7 +87,7 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("code") == "MALFORMED_REQUEST"
     }
 
-    def "Scenario 4: Invalid timestamp format in payload returns error"() {
+    def "Scenario 4: Invalid timestamp format in payload returns per-event error"() {
         given: "a request with invalid timestamp format in occurredAt"
         def path = "/v1/health-events"
         def body = '''
@@ -113,10 +113,16 @@ class GlobalExceptionHandlerSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "I get 400 Bad Request"
-        response.statusCode() == 400
-        def code = response.body().jsonPath().getString("code")
-        code in ["MALFORMED_REQUEST", "VALIDATION_ERROR"]
+        then: "I get 200 with all_invalid status (graceful per-event error handling)"
+        response.statusCode() == 200
+        response.body().jsonPath().getString("status") == "all_invalid"
+
+        and: "event result shows invalid with error about occurredAt"
+        def eventResults = response.body().jsonPath().getList("events")
+        eventResults.size() == 1
+        eventResults[0].status == "invalid"
+        eventResults[0].error != null
+        eventResults[0].error.message.contains("occurredAt")
     }
 
     def "Scenario 5: Unknown event type returns invalid status per event"() {

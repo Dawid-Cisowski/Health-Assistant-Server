@@ -1,6 +1,7 @@
 package com.healthassistant.appevents.api.dto;
 
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,13 +30,11 @@ public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealt
 
         String idempotencyKey = extractStringField(node, "idempotencyKey").orElse(null);
         String type = extractStringField(node, "type").orElse(null);
-        Instant occurredAt = extractStringField(node, "occurredAt")
-                .map(Instant::parse)
-                .orElse(null);
+        Instant occurredAt = parseOccurredAt(node);
+        String deserializationError = validateRequiredFields(type, occurredAt);
 
         EventPayload payload = null;
-        String deserializationError = null;
-        if (hasNonNullField(node, "payload") && type != null) {
+        if (deserializationError == null && hasNonNullField(node, "payload") && type != null) {
             try {
                 EventType eventType = EventType.from(type);
                 Class<? extends EventPayload> payloadClass = EventPayload.payloadClassFor(eventType);
@@ -42,13 +42,40 @@ public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealt
             } catch (IllegalArgumentException e) {
                 deserializationError = "Unknown event type: " + type;
                 log.debug("Failed to deserialize event: {}", deserializationError);
-            } catch (Exception e) {
+            } catch (JsonProcessingException e) {
                 deserializationError = extractMeaningfulError(e);
                 log.debug("Failed to deserialize payload for type {}: {}", type, deserializationError);
+            } catch (RuntimeException e) {
+                deserializationError = "Unexpected error processing payload: " + e.getMessage();
+                log.error("Unexpected error deserializing payload for type {}: {}", type, e.getMessage(), e);
             }
         }
 
         return new SubmitHealthEventsRequest.HealthEventRequest(idempotencyKey, type, occurredAt, payload, deserializationError);
+    }
+
+    private Instant parseOccurredAt(JsonNode node) {
+        return extractStringField(node, "occurredAt")
+                .flatMap(this::safeParseInstant)
+                .orElse(null);
+    }
+
+    private Optional<Instant> safeParseInstant(String value) {
+        try {
+            return Optional.of(Instant.parse(value));
+        } catch (DateTimeParseException e) {
+            return Optional.empty();
+        }
+    }
+
+    private String validateRequiredFields(String type, Instant occurredAt) {
+        if (type == null) {
+            return "Missing required field: type";
+        }
+        if (occurredAt == null) {
+            return "Missing or invalid required field: occurredAt";
+        }
+        return null;
     }
 
     private Optional<String> extractStringField(JsonNode node, String fieldName) {

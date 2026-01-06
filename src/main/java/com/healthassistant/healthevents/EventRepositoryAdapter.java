@@ -68,7 +68,9 @@ class EventRepositoryAdapter implements EventRepository {
                 toPayload(eventType, entity.getPayload()),
                 DeviceId.of(entity.getDeviceId()),
                 EventId.of(entity.getEventId())
-        ).withCreatedAt(entity.getCreatedAt());
+        )
+                .withCreatedAt(entity.getCreatedAt())
+                .withDeletionInfo(entity.getDeletedByEventId(), entity.getSupersededByEventId());
     }
 
     @Override
@@ -78,7 +80,7 @@ class EventRepositoryAdapter implements EventRepository {
             entity.setDeletedAt(deletedAt);
             entity.setDeletedByEventId(deletedByEventId);
             jpaRepository.save(entity);
-            log.info("Marked event {} as deleted by {}", targetEventId, deletedByEventId);
+            log.warn("AUDIT: Marked event {} as deleted by {} for device {}", targetEventId, deletedByEventId, requestingDeviceId);
             return new CompensationTargetInfo(
                     entity.getEventId(),
                     entity.getEventType(),
@@ -94,7 +96,7 @@ class EventRepositoryAdapter implements EventRepository {
         return jpaRepository.findByEventIdAndDeviceId(targetEventId, requestingDeviceId).map(entity -> {
             entity.setSupersededByEventId(supersededByEventId);
             jpaRepository.save(entity);
-            log.info("Marked event {} as superseded by {}", targetEventId, supersededByEventId);
+            log.warn("AUDIT: Marked event {} as superseded by {} for device {}", targetEventId, supersededByEventId, requestingDeviceId);
             return new CompensationTargetInfo(
                     entity.getEventId(),
                     entity.getEventType(),
@@ -125,10 +127,7 @@ class EventRepositoryAdapter implements EventRepository {
     public Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart) {
         log.debug("Looking for sleep event with deviceId={}, sleepStart={}", deviceId.value(), sleepStart);
 
-        return jpaRepository.findSleepInfoByDeviceIdAndSleepStart(
-                        deviceId.value(),
-                        sleepStart.toString()
-                )
+        return jpaRepository.findSleepInfoByDeviceIdAndSleepStart(deviceId.value(), sleepStart)
                 .map(projection -> new ExistingSleepInfo(
                         IdempotencyKey.of(projection.getIdempotencyKey()),
                         EventId.of(projection.getEventId())

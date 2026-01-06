@@ -75,12 +75,31 @@ class HealthEventsResponseMapper {
     }
 
     private void logProcessingResult(String status, int totalEvents, Summary summary) {
-        switch (status) {
-            case "all_invalid" -> log.warn("All {} events were invalid", totalEvents);
-            case "partial_success" -> log.info("Processed {} events: {} stored, {} duplicate, {} invalid",
-                    totalEvents, summary.stored(), summary.duplicate(), summary.invalid());
-            default -> log.info("Successfully processed {} events: {} stored, {} duplicate",
-                    totalEvents, summary.stored(), summary.duplicate());
+        record LogEntry(String message, boolean isWarning) {}
+
+        LogEntry entry = switch (status) {
+            case "all_invalid" -> new LogEntry(
+                    "All %d events were invalid".formatted(totalEvents),
+                    true
+            );
+            case "partial_success" -> new LogEntry(
+                    "Processed %d events: %d stored, %d duplicate, %d invalid".formatted(
+                            totalEvents, summary.stored(), summary.duplicate(), summary.invalid()
+                    ),
+                    false
+            );
+            default -> new LogEntry(
+                    "Successfully processed %d events: %d stored, %d duplicate".formatted(
+                            totalEvents, summary.stored(), summary.duplicate()
+                    ),
+                    false
+            );
+        };
+
+        if (entry.isWarning()) {
+            log.warn(entry.message());
+        } else {
+            log.info(entry.message());
         }
     }
 }

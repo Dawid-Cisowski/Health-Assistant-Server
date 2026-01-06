@@ -8,6 +8,8 @@ import java.util.Objects;
 
 public record IdempotencyKey(String value) {
 
+    private static final String TEMP_VALIDATION_KEY = "temp-key-for-validation";
+
     public IdempotencyKey {
         Objects.requireNonNull(value, "Idempotency key cannot be null");
         if (value.isBlank()) {
@@ -16,6 +18,14 @@ public record IdempotencyKey(String value) {
         if (value.length() > 512) {
             throw new IllegalArgumentException("Idempotency key cannot exceed 512 characters");
         }
+    }
+
+    public static IdempotencyKey temporary() {
+        return new IdempotencyKey(TEMP_VALIDATION_KEY);
+    }
+
+    public boolean isTemporary() {
+        return TEMP_VALIDATION_KEY.equals(value);
     }
 
     public static IdempotencyKey of(String value) {

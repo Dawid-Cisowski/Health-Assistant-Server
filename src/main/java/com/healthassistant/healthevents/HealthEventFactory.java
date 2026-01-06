@@ -22,15 +22,7 @@ class HealthEventFactory {
             EventPayload payload,
             DeviceId deviceId
     ) {
-        return new Event(
-                idempotencyKey,
-                eventType,
-                occurredAt,
-                payload,
-                deviceId,
-                eventIdGenerator.generate(),
-                Instant.now()
-        );
+        return Event.create(idempotencyKey, eventType, occurredAt, payload, deviceId, eventIdGenerator.generate());
     }
 
     Event createUpdate(
@@ -40,14 +32,14 @@ class HealthEventFactory {
             EventPayload payload,
             DeviceId deviceId
     ) {
-        return new Event(
+        return Event.create(
                 existingEvent.idempotencyKey(),
                 eventType,
                 occurredAt,
                 payload,
                 deviceId,
-                existingEvent.eventId(),
-                existingEvent.createdAt()
-        );
+                existingEvent.eventId()
+        ).withCreatedAt(existingEvent.createdAt())
+         .withDeletionInfo(existingEvent.deletedByEventId(), existingEvent.supersededByEventId());
     }
 }

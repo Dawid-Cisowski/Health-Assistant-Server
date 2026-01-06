@@ -13,11 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -27,8 +26,7 @@ import java.util.stream.IntStream;
 @Slf4j
 class StoreHealthEventsCommandHandler {
 
-    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final String SLEEP_SESSION_V1 = "SleepSessionRecorded.v1";
+    private static final String SLEEP_SESSION_TYPE_VALUE = "SleepSessionRecorded.v1";
 
     private final EventRepository eventRepository;
     private final HealthEventFactory eventFactory;
@@ -61,31 +59,32 @@ class StoreHealthEventsCommandHandler {
 
         Map<String, Event> existingEvents = eventRepository.findExistingEventsByIdempotencyKeys(idempotencyKeys);
 
-        List<Event> eventsToSave = new ArrayList<>();
-        List<StoreHealthEventsResult.EventResult> duplicateResults = new ArrayList<>();
+        Map<Boolean, List<Integer>> partitioned = validIndices.stream()
+                .collect(Collectors.partitioningBy(index ->
+                        existingEvents.containsKey(events.get(index).idempotencyKey().value())));
 
-        validIndices
-                .forEach(index -> {
+        List<StoreHealthEventsResult.EventResult> duplicateResults = partitioned.get(true).stream()
+                .map(index -> createDuplicateError(index,
+                        "Event with this idempotency key already exists. Use EventCorrected.v1 to modify events."))
+                .toList();
+
+        List<Event> eventsToSave = partitioned.get(false).stream()
+                .map(index -> {
                     var envelope = events.get(index);
-                    String idempotencyKeyValue = envelope.idempotencyKey().value();
-                    Event existingEvent = existingEvents.get(idempotencyKeyValue);
                     EventType eventType = EventType.from(envelope.eventType());
-                    if (existingEvent != null) {
-                        duplicateResults.add(createDuplicateError(index,
-                                "Event with this idempotency key already exists. Use EventCorrected.v1 to modify events."));
-                        return;
-                    }
-                    Event event = eventFactory.createNew(envelope.idempotencyKey(), eventType, envelope.occurredAt(), envelope.payload(), command.deviceId());
-                    eventsToSave.add(event);
-                });
+                    return eventFactory.createNew(envelope.idempotencyKey(), eventType, envelope.occurredAt(), envelope.payload(), command.deviceId());
+                })
+                .toList();
 
-        List<StoreHealthEventsResult.CompensationTarget> compensationTargets = new ArrayList<>();
+        List<StoreHealthEventsResult.CompensationTarget> compensationTargets;
 
         if (!eventsToSave.isEmpty()) {
             eventRepository.saveAll(eventsToSave);
             log.info("Stored {} new events in batch", eventsToSave.size());
 
-            compensationTargets.addAll(handleCompensationEvents(eventsToSave, deviceId));
+            compensationTargets = handleCompensationEvents(eventsToSave, deviceId);
+        } else {
+            compensationTargets = List.of();
         }
 
         Map<String, Event> allProcessedEvents = new java.util.HashMap<>();
@@ -119,9 +118,9 @@ class StoreHealthEventsCommandHandler {
 
                     Event savedEvent = savedEventsByIndex.get(index);
                     if (savedEvent != null) {
-                        if (savedEvent.eventType().value().equals("SleepSessionRecorded.v1")) {
+                        if (SLEEP_SESSION_TYPE_VALUE.equals(savedEvent.eventType().value())) {
                             log.info("Sleep event index={} status=stored idempotencyKey={}",
-                                    index, savedEvent.idempotencyKey().value());
+                                    index, LogMasker.maskSensitive(savedEvent.idempotencyKey().value()));
                         }
 
                         return new StoreHealthEventsResult.EventResult(
@@ -165,28 +164,31 @@ class StoreHealthEventsCommandHandler {
     private Set<LocalDate> extractAffectedDates(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
         return IntStream.range(0, results.size())
                 .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
-                .mapToObj(index -> {
-                    var envelope = command.events().get(index);
-                    Instant occurredAt = envelope.occurredAt();
-                    return occurredAt != null ? occurredAt.atZone(POLAND_ZONE).toLocalDate() : null;
-                })
+                .mapToObj(command.events()::get)
+                .map(StoreHealthEventsCommand.EventEnvelope::occurredAt)
                 .filter(Objects::nonNull)
+                .map(DateTimeUtils::toPolandDate)
                 .collect(Collectors.toSet());
     }
 
     private Set<EventType> extractEventTypes(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
         return IntStream.range(0, results.size())
                 .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
-                .mapToObj(index -> {
-                    var envelope = command.events().get(index);
-                    try {
-                        return EventType.from(envelope.eventType());
-                    } catch (Exception e) {
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
+                .mapToObj(command.events()::get)
+                .map(StoreHealthEventsCommand.EventEnvelope::eventType)
+                .map(this::parseEventTypeSafely)
+                .flatMap(Optional::stream)
                 .collect(Collectors.toSet());
+    }
+
+    private Optional<EventType> parseEventTypeSafely(String eventTypeStr) {
+        try {
+            return Optional.of(EventType.from(eventTypeStr));
+        } catch (IllegalArgumentException e) {
+            log.error("Stored event has invalid event type '{}'. This should never happen - indicates data corruption or validation bypass.",
+                    eventTypeStr, e);
+            throw new IllegalStateException("Stored event has invalid event type: " + eventTypeStr, e);
+        }
     }
 
     private StoreHealthEventsResult.EventResult validateEvent(
@@ -210,7 +212,7 @@ class StoreHealthEventsCommandHandler {
         }
 
         IdempotencyKey idempotencyKey = envelope.idempotencyKey();
-        if (idempotencyKey.value().equals("temp-key-for-validation")) {
+        if (idempotencyKey.isTemporary()) {
             return createInvalidResult(index, "idempotencyKey", "Missing required field: idempotencyKey");
         }
 
@@ -262,56 +264,71 @@ class StoreHealthEventsCommandHandler {
     }
 
     private List<StoreHealthEventsResult.CompensationTarget> handleCompensationEvents(List<Event> savedEvents, String requestingDeviceId) {
-        List<StoreHealthEventsResult.CompensationTarget> compensations = new ArrayList<>();
-
-        savedEvents.stream()
+        return savedEvents.stream()
                 .filter(event -> event.payload() instanceof EventDeletedPayload || event.payload() instanceof EventCorrectedPayload)
-                .forEach(event -> {
-                    if (event.payload() instanceof EventDeletedPayload deletedPayload) {
-                        eventRepository.markAsDeleted(
-                                deletedPayload.targetEventId(),
-                                event.eventId().value(),
-                                Instant.now(),
-                                requestingDeviceId
-                        ).ifPresentOrElse(
-                                info -> {
-                                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
-                                            info.targetEventId(),
-                                            info.targetEventType(),
-                                            info.targetOccurredAt(),
-                                            info.deviceId(),
-                                            StoreHealthEventsResult.CompensationType.DELETED
-                                    ));
-                                    log.info("Processed EventDeleted.v1: marked event {} as deleted", deletedPayload.targetEventId());
-                                },
-                                () -> log.warn("EventDeleted.v1: target event {} not found or not owned by device {}",
-                                        deletedPayload.targetEventId(), requestingDeviceId)
-                        );
-                    } else if (event.payload() instanceof EventCorrectedPayload correctedPayload) {
-                        eventRepository.markAsSuperseded(
-                                correctedPayload.targetEventId(),
-                                event.eventId().value(),
-                                requestingDeviceId
-                        ).ifPresentOrElse(
-                                info -> {
-                                    compensations.add(new StoreHealthEventsResult.CompensationTarget(
-                                            info.targetEventId(),
-                                            info.targetEventType(),
-                                            info.targetOccurredAt(),
-                                            info.deviceId(),
-                                            StoreHealthEventsResult.CompensationType.CORRECTED,
-                                            correctedPayload.correctedEventType(),
-                                            correctedPayload.correctedPayload(),
-                                            correctedPayload.correctedOccurredAt()
-                                    ));
-                                    log.info("Processed EventCorrected.v1: marked event {} as superseded", correctedPayload.targetEventId());
-                                },
-                                () -> log.warn("EventCorrected.v1: target event {} not found or not owned by device {}",
-                                        correctedPayload.targetEventId(), requestingDeviceId)
-                        );
-                    }
-                });
+                .flatMap(event -> processCompensationEvent(event, requestingDeviceId).stream())
+                .toList();
+    }
 
-        return compensations;
+    private Optional<StoreHealthEventsResult.CompensationTarget> processCompensationEvent(Event event, String requestingDeviceId) {
+        return switch (event.payload()) {
+            case EventDeletedPayload deletedPayload -> processDeletedEvent(event, deletedPayload, requestingDeviceId);
+            case EventCorrectedPayload correctedPayload -> processCorrectedEvent(event, correctedPayload, requestingDeviceId);
+            default -> Optional.empty();
+        };
+    }
+
+    private Optional<StoreHealthEventsResult.CompensationTarget> processDeletedEvent(
+            Event event,
+            EventDeletedPayload deletedPayload,
+            String requestingDeviceId
+    ) {
+        return eventRepository.markAsDeleted(
+                deletedPayload.targetEventId(),
+                event.eventId().value(),
+                Instant.now(),
+                requestingDeviceId
+        ).map(info -> {
+            log.info("Processed EventDeleted.v1: marked event {} as deleted", deletedPayload.targetEventId());
+            return new StoreHealthEventsResult.CompensationTarget(
+                    info.targetEventId(),
+                    info.targetEventType(),
+                    info.targetOccurredAt(),
+                    info.deviceId(),
+                    StoreHealthEventsResult.CompensationType.DELETED
+            );
+        }).or(() -> {
+            log.warn("EventDeleted.v1: target event {} not found or not owned by device {}",
+                    deletedPayload.targetEventId(), requestingDeviceId);
+            return Optional.empty();
+        });
+    }
+
+    private Optional<StoreHealthEventsResult.CompensationTarget> processCorrectedEvent(
+            Event event,
+            EventCorrectedPayload correctedPayload,
+            String requestingDeviceId
+    ) {
+        return eventRepository.markAsSuperseded(
+                correctedPayload.targetEventId(),
+                event.eventId().value(),
+                requestingDeviceId
+        ).map(info -> {
+            log.info("Processed EventCorrected.v1: marked event {} as superseded", correctedPayload.targetEventId());
+            return new StoreHealthEventsResult.CompensationTarget(
+                    info.targetEventId(),
+                    info.targetEventType(),
+                    info.targetOccurredAt(),
+                    info.deviceId(),
+                    StoreHealthEventsResult.CompensationType.CORRECTED,
+                    correctedPayload.correctedEventType(),
+                    correctedPayload.correctedPayload(),
+                    correctedPayload.correctedOccurredAt()
+            );
+        }).or(() -> {
+            log.warn("EventCorrected.v1: target event {} not found or not owned by device {}",
+                    correctedPayload.targetEventId(), requestingDeviceId);
+            return Optional.empty();
+        });
     }
 }

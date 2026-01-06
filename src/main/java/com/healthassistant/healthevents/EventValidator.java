@@ -1,9 +1,12 @@
 package com.healthassistant.healthevents;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.healthevents.api.dto.payload.*;
+import com.healthassistant.healthevents.api.model.EventType;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -12,9 +15,11 @@ import java.util.stream.IntStream;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 class EventValidator {
 
     private final Validator validator;
+    private final ObjectMapper objectMapper;
 
     List<EventValidationError> validate(EventPayload payload) {
         if (payload == null) {
@@ -70,13 +75,38 @@ class EventValidator {
             return errors;
         }
 
+        EventType correctedType;
         try {
-            com.healthassistant.healthevents.api.model.EventType.from(payload.correctedEventType());
+            correctedType = EventType.from(payload.correctedEventType());
         } catch (IllegalArgumentException e) {
             errors.add(EventValidationError.invalidValue("correctedEventType", "invalid event type: " + payload.correctedEventType()));
+            return errors;
         }
 
+        if (payload.correctedPayload() == null || payload.correctedPayload().isEmpty()) {
+            errors.add(EventValidationError.missingField("correctedPayload"));
+            return errors;
+        }
+
+        errors.addAll(validateCorrectedPayloadContent(correctedType, payload));
+
         return errors;
+    }
+
+    private List<EventValidationError> validateCorrectedPayloadContent(EventType correctedType, EventCorrectedPayload payload) {
+        try {
+            Class<? extends EventPayload> payloadClass = EventPayload.payloadClassFor(correctedType);
+            EventPayload correctedPayload = objectMapper.convertValue(payload.correctedPayload(), payloadClass);
+            return validate(correctedPayload).stream()
+                    .map(error -> EventValidationError.invalidValue(
+                            "correctedPayload." + error.field(),
+                            error.message()))
+                    .toList();
+        } catch (IllegalArgumentException e) {
+            log.debug("Failed to deserialize corrected payload for type {}: {}", correctedType.value(), e.getMessage());
+            return List.of(EventValidationError.invalidValue("correctedPayload",
+                    "Cannot deserialize payload for type " + correctedType.value() + ": " + e.getMessage()));
+        }
     }
 
     private List<EventValidationError> validateTimeRange(java.time.Instant start, java.time.Instant end, String endField, String startField) {

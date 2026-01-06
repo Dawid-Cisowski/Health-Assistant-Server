@@ -28,14 +28,14 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
         SELECT idempotency_key AS idempotencyKey, event_id AS eventId FROM health_events
         WHERE device_id = :deviceId
         AND event_type = 'SleepSessionRecorded.v1'
-        AND payload->>'sleepStart' = :sleepStart
+        AND (payload->>'sleepStart')::timestamptz = :sleepStart
         AND deleted_at IS NULL
         AND superseded_by_event_id IS NULL
         LIMIT 1
         """, nativeQuery = true)
     Optional<SleepInfoProjection> findSleepInfoByDeviceIdAndSleepStart(
             @Param("deviceId") String deviceId,
-            @Param("sleepStart") String sleepStart
+            @Param("sleepStart") Instant sleepStart
     );
 
     void deleteByDeviceId(String deviceId);

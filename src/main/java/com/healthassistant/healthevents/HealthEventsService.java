@@ -27,8 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,8 +38,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 class HealthEventsService implements HealthEventsFacade {
-
-    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private static final String STEPS_BUCKETED_V1 = "StepsBucketedRecorded.v1";
     private static final String WORKOUT_V1 = "WorkoutRecorded.v1";
@@ -58,6 +54,21 @@ class HealthEventsService implements HealthEventsFacade {
     private final EventRepository eventRepository;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Stores health events and publishes domain events for downstream projectors.
+     *
+     * <p>IMPORTANT: Event listeners for the published events (StepsEventsStoredEvent, WorkoutEventsStoredEvent, etc.)
+     * should use {@code @TransactionalEventListener(phase = AFTER_COMMIT)} to ensure they only process events
+     * after the transaction successfully commits. Using regular {@code @EventListener} or
+     * {@code @TransactionalEventListener(phase = BEFORE_COMMIT)} could lead to:
+     * <ul>
+     *   <li>Processing events for data that gets rolled back</li>
+     *   <li>Inconsistent projections if the listener fails and causes rollback</li>
+     * </ul>
+     *
+     * <p>TODO: Consider using Spring's ApplicationEventMulticaster with async execution for better resilience,
+     * or migrate to a message broker (e.g., Kafka) for guaranteed delivery and replay capabilities.
+     */
     @Override
     @Transactional
     public StoreHealthEventsResult storeHealthEvents(StoreHealthEventsCommand command) {
@@ -166,37 +177,34 @@ class HealthEventsService implements HealthEventsFacade {
     }
 
     private void publishCompensationEvents(StoreHealthEventsResult result, String deviceId) {
-        List<CompensationEventsStoredEvent.CompensationEventData> deletions = new ArrayList<>();
-        List<CompensationEventsStoredEvent.CorrectionEventData> corrections = new ArrayList<>();
-
-        result.compensationTargets().forEach(target -> {
-            Set<LocalDate> affectedDates = target.targetOccurredAt() != null
-                    ? Set.of(toLocalDate(target.targetOccurredAt()))
-                    : Set.of();
-
-            if (target.compensationType() == StoreHealthEventsResult.CompensationType.DELETED) {
-                deletions.add(new CompensationEventsStoredEvent.CompensationEventData(
+        List<CompensationEventsStoredEvent.CompensationEventData> deletions = result.compensationTargets().stream()
+                .filter(target -> target.compensationType() == StoreHealthEventsResult.CompensationType.DELETED)
+                .map(target -> new CompensationEventsStoredEvent.CompensationEventData(
                         null,
                         target.targetEventId(),
                         target.targetEventType(),
-                        affectedDates
-                ));
-            } else {
-                Set<LocalDate> correctedDates = target.correctedOccurredAt() != null
-                        ? Set.of(toLocalDate(target.correctedOccurredAt()))
-                        : affectedDates;
+                        extractDateSet(target.targetOccurredAt())
+                ))
+                .toList();
 
-                corrections.add(new CompensationEventsStoredEvent.CorrectionEventData(
-                        null,
-                        target.targetEventId(),
-                        target.targetEventType(),
-                        correctedDates,
-                        target.correctedEventType(),
-                        target.correctedPayload(),
-                        target.correctedOccurredAt()
-                ));
-            }
-        });
+        List<CompensationEventsStoredEvent.CorrectionEventData> corrections = result.compensationTargets().stream()
+                .filter(target -> target.compensationType() == StoreHealthEventsResult.CompensationType.CORRECTED)
+                .map(target -> {
+                    Set<LocalDate> affectedDates = extractDateSet(target.targetOccurredAt());
+                    Set<LocalDate> correctedDates = target.correctedOccurredAt() != null
+                            ? extractDateSet(target.correctedOccurredAt())
+                            : affectedDates;
+                    return new CompensationEventsStoredEvent.CorrectionEventData(
+                            null,
+                            target.targetEventId(),
+                            target.targetEventType(),
+                            correctedDates,
+                            target.correctedEventType(),
+                            target.correctedPayload(),
+                            target.correctedOccurredAt()
+                    );
+                })
+                .toList();
 
         CompensationEventsStoredEvent event = new CompensationEventsStoredEvent(deviceId, deletions, corrections);
 
@@ -206,16 +214,19 @@ class HealthEventsService implements HealthEventsFacade {
         eventPublisher.publishEvent(event);
     }
 
+    private Set<LocalDate> extractDateSet(Instant instant) {
+        return Optional.ofNullable(instant)
+                .map(DateTimeUtils::toPolandDate)
+                .map(Set::of)
+                .orElse(Set.of());
+    }
+
     private Set<LocalDate> extractAffectedDates(List<StoredEventData> events) {
         return events.stream()
                 .map(StoredEventData::occurredAt)
                 .filter(Objects::nonNull)
-                .map(this::toLocalDate)
+                .map(DateTimeUtils::toPolandDate)
                 .collect(Collectors.toSet());
-    }
-
-    private LocalDate toLocalDate(Instant instant) {
-        return instant.atZone(POLAND_ZONE).toLocalDate();
     }
 
     @Override
