@@ -59,9 +59,10 @@ class WorkoutService implements WorkoutFacade {
                             .toList();
 
                     return new WorkoutDetailResponse.ExerciseDetail(
-                            exercise.getExerciseName(), exercise.getMuscleGroup(),
-                            exercise.getOrderInWorkout(), exercise.getTotalSets(),
-                            exercise.getTotalVolumeKg(), exercise.getMaxWeightKg(), setDetails);
+                            exercise.getExerciseId(), exercise.getExerciseName(),
+                            exercise.getMuscleGroup(), exercise.getOrderInWorkout(),
+                            exercise.getTotalSets(), exercise.getTotalVolumeKg(),
+                            exercise.getMaxWeightKg(), setDetails);
                 })
                 .toList();
 
@@ -85,9 +86,10 @@ class WorkoutService implements WorkoutFacade {
                     List<WorkoutDetailResponse.ExerciseDetail> exerciseDetails = workout.getExercises().stream()
                             .sorted(Comparator.comparing(WorkoutExerciseProjectionJpaEntity::getOrderInWorkout))
                             .map(exercise -> new WorkoutDetailResponse.ExerciseDetail(
-                                    exercise.getExerciseName(), exercise.getMuscleGroup(),
-                                    exercise.getOrderInWorkout(), exercise.getTotalSets(),
-                                    exercise.getTotalVolumeKg(), exercise.getMaxWeightKg(), List.of()))
+                                    exercise.getExerciseId(), exercise.getExerciseName(),
+                                    exercise.getMuscleGroup(), exercise.getOrderInWorkout(),
+                                    exercise.getTotalSets(), exercise.getTotalVolumeKg(),
+                                    exercise.getMaxWeightKg(), List.of()))
                             .toList();
 
                     return new WorkoutDetailResponse(

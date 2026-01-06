@@ -52,6 +52,10 @@ public record WorkoutDetailResponse(
 ) {
     @Schema(description = "Exercise details")
     public record ExerciseDetail(
+        @JsonProperty("exerciseId")
+        @Schema(description = "Exercise catalog identifier", example = "pullup-wide-grip")
+        String exerciseId,
+
         @JsonProperty("exerciseName")
         @Schema(description = "Exercise name", example = "Podciąganie się nachwytem")
         String exerciseName,

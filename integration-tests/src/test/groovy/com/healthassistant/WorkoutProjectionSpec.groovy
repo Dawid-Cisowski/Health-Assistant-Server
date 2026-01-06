@@ -45,9 +45,11 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         response.getInt("totalExercises") == 2
         response.getInt("totalSets") == 5
 
-        and: "exercise projections are created"
+        and: "exercise projections are created with exerciseId"
         def exercises = response.getList("exercises")
         exercises.size() == 2
+        exercises[0].exerciseId == "back_2"
+        exercises[1].exerciseId == "back_5"
 
         and: "set projections are created"
         def totalSets = exercises.collect { it.sets.size() }.sum()
@@ -255,8 +257,10 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         def exercises = response.getList("exercises")
         exercises.size() == 2
         exercises[0].orderInWorkout == 1
+        exercises[0].exerciseId == "back_2"
         exercises[0].exerciseName == "Podciąganie się nachwytem (szeroki rozstaw rąk)"
         exercises[1].orderInWorkout == 2
+        exercises[1].exerciseId == "back_5"
         exercises[1].exerciseName == "Wiosłowanie sztangielkami w opadzie"
     }
 
@@ -434,6 +438,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                 "note": "Plecy i biceps",
                 "exercises": [
                     {
+                        "exerciseId": "back_2",
                         "name": "Podciąganie się nachwytem (szeroki rozstaw rąk)",
                         "muscleGroup": "Plecy",
                         "orderInWorkout": 1,
@@ -444,6 +449,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
                         ]
                     },
                     {
+                        "exerciseId": "back_5",
                         "name": "Wiosłowanie sztangielkami w opadzie",
                         "muscleGroup": "Plecy",
                         "orderInWorkout": 2,
