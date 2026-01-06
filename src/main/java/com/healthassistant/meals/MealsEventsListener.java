@@ -1,6 +1,5 @@
 package com.healthassistant.meals;
 
-import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.MealsEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
@@ -22,14 +21,14 @@ class MealsEventsListener {
         log.info("Meals listener received MealsEventsStoredEvent with {} events for {} dates",
                 event.events().size(), event.affectedDates().size());
 
-        for (StoredEventData eventData : event.events()) {
+        event.events().forEach(eventData -> {
             try {
-                log.debug("Processing MealRecorded event: {}", eventData.eventId().value());
+                log.debug("Processing MealRecorded event: {}", sanitizeForLog(eventData.eventId().value()));
                 mealsProjector.projectMeal(eventData);
             } catch (Exception e) {
-                log.error("Failed to project meal for event: {}", eventData.eventId().value(), e);
+                log.error("Failed to project meal for event: {}", sanitizeForLog(eventData.eventId().value()), e);
             }
-        }
+        });
 
         log.info("Meals listener completed processing {} events", event.events().size());
     }
@@ -55,7 +54,7 @@ class MealsEventsListener {
             try {
                 mealsProjector.deleteByEventId(deletion.targetEventId());
             } catch (Exception e) {
-                log.error("Failed to delete meal projection for eventId: {}", deletion.targetEventId(), e);
+                log.error("Failed to delete meal projection for eventId: {}", sanitizeForLog(deletion.targetEventId()), e);
             }
         });
 
@@ -70,8 +69,13 @@ class MealsEventsListener {
                     );
                 }
             } catch (Exception e) {
-                log.error("Failed to process correction for meal eventId: {}", correction.targetEventId(), e);
+                log.error("Failed to process correction for meal eventId: {}", sanitizeForLog(correction.targetEventId()), e);
             }
         });
+    }
+
+    private String sanitizeForLog(String value) {
+        if (value == null) return "null";
+        return value.replaceAll("[^a-zA-Z0-9_-]", "_");
     }
 }

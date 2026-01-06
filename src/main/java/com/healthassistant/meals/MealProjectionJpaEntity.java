@@ -9,9 +9,8 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "meal_projections")
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 class MealProjectionJpaEntity {
 

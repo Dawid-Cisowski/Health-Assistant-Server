@@ -18,8 +18,10 @@ class MealFactory {
 
     Optional<Meal> createFromEvent(StoredEventData eventData) {
         if (!(eventData.payload() instanceof MealRecordedPayload payload)) {
-            log.warn("Expected MealRecordedPayload but got {}, skipping",
-                    eventData.payload().getClass().getSimpleName());
+            String payloadType = eventData.payload() != null
+                    ? eventData.payload().getClass().getSimpleName()
+                    : "null";
+            log.warn("Expected MealRecordedPayload but got {}, skipping", payloadType);
             return Optional.empty();
         }
 
@@ -82,6 +84,11 @@ class MealFactory {
         if (value == null) return null;
         if (value instanceof Integer i) return i;
         if (value instanceof Number n) return n.intValue();
-        return Integer.parseInt(value.toString());
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse integer from value: {}", value);
+            return null;
+        }
     }
 }

@@ -630,7 +630,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         response.getInt("healthRatingCounts.neutral") == 0
     }
 
-    def "Scenario 10: API returns 404 for date with no meal data"() {
+    def "Scenario 10: API returns 200 with zero counts for date with no meal data"() {
         given: "no meal data exists"
 
         when: "I query daily detail"
@@ -639,8 +639,10 @@ class MealProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "404 is returned"
-        response.statusCode() == 404
+        then: "200 is returned with zero counts (date exists, just no data)"
+        response.statusCode() == 200
+        response.body().jsonPath().getInt("totalMealCount") == 0
+        response.body().jsonPath().getInt("totalCaloriesKcal") == 0
     }
 
     def "Scenario 11: Range summary includes days with no data as zero"() {

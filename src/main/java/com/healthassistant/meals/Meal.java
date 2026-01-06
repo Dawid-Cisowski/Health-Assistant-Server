@@ -44,6 +44,9 @@ record Meal(
             Integer carbohydratesGrams,
             HealthRating healthRating
     ) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Meal title cannot be blank");
+        }
         LocalDate date = occurredAt.atZone(POLAND_ZONE).toLocalDate();
         Macros macros = Macros.of(caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams);
         return new Meal(deviceId, eventId, date, occurredAt, title, mealType, macros, healthRating);

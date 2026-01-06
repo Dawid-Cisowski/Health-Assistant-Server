@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 class MealsProjector {
 
     private final MealProjectionJpaRepository mealRepository;
@@ -59,10 +61,7 @@ class MealsProjector {
     }
 
     private int calculateNextMealNumber(String deviceId, LocalDate date) {
-        List<MealProjectionJpaEntity> existingMeals =
-                mealRepository.findByDeviceIdAndDateOrderByMealNumberAsc(deviceId, date);
-        return existingMeals.isEmpty() ? 1 :
-                existingMeals.getLast().getMealNumber() + 1;
+        return mealRepository.findMaxMealNumber(deviceId, date) + 1;
     }
 
     public void deleteByEventId(String eventId) {
@@ -70,7 +69,7 @@ class MealsProjector {
             String deviceId = entity.getDeviceId();
             LocalDate date = entity.getDate();
             mealRepository.deleteByEventId(eventId);
-            log.info("Deleted meal projection for eventId: {}", eventId);
+            log.info("Deleted meal projection for eventId: {}", sanitizeForLog(eventId));
             updateDailyProjection(deviceId, date);
         });
     }
@@ -81,6 +80,15 @@ class MealsProjector {
     }
 
     private void updateDailyProjection(String deviceId, LocalDate date) {
+        try {
+            doUpdateDailyProjection(deviceId, date);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Version conflict for daily meal projection {}/{}, retrying once", deviceId, date);
+            doUpdateDailyProjection(deviceId, date);
+        }
+    }
+
+    private void doUpdateDailyProjection(String deviceId, LocalDate date) {
         List<MealProjectionJpaEntity> meals =
                 mealRepository.findByDeviceIdAndDateOrderByMealNumberAsc(deviceId, date);
 
@@ -93,13 +101,15 @@ class MealsProjector {
             return;
         }
 
-        int totalCalories = meals.stream().mapToInt(MealProjectionJpaEntity::getCaloriesKcal).sum();
-        int totalProtein = meals.stream().mapToInt(MealProjectionJpaEntity::getProteinGrams).sum();
-        int totalFat = meals.stream().mapToInt(MealProjectionJpaEntity::getFatGrams).sum();
-        int totalCarbs = meals.stream().mapToInt(MealProjectionJpaEntity::getCarbohydratesGrams).sum();
+        MacroTotals totals = meals.stream()
+                .reduce(
+                        MacroTotals.ZERO,
+                        (acc, m) -> acc.add(m.getCaloriesKcal(), m.getProteinGrams(), m.getFatGrams(), m.getCarbohydratesGrams()),
+                        MacroTotals::combine
+                );
 
         int totalMealCount = meals.size();
-        int avgCalories = totalMealCount > 0 ? totalCalories / totalMealCount : 0;
+        int avgCalories = totalMealCount > 0 ? totals.calories() / totalMealCount : 0;
 
         Map<String, Long> mealTypeCounts = meals.stream()
                 .collect(Collectors.groupingBy(MealProjectionJpaEntity::getMealType, Collectors.counting()));
@@ -125,30 +135,33 @@ class MealsProjector {
                         .date(date)
                         .build());
 
-        daily.setTotalMealCount(totalMealCount);
-        daily.setBreakfastCount(mealTypeCounts.getOrDefault("BREAKFAST", 0L).intValue());
-        daily.setBrunchCount(mealTypeCounts.getOrDefault("BRUNCH", 0L).intValue());
-        daily.setLunchCount(mealTypeCounts.getOrDefault("LUNCH", 0L).intValue());
-        daily.setDinnerCount(mealTypeCounts.getOrDefault("DINNER", 0L).intValue());
-        daily.setSnackCount(mealTypeCounts.getOrDefault("SNACK", 0L).intValue());
-        daily.setDessertCount(mealTypeCounts.getOrDefault("DESSERT", 0L).intValue());
-        daily.setDrinkCount(mealTypeCounts.getOrDefault("DRINK", 0L).intValue());
-
-        daily.setTotalCaloriesKcal(totalCalories);
-        daily.setTotalProteinGrams(totalProtein);
-        daily.setTotalFatGrams(totalFat);
-        daily.setTotalCarbohydratesGrams(totalCarbs);
-        daily.setAverageCaloriesPerMeal(avgCalories);
-
-        daily.setVeryHealthyCount(healthRatingCounts.getOrDefault("VERY_HEALTHY", 0L).intValue());
-        daily.setHealthyCount(healthRatingCounts.getOrDefault("HEALTHY", 0L).intValue());
-        daily.setNeutralCount(healthRatingCounts.getOrDefault("NEUTRAL", 0L).intValue());
-        daily.setUnhealthyCount(healthRatingCounts.getOrDefault("UNHEALTHY", 0L).intValue());
-        daily.setVeryUnhealthyCount(healthRatingCounts.getOrDefault("VERY_UNHEALTHY", 0L).intValue());
-
-        daily.setFirstMealTime(firstMealTime);
-        daily.setLastMealTime(lastMealTime);
+        daily.updateTotals(totalMealCount, totals.calories(), totals.protein(), totals.fat(), totals.carbs(), avgCalories);
+        daily.updateMealTypeCounts(mealTypeCounts);
+        daily.updateHealthRatingCounts(healthRatingCounts);
+        daily.updateMealTimes(firstMealTime, lastMealTime);
 
         dailyRepository.save(daily);
+    }
+
+    private String sanitizeForLog(String value) {
+        if (value == null) return "null";
+        return value.replaceAll("[^a-zA-Z0-9_-]", "_");
+    }
+
+    private record MacroTotals(int calories, int protein, int fat, int carbs) {
+        static final MacroTotals ZERO = new MacroTotals(0, 0, 0, 0);
+
+        MacroTotals add(int cal, int prot, int f, int c) {
+            return new MacroTotals(calories + cal, protein + prot, fat + f, carbs + c);
+        }
+
+        static MacroTotals combine(MacroTotals a, MacroTotals b) {
+            return new MacroTotals(
+                    a.calories + b.calories,
+                    a.protein + b.protein,
+                    a.fat + b.fat,
+                    a.carbs + b.carbs
+            );
+        }
     }
 }

@@ -5,13 +5,13 @@ import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 
 @Entity
 @Table(name = "meal_daily_projections")
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 class MealDailyProjectionJpaEntity {
 
@@ -125,5 +125,37 @@ class MealDailyProjectionJpaEntity {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    void updateTotals(int totalMealCount, int totalCalories, int totalProtein, int totalFat, int totalCarbs, int avgCalories) {
+        this.totalMealCount = totalMealCount;
+        this.totalCaloriesKcal = totalCalories;
+        this.totalProteinGrams = totalProtein;
+        this.totalFatGrams = totalFat;
+        this.totalCarbohydratesGrams = totalCarbs;
+        this.averageCaloriesPerMeal = avgCalories;
+    }
+
+    void updateMealTypeCounts(Map<String, Long> mealTypeCounts) {
+        this.breakfastCount = mealTypeCounts.getOrDefault("BREAKFAST", 0L).intValue();
+        this.brunchCount = mealTypeCounts.getOrDefault("BRUNCH", 0L).intValue();
+        this.lunchCount = mealTypeCounts.getOrDefault("LUNCH", 0L).intValue();
+        this.dinnerCount = mealTypeCounts.getOrDefault("DINNER", 0L).intValue();
+        this.snackCount = mealTypeCounts.getOrDefault("SNACK", 0L).intValue();
+        this.dessertCount = mealTypeCounts.getOrDefault("DESSERT", 0L).intValue();
+        this.drinkCount = mealTypeCounts.getOrDefault("DRINK", 0L).intValue();
+    }
+
+    void updateHealthRatingCounts(Map<String, Long> healthRatingCounts) {
+        this.veryHealthyCount = healthRatingCounts.getOrDefault("VERY_HEALTHY", 0L).intValue();
+        this.healthyCount = healthRatingCounts.getOrDefault("HEALTHY", 0L).intValue();
+        this.neutralCount = healthRatingCounts.getOrDefault("NEUTRAL", 0L).intValue();
+        this.unhealthyCount = healthRatingCounts.getOrDefault("UNHEALTHY", 0L).intValue();
+        this.veryUnhealthyCount = healthRatingCounts.getOrDefault("VERY_UNHEALTHY", 0L).intValue();
+    }
+
+    void updateMealTimes(Instant firstMealTime, Instant lastMealTime) {
+        this.firstMealTime = firstMealTime;
+        this.lastMealTime = lastMealTime;
     }
 }
