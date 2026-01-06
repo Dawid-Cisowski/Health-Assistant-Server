@@ -20,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -89,9 +90,9 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
 
         DeviceId deviceId = DeviceId.of(deviceIdStr);
         byte[] secret = deviceSecretProvider.getSecret(deviceId.value())
-                .orElseThrow(() -> new HmacAuthenticationException("Unknown device ID: " + deviceId.value()));
+                .orElseThrow(() -> new HmacAuthenticationException("Invalid authentication credentials"));
 
-        if (nonceCache.isUsed(deviceId.value(), nonce)) {
+        if (!nonceCache.markAsUsedIfAbsent(deviceId.value(), nonce)) {
             throw new HmacAuthenticationException("Nonce already used (replay attack detected)");
         }
 
@@ -113,7 +114,6 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             throw new HmacAuthenticationException("Invalid signature");
         }
 
-        nonceCache.markAsUsed(deviceId.value(), nonce);
         return deviceId;
     }
 
@@ -123,6 +123,11 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
         if (value == null || value.isBlank()) {
             throw new HmacAuthenticationException("Missing " + headerName + " header");
         }
+
+        if (value.contains("\n") || value.contains("\r")) {
+            throw new HmacAuthenticationException("Invalid character in " + headerName + " header");
+        }
+
         return value;
     }
 
@@ -140,7 +145,7 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
         long diffSeconds = Math.abs(now.getEpochSecond() - timestamp.getEpochSecond());
 
         if (diffSeconds > toleranceSeconds) {
-            throw new HmacAuthenticationException("Timestamp out of acceptable range (tolerance: " + toleranceSeconds + "s)");
+            throw new HmacAuthenticationException("Timestamp out of acceptable range");
         }
     }
 
@@ -164,7 +169,8 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        ErrorResponse errorResponse = new ErrorResponse("HMAC_AUTH_FAILED", message, java.util.List.of());
+        String safeMessage = Objects.requireNonNullElse(message, "Authentication failed");
+        ErrorResponse errorResponse = new ErrorResponse("HMAC_AUTH_FAILED", safeMessage, java.util.List.of());
 
         objectMapper.writeValue(response.getWriter(), errorResponse);
     }

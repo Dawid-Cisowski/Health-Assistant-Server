@@ -464,10 +464,11 @@ class HmacAuthenticationSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "I get 401 Unauthorized with unknown device message"
+        then: "I get 401 Unauthorized (generic message to prevent device enumeration)"
         response.statusCode() == 401
         response.body().jsonPath().getString("code") == "HMAC_AUTH_FAILED"
-        response.body().jsonPath().getString("message").toLowerCase().contains("unknown device")
+        // Security: Don't reveal whether device ID exists - use generic message
+        response.body().jsonPath().getString("message") != null
     }
 
     def "Scenario 17: Empty device ID returns 401"() {

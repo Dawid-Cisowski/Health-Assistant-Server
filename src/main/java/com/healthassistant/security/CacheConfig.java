@@ -21,7 +21,7 @@ class CacheConfig {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager(NONCE_CACHE);
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(appProperties.getNonce().getCacheTtlSeconds(), TimeUnit.SECONDS)
-                .maximumSize(10000));
+                .recordStats());
         return cacheManager;
     }
 }

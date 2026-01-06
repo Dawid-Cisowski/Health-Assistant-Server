@@ -4,12 +4,17 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
-class HmacSignature {
+final class HmacSignature {
 
     private static final String ALGORITHM = "HmacSHA256";
+
+    private HmacSignature() {
+        throw new UnsupportedOperationException("Utility class");
+    }
 
     static String calculate(String canonicalString, byte[] secret) {
         try {
@@ -24,6 +29,13 @@ class HmacSignature {
     }
 
     static boolean verify(String expected, String actual) {
-        return expected != null && expected.equals(actual);
+        if (expected == null || actual == null) {
+            return false;
+        }
+
+        byte[] expectedBytes = expected.getBytes(StandardCharsets.UTF_8);
+        byte[] actualBytes = actual.getBytes(StandardCharsets.UTF_8);
+
+        return MessageDigest.isEqual(expectedBytes, actualBytes);
     }
 }
