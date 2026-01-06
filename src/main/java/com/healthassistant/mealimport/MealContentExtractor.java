@@ -18,12 +18,40 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 class MealContentExtractor {
+
+    private static final double MEAL_TYPE_CONFIDENCE_THRESHOLD = 0.5;
+    private static final int MAX_USER_INPUT_LENGTH = 2000;
+    private static final int MAX_CALORIES = 10000;
+    private static final int MAX_PROTEIN_GRAMS = 500;
+    private static final int MAX_FAT_GRAMS = 500;
+    private static final int MAX_CARBS_GRAMS = 1000;
+
+    private static final Pattern IGNORE_INSTRUCTIONS_PATTERN = Pattern.compile(
+        "(?i)ignore\\s+(all\\s+)?previous\\s+instructions?"
+    );
+    private static final Pattern DISREGARD_PATTERN = Pattern.compile(
+        "(?i)disregard\\s+(all\\s+)?previous"
+    );
+    private static final Pattern SYSTEM_PROMPT_PATTERN = Pattern.compile(
+        "(?i)system\\s*:"
+    );
+    private static final Pattern SYSTEM_TAG_PATTERN = Pattern.compile(
+        "(?i)<\\|system\\|>"
+    );
+    private static final Pattern JSON_INJECTION_PATTERN = Pattern.compile(
+        "\\{\\s*\"(isMeal|caloriesKcal|proteinGrams)\"\\s*:"
+    );
+    private static final Pattern EXCESSIVE_NEWLINES_PATTERN = Pattern.compile(
+        "[\\r\\n]{3,}"
+    );
 
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
@@ -50,17 +78,19 @@ class MealContentExtractor {
             userSpec.text(buildUserPrompt(description, images, timeContext));
 
             if (images != null && !images.isEmpty()) {
-                for (MultipartFile image : images) {
-                    try {
-                        String mimeType = getMimeType(image);
-                        byte[] imageBytes = image.getBytes();
-                        userSpec.media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes));
-                    } catch (IOException e) {
-                        log.warn("Failed to read image: {}", image.getOriginalFilename(), e);
-                    }
-                }
+                images.forEach(image -> attachImageToSpec(userSpec, image));
             }
         }).call().content();
+    }
+
+    private void attachImageToSpec(org.springframework.ai.chat.client.ChatClient.PromptUserSpec userSpec, MultipartFile image) {
+        try {
+            String mimeType = getMimeType(image);
+            byte[] imageBytes = image.getBytes();
+            userSpec.media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes));
+        } catch (IOException e) {
+            log.warn("Failed to read image: {}", image.getOriginalFilename(), e);
+        }
     }
 
     private String getMimeType(MultipartFile image) {
@@ -205,11 +235,27 @@ class MealContentExtractor {
         return sb.toString();
     }
 
+    private String sanitizeUserInput(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        var sanitized = IGNORE_INSTRUCTIONS_PATTERN.matcher(input).replaceAll("[filtered]");
+        sanitized = DISREGARD_PATTERN.matcher(sanitized).replaceAll("[filtered]");
+        sanitized = SYSTEM_PROMPT_PATTERN.matcher(sanitized).replaceAll("[filtered]");
+        sanitized = SYSTEM_TAG_PATTERN.matcher(sanitized).replaceAll("[filtered]");
+        sanitized = JSON_INJECTION_PATTERN.matcher(sanitized).replaceAll("[filtered-json]");
+        sanitized = EXCESSIVE_NEWLINES_PATTERN.matcher(sanitized).replaceAll("\n\n");
+
+        return sanitized.substring(0, Math.min(sanitized.length(), MAX_USER_INPUT_LENGTH));
+    }
+
     private String buildUserPrompt(String description, List<MultipartFile> images, MealTimeContext timeContext) {
         StringBuilder prompt = new StringBuilder("Analyze this meal.\n");
 
         if (description != null && !description.isBlank()) {
-            prompt.append("Description: ").append(description).append("\n");
+            var sanitizedDescription = sanitizeUserInput(description);
+            prompt.append("User-provided description (untrusted user input): ").append(sanitizedDescription).append("\n");
         }
 
         if (images != null && !images.isEmpty()) {
@@ -260,10 +306,10 @@ class MealContentExtractor {
             String title = getTextOrNull(root, "title");
             String description = getTextOrNull(root, "description");
             String mealType = getTextOrNull(root, "mealType");
-            Integer caloriesKcal = getIntOrNull(root, "caloriesKcal");
-            Integer proteinGrams = getIntOrNull(root, "proteinGrams");
-            Integer fatGrams = getIntOrNull(root, "fatGrams");
-            Integer carbohydratesGrams = getIntOrNull(root, "carbohydratesGrams");
+            Integer caloriesKcal = validateNutritionalValue(getIntOrNull(root, "caloriesKcal"), "calories", MAX_CALORIES);
+            Integer proteinGrams = validateNutritionalValue(getIntOrNull(root, "proteinGrams"), "protein", MAX_PROTEIN_GRAMS);
+            Integer fatGrams = validateNutritionalValue(getIntOrNull(root, "fatGrams"), "fat", MAX_FAT_GRAMS);
+            Integer carbohydratesGrams = validateNutritionalValue(getIntOrNull(root, "carbohydratesGrams"), "carbs", MAX_CARBS_GRAMS);
             String healthRating = getTextOrNull(root, "healthRating");
 
             if (title == null || mealType == null) {
@@ -271,7 +317,7 @@ class MealContentExtractor {
             }
 
             if (caloriesKcal == null || proteinGrams == null || fatGrams == null || carbohydratesGrams == null) {
-                return ExtractedMealData.invalid("Missing nutritional values", confidence);
+                return ExtractedMealData.invalid("Missing or invalid nutritional values", confidence);
             }
 
             if (healthRating == null) {
@@ -281,7 +327,7 @@ class MealContentExtractor {
             double mealTypeConfidence = root.path("mealTypeConfidence").asDouble(1.0);
             List<ClarifyingQuestion> questions = parseQuestions(root);
 
-            if (mealTypeConfidence < 0.5 && !hasMealTypeQuestion(questions)) {
+            if (mealTypeConfidence < MEAL_TYPE_CONFIDENCE_THRESHOLD && !hasMealTypeQuestion(questions)) {
                 questions = new ArrayList<>(questions);
                 questions.add(createMealTypeQuestion());
                 log.debug("Added meal type clarifying question due to low confidence: {}", mealTypeConfidence);
@@ -309,46 +355,47 @@ class MealContentExtractor {
             return List.of();
         }
 
-        List<ClarifyingQuestion> questions = new ArrayList<>();
-        for (JsonNode questionNode : questionsNode) {
-            String questionId = getTextOrNull(questionNode, "questionId");
-            String questionText = getTextOrNull(questionNode, "questionText");
-            String questionTypeStr = getTextOrNull(questionNode, "questionType");
+        return StreamSupport.stream(questionsNode.spliterator(), false)
+            .map(this::parseQuestion)
+            .flatMap(Optional::stream)
+            .toList();
+    }
 
-            if (questionId == null || questionText == null || questionTypeStr == null) {
-                continue;
-            }
+    private Optional<ClarifyingQuestion> parseQuestion(JsonNode questionNode) {
+        String questionId = getTextOrNull(questionNode, "questionId");
+        String questionText = getTextOrNull(questionNode, "questionText");
+        String questionTypeStr = getTextOrNull(questionNode, "questionType");
 
-            ClarifyingQuestion.QuestionType questionType;
-            try {
-                questionType = ClarifyingQuestion.QuestionType.valueOf(questionTypeStr);
-            } catch (IllegalArgumentException e) {
-                log.debug("Unknown question type: {}", questionTypeStr);
-                questionType = ClarifyingQuestion.QuestionType.FREE_TEXT;
-            }
-
-            List<String> options = parseStringArray(questionNode.path("options"));
-            List<String> affectedFields = parseStringArray(questionNode.path("affectedFields"));
-
-            questions.add(new ClarifyingQuestion(
-                questionId, questionText, questionType, options, affectedFields
-            ));
+        if (questionId == null || questionText == null || questionTypeStr == null) {
+            return Optional.empty();
         }
 
-        return questions;
+        ClarifyingQuestion.QuestionType questionType = parseQuestionType(questionTypeStr);
+        List<String> options = parseStringArray(questionNode.path("options"));
+        List<String> affectedFields = parseStringArray(questionNode.path("affectedFields"));
+
+        return Optional.of(new ClarifyingQuestion(
+            questionId, questionText, questionType, options, affectedFields
+        ));
+    }
+
+    private ClarifyingQuestion.QuestionType parseQuestionType(String questionTypeStr) {
+        try {
+            return ClarifyingQuestion.QuestionType.valueOf(questionTypeStr);
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown question type: {}", questionTypeStr);
+            return ClarifyingQuestion.QuestionType.FREE_TEXT;
+        }
     }
 
     private List<String> parseStringArray(JsonNode arrayNode) {
         if (arrayNode.isMissingNode() || !arrayNode.isArray()) {
             return List.of();
         }
-        List<String> result = new ArrayList<>();
-        for (JsonNode item : arrayNode) {
-            if (item.isTextual()) {
-                result.add(item.asText());
-            }
-        }
-        return result;
+        return StreamSupport.stream(arrayNode.spliterator(), false)
+            .filter(JsonNode::isTextual)
+            .map(JsonNode::asText)
+            .toList();
     }
 
     private boolean hasMealTypeQuestion(List<ClarifyingQuestion> questions) {
@@ -431,6 +478,17 @@ class MealContentExtractor {
             return null;
         }
         return node.asInt();
+    }
+
+    private Integer validateNutritionalValue(Integer value, String fieldName, int maxValue) {
+        if (value == null) {
+            return null;
+        }
+        if (value < 0 || value > maxValue) {
+            log.warn("Invalid {} from AI: {} (expected 0-{})", fieldName, value, maxValue);
+            return null;
+        }
+        return value;
     }
 
     ExtractedMealData reAnalyzeWithContext(

@@ -4,14 +4,14 @@ import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.model.DeviceId;
+import com.healthassistant.healthevents.api.dto.payload.HealthRating;
+import com.healthassistant.healthevents.api.dto.payload.MealType;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.mealimport.api.MealImportFacade;
 import com.healthassistant.mealimport.api.dto.MealDraftResponse;
 import com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest;
 import com.healthassistant.mealimport.api.dto.MealImportResponse;
-import com.healthassistant.healthevents.api.dto.payload.HealthRating;
-import com.healthassistant.healthevents.api.dto.payload.MealType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -38,7 +39,9 @@ class MealImportService implements MealImportFacade {
     private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
         "image/*", "application/octet-stream"
     );
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    private static final long MAX_TOTAL_SIZE = 30 * 1024 * 1024;
+    private static final int MAX_FILES_COUNT = 5;
 
     private final MealContentExtractor contentExtractor;
     private final MealEventMapper eventMapper;
@@ -47,13 +50,12 @@ class MealImportService implements MealImportFacade {
     private final MealsFacade mealsFacade;
 
     @Override
+    @Transactional
     public MealImportResponse importMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
         validateInput(description, images);
 
         if (images != null && !images.isEmpty()) {
-            for (MultipartFile image : images) {
-                validateImage(image);
-            }
+            images.forEach(this::validateImage);
         }
 
         try {
@@ -126,6 +128,17 @@ class MealImportService implements MealImportFacade {
         if (!hasDescription && !hasImages) {
             throw new IllegalArgumentException("Either description or images required");
         }
+
+        if (images != null && images.size() > MAX_FILES_COUNT) {
+            throw new IllegalArgumentException("Maximum " + MAX_FILES_COUNT + " images allowed");
+        }
+
+        if (images != null) {
+            long totalSize = images.stream().mapToLong(MultipartFile::getSize).sum();
+            if (totalSize > MAX_TOTAL_SIZE) {
+                throw new IllegalArgumentException("Total images size exceeds 30MB limit");
+            }
+        }
     }
 
     private void validateImage(MultipartFile image) {
@@ -156,9 +169,9 @@ class MealImportService implements MealImportFacade {
     }
 
     private String detectImageType(MultipartFile image) {
-        try {
+        try (InputStream is = image.getInputStream()) {
             byte[] header = new byte[12];
-            int read = image.getInputStream().read(header);
+            int read = is.read(header);
             if (read < 4) {
                 return null;
             }
@@ -193,9 +206,7 @@ class MealImportService implements MealImportFacade {
         validateInput(description, images);
 
         if (images != null && !images.isEmpty()) {
-            for (MultipartFile image : images) {
-                validateImage(image);
-            }
+            images.forEach(this::validateImage);
         }
 
         try {
@@ -275,8 +286,8 @@ class MealImportService implements MealImportFacade {
                 );
 
                 if (reAnalyzed.isValid()) {
-                    updateDraftFromExtraction(draft, reAnalyzed);
-                    draft.setUserFeedback(request.userFeedback());
+                    draft.updateFromExtraction(reAnalyzed);
+                    draft.recordUserContext(request.answers(), request.userFeedback());
 
                     log.info("Re-analysis successful for draft {}: {} kcal -> {} kcal",
                         draftId, currentExtraction.caloriesKcal(), reAnalyzed.caloriesKcal());
@@ -285,14 +296,9 @@ class MealImportService implements MealImportFacade {
                         draftId, reAnalyzed.validationError());
                 }
             } catch (MealExtractionException e) {
-                log.warn("Re-analysis failed for draft {}, keeping original values: {}",
+                log.warn("Re-analysis failed for draft {}, keeping original values. User should verify data is current. Error: {}",
                     draftId, e.getMessage());
-                if (hasAnswers) {
-                    draft.setAnswers(request.answers());
-                }
-                if (hasFeedback) {
-                    draft.setUserFeedback(request.userFeedback());
-                }
+                draft.recordUserContext(request.answers(), request.userFeedback());
             }
         }
 
@@ -318,24 +324,6 @@ class MealImportService implements MealImportFacade {
             draft.getConfidence().doubleValue(),
             draft.getQuestions()
         );
-    }
-
-    private void updateDraftFromExtraction(MealImportDraft draft, ExtractedMealData extraction) {
-        draft.setTitle(extraction.title());
-        draft.setDescription(extraction.description());
-        draft.setMealType(MealType.valueOf(extraction.mealType()));
-        draft.setCaloriesKcal(extraction.caloriesKcal());
-        draft.setProteinGrams(extraction.proteinGrams());
-        draft.setFatGrams(extraction.fatGrams());
-        draft.setCarbohydratesGrams(extraction.carbohydratesGrams());
-        draft.setHealthRating(HealthRating.valueOf(extraction.healthRating()));
-        draft.setConfidence(BigDecimal.valueOf(extraction.confidence()));
-
-        if (extraction.occurredAt() != null) {
-            draft.setSuggestedOccurredAt(extraction.occurredAt());
-        }
-
-        draft.setQuestions(extraction.questions());
     }
 
     @Override

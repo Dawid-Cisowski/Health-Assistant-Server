@@ -6,11 +6,11 @@ import com.healthassistant.mealimport.api.dto.QuestionAnswer;
 import com.healthassistant.healthevents.api.dto.payload.HealthRating;
 import com.healthassistant.healthevents.api.dto.payload.MealType;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -22,17 +22,20 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "meal_import_drafts", indexes = {
-    @Index(name = "idx_meal_import_drafts_device", columnList = "device_id")
+    @Index(name = "idx_meal_import_drafts_device", columnList = "device_id"),
+    @Index(name = "idx_meal_import_drafts_cleanup", columnList = "status, expires_at")
 })
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 class MealImportDraft {
 
     @Id
     private UUID id;
+
+    @Version
+    private Long version;
 
     @Column(name = "device_id", nullable = false)
     private String deviceId;
@@ -175,5 +178,32 @@ class MealImportDraft {
 
     boolean isExpired() {
         return this.expiresAt.isBefore(Instant.now());
+    }
+
+    void updateFromExtraction(ExtractedMealData extraction) {
+        this.title = extraction.title();
+        this.description = extraction.description();
+        this.mealType = MealType.valueOf(extraction.mealType());
+        this.caloriesKcal = extraction.caloriesKcal();
+        this.proteinGrams = extraction.proteinGrams();
+        this.fatGrams = extraction.fatGrams();
+        this.carbohydratesGrams = extraction.carbohydratesGrams();
+        this.healthRating = HealthRating.valueOf(extraction.healthRating());
+        this.confidence = BigDecimal.valueOf(extraction.confidence());
+
+        if (extraction.occurredAt() != null) {
+            this.suggestedOccurredAt = extraction.occurredAt();
+        }
+
+        this.questions = extraction.questions();
+    }
+
+    void recordUserContext(List<QuestionAnswer> answers, String feedback) {
+        if (answers != null && !answers.isEmpty()) {
+            this.answers = answers;
+        }
+        if (feedback != null && !feedback.isBlank()) {
+            this.userFeedback = feedback;
+        }
     }
 }
