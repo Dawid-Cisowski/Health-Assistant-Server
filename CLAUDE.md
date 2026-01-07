@@ -54,9 +54,447 @@ docker stop postgres-dev
 docker rm postgres-dev
 ```
 
+---
+
+# Development Standards
+
+## CRITICAL: Code Quality Rules
+
+These rules MUST be followed for ALL code in this repository. Violations are NOT acceptable.
+
+### 1. NO Imperative Loops
+
+**FORBIDDEN**: `for`, `while`, `do-while` loops
+
+**REQUIRED**: Stream API, `datesUntil()`, `iterate()`, functional methods
+
+```java
+// ❌ FORBIDDEN
+for (int i = 0; i < items.size(); i++) {
+    process(items.get(i));
+}
+
+while (!current.isAfter(endDate)) {
+    results.add(process(current));
+    current = current.plusDays(1);
+}
+
+// ✅ REQUIRED
+items.forEach(this::process);
+
+// ✅ REQUIRED - date iteration
+startDate.datesUntil(endDate.plusDays(1))
+    .map(this::process)
+    .toList();
+
+// ✅ REQUIRED - indexed iteration if index needed
+IntStream.range(0, items.size())
+    .mapToObj(i -> processWithIndex(items.get(i), i))
+    .toList();
+```
+
+### 2. NO @Setter on Entities (Anemic Domain Model Prevention)
+
+**FORBIDDEN**: `@Setter` on any JPA entity or domain object
+
+**REQUIRED**: Business methods with meaningful names
+
+```java
+// ❌ FORBIDDEN - Anemic Domain Model
+@Entity
+@Getter
+@Setter  // NEVER!
+class WorkoutProjection {
+    private int totalVolume;
+    private int exerciseCount;
+}
+
+// ✅ REQUIRED - Rich Domain Model
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+class WorkoutProjection {
+    private int totalVolume;
+    private int exerciseCount;
+
+    // Business method - tells WHAT is happening
+    void updateWorkoutMetrics(int totalVolume, int exerciseCount) {
+        this.totalVolume = totalVolume;
+        this.exerciseCount = exerciseCount;
+    }
+}
+```
+
+### 3. @Version on ALL Entities
+
+**REQUIRED**: Every JPA entity MUST have optimistic locking
+
+```java
+@Entity
+class SomeProjection {
+    @Version
+    private Long version;  // ALWAYS required
+
+    // ... other fields
+}
+```
+
+### 4. Protected No-Args Constructor
+
+**REQUIRED**: JPA entities use `@NoArgsConstructor(access = AccessLevel.PROTECTED)`
+
+```java
+// ❌ FORBIDDEN
+@NoArgsConstructor
+class Entity { }
+
+// ✅ REQUIRED
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+class Entity { }
+```
+
+### 5. Log Sanitization
+
+**REQUIRED**: All user input in logs MUST be sanitized
+
+```java
+// Helper methods required in controllers/services that log user data
+private String maskDeviceId(String deviceId) {
+    if (deviceId == null || deviceId.length() < 8) return "***";
+    return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+}
+
+private String sanitizeForLog(String input) {
+    if (input == null) return "null";
+    return input.replaceAll("[\\r\\n\\t]", "_");
+}
+
+// Usage
+log.info("Request from device {}: {}", maskDeviceId(deviceId), sanitizeForLog(filename));
+```
+
+### 6. AI Prompt Injection Protection
+
+**REQUIRED**: Validate all user input sent to AI models
+
+```java
+// Before sending to AI
+private void validateUserInput(String message) {
+    if (message == null || message.isBlank()) {
+        throw new IllegalArgumentException("Message cannot be empty");
+    }
+    if (message.length() > 2000) {
+        throw new IllegalArgumentException("Message too long");
+    }
+    // Check for prompt injection patterns
+    String lower = message.toLowerCase();
+    if (lower.contains("ignore previous") || lower.contains("system prompt")) {
+        throw new IllegalArgumentException("Invalid message content");
+    }
+}
+```
+
+### 7. No Sensitive Data in Logs
+
+**FORBIDDEN**: Logging secrets, tokens, full device IDs, personal data
+
+```java
+// ❌ FORBIDDEN
+log.info("Processing request with secret: {}", apiKey);
+log.info("User {} data: {}", userId, personalData);
+
+// ✅ REQUIRED
+log.info("Processing request for device {}", maskDeviceId(deviceId));
+log.debug("Processing {} items", items.size());
+```
+
+### 8. Safe Error Messages
+
+**REQUIRED**: Never expose internal details in API responses
+
+```java
+// ❌ FORBIDDEN
+return ResponseEntity.badRequest().body(e.getMessage());
+
+// ✅ REQUIRED
+private String mapToSafeErrorMessage(String errorMessage) {
+    if (errorMessage == null) return "Invalid request";
+    if (errorMessage.contains("empty")) return "Input is empty";
+    if (errorMessage.contains("size")) return "Input exceeds maximum size";
+    return "Invalid request";
+}
+```
+
+---
+
+## Architecture Standards (DDD & Clean Architecture)
+
+### Module Structure
+
+Each module follows a flat structure with public `api/` subpackage:
+```
+module/
+├── api/                    # PUBLIC - facades and DTOs only
+│   ├── ModuleFacade.java   # Public interface (only way to access module)
+│   └── dto/                # Public DTOs (Records preferred)
+│       └── SomeResponse.java
+├── ModuleEntity.java       # INTERNAL (package-private)
+├── ModuleService.java      # INTERNAL (package-private)
+├── ModuleRepository.java   # INTERNAL (package-private)
+├── ModuleController.java   # INTERNAL (package-private)
+└── ModuleProjector.java    # INTERNAL (package-private)
+```
+
+**Key Rules**:
+- Only `api/` subpackage is public (facade + DTOs)
+- Everything else is package-private (no `public` modifier)
+- Other modules can ONLY access through the facade
+- Controllers are internal to the module (not in `api/`)
+
+### Facade Pattern
+
+**REQUIRED**: All cross-module communication through facades
+
+```java
+// ✅ Public facade interface
+public interface WorkoutFacade {
+    WorkoutDto getWorkout(WorkoutId id, DeviceId deviceId);
+    List<WorkoutDto> getWorkoutsInRange(LocalDate from, LocalDate to, DeviceId deviceId);
+}
+
+// ✅ Internal implementation (package-private)
+@Service
+@RequiredArgsConstructor
+class WorkoutFacadeImpl implements WorkoutFacade {
+    private final WorkoutService workoutService;
+    // ...
+}
+```
+
+### Value Objects
+
+**REQUIRED**: Use Value Objects for domain concepts
+
+```java
+// ✅ Value Object as Record
+public record DeviceId(String value) {
+    public DeviceId {
+        Objects.requireNonNull(value, "DeviceId cannot be null");
+        if (value.isBlank()) throw new IllegalArgumentException("DeviceId cannot be blank");
+    }
+
+    public static DeviceId of(String value) {
+        return new DeviceId(value);
+    }
+}
+
+// ✅ Usage - type safety
+void processEvent(DeviceId deviceId, EventId eventId) { }  // Clear types
+// vs
+void processEvent(String deviceId, String eventId) { }     // Confusing
+```
+
+### DTOs as Records
+
+**REQUIRED**: All DTOs should be Java Records
+
+```java
+// ✅ Immutable DTO
+public record WorkoutResponse(
+    UUID workoutId,
+    Instant performedAt,
+    int durationMinutes,
+    int totalVolume,
+    List<ExerciseResponse> exercises
+) { }
+```
+
+### Repository Pattern
+
+```java
+// ✅ Repository interface
+interface WorkoutRepository extends JpaRepository<WorkoutEntity, UUID> {
+
+    @Query("SELECT w FROM WorkoutEntity w WHERE w.deviceId = :deviceId AND w.date BETWEEN :from AND :to")
+    List<WorkoutEntity> findByDeviceIdAndDateRange(
+        @Param("deviceId") String deviceId,
+        @Param("from") LocalDate from,
+        @Param("to") LocalDate to
+    );
+}
+```
+
+---
+
+## Modern Java 21 Patterns
+
+### Required Java Features
+
+1. **Records** for DTOs and Value Objects
+2. **Sealed Classes** for type hierarchies
+3. **Pattern Matching** for instanceof and switch
+4. **Stream API** for all collection processing
+5. **Optional** for nullable returns (never null)
+6. **Virtual Threads** for I/O operations
+
+### Pattern Matching Examples
+
+```java
+// ✅ Pattern matching for instanceof
+if (payload instanceof StepsPayload steps) {
+    processSteps(steps.count(), steps.bucketStart());
+}
+
+// ✅ Pattern matching in switch
+return switch (eventType) {
+    case STEPS -> processSteps(event);
+    case SLEEP -> processSleep(event);
+    case WORKOUT -> processWorkout(event);
+    default -> throw new IllegalArgumentException("Unknown event type: " + eventType);
+};
+```
+
+### Stream API Patterns
+
+```java
+// ✅ Grouping
+Map<LocalDate, List<Event>> eventsByDate = events.stream()
+    .collect(Collectors.groupingBy(Event::getDate));
+
+// ✅ Filtering and mapping
+List<WorkoutDto> workouts = entities.stream()
+    .filter(e -> e.getDeviceId().equals(deviceId))
+    .map(this::toDto)
+    .toList();
+
+// ✅ Reduction
+int totalSteps = hourlyData.stream()
+    .mapToInt(HourlySteps::getCount)
+    .sum();
+
+// ✅ Optional handling
+return repository.findById(id)
+    .map(this::toDto)
+    .orElseThrow(() -> new NotFoundException("Workout not found: " + id));
+```
+
+---
+
+## Testing Standards
+
+### Integration Tests (Spock + Testcontainers)
+
+**REQUIRED**: All features must have integration tests
+
+```groovy
+class WorkoutProjectionSpec extends IntegrationSpec {
+
+    def "should project workout with exercises and sets"() {
+        given: "a workout event"
+        def workoutEvent = createWorkoutEvent(deviceId, workoutId, exercises)
+
+        when: "event is submitted"
+        submitEvents([workoutEvent])
+
+        then: "workout is projected"
+        def workout = getWorkout(workoutId)
+        workout.totalVolume == expectedVolume
+        workout.exercises.size() == exercises.size()
+    }
+
+    def "should handle concurrent updates with optimistic locking"() {
+        given: "existing workout projection"
+        def existing = createProjection()
+
+        when: "concurrent updates occur"
+        def futures = (1..10).collect {
+            CompletableFuture.runAsync { updateProjection(existing.id) }
+        }
+        CompletableFuture.allOf(futures as CompletableFuture[]).join()
+
+        then: "no updates are lost"
+        def result = getProjection(existing.id)
+        result.version >= 10
+    }
+}
+```
+
+### Test Patterns
+
+1. **Given-When-Then** structure
+2. **One assertion per test** (or related assertions)
+3. **Test edge cases**: null, empty, boundary values
+4. **Test error cases**: validation failures, not found
+5. **Test concurrency**: optimistic locking, race conditions
+
+---
+
+## Security Checklist
+
+### Before Every PR
+
+- [ ] No `@Setter` on entities
+- [ ] No `for`/`while` loops (use Stream API)
+- [ ] All entities have `@Version`
+- [ ] All user input sanitized in logs
+- [ ] No sensitive data in logs or error messages
+- [ ] AI inputs validated for prompt injection
+- [ ] HMAC authentication on all `/v1/*` endpoints
+- [ ] Integration tests cover new functionality
+- [ ] No hardcoded secrets or credentials
+
+### Security Patterns
+
+```java
+// ✅ Constant-time comparison for secrets
+MessageDigest.isEqual(expected.getBytes(), actual.getBytes());
+
+// ✅ Input validation at boundaries
+@PostMapping("/v1/events")
+ResponseEntity<?> submitEvents(@Valid @RequestBody EventRequest request) {
+    // @Valid triggers validation
+}
+
+// ✅ Output encoding
+return ResponseEntity.ok(sanitizedResponse);
+```
+
+---
+
+## Code Review Checklist
+
+### Critical Issues (Must Fix)
+
+1. **Imperative loops** → Replace with Stream API
+2. **@Setter on entities** → Add business methods
+3. **Missing @Version** → Add optimistic locking
+4. **Log injection vulnerabilities** → Sanitize inputs
+5. **Prompt injection risks** → Validate AI inputs
+6. **Information disclosure** → Safe error messages
+7. **Missing validation** → Add @Valid, null checks
+
+### Warnings (Should Fix)
+
+1. **Anemic domain models** → Move logic to entities
+2. **Primitive obsession** → Use Value Objects
+3. **Missing tests** → Add integration tests
+4. **Complex methods** → Extract and simplify
+5. **Duplicate code** → Extract common patterns
+
+### Best Practices
+
+1. **Prefer composition over inheritance**
+2. **Fail fast** - validate early
+3. **Make illegal states unrepresentable**
+4. **Use Optional instead of null**
+5. **Immutability by default**
+
+---
+
 ## Architecture Overview
 
 ### Modular Architecture by Feature
+
 The codebase follows a modular architecture organized by feature/bounded context:
 
 **Package Structure** (16 modules verified by Spring Modulith):
@@ -137,7 +575,7 @@ Events are projected into query-optimized views:
 
 ### AI Health Assistant (Spring AI + Gemini)
 
-**Architecture**: Natural language interface for querying health data using Gemini 2.0 Flash with SSE streaming.
+**Architecture**: Natural language interface for querying health data using Gemini 3 Flash with SSE streaming.
 
 **Flow**:
 1. POST /v1/assistant/chat → `AssistantController` (SSE endpoint)
@@ -149,7 +587,7 @@ Events are projected into query-optimized views:
 
 **Key Features**:
 - **Conversation History**: Multi-turn conversations with context retention (last 20 messages)
-- **Smart Date Recognition**: AI automatically converts natural language ("dzisiaj", "ostatni tydzień", "ostatni miesiąc") to ISO-8601 dates
+- **Smart Date Recognition**: AI automatically converts natural language ("today", "last week", "last month") to ISO-8601 dates
 - **Dynamic System Prompt**: Current date injected into prompt so AI can calculate relative dates
 - **5 Tools Available**: `getStepsData`, `getSleepData`, `getWorkoutData`, `getDailySummary`, `getMealsData`
 - **SSE Streaming**: Real-time word-by-word responses via Server-Sent Events
@@ -164,7 +602,7 @@ Events are projected into query-optimized views:
 - `Conversation.java`, `ConversationMessage.java` - JPA entities for conversation storage
 
 **Important Implementation Details**:
-- System instruction must include "BIEŻĄCA DATA: {date}" at the top for date recognition to work
+- System instruction must include current date at the top for date recognition to work
 - All tool parameter descriptions specify ISO-8601 format requirement (YYYY-MM-DD)
 - Tools retrieve deviceId from `AssistantContext.getDeviceId()` (set by controller)
 - Errors are caught and returned as `ErrorEvent` to keep SSE stream alive
@@ -189,8 +627,6 @@ Events are projected into query-optimized views:
 export GEMINI_API_KEY="your-api-key"
 export GEMINI_MODEL="gemini-3-flash-preview"  # optional, this is default
 ```
-
-See `AI_ASSISTANT_README.md` for detailed documentation on date recognition patterns and conversation history.
 
 ### Health Data Push Model (Health Connect)
 
@@ -260,21 +696,23 @@ export NONCE_CACHE_TTL_SEC=600
 
 **Core Tables**:
 - `health_events` - Append-only event log (JSONB payload, GIN indexed)
-- `daily_summaries` - Aggregated daily metrics (JSONB summary, V17 adds ai_summary_cache, V22 adds device_id)
-- `conversations` - AI assistant conversation tracking (V8)
-- `conversation_messages` - Message history per conversation (V8)
+- `daily_summaries` - Aggregated daily metrics (JSONB summary, ai_summary_cache, device_id)
+- `conversations` - AI assistant conversation tracking
+- `conversation_messages` - Message history per conversation
 
-**Projection Tables** (all have `version` column for optimistic locking, V23):
-- `steps_hourly_projections`, `steps_daily_projections` (V6, V20 adds device_id)
-- `workout_projections`, `workout_exercise_projections`, `workout_set_projections` (V5)
-- `sleep_projections` (V7, V18 adds sleep_score, V21 adds device_id)
-- `calories_hourly_projections`, `calories_daily_projections` (V10)
-- `activity_hourly_projections`, `activity_daily_projections` (V11)
-- `meal_projections`, `meal_daily_projections` (V13, V21 adds device_id)
-- `meal_import_drafts` (V15-V16, AI-powered meal import)
-- `exercise_name_mappings` (V28, maps exercise names to catalog IDs for statistics)
+**Projection Tables** (all have `version` column for optimistic locking):
+- `steps_hourly_projections`, `steps_daily_projections`
+- `workout_projections`, `workout_exercise_projections`, `workout_set_projections`
+- `sleep_projections`
+- `calories_hourly_projections`, `calories_daily_projections`
+- `activity_hourly_projections`, `activity_daily_projections`
+- `meal_projections`, `meal_daily_projections`
+- `meal_import_drafts` (AI-powered meal import)
+- `exercise_name_mappings` (maps exercise names to catalog IDs for statistics)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V28)
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V35)
+
+---
 
 ## Event Types
 
@@ -304,12 +742,14 @@ All events have:
 
 See `EventValidator.java` for detailed validation rules.
 
+---
+
 ## Testing
 
 **Test Framework**: Spock (Groovy) with Spring Boot Test + Testcontainers
 
 **Integration Tests** (`integration-tests/` module):
-- 366 Spock specifications
+- 420 Spock specifications
 - PostgreSQL via Testcontainers
 - REST Assured for API testing
 - WireMock for mocking external APIs
@@ -334,6 +774,8 @@ See `EventValidator.java` for detailed validation rules.
 # View report
 open integration-tests/build/reports/tests/test/index.html
 ```
+
+---
 
 ## Configuration
 
@@ -365,11 +807,13 @@ open integration-tests/build/reports/tests/test/index.html
 - **JaCoCo**: Code coverage (`./gradlew jacocoTestReport`, reports in `build/reports/jacoco/`)
 - **Modularity Tests**: `ModularityTests.java` verifies module boundaries (16 modules)
 
+---
+
 ## API Endpoints
 
 ### AI Assistant
 - `POST /v1/assistant/chat` - Chat with AI assistant (SSE streaming, HMAC auth required)
-  - Request: `{"message": "Ile kroków zrobiłem dzisiaj?"}`
+  - Request: `{"message": "How many steps did I take today?"}`
   - Response: SSE stream with `ContentEvent`, `ToolCallEvent`, `ToolResultEvent`, `DoneEvent`
 
 ### Event Ingestion
@@ -401,6 +845,8 @@ open integration-tests/build/reports/tests/test/index.html
 - `GET /actuator/prometheus` - Prometheus metrics
 - `GET /swagger-ui.html` - OpenAPI documentation
 
+---
+
 ## Key Design Principles
 
 1. **Events are source of truth** - All data in immutable event log
@@ -410,6 +856,8 @@ open integration-tests/build/reports/tests/test/index.html
 5. **Transactional operations** - `@Transactional` ensures atomicity
 6. **Type safety** - Value objects, enums, validation at boundaries
 7. **Time zone consistency** - UTC internally, Poland time for daily boundaries
+
+---
 
 ## Common Development Patterns
 
@@ -424,10 +872,10 @@ open integration-tests/build/reports/tests/test/index.html
 
 ### Adding a New Projection
 
-1. Create Flyway migration for projection tables
+1. Create Flyway migration for projection tables (include `version` column!)
 2. Create projector class (e.g., `StepsProjector`)
 3. Wire into `StoreHealthEventsCommandHandler.projectEvents()`
-4. Create JPA entities and repositories
+4. Create JPA entities and repositories (with `@Version`, no `@Setter`)
 5. Create query endpoints in REST controller
 6. Add integration tests
 
@@ -456,11 +904,13 @@ WHERE occurred_at >= '2025-01-15'
 SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 ```
 
+---
+
 ## Tech Stack
 
 - **Java 21** with virtual threads (Project Loom)
 - **Spring Boot 3.3.5** (Web, Data JPA, Actuator, Validation)
-- **Spring AI 1.1.0** with Google Gemini integration
+- **Spring AI 1.1.0** with Google Gemini 3 Flash integration
 - **Spring Modulith 1.3.1** for modular architecture
 - **PostgreSQL 16** with JSONB
 - **Gradle 8.5+** with Kotlin DSL
@@ -472,7 +922,3 @@ SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 - **Spock** (Groovy) for test specifications
 - **Docker & Docker Compose** for containerization
 - **SpotBugs + PMD + JaCoCo** for code quality
-
-## Additional Documentation
-
-- **README.md** - Overview, quick start guide, and API documentation
