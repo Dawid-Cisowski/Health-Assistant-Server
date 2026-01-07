@@ -23,11 +23,18 @@ class StepsProjector {
     private final StepsHourlyProjectionJpaRepository hourlyRepository;
     private final StepsBucketFactory stepsBucketFactory;
 
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) return "***";
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
+
+    @Transactional
     public void projectSteps(StoredEventData eventData) {
         stepsBucketFactory.createFromEvent(eventData)
                 .ifPresent(this::saveProjection);
     }
 
+    @Transactional
     public void projectCorrectedSteps(String deviceId, Map<String, Object> payload, Instant occurredAt) {
         stepsBucketFactory.createFromCorrectionPayload(deviceId, payload)
                 .ifPresent(this::saveProjection);
@@ -35,10 +42,10 @@ class StepsProjector {
 
     @Transactional
     public void reprojectForDate(String deviceId, LocalDate date) {
-        log.info("Reprojecting steps for device {} on date {}", deviceId, date);
+        log.info("Reprojecting steps for device {} on date {}", maskDeviceId(deviceId), date);
         hourlyRepository.deleteByDeviceIdAndDate(deviceId, date);
         dailyRepository.deleteByDeviceIdAndDate(deviceId, date);
-        log.info("Deleted projections for device {} on date {} - events will be reprojected on next sync", deviceId, date);
+        log.info("Deleted projections for device {} on date {} - events will be reprojected on next sync", maskDeviceId(deviceId), date);
     }
 
     private void saveProjection(StepsBucket bucket) {
@@ -102,15 +109,14 @@ class StepsProjector {
                         .date(date)
                         .build());
 
-        daily.setTotalSteps(totalSteps);
-        daily.setFirstStepTime(firstStepTime);
-        daily.setLastStepTime(lastStepTime);
-        daily.setActiveHoursCount(activeHoursCount);
-
-        if (mostActiveHourData != null) {
-            daily.setMostActiveHour(mostActiveHourData.getHour());
-            daily.setMostActiveHourSteps(mostActiveHourData.getStepCount());
-        }
+        daily.updateDailySummary(
+                totalSteps,
+                firstStepTime,
+                lastStepTime,
+                activeHoursCount,
+                mostActiveHourData != null ? mostActiveHourData.getHour() : null,
+                mostActiveHourData != null ? mostActiveHourData.getStepCount() : null
+        );
 
         dailyRepository.save(daily);
     }

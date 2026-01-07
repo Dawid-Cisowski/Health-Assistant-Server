@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +25,11 @@ class StepsService implements StepsFacade {
     private final StepsDailyProjectionJpaRepository dailyRepository;
     private final StepsHourlyProjectionJpaRepository hourlyRepository;
     private final StepsProjector stepsProjector;
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) return "***";
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
 
     @Override
     public StepsDailyBreakdownResponse getDailyBreakdown(String deviceId, LocalDate date) {
@@ -82,20 +86,17 @@ class StepsService implements StepsFacade {
         Map<LocalDate, StepsDailyProjectionJpaEntity> dataByDate = dailyData.stream()
             .collect(Collectors.toMap(StepsDailyProjectionJpaEntity::getDate, d -> d));
 
-        List<StepsRangeSummaryResponse.DailyStats> dailyStats = new ArrayList<>();
-        LocalDate current = startDate;
-
-        while (!current.isAfter(endDate)) {
-            StepsDailyProjectionJpaEntity dayData = dataByDate.get(current);
-
-            dailyStats.add(new StepsRangeSummaryResponse.DailyStats(
-                current,
-                dayData != null ? dayData.getTotalSteps() : 0,
-                dayData != null ? dayData.getActiveHoursCount() : 0
-            ));
-
-            current = current.plusDays(1);
-        }
+        List<StepsRangeSummaryResponse.DailyStats> dailyStats = startDate
+            .datesUntil(endDate.plusDays(1))
+            .map(date -> {
+                StepsDailyProjectionJpaEntity dayData = dataByDate.get(date);
+                return new StepsRangeSummaryResponse.DailyStats(
+                    date,
+                    dayData != null ? dayData.getTotalSteps() : 0,
+                    dayData != null ? dayData.getActiveHoursCount() : 0
+                );
+            })
+            .toList();
 
         int totalSteps = dailyStats.stream()
             .mapToInt(StepsRangeSummaryResponse.DailyStats::totalSteps)
@@ -122,7 +123,7 @@ class StepsService implements StepsFacade {
     @Override
     @Transactional
     public void deleteProjectionsByDeviceId(String deviceId) {
-        log.debug("Deleting steps projections for device: {}", deviceId);
+        log.debug("Deleting steps projections for device: {}", maskDeviceId(deviceId));
         hourlyRepository.deleteByDeviceId(deviceId);
         dailyRepository.deleteByDeviceId(deviceId);
     }
@@ -130,7 +131,7 @@ class StepsService implements StepsFacade {
     @Override
     @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
-        log.debug("Deleting steps projections for device {} date {}", deviceId, date);
+        log.debug("Deleting steps projections for device {} date {}", maskDeviceId(deviceId), date);
         hourlyRepository.deleteByDeviceIdAndDate(deviceId, date);
         dailyRepository.deleteByDeviceIdAndDate(deviceId, date);
     }
@@ -139,12 +140,12 @@ class StepsService implements StepsFacade {
     @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} steps events directly", events.size());
-        for (StoredEventData event : events) {
+        events.forEach(event -> {
             try {
                 stepsProjector.projectSteps(event);
             } catch (Exception e) {
                 log.error("Failed to project steps event: {}", event.eventId().value(), e);
             }
-        }
+        });
     }
 }

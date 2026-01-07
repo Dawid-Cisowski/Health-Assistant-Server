@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 @RestController
 @RequestMapping("/v1/steps")
@@ -23,7 +24,14 @@ import java.time.LocalDate;
 @Tag(name = "Steps", description = "Steps tracking and analytics endpoints")
 class StepsController {
 
+    private static final int MAX_DATE_RANGE_DAYS = 365;
+
     private final StepsFacade stepsFacade;
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) return "***";
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
 
     @GetMapping("/daily/{date}")
     @Operation(
@@ -40,7 +48,7 @@ class StepsController {
             @RequestHeader("X-Device-Id") String deviceId,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
-        log.info("Retrieving daily steps breakdown for device: {} date: {}", deviceId, date);
+        log.info("Retrieving daily steps breakdown for device: {} date: {}", maskDeviceId(deviceId), date);
         StepsDailyBreakdownResponse breakdown = stepsFacade.getDailyBreakdown(deviceId, date);
 
         if (breakdown.totalSteps() == 0) {
@@ -71,7 +79,13 @@ class StepsController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving steps range summary for device: {} from {} to {}", deviceId, startDate, endDate);
+        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+        if (daysBetween > MAX_DATE_RANGE_DAYS) {
+            log.warn("Date range too large: {} days (max {})", daysBetween, MAX_DATE_RANGE_DAYS);
+            return ResponseEntity.badRequest().build();
+        }
+
+        log.info("Retrieving steps range summary for device: {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
         StepsRangeSummaryResponse summary = stepsFacade.getRangeSummary(deviceId, startDate, endDate);
         return ResponseEntity.ok(summary);
     }

@@ -9,8 +9,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "steps_hourly_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class StepsHourlyProjectionJpaEntity {
