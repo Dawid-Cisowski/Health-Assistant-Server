@@ -4,6 +4,7 @@ plugins {
     id("org.springframework.boot") version "3.3.5"
     id("io.spring.dependency-management") version "1.1.6"
     id("com.github.spotbugs") version "6.0.26"
+    id("org.sonarqube") version "5.1.0.4882"
     pmd
 }
 
@@ -143,6 +144,22 @@ tasks.jacocoTestReport {
     reports {
         xml.required = true
         html.required = true
+    }
+}
+
+// SonarQube configuration
+sonar {
+    properties {
+        property("sonar.projectKey", "health-assistant-server")
+        property("sonar.host.url", "https://sonarcloud.io")
+
+        // JaCoCo coverage from integration-tests module
+        property("sonar.coverage.jacoco.xmlReportPaths",
+            "${project(":integration-tests").layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml")
+
+        // Source configuration
+        property("sonar.sources", "src/main/java")
+        property("sonar.java.binaries", "${layout.buildDirectory.get()}/classes/java/main")
     }
 }
 
