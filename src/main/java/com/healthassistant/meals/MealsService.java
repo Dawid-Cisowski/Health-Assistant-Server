@@ -1,16 +1,30 @@
 package com.healthassistant.meals;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.healthevents.api.dto.payload.EventCorrectedPayload;
+import com.healthassistant.healthevents.api.dto.payload.EventDeletedPayload;
+import com.healthassistant.healthevents.api.dto.payload.MealRecordedPayload;
+import com.healthassistant.healthevents.api.model.DeviceId;
+import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
+import com.healthassistant.meals.api.dto.MealResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
+import com.healthassistant.meals.api.dto.RecordMealRequest;
+import com.healthassistant.meals.api.dto.UpdateMealRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -26,10 +40,17 @@ class MealsService implements MealsFacade {
 
     private static final int MAX_RANGE_DAYS = 365;
     private static final int MAX_MEALS_PER_DAY = 50;
+    private static final int MAX_BACKDATE_DAYS = 30;
+    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+    private static final String MEAL_V1 = "MealRecorded.v1";
+    private static final String EVENT_DELETED_V1 = "EventDeleted.v1";
+    private static final String EVENT_CORRECTED_V1 = "EventCorrected.v1";
 
     private final MealDailyProjectionJpaRepository dailyRepository;
     private final MealProjectionJpaRepository mealRepository;
     private final MealsProjector mealsProjector;
+    private final HealthEventsFacade healthEventsFacade;
+    private final ObjectMapper objectMapper;
 
     @Override
     public MealDailyDetailResponse getDailyDetail(String deviceId, LocalDate date) {
@@ -140,6 +161,213 @@ class MealsService implements MealsFacade {
                 dayData != null ? dayData.getTotalFatGrams() : 0,
                 dayData != null ? dayData.getTotalCarbohydratesGrams() : 0
         );
+    }
+
+    @Override
+    @Transactional
+    public MealResponse recordMeal(String deviceId, RecordMealRequest request) {
+        Instant occurredAt = request.occurredAt() != null ? request.occurredAt() : Instant.now();
+        validateBackdating(occurredAt);
+
+        MealRecordedPayload payload = new MealRecordedPayload(
+                request.title(),
+                request.mealType(),
+                request.caloriesKcal(),
+                request.proteinGrams(),
+                request.fatGrams(),
+                request.carbohydratesGrams(),
+                request.healthRating()
+        );
+
+        String idempotencyKey = generateMealIdempotencyKey(deviceId, occurredAt);
+
+        StoreHealthEventsCommand command = new StoreHealthEventsCommand(
+                List.of(new StoreHealthEventsCommand.EventEnvelope(
+                        new IdempotencyKey(idempotencyKey),
+                        MEAL_V1,
+                        occurredAt,
+                        payload
+                )),
+                new DeviceId(deviceId)
+        );
+
+        log.info("Recording meal for device {} at {}", sanitizeForLog(deviceId), occurredAt);
+        StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
+
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+            String error = result.results().isEmpty() ? "No result" :
+                    result.results().getFirst().error() != null ?
+                            result.results().getFirst().error().message() : "Unknown error";
+            throw new IllegalStateException("Failed to record meal: " + error);
+        }
+
+        String eventId = result.results().getFirst().eventId().value();
+        LocalDate date = toPolandDate(occurredAt);
+
+        return new MealResponse(
+                eventId,
+                date,
+                occurredAt,
+                request.title(),
+                request.mealType().name(),
+                request.caloriesKcal(),
+                request.proteinGrams(),
+                request.fatGrams(),
+                request.carbohydratesGrams(),
+                request.healthRating().name()
+        );
+    }
+
+    @Override
+    @Transactional
+    public void deleteMeal(String deviceId, String eventId) {
+        StoredEventData existingEvent = healthEventsFacade.findEventById(deviceId, eventId)
+                .orElseGet(() -> {
+                    log.warn("Security: Device {} attempted to delete eventId {} which doesn't exist or belongs to another device",
+                            sanitizeForLog(deviceId), sanitizeForLog(eventId));
+                    throw new MealNotFoundException(eventId);
+                });
+
+        if (!MEAL_V1.equals(existingEvent.eventType().value())) {
+            log.warn("Security: Device {} attempted to delete eventId {} which is not a meal event (type: {})",
+                    sanitizeForLog(deviceId), sanitizeForLog(eventId), existingEvent.eventType().value());
+            throw new MealNotFoundException(eventId);
+        }
+
+        EventDeletedPayload payload = new EventDeletedPayload(
+                eventId,
+                existingEvent.idempotencyKey().value(),
+                "User requested deletion"
+        );
+
+        String idempotencyKey = deviceId + "|delete|" + eventId;
+
+        StoreHealthEventsCommand command = new StoreHealthEventsCommand(
+                List.of(new StoreHealthEventsCommand.EventEnvelope(
+                        new IdempotencyKey(idempotencyKey),
+                        EVENT_DELETED_V1,
+                        Instant.now(),
+                        payload
+                )),
+                new DeviceId(deviceId)
+        );
+
+        log.info("Deleting meal {} for device {}", sanitizeForLog(eventId), sanitizeForLog(deviceId));
+        StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
+
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+            String error = result.results().isEmpty() ? "No result" :
+                    result.results().getFirst().error() != null ?
+                            result.results().getFirst().error().message() : "Unknown error";
+            throw new IllegalStateException("Failed to delete meal: " + error);
+        }
+    }
+
+    @Override
+    @Transactional
+    public MealResponse updateMeal(String deviceId, String eventId, UpdateMealRequest request) {
+        StoredEventData existingEvent = healthEventsFacade.findEventById(deviceId, eventId)
+                .orElseGet(() -> {
+                    log.warn("Security: Device {} attempted to update eventId {} which doesn't exist or belongs to another device",
+                            sanitizeForLog(deviceId), sanitizeForLog(eventId));
+                    throw new MealNotFoundException(eventId);
+                });
+
+        if (!MEAL_V1.equals(existingEvent.eventType().value())) {
+            log.warn("Security: Device {} attempted to update eventId {} which is not a meal event (type: {})",
+                    sanitizeForLog(deviceId), sanitizeForLog(eventId), existingEvent.eventType().value());
+            throw new MealNotFoundException(eventId);
+        }
+
+        Instant newOccurredAt = request.occurredAt() != null ? request.occurredAt() : existingEvent.occurredAt();
+        validateBackdating(newOccurredAt);
+
+        MealRecordedPayload correctedPayload = new MealRecordedPayload(
+                request.title(),
+                request.mealType(),
+                request.caloriesKcal(),
+                request.proteinGrams(),
+                request.fatGrams(),
+                request.carbohydratesGrams(),
+                request.healthRating()
+        );
+
+        Map<String, Object> payloadMap = objectMapper.convertValue(
+                correctedPayload,
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
+        );
+
+        EventCorrectedPayload payload = new EventCorrectedPayload(
+                eventId,
+                existingEvent.idempotencyKey().value(),
+                MEAL_V1,
+                payloadMap,
+                newOccurredAt,
+                "User requested update"
+        );
+
+        // Use content-based idempotency key so same correction request is idempotent
+        String idempotencyKey = deviceId + "|correct|" + eventId + "|" + newOccurredAt.toEpochMilli();
+
+        StoreHealthEventsCommand command = new StoreHealthEventsCommand(
+                List.of(new StoreHealthEventsCommand.EventEnvelope(
+                        new IdempotencyKey(idempotencyKey),
+                        EVENT_CORRECTED_V1,
+                        Instant.now(),
+                        payload
+                )),
+                new DeviceId(deviceId)
+        );
+
+        log.info("Updating meal {} for device {}", sanitizeForLog(eventId), sanitizeForLog(deviceId));
+        StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
+
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+            String error = result.results().isEmpty() ? "No result" :
+                    result.results().getFirst().error() != null ?
+                            result.results().getFirst().error().message() : "Unknown error";
+            throw new IllegalStateException("Failed to update meal: " + error);
+        }
+
+        String newEventId = result.results().getFirst().eventId().value();
+        LocalDate date = toPolandDate(newOccurredAt);
+
+        return new MealResponse(
+                newEventId,
+                date,
+                newOccurredAt,
+                request.title(),
+                request.mealType().name(),
+                request.caloriesKcal(),
+                request.proteinGrams(),
+                request.fatGrams(),
+                request.carbohydratesGrams(),
+                request.healthRating().name()
+        );
+    }
+
+    private void validateBackdating(Instant occurredAt) {
+        Instant now = Instant.now();
+
+        if (occurredAt.isAfter(now)) {
+            throw new BackdatingValidationException("Meal date cannot be in the future");
+        }
+
+        long daysBetween = ChronoUnit.DAYS.between(occurredAt, now);
+        if (daysBetween > MAX_BACKDATE_DAYS) {
+            throw new BackdatingValidationException(
+                    "Meal date cannot be more than " + MAX_BACKDATE_DAYS + " days in the past"
+            );
+        }
+    }
+
+    private String generateMealIdempotencyKey(String deviceId, Instant occurredAt) {
+        // Use millisecond precision to allow idempotency within same millisecond
+        return deviceId + "|" + MEAL_V1 + "|" + occurredAt.toEpochMilli();
+    }
+
+    private LocalDate toPolandDate(Instant instant) {
+        return instant != null ? instant.atZone(POLAND_ZONE).toLocalDate() : null;
     }
 
     @Override

@@ -29,4 +29,6 @@ public interface HealthEventsFacade {
     void deleteEventsByDeviceId(String deviceId);
 
     Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart);
+
+    Optional<StoredEventData> findEventById(String deviceId, String eventId);
 }

@@ -318,4 +318,12 @@ class HealthEventsService implements HealthEventsFacade {
     public Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart) {
         return eventRepository.findExistingSleepInfo(deviceId, sleepStart);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<StoredEventData> findEventById(String deviceId, String eventId) {
+        return healthEventJpaRepository.findByEventIdAndDeviceId(eventId, deviceId)
+                .filter(entity -> entity.getDeletedAt() == null && entity.getSupersededByEventId() == null)
+                .map(this::toStoredEventData);
+    }
 }

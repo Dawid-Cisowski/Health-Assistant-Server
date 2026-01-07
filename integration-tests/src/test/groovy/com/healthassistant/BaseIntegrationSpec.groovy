@@ -93,7 +93,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Routine specs
             "test-routines",
             // Compensation events specs
-            "test-deletion", "test-correction"
+            "test-deletion", "test-correction",
+            // Meal CRUD specs
+            "test-meal-crud"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
@@ -508,6 +510,20 @@ abstract class BaseIntegrationSpec extends Specification {
                 .header("X-Timestamp", timestamp)
                 .header("X-Nonce", nonce)
                 .header("X-Signature", signature)
+    }
+
+    def authenticatedPutRequestWithBody(String deviceId, String secretBase64, String path, String body) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String signature = generateHmacSignature("PUT", path, timestamp, nonce, deviceId, body, secretBase64)
+
+        return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+                .body(body)
     }
 
 

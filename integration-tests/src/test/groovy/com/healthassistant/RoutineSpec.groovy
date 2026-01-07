@@ -266,18 +266,4 @@ class RoutineSpec extends BaseIntegrationSpec {
         return response.body().jsonPath().getString("id")
     }
 
-    // Helper for PUT requests
-    private authenticatedPutRequestWithBody(String deviceId, String secretBase64, String path, String body) {
-        String timestamp = generateTimestamp()
-        String nonce = generateNonce()
-        String signature = generateHmacSignature("PUT", path, timestamp, nonce, deviceId, body, secretBase64)
-
-        return io.restassured.RestAssured.given()
-                .contentType(io.restassured.http.ContentType.JSON)
-                .header("X-Device-Id", deviceId)
-                .header("X-Timestamp", timestamp)
-                .header("X-Nonce", nonce)
-                .header("X-Signature", signature)
-                .body(body)
-    }
 }
