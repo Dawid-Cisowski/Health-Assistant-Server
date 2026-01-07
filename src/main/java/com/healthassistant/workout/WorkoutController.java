@@ -38,9 +38,12 @@ class WorkoutController {
             @ApiResponse(responseCode = "404", description = "Workout not found"),
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
-    ResponseEntity<WorkoutDetailResponse> getWorkoutDetails(@PathVariable String workoutId) {
-        log.info("Retrieving workout details for workoutId: {}", workoutId);
-        return workoutFacade.getWorkoutDetails(workoutId)
+    ResponseEntity<WorkoutDetailResponse> getWorkoutDetails(
+            @PathVariable String workoutId,
+            @RequestHeader("X-Device-Id") String deviceId
+    ) {
+        log.info("Retrieving workout details for workoutId: {} deviceId: {}", workoutId, maskDeviceId(deviceId));
+        return workoutFacade.getWorkoutDetails(deviceId, workoutId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

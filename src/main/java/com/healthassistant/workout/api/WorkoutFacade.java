@@ -10,7 +10,7 @@ import java.util.Optional;
 
 public interface WorkoutFacade {
 
-    Optional<WorkoutDetailResponse> getWorkoutDetails(String workoutId);
+    Optional<WorkoutDetailResponse> getWorkoutDetails(String deviceId, String workoutId);
 
     List<WorkoutDetailResponse> getWorkoutsByDateRange(String deviceId, LocalDate startDate, LocalDate endDate);
 

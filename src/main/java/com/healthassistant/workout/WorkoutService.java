@@ -29,8 +29,8 @@ class WorkoutService implements WorkoutFacade {
     private final ExerciseDefinitionRepository exerciseDefinitionRepository;
 
     @Override
-    public Optional<WorkoutDetailResponse> getWorkoutDetails(String workoutId) {
-        Optional<WorkoutProjectionJpaEntity> workoutOpt = workoutRepository.findByWorkoutId(workoutId);
+    public Optional<WorkoutDetailResponse> getWorkoutDetails(String deviceId, String workoutId) {
+        Optional<WorkoutProjectionJpaEntity> workoutOpt = workoutRepository.findByDeviceIdAndWorkoutId(deviceId, workoutId);
 
         if (workoutOpt.isEmpty()) {
             return Optional.empty();

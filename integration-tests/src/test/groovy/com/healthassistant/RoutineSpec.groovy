@@ -250,6 +250,69 @@ class RoutineSpec extends BaseIntegrationSpec {
         response.statusCode() == 401
     }
 
+    def "Scenario 11: Device isolation - different devices have separate routines"() {
+        given: "a routine created by device 1"
+        def device1RoutineId = createRoutine("Device 1 Routine", [
+                [exerciseId: "chest_1", orderIndex: 1, defaultSets: 3]
+        ])
+
+        and: "a routine created by device 2"
+        def request2 = JsonOutput.toJson([
+                name: "Device 2 Routine",
+                exercises: [
+                        [exerciseId: "back_1", orderIndex: 1, defaultSets: 4]
+                ]
+        ])
+        def device2Response = authenticatedPostRequestWithBody("different-device-id", DIFFERENT_DEVICE_SECRET_BASE64, "/v1/routines", request2)
+                .post("/v1/routines")
+                .then()
+                .statusCode(201)
+                .extract()
+        def device2RoutineId = device2Response.body().jsonPath().getString("id")
+
+        when: "device 1 lists its routines"
+        def device1Routines = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/routines")
+                .get("/v1/routines")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath()
+                .getList("")
+
+        then: "device 1 only sees its own routine"
+        device1Routines.size() >= 1
+        device1Routines.any { it.name == "Device 1 Routine" }
+        !device1Routines.any { it.name == "Device 2 Routine" }
+
+        when: "device 2 lists its routines"
+        def device2Routines = authenticatedGetRequest("different-device-id", DIFFERENT_DEVICE_SECRET_BASE64, "/v1/routines")
+                .get("/v1/routines")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath()
+                .getList("")
+
+        then: "device 2 only sees its own routine"
+        device2Routines.size() >= 1
+        device2Routines.any { it.name == "Device 2 Routine" }
+        !device2Routines.any { it.name == "Device 1 Routine" }
+
+        and: "device 1 cannot access device 2's routine by ID"
+        authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/routines/${device2RoutineId}")
+                .get("/v1/routines/${device2RoutineId}")
+                .then()
+                .statusCode(404)
+
+        and: "device 2 cannot access device 1's routine by ID"
+        authenticatedGetRequest("different-device-id", DIFFERENT_DEVICE_SECRET_BASE64, "/v1/routines/${device1RoutineId}")
+                .get("/v1/routines/${device1RoutineId}")
+                .then()
+                .statusCode(404)
+    }
+
     // Helper method to create a routine and return its ID
     private String createRoutine(String name, List<Map> exercises) {
         def request = JsonOutput.toJson([

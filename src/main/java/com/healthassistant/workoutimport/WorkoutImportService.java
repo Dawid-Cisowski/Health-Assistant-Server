@@ -100,7 +100,7 @@ class WorkoutImportService implements WorkoutImportFacade {
                 ? eventResult.eventId().value()
                 : null;
 
-            WorkoutDetailResponse workoutDetails = workoutFacade.getWorkoutDetails(workoutId)
+            WorkoutDetailResponse workoutDetails = workoutFacade.getWorkoutDetails(deviceId.value(), workoutId)
                 .orElse(null);
 
             log.info("Successfully imported workout {} for device {}: {} exercises, {} sets, status={}",

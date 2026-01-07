@@ -414,6 +414,88 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         noExceptionThrown()
     }
 
+    def "Scenario 13: Device isolation - different devices have separate workout projections"() {
+        given: "workouts from two different devices"
+        def event1 = """
+        {
+            "idempotencyKey": "${DEVICE_ID}|workout|device1-workout",
+            "type": "WorkoutRecorded.v1",
+            "occurredAt": "2025-11-20T18:00:00Z",
+            "payload": {
+                "workoutId": "device1-workout",
+                "performedAt": "2025-11-20T18:00:00Z",
+                "source": "GYMRUN_SCREENSHOT",
+                "exercises": [
+                    {
+                        "name": "Bench Press",
+                        "orderInWorkout": 1,
+                        "sets": [{"setNumber": 1, "weightKg": 100.0, "reps": 10, "isWarmup": false}]
+                    }
+                ]
+            }
+        }
+        """
+        def request1 = createHealthEventsRequest(event1)
+
+        def event2 = """
+        {
+            "idempotencyKey": "different-device-id|workout|device2-workout",
+            "type": "WorkoutRecorded.v1",
+            "occurredAt": "2025-11-20T18:00:00Z",
+            "payload": {
+                "workoutId": "device2-workout",
+                "performedAt": "2025-11-20T18:00:00Z",
+                "source": "GYMRUN_SCREENSHOT",
+                "exercises": [
+                    {
+                        "name": "Squat",
+                        "orderInWorkout": 1,
+                        "sets": [{"setNumber": 1, "weightKg": 150.0, "reps": 8, "isWarmup": false}]
+                    }
+                ]
+            }
+        }
+        """
+        def request2 = """
+        {
+            "events": [${event2}],
+            "deviceId": "different-device-id"
+        }
+        """.stripIndent().trim()
+
+        when: "I submit workouts from both devices"
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request1)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+        authenticatedPostRequestWithBody("different-device-id", DIFFERENT_DEVICE_SECRET_BASE64, "/v1/health-events", request2)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "device 1 can see its workout"
+        def response1 = waitForApiResponse("/v1/workouts/device1-workout", DEVICE_ID, SECRET_BASE64)
+        response1.getString("workoutId") == "device1-workout"
+        response1.getList("exercises")[0].exerciseName == "Bench Press"
+
+        and: "device 2 can see its workout"
+        def response2 = waitForApiResponse("/v1/workouts/device2-workout", "different-device-id", DIFFERENT_DEVICE_SECRET_BASE64)
+        response2.getString("workoutId") == "device2-workout"
+        response2.getList("exercises")[0].exerciseName == "Squat"
+
+        and: "device 1 cannot see device 2's workout (returns 404)"
+        authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/workouts/device2-workout")
+                .get("/v1/workouts/device2-workout")
+                .then()
+                .statusCode(404)
+
+        and: "device 2 cannot see device 1's workout (returns 404)"
+        authenticatedGetRequest("different-device-id", DIFFERENT_DEVICE_SECRET_BASE64, "/v1/workouts/device1-workout")
+                .get("/v1/workouts/device1-workout")
+                .then()
+                .statusCode(404)
+    }
+
     // Helper methods
 
     String createHealthEventsRequest(String event) {

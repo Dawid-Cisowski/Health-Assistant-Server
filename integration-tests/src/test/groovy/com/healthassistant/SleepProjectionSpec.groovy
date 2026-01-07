@@ -654,4 +654,65 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         response.getString("firstSleepStart") == sleepStart
         response.getString("lastSleepEnd") == sleepEnd
     }
+
+    def "Scenario 14: Device isolation - different devices have separate projections"() {
+        given: "sleep from two different devices"
+        def date = "2025-12-04"
+        def request1 = """
+        {
+            "events": [{
+                "idempotencyKey": "${DEVICE_ID}|sleep|device1-2025-12-04",
+                "type": "SleepSessionRecorded.v1",
+                "occurredAt": "2025-12-04T06:00:00Z",
+                "payload": {
+                    "sleepId": "device1-sleep",
+                    "sleepStart": "2025-12-03T22:00:00Z",
+                    "sleepEnd": "2025-12-04T06:00:00Z",
+                    "totalMinutes": 480,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+        def request2 = """
+        {
+            "events": [{
+                "idempotencyKey": "different-device-id|sleep|device2-2025-12-04",
+                "type": "SleepSessionRecorded.v1",
+                "occurredAt": "2025-12-04T07:00:00Z",
+                "payload": {
+                    "sleepId": "device2-sleep",
+                    "sleepStart": "2025-12-03T23:00:00Z",
+                    "sleepEnd": "2025-12-04T07:00:00Z",
+                    "totalMinutes": 480,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "different-device-id"
+        }
+        """
+
+        when: "I submit events from both devices"
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request1)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+        authenticatedPostRequestWithBody("different-device-id", DIFFERENT_DEVICE_SECRET_BASE64, "/v1/health-events", request2)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "each device has its own projection (verified via API)"
+        def response1 = waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
+        response1.getInt("totalSleepMinutes") == 480
+        response1.getList("sessions").size() == 1
+        response1.getList("sessions")[0].durationMinutes == 480
+
+        and: "different device has its own data"
+        def response2 = waitForApiResponse("/v1/sleep/daily/${date}", "different-device-id", DIFFERENT_DEVICE_SECRET_BASE64)
+        response2.getInt("totalSleepMinutes") == 480
+        response2.getList("sessions").size() == 1
+        response2.getList("sessions")[0].durationMinutes == 480
+    }
 }

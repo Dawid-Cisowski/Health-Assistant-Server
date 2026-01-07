@@ -631,4 +631,59 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
         then: "no projections are created (API returns 404)"
         apiReturns404("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
     }
+
+    def "Scenario 14: Device isolation - different devices have separate projections"() {
+        given: "steps from two different devices"
+        def date = "2025-11-22"
+        def request1 = """
+        {
+            "events": [{
+                "idempotencyKey": "${DEVICE_ID}|steps|2025-11-22T09:00:00Z",
+                "type": "StepsBucketedRecorded.v1",
+                "occurredAt": "2025-11-22T09:01:00Z",
+                "payload": {
+                    "bucketStart": "2025-11-22T09:00:00Z",
+                    "bucketEnd": "2025-11-22T09:01:00Z",
+                    "count": 1000,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+        def request2 = """
+        {
+            "events": [{
+                "idempotencyKey": "different-device-id|steps|2025-11-22T09:00:00Z",
+                "type": "StepsBucketedRecorded.v1",
+                "occurredAt": "2025-11-22T09:01:00Z",
+                "payload": {
+                    "bucketStart": "2025-11-22T09:00:00Z",
+                    "bucketEnd": "2025-11-22T09:01:00Z",
+                    "count": 2000,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "different-device-id"
+        }
+        """
+
+        when: "I submit events from both devices"
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request1)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+        authenticatedPostRequestWithBody("different-device-id", DIFFERENT_DEVICE_SECRET_BASE64, "/v1/health-events", request2)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "each device has its own projection (verified via API)"
+        def response1 = waitForApiResponse("/v1/steps/daily/${date}", DEVICE_ID, SECRET_BASE64)
+        response1.getInt("totalSteps") == 1000
+
+        and: "different device has its own data"
+        def response2 = waitForApiResponse("/v1/steps/daily/${date}", "different-device-id", DIFFERENT_DEVICE_SECRET_BASE64)
+        response2.getInt("totalSteps") == 2000
+    }
 }

@@ -14,6 +14,8 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
 
     Optional<WorkoutProjectionJpaEntity> findByWorkoutId(String workoutId);
 
+    Optional<WorkoutProjectionJpaEntity> findByDeviceIdAndWorkoutId(String deviceId, String workoutId);
+
     boolean existsByWorkoutId(String workoutId);
 
     List<WorkoutProjectionJpaEntity> findByDeviceIdAndPerformedDateBetweenOrderByPerformedAtDesc(

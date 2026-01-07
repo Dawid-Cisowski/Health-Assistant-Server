@@ -95,7 +95,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Compensation events specs
             "test-deletion", "test-correction",
             // Meal CRUD specs
-            "test-meal-crud"
+            "test-meal-crud",
+            // Cross-module and edge case specs
+            "test-cross-module", "test-timezone", "test-ratelimit", "test-mealedge"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
