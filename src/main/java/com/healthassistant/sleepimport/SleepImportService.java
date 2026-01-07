@@ -36,8 +36,9 @@ class SleepImportService implements SleepImportFacade {
     private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
             "image/*", "application/octet-stream"
     );
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+    private static final int HASH_PREFIX_LENGTH = 8;
 
     private final SleepImageExtractor imageExtractor;
     private final SleepEventMapper eventMapper;
@@ -102,11 +103,16 @@ class SleepImportService implements SleepImportFacade {
             StoreHealthEventsCommand command = new StoreHealthEventsCommand(envelopes, deviceId);
             StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
+            if (result.results().isEmpty()) {
+                log.error("No event results returned from health events facade");
+                return SleepImportResponse.failure("Internal error: no results returned");
+            }
+
             var sleepEventResult = result.results().getLast();
             if (sleepEventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
-                String errorMessage = sleepEventResult.error() != null
-                        ? sleepEventResult.error().message()
-                        : "Validation failed";
+                String errorMessage = Optional.ofNullable(sleepEventResult.error())
+                        .map(StoreHealthEventsResult.EventError::message)
+                        .orElse("Validation failed");
                 log.warn("Sleep event validation failed: {}", errorMessage);
                 return SleepImportResponse.failure("Validation error: " + errorMessage);
             }
@@ -208,13 +214,13 @@ class SleepImportService implements SleepImportFacade {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(image.getBytes());
-            String imageHash = HexFormat.of().formatHex(hash).substring(0, 8);
+            String imageHash = HexFormat.of().formatHex(hash).substring(0, HASH_PREFIX_LENGTH);
 
             return String.format("ohealth-import-%s-%s", data.sleepDate(), imageHash);
 
         } catch (Exception e) {
             log.warn("Failed to generate hash-based sleep ID, using UUID", e);
-            return "ohealth-import-" + UUID.randomUUID().toString().substring(0, 8);
+            return "ohealth-import-" + UUID.randomUUID().toString().substring(0, HASH_PREFIX_LENGTH);
         }
     }
 }

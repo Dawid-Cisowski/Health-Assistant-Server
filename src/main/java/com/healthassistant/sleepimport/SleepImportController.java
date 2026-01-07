@@ -24,6 +24,11 @@ class SleepImportController {
 
     private final SleepImportFacade sleepImportFacade;
 
+    private String sanitizeForLog(String input) {
+        if (input == null) return "null";
+        return input.replaceAll("[\\r\\n\\t]", "_");
+    }
+
     @PostMapping(value = "/import-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Import sleep from ohealth screenshot",
@@ -45,7 +50,7 @@ class SleepImportController {
             @RequestAttribute("deviceId") String deviceId
     ) {
         log.info("Sleep image import request from device {}, file: {}, size: {} bytes, year: {}",
-                deviceId, image.getOriginalFilename(), image.getSize(), year);
+                deviceId, sanitizeForLog(image.getOriginalFilename()), image.getSize(), year);
 
         try {
             SleepImportResponse response = sleepImportFacade.importFromImage(
