@@ -60,7 +60,7 @@ class WorkoutController {
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving workouts for device {} date range: {} to {}", deviceId, from, to);
+        log.info("Retrieving workouts for device {} date range: {} to {}", maskDeviceId(deviceId), from, to);
         List<WorkoutDetailResponse> workouts = workoutFacade.getWorkoutsByDateRange(deviceId, from, to);
         return ResponseEntity.ok(workouts);
     }
@@ -96,7 +96,21 @@ class WorkoutController {
             @ApiResponse(responseCode = "200", description = "Exercises retrieved successfully")
     })
     ResponseEntity<List<ExerciseDefinition>> getExercisesByMuscle(@PathVariable String muscle) {
-        log.info("Retrieving exercises for muscle: {}", muscle);
+        log.info("Retrieving exercises for muscle: {}", sanitizeForLog(muscle));
         return ResponseEntity.ok(exerciseCatalog.getExercisesByMuscle(muscle));
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replaceAll("[\\r\\n\\t]", "_");
     }
 }

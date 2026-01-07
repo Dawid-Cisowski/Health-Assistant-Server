@@ -1,10 +1,10 @@
 package com.healthassistant.workout;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,8 +14,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "routines")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 class RoutineEntity {
 
@@ -66,5 +65,20 @@ class RoutineEntity {
 
     void clearExercises() {
         exercises.clear();
+    }
+
+    void updateDetails(String name, String description, String colorTheme) {
+        this.name = name;
+        this.description = description;
+        this.colorTheme = colorTheme;
+    }
+
+    static RoutineEntity create(String deviceId, String name, String description, String colorTheme) {
+        var entity = new RoutineEntity();
+        entity.deviceId = deviceId;
+        entity.name = name;
+        entity.description = description;
+        entity.colorTheme = colorTheme;
+        return entity;
     }
 }

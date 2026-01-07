@@ -35,23 +35,20 @@ class RoutineService {
     RoutineResponse createRoutine(RoutineRequest request, String deviceId) {
         validateExerciseIds(request.exercises());
 
-        RoutineEntity routine = new RoutineEntity();
-        routine.setDeviceId(deviceId);
-        routine.setName(request.name());
-        routine.setDescription(request.description());
-        routine.setColorTheme(request.colorTheme());
+        RoutineEntity routine = RoutineEntity.create(
+                deviceId, request.name(), request.description(), request.colorTheme());
 
-        for (RoutineExerciseRequest exerciseRequest : request.exercises()) {
-            RoutineExerciseEntity exercise = new RoutineExerciseEntity();
-            exercise.setExerciseId(exerciseRequest.exerciseId());
-            exercise.setOrderIndex(exerciseRequest.orderIndex());
-            exercise.setDefaultSets(exerciseRequest.defaultSets());
-            exercise.setNotes(exerciseRequest.notes());
+        request.exercises().forEach(exerciseRequest -> {
+            RoutineExerciseEntity exercise = RoutineExerciseEntity.create(
+                    exerciseRequest.exerciseId(),
+                    exerciseRequest.orderIndex(),
+                    exerciseRequest.defaultSets(),
+                    exerciseRequest.notes());
             routine.addExercise(exercise);
-        }
+        });
 
         RoutineEntity saved = routineRepository.save(routine);
-        log.info("Created routine '{}' with id {} for device {}", saved.getName(), saved.getId(), deviceId);
+        log.info("Created routine '{}' with id {} for device {}", saved.getName(), saved.getId(), maskDeviceId(deviceId));
         return toResponse(saved);
     }
 
@@ -61,22 +58,20 @@ class RoutineService {
                 .map(routine -> {
                     validateExerciseIds(request.exercises());
 
-                    routine.setName(request.name());
-                    routine.setDescription(request.description());
-                    routine.setColorTheme(request.colorTheme());
+                    routine.updateDetails(request.name(), request.description(), request.colorTheme());
 
                     routine.clearExercises();
-                    for (RoutineExerciseRequest exerciseRequest : request.exercises()) {
-                        RoutineExerciseEntity exercise = new RoutineExerciseEntity();
-                        exercise.setExerciseId(exerciseRequest.exerciseId());
-                        exercise.setOrderIndex(exerciseRequest.orderIndex());
-                        exercise.setDefaultSets(exerciseRequest.defaultSets());
-                        exercise.setNotes(exerciseRequest.notes());
+                    request.exercises().forEach(exerciseRequest -> {
+                        RoutineExerciseEntity exercise = RoutineExerciseEntity.create(
+                                exerciseRequest.exerciseId(),
+                                exerciseRequest.orderIndex(),
+                                exerciseRequest.defaultSets(),
+                                exerciseRequest.notes());
                         routine.addExercise(exercise);
-                    }
+                    });
 
                     RoutineEntity saved = routineRepository.save(routine);
-                    log.info("Updated routine '{}' with id {} for device {}", saved.getName(), saved.getId(), deviceId);
+                    log.info("Updated routine '{}' with id {} for device {}", saved.getName(), saved.getId(), maskDeviceId(deviceId));
                     return toResponse(saved);
                 });
     }
@@ -85,7 +80,7 @@ class RoutineService {
     boolean deleteRoutine(UUID id, String deviceId) {
         if (routineRepository.existsByIdAndDeviceId(id, deviceId)) {
             routineRepository.deleteByIdAndDeviceId(id, deviceId);
-            log.info("Deleted routine with id {} for device {}", id, deviceId);
+            log.info("Deleted routine with id {} for device {}", id, maskDeviceId(deviceId));
             return true;
         }
         return false;
@@ -154,5 +149,12 @@ class RoutineService {
                         ExerciseDefinition::name,
                         (a, b) -> a
                 ));
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
 }

@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -17,6 +18,7 @@ class WorkoutProjector {
     private final WorkoutSetProjectionJpaRepository setRepository;
     private final WorkoutFactory workoutFactory;
 
+    @Transactional
     public void projectWorkout(StoredEventData eventData) {
         workoutFactory.createFromEvent(eventData).ifPresentOrElse(
                 this::saveProjection,

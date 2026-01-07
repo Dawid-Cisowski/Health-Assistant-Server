@@ -56,7 +56,7 @@ class ExerciseStatisticsController {
             String deviceId
     ) {
         log.info("Retrieving exercise statistics for exerciseId: {}, device: {}, dateRange: {} to {}",
-                exerciseId, deviceId, fromDate, toDate);
+                sanitizeForLog(exerciseId), maskDeviceId(deviceId), fromDate, toDate);
 
         return statisticsService.getStatistics(deviceId, exerciseId, fromDate, toDate)
                 .map(ResponseEntity::ok)
@@ -66,5 +66,19 @@ class ExerciseStatisticsController {
                     }
                     return ResponseEntity.notFound().build();
                 });
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replaceAll("[\\r\\n\\t]", "_");
     }
 }

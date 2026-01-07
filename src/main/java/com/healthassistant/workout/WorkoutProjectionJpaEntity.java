@@ -12,8 +12,7 @@ import java.util.List;
 @Entity
 @Table(name = "workout_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class WorkoutProjectionJpaEntity {

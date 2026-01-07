@@ -133,8 +133,15 @@ class WorkoutFactory {
             return exerciseId;
         }
         log.warn("Invalid exerciseId '{}' for exercise '{}' - no matching catalog entry, setting to null",
-                exerciseId, exerciseName);
+                sanitizeForLog(exerciseId), sanitizeForLog(exerciseName));
         return null;
+    }
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replaceAll("[\\r\\n\\t]", "_");
     }
 
     private ExerciseSet toSet(WorkoutPayload.ExerciseSet payload) {

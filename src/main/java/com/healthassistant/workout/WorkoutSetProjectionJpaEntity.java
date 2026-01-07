@@ -9,8 +9,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "workout_set_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class WorkoutSetProjectionJpaEntity {
@@ -45,6 +44,9 @@ class WorkoutSetProjectionJpaEntity {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Version
+    private Long version;
 
     @PrePersist
     protected void onCreate() {

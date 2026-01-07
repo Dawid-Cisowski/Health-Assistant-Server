@@ -35,7 +35,7 @@ class RoutineController {
     ResponseEntity<List<RoutineListResponse>> getRoutines(
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving routines for device: {}", deviceId);
+        log.info("Retrieving routines for device: {}", maskDeviceId(deviceId));
         List<RoutineListResponse> routines = routineService.getRoutines(deviceId);
         return ResponseEntity.ok(routines);
     }
@@ -54,7 +54,7 @@ class RoutineController {
             @PathVariable UUID id,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving routine {} for device: {}", id, deviceId);
+        log.info("Retrieving routine {} for device: {}", id, maskDeviceId(deviceId));
         return routineService.getRoutine(id, deviceId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -74,7 +74,7 @@ class RoutineController {
             @Valid @RequestBody RoutineRequest request,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Creating routine '{}' for device: {}", request.name(), deviceId);
+        log.info("Creating routine '{}' for device: {}", sanitizeForLog(request.name()), maskDeviceId(deviceId));
         RoutineResponse response = routineService.createRoutine(request, deviceId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -95,7 +95,7 @@ class RoutineController {
             @Valid @RequestBody RoutineRequest request,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Updating routine {} for device: {}", id, deviceId);
+        log.info("Updating routine {} for device: {}", id, maskDeviceId(deviceId));
         return routineService.updateRoutine(id, request, deviceId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -115,10 +115,24 @@ class RoutineController {
             @PathVariable UUID id,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Deleting routine {} for device: {}", id, deviceId);
+        log.info("Deleting routine {} for device: {}", id, maskDeviceId(deviceId));
         boolean deleted = routineService.deleteRoutine(id, deviceId);
         return deleted
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.notFound().build();
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replaceAll("[\\r\\n\\t]", "_");
     }
 }
