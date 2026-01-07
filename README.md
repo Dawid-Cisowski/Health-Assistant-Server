@@ -1,316 +1,357 @@
 # Health Assistant Server
 
-A Spring Boot 3.3 backend service for health data ingestion, synchronization with Google Fit, and daily health summaries with HMAC authentication and idempotency guarantees
+Backend server for managing health data with Health Connect integration, AI assistant, and meal/workout tracking.
 
-## 🚀 Features
+**Tech Stack**: Java 21 + Spring Boot 3.3 + PostgreSQL 16 + Spring AI (Gemini) + Spring Modulith
 
-### 🤖 AI Health Assistant (NEW!)
-- **Natural Language Interface**: Ask questions in Polish about your health data
-- **Conversation History**: Multi-turn conversations with context retention (last 20 messages)
-- **Smart Date Recognition**: Understands "dzisiaj", "wczoraj", "ostatni tydzień", "ostatni miesiąc"
-- **Real-time Streaming**: SSE-based responses that stream word-by-word
-- **Intelligent Tool Selection**: AI automatically chooses which data to fetch
-- **5 Health Tools**: Sleep data, steps, workouts, meals, and daily summaries
-- **Gemini 2.0 Flash**: Fast and accurate responses powered by Google's latest model
+## Features
 
-### Core Event Ingestion
-- **Batch Event Ingestion**: Accept up to 100 events per request
-- **HMAC Authentication**: Secure header-based authentication with replay protection
-- **Idempotency**: Automatic deduplication using client-provided keys
-- **Append-Only Storage**: Events stored in PostgreSQL with JSONB payloads
-- **Event Validation**: Type-specific payload validation
+### AI Health Assistant
+- **Natural Language**: "How many steps did I take today?", "How did I sleep this week?"
+- **Conversation History**: Multi-turn with context (last 20 messages)
+- **Date Recognition**: "today", "yesterday", "last week", "last month"
+- **SSE Streaming**: Real-time word-by-word responses
+- **5 AI Tools**: Steps, sleep, workouts, meals, daily summaries
+- **Gemini 3 Flash**: Google's latest model with function calling
 
-### Health Connect Integration (Push Model)
-- **Event-Based Ingestion**: Health data pushed directly from mobile app via Health Connect
-- **Historical Data Sync**: Optional Google Fit sync for backfilling historical data
-- **15-Minute Buckets**: Steps, distance, calories, and heart rate in 15-minute intervals
-- **Session Import**: Sleep sessions and walking sessions with step attribution
-- **Activity Time Calculation**: Automatic detection of active periods from step data
+### Event Sourcing & Projections
+- **Append-only Event Log**: All data as immutable events in PostgreSQL
+- **9 Event Types**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories
+- **6 Projections**: Steps, Sleep, Workout, Calories, Activity, Meals
+- **Optimistic Locking**: `@Version` on all entities with automatic retry
+- **Idempotency**: Deduplication via `idempotency_key`
 
-### Daily Summaries
-- **Automated Aggregation**: Daily health metrics calculated from events
-- **Summary API**: Retrieve daily summaries with steps, calories, sleep, and activity time
-- **Walking Sessions**: Track individual walks with duration, steps, distance, and calories
+### AI-Powered Import (Vision)
+- **Sleep Import**: Screenshot from oHealth → AI extraction → SleepSessionRecorded
+- **Workout Import**: Screenshot from GymRun → AI extraction → WorkoutRecorded
+- **Meal Import**: Meal photo → AI analysis → Draft → Confirm → MealRecorded
 
-### Infrastructure
-- **PostgreSQL 16** with JSONB support
-- **Flyway** database migrations
-- **Docker** support with docker-compose
-- **Health Checks** and Prometheus metrics
-- **OpenAPI Documentation** via Swagger UI
+### Workout & Exercise Tracking
+- **59 Exercises in Catalog**: Complete list with muscle groups
+- **Exercise Statistics**: Progression stats for each exercise
+- **Workout Routines**: Training templates with default sets
+- **Volume Tracking**: Total volume, working volume, max weights
 
-## 📋 Tech Stack
+### Security
+- **HMAC-SHA256 Authentication**: Signature on every request
+- **Replay Protection**: Nonce cache with TTL
+- **Log Sanitization**: Protection against log injection
+- **Prompt Injection Protection**: AI message validation
+- **Constant-time Signature Verification**: Protection against timing attacks
 
-- **Java 21** (Eclipse Temurin)
-- **Spring Boot 3.3.5**
-- **PostgreSQL 16** with JSONB support
-- **Gradle (Kotlin DSL)**
-- **Flyway** for database migrations
-- **Caffeine** for nonce caching (anti-replay)
-- **Virtual Threads** for parallel processing
-- **Testcontainers** for integration testing
-- **Docker & Docker Compose** for containerization
+## Architecture
 
-## 🏗️ Project Structure
+### 16 Modules (Spring Modulith)
 
 ```
-health-assistant-server/
-├── src/main/java/com/healthassistant/
-│   ├── application/
-│   │   ├── ingestion/          # Event storage and processing
-│   │   ├── summary/            # Daily summary aggregation
-│   │   └── sync/               # Google Fit synchronization
-│   ├── domain/
-│   │   ├── event/              # Event domain model
-│   │   └── summary/            # Summary domain model
-│   ├── infrastructure/
-│   │   ├── googlefit/          # Google Fit API client
-│   │   └── web/                # REST controllers, security
-│   ├── config/                 # Configuration classes
-│   └── dto/                    # Data transfer objects
-├── src/main/resources/
-│   ├── application.yml
-│   └── db/migration/           # Flyway migrations
-├── integration-tests/          # Integration tests (366 Spock tests)
-├── docker-compose.yml
-├── Dockerfile
-└── README.md
+com.healthassistant/
+├── appevents/       # Event submission API
+├── healthevents/    # Event store, validation, idempotency
+├── dailysummary/    # Daily aggregations + AI summary
+├── steps/           # Steps projections (hourly → daily)
+├── sleep/           # Sleep projections
+├── sleepimport/     # AI sleep import from screenshots
+├── workout/         # Workout projections, exercises, routines
+├── workoutimport/   # AI workout import
+├── calories/        # Calories projections (hourly → daily)
+├── activity/        # Activity projections
+├── meals/           # Meal projections
+├── mealimport/      # AI meal import (draft flow)
+├── assistant/       # AI chat with Gemini
+├── googlefit/       # Historical sync with Google Fit
+├── security/        # HMAC filter, nonce cache
+└── config/          # Configuration, exception handling
 ```
 
-## 🔧 Configuration
+### Event Flow
 
-Configure via environment variables:
+```
+POST /v1/health-events
+    ↓
+HealthEventsController
+    ↓
+StoreHealthEventsCommandHandler
+    ├── EventValidator (payload validation)
+    ├── EventRepository (save/update)
+    ├── Spring Modulith Events
+    │   ├── StepsProjector
+    │   ├── SleepProjector
+    │   ├── WorkoutProjector
+    │   ├── CaloriesProjector
+    │   ├── ActivityProjector
+    │   └── MealsProjector
+    └── DailySummaryAggregator
+```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DB_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/health_assistant` |
-| `DB_USER` | Database username | `postgres` |
-| `DB_PASSWORD` | Database password | `postgres` |
-| `HMAC_DEVICES_JSON` | JSON map of device ID to base64 secret | `{"test-device-1":"dGVzdC1zZWNyZXQtMTIz"}` |
-| `HMAC_TOLERANCE_SEC` | Timestamp tolerance in seconds | `600` |
-| `NONCE_CACHE_TTL_SEC` | Nonce cache TTL (anti-replay) | `600` |
-| `GOOGLE_FIT_CLIENT_ID` | Google OAuth client ID | - |
-| `GOOGLE_FIT_CLIENT_SECRET` | Google OAuth client secret | - |
-| `GOOGLE_FIT_REFRESH_TOKEN` | Google OAuth refresh token | - |
-| `GEMINI_API_KEY` | Google Gemini API key for AI Assistant | - |
-| `GEMINI_MODEL` | Gemini model name | `gemini-3-flash-preview` |
-
-## 🚀 Quick Start
-
-### Using Docker Compose (Recommended)
-
-1. **Start services**:
-   ```bash
-   docker-compose up --build
-   ```
-
-2. **Access the API**:
-   - Swagger UI: http://localhost:8080/swagger-ui.html
-   - Health: http://localhost:8080/actuator/health
-   - Metrics: http://localhost:8080/actuator/prometheus
-
-3. **Stop services**:
-   ```bash
-   docker-compose down
-   ```
-
-### Local Development
-
-**Prerequisites**:
-- Java 21
-- PostgreSQL 16
-- Gradle 8.5+
-
-**Steps**:
-
-1. **Start PostgreSQL**:
-   ```bash
-   docker run --name postgres-dev \
-     -e POSTGRES_DB=health_assistant \
-     -e POSTGRES_USER=postgres \
-     -e POSTGRES_PASSWORD=postgres \
-     -p 5432:5432 \
-     -d postgres:16-alpine
-   ```
-
-2. **Set environment variables**:
-   ```bash
-   export DB_URL=jdbc:postgresql://localhost:5432/health_assistant
-   export DB_USER=postgres
-   export DB_PASSWORD=postgres
-   export HMAC_DEVICES_JSON='{"test-device":"dGVzdC1zZWNyZXQtMTIz"}'
-   ```
-
-3. **Run application**:
-   ```bash
-   ./gradlew bootRun
-   ```
-
-## 📡 API Endpoints
+## API Endpoints
 
 ### AI Assistant
-- `POST /v1/assistant/chat` - Chat with AI health assistant (SSE streaming, HMAC auth required)
-  - **Request**: `{"message": "Ile kroków zrobiłem dzisiaj?"}`
-  - **Response**: Server-Sent Events stream with real-time answers
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/assistant/chat` | Chat SSE streaming |
 
-### Event Ingestion
-- `POST /v1/health-events` - Batch event ingestion (HMAC auth required)
-
-### Google Fit Sync (Historical/Legacy)
-- `POST /v1/google-fit/sync/day?date=YYYY-MM-DD` - Sync specific day from Google Fit (up to 5 years back)
-
-### Import APIs (AI-powered)
-- `POST /v1/sleep/import-image?year=YYYY` - Import sleep from screenshot (year optional, default: current year)
-- `POST /v1/workouts/import-image` - Import workout from screenshot
-- `POST /v1/meals/import-image` - Import meal from image (returns draft for confirmation)
+### Health Events
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/health-events` | Batch event ingestion (max 100) |
 
 ### Daily Summaries
-- `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
-- `GET /v1/daily-summaries/range?from={date}&to={date}` - Get daily summary range
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/daily-summaries/{date}` | Daily summary |
+| GET | `/v1/daily-summaries/range` | Date range summaries |
+| GET | `/v1/daily-summaries/{date}/ai-text` | AI-generated summary text |
 
-### Query APIs
-- `GET /v1/steps/daily/{date}` - Daily step breakdown
-- `GET /v1/steps/daily/range?from={date}&to={date}` - Step range summary
-- `GET /v1/workouts/{workoutId}` - Workout details
-- `GET /v1/workouts?from={date}&to={date}` - Workouts by date range
-- `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
-- `GET /v1/meals/range?from={date}&to={date}` - Meals data range
+### Steps
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/steps/daily/{date}` | Hourly breakdown |
+| GET | `/v1/steps/range` | Range with daily stats |
 
-See [Swagger UI](http://localhost:8080/swagger-ui.html) for detailed documentation.
+### Sleep
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/sleep/daily/{date}` | Sleep sessions for day |
+| GET | `/v1/sleep/range` | Range with daily stats |
+| POST | `/v1/sleep/import-image` | AI import from screenshot |
 
-## 📊 Supported Event Types
+### Workouts
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/workouts/{workoutId}` | Workout details |
+| GET | `/v1/workouts` | Workout list (date range) |
+| POST | `/v1/workouts/import-image` | AI import from screenshot |
 
-| Event Type | Description | Status |
-|------------|-------------|--------|
-| `StepsBucketedRecorded.v1` | Bucketed step counts (1-minute intervals) | ✅ Active |
-| `HeartRateSummaryRecorded.v1` | Heart rate statistics over a time window | ✅ Active |
-| `SleepSessionRecorded.v1` | Sleep session with optional stage breakdown | ✅ Active |
-| `ActiveCaloriesBurnedRecorded.v1` | Active calories burned in a time bucket | ✅ Active |
-| `ActiveMinutesRecorded.v1` | Active minutes in a time bucket | ✅ Active |
-| `DistanceBucketedRecorded.v1` | Distance traveled in bucketed intervals | ✅ Active |
-| `WalkingSessionRecorded.v1` | Walking session with steps, distance, calories | ✅ Active |
-| `WorkoutRecorded.v1` | Strength workout with exercises, sets, and reps | ✅ Active |
-| `MealRecorded.v1` | Meal with nutrition info and health rating | ✅ Active |
+### Exercise Catalog
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/workouts/exercises` | All 59 exercises |
+| GET | `/v1/workouts/exercises/muscles` | List of muscle groups |
+| GET | `/v1/workouts/exercises/muscle/{muscle}` | Exercises for muscle group |
+| GET | `/v1/exercises/{id}/statistics` | Progression statistics |
 
-## 🗄️ Database Schema
+### Routines
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/routines` | User's routine list |
+| GET | `/v1/routines/{id}` | Routine details |
+| POST | `/v1/routines` | Create routine |
+| PUT | `/v1/routines/{id}` | Update routine |
+| DELETE | `/v1/routines/{id}` | Delete routine |
 
-### Tables
+### Calories
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/calories/daily/{date}` | Hourly breakdown |
+| GET | `/v1/calories/range` | Range with daily stats |
 
-**`health_events`** - Append-only event storage
-- `id` (BIGSERIAL): Primary key
-- `event_id` (VARCHAR): Server-generated unique ID
-- `idempotency_key` (VARCHAR): Client-provided deduplication key (non-unique)
-- `event_type` (VARCHAR): Event type
-- `occurred_at` (TIMESTAMPTZ): Event occurrence time
-- `payload` (JSONB): Event-specific data
-- `device_id` (VARCHAR): Source device
-- `created_at` (TIMESTAMPTZ): Server ingestion time
+### Activity
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/activity/daily/{date}` | Hourly breakdown |
+| GET | `/v1/activity/range` | Range with daily stats |
 
-**`daily_summaries`** - Aggregated daily metrics
-- `id` (BIGSERIAL): Primary key
-- `date` (DATE): Summary date (unique)
-- `total_steps` (INTEGER): Total steps for the day
-- `total_active_calories` (DOUBLE): Total active calories burned
-- `total_distance_meters` (DOUBLE): Total distance in meters
-- `sleep_duration_minutes` (INTEGER): Total sleep duration
-- `activity_time_minutes` (INTEGER): Time spent active (calculated from steps)
-- `updated_at` (TIMESTAMPTZ): Last update time
+### Meals
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/meals/daily/{date}` | Meals for day |
+| GET | `/v1/meals/range` | Meals range |
+| POST | `/v1/meals` | Add meal |
+| PUT | `/v1/meals/{eventId}` | Edit meal |
+| DELETE | `/v1/meals/{eventId}` | Delete meal |
+| POST | `/v1/meals/import` | AI import (quick) |
+| POST | `/v1/meals/import/analyze` | AI draft creation |
+| PATCH | `/v1/meals/import/{draftId}` | Update draft |
+| POST | `/v1/meals/import/{draftId}/confirm` | Confirm draft |
 
-## 🔄 Health Data Synchronization
+### Google Fit (Legacy)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/google-fit/sync/day` | Historical sync (up to 5 years) |
 
-### Push Model (Health Connect)
-Health data is pushed directly from the mobile app via Health Connect:
-- Events submitted via `POST /v1/health-events`
-- Idempotent processing with automatic deduplication
-- Real-time projection updates
+### Admin
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/admin/reproject` | Rebuild projections |
 
-### Historical Google Fit Sync (Optional)
-For backfilling historical data from Google Fit:
+## Event Types
+
+| Event Type | Fields | Validation |
+|------------|--------|------------|
+| `StepsBucketedRecorded.v1` | bucketStart, bucketEnd, count | count ≥ 0 |
+| `HeartRateSummaryRecorded.v1` | bucketStart, bucketEnd, avg, min, max, samples | metrics ≥ 0 |
+| `SleepSessionRecorded.v1` | sleepStart, sleepEnd, totalMinutes, stages | minutes ≥ 0 |
+| `ActiveCaloriesBurnedRecorded.v1` | bucketStart, bucketEnd, energyKcal | kcal ≥ 0 |
+| `ActiveMinutesRecorded.v1` | bucketStart, bucketEnd, activeMinutes | minutes ≥ 0 |
+| `DistanceBucketedRecorded.v1` | bucketStart, bucketEnd, distanceMeters | meters ≥ 0 |
+| `WalkingSessionRecorded.v1` | sessionId, start, end, durationMinutes | duration ≥ 0 |
+| `WorkoutRecorded.v1` | workoutId, performedAt, exercises[] | exercises non-empty |
+| `MealRecorded.v1` | title, mealType, macros, healthRating | macros ≥ 0 |
+
+**Meal Types**: BREAKFAST, BRUNCH, LUNCH, DINNER, SNACK, DESSERT, DRINK
+
+**Health Ratings**: VERY_HEALTHY, HEALTHY, NEUTRAL, UNHEALTHY, VERY_UNHEALTHY
+
+## Database Schema
+
+### 35 Flyway Migrations (V1-V35)
+
+**Core Tables**:
+- `health_events` - Event log (JSONB payload, GIN index, version)
+- `daily_summaries` - Daily aggregates (JSONB, ai_summary_cache, device_id)
+- `conversations` - AI conversation history
+- `conversation_messages` - Messages in conversations
+
+**Projection Tables** (all with `version` for optimistic locking):
+- `steps_hourly_projections`, `steps_daily_projections`
+- `sleep_sessions_projections`, `sleep_daily_projections`
+- `workout_projections`, `workout_exercise_projections`, `workout_set_projections`
+- `calories_hourly_projections`, `calories_daily_projections`
+- `activity_hourly_projections`, `activity_daily_projections`
+- `meal_projections`, `meal_daily_projections`
+
+**Domain Tables**:
+- `exercises` - Catalog of 59 exercises
+- `exercise_name_mappings` - AI matching names → catalog IDs
+- `routines`, `routine_exercises` - Workout templates
+- `meal_import_drafts` - AI draft flow for meals
+
+## Configuration
+
+### Required
 ```bash
-curl -X POST "http://localhost:8080/v1/google-fit/sync/day?date=2025-01-15"
+export DB_URL=jdbc:postgresql://localhost:5432/health_assistant
+export DB_USER=postgres
+export DB_PASSWORD=postgres
+export HMAC_DEVICES_JSON='{"device-id":"base64-secret"}'
 ```
-- Sync specific day up to 5 years back
-- Idempotent - can be run multiple times
-- Automatic reprojection after sync completion
 
-### Activity Detection
-- Automatically calculates activity time from step patterns
-- Identifies walking sessions
-- Attributes steps to walks based on time overlap
+### Optional
+```bash
+export HMAC_TOLERANCE_SEC=600          # Timestamp tolerance (default: 600)
+export NONCE_CACHE_TTL_SEC=600         # Nonce cache TTL (default: 600)
+export GEMINI_API_KEY=your-key         # For AI Assistant
+export GEMINI_MODEL=gemini-3-flash-preview
+export GOOGLE_FIT_CLIENT_ID=...        # For historical sync
+export GOOGLE_FIT_CLIENT_SECRET=...
+export GOOGLE_FIT_REFRESH_TOKEN=...
+```
 
-## 🧪 Testing
+## Quick Start
+
+### Docker Compose (Recommended)
+```bash
+docker-compose up --build
+```
+
+### Local Development
+```bash
+# Start PostgreSQL
+docker run --name postgres-dev \
+  -e POSTGRES_DB=health_assistant \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -p 5432:5432 \
+  -d postgres:16-alpine
+
+# Run application
+./gradlew bootRun
+```
+
+### Endpoints
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- Health: http://localhost:8080/actuator/health
+- Metrics: http://localhost:8080/actuator/prometheus
+
+## Testing
 
 ```bash
-# Run all tests (main + integration)
+# All tests
 ./gradlew build
 
-# Run only integration tests
+# Integration tests only
 ./gradlew :integration-tests:test
 
-# View test reports
+# Specific test
+./gradlew :integration-tests:test --tests "*WorkoutSpec*"
+
+# Test report
 open integration-tests/build/reports/tests/test/index.html
 ```
 
-**Test Coverage**: 366 integration tests covering:
-- Event validation (Steps, Sleep, Workout, Meal, Heart Rate, Distance, Walking Session, Active Minutes, Active Calories)
-- Projections (Steps, Sleep, Workout, Calories, Activity, Meals)
-- Features (Daily Summaries, AI Assistant, Conversation History, Google Fit Sync)
-- Import (Workout Import, Meal Import, Sleep Import)
-- AI Evaluation (LLM-as-a-Judge hallucination tests)
-- Concurrency (Optimistic Locking)
+### 420 Integration Tests (49 Spec Files)
+- **Event Validation**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories
+- **Projections**: Steps, Sleep, Workout, Calories, Activity, Meals, ExerciseStatistics
+- **Features**: DailySummary, Assistant, ConversationHistory, GoogleFitSync, HmacAuthentication, BatchEventIngestion, Routines
+- **Import**: WorkoutImport, MealImport, SleepImport, MealImportDraft
+- **Security**: HmacAuthentication, EventSecurity, GlobalExceptionHandler
+- **Concurrency**: OptimisticLocking
+- **AI**: AiDailySummary, AiDailySummaryCache
 
-## 📈 Monitoring
+## Tech Stack
 
-**Health Check**:
-```bash
-curl http://localhost:8080/actuator/health
+| Category | Technology |
+|----------|------------|
+| Language | Java 21 (Virtual Threads) |
+| Framework | Spring Boot 3.3.5 |
+| AI | Spring AI 1.1.0 + Gemini 3 Flash |
+| Architecture | Spring Modulith 1.3.1 |
+| Database | PostgreSQL 16 (JSONB) |
+| Migrations | Flyway |
+| Build | Gradle 8.5+ (Kotlin DSL) |
+| Caching | Caffeine |
+| HTTP Client | OpenFeign |
+| Mapping | MapStruct |
+| Testing | Spock + Testcontainers + REST Assured |
+| Quality | SpotBugs + PMD + JaCoCo |
+| Container | Docker + Docker Compose |
+
+## HMAC Authentication
+
+All `/v1/*` endpoints require HMAC signature.
+
+### Headers
+```
+X-Device-Id: device-identifier
+X-Timestamp: 2026-01-07T12:00:00Z
+X-Nonce: random-unique-string
+X-Signature: hmac-sha256-signature
 ```
 
-**Prometheus Metrics**:
+### Signature Calculation
+```
+canonical = METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + DEVICE_ID + "\n" + BODY
+signature = HMAC-SHA256(canonical, device_secret)
+```
+
+## Key Design Principles
+
+1. **Events as Source of Truth** - Immutable event log, regenerable projections
+2. **Idempotency** - Safe retry via idempotency_key
+3. **Eventual Consistency** - Projection failures don't block ingestion
+4. **Optimistic Locking** - @Version on all entities
+5. **Module Boundaries** - Package-private + public facades
+6. **Modern Java 21** - Records, Stream API, Pattern Matching, Virtual Threads
+7. **Security First** - HMAC, log sanitization, prompt injection protection
+
+## Monitoring
+
 ```bash
+# Health check
+curl http://localhost:8080/actuator/health
+
+# Prometheus metrics
 curl http://localhost:8080/actuator/prometheus
 ```
 
 **Key Metrics**:
-- `http_server_requests_seconds`: Request duration
-- `jvm_memory_used_bytes`: Memory usage
-- `jdbc_connections_active`: Active DB connections
-
-## 🔒 Security
-
-1. **HMAC Authentication**:
-   - HMAC-SHA256 signing with device secrets
-   - Timestamp validation (prevents time-based attacks)
-   - Nonce tracking (prevents replay attacks)
-
-2. **Input Validation**:
-   - Bean Validation (@Valid annotations)
-   - Type-specific payload validation
-   - Batch size limits
-
-3. **Database Security**:
-   - Prepared statements (SQL injection prevention)
-   - Connection pooling with HikariCP
-
-## 🚧 Recent Updates
-
-- ✅ **Sleep Import Year Parameter** - Optional year parameter for AI sleep import to handle screenshots without year
-- ✅ **Extended Google Fit Sync** - Sync up to 5 years of historical data (previously 1 year)
-- ✅ **Optimistic Locking** - @Version-based concurrency control for all projections with automatic retry
-- ✅ **Comprehensive Test Coverage** - 366 integration tests covering all 9 event types with validation
-- ✅ **Conversation History** - Multi-turn AI conversations with context retention
-- ✅ **AI Health Assistant** - Natural language chat interface with Gemini 2.0 Flash
-- ✅ **Smart Date Recognition** - Automatic interpretation of "dzisiaj", "ostatni tydzień", etc.
-- ✅ **Real-time SSE Streaming** - Word-by-word AI responses via Server-Sent Events
-- ✅ **Meal Tracking** - MealRecorded events with nutrition and health ratings
-- ✅ **Workout Projections** - Pre-calculated workout metrics and volumes
-- ✅ Walking session tracking with step attribution
-- ✅ Activity time calculation from step patterns
-
-## 📝 License
-
-Copyright © 2026. All rights reserved.
+- `http_server_requests_seconds` - Request latency
+- `jvm_memory_used_bytes` - Memory usage
+- `jdbc_connections_active` - DB connections
+- `cache_gets_total` - Cache hits/misses
 
 ---
 
-**Built with ❤️ using Spring Boot 3.3 and Java 21**
+**Built with Java 21 + Spring Boot 3.3 + Spring AI**
+
+Copyright 2026. All rights reserved.
