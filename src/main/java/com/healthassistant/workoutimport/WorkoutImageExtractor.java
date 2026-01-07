@@ -17,8 +17,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.StreamSupport;
 
 @Component
 @RequiredArgsConstructor
@@ -145,6 +147,10 @@ class WorkoutImageExtractor {
 
             boolean isWorkoutScreenshot = root.path("isWorkoutScreenshot").asBoolean(false);
             double confidence = root.path("confidence").asDouble(0.0);
+            if (confidence < 0.0 || confidence > 1.0) {
+                log.warn("AI returned invalid confidence: {}, clamping to [0.0, 1.0]", confidence);
+                confidence = Math.max(0.0, Math.min(1.0, confidence));
+            }
 
             if (!isWorkoutScreenshot) {
                 String error = root.path("validationError").asText("Not a workout screenshot");
@@ -158,9 +164,9 @@ class WorkoutImageExtractor {
             JsonNode exercisesNode = root.path("exercises");
 
             if (exercisesNode.isArray()) {
-                for (JsonNode exerciseNode : exercisesNode) {
-                    exercises.add(parseExercise(exerciseNode));
-                }
+                StreamSupport.stream(exercisesNode.spliterator(), false)
+                    .map(this::parseExercise)
+                    .forEach(exercises::add);
             }
 
             if (exercises.isEmpty()) {
@@ -188,16 +194,33 @@ class WorkoutImageExtractor {
         }
 
         try {
-            return Instant.parse(performedAtStr);
+            Instant parsed = Instant.parse(performedAtStr);
+            return validateAndClampDate(parsed);
         } catch (DateTimeParseException e) {
             try {
                 LocalDateTime localDateTime = LocalDateTime.parse(performedAtStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-                return localDateTime.atZone(POLAND_ZONE).toInstant();
+                Instant parsed = localDateTime.atZone(POLAND_ZONE).toInstant();
+                return validateAndClampDate(parsed);
             } catch (DateTimeParseException e2) {
                 log.warn("Could not parse performedAt: {}, using current time", performedAtStr);
                 return Instant.now();
             }
         }
+    }
+
+    private Instant validateAndClampDate(Instant date) {
+        Instant now = Instant.now();
+        Instant tenYearsAgo = now.minus(3650, ChronoUnit.DAYS);
+
+        if (date.isAfter(now)) {
+            log.warn("AI returned future performedAt: {}, using current time", date);
+            return now;
+        }
+        if (date.isBefore(tenYearsAgo)) {
+            log.warn("AI returned performedAt more than 10 years ago: {}, using current time", date);
+            return now;
+        }
+        return date;
     }
 
     private ExtractedWorkoutData.Exercise parseExercise(JsonNode node) {
@@ -208,21 +231,21 @@ class WorkoutImageExtractor {
         String suggestedId = parseNullableString(node.path("suggestedId"));
         String suggestedPrimaryMuscle = parseNullableString(node.path("suggestedPrimaryMuscle"));
         String suggestedDescription = parseNullableString(node.path("suggestedDescription"));
-        String muscleGroup = parseMuscleGroup(node.path("muscleGroup"));
+        String muscleGroup = parseNullableString(node.path("muscleGroup"));
         int order = node.path("orderInWorkout").asInt(1);
 
         List<ExtractedWorkoutData.ExerciseSet> sets = new ArrayList<>();
         JsonNode setsNode = node.path("sets");
 
         if (setsNode.isArray()) {
-            for (JsonNode setNode : setsNode) {
-                sets.add(new ExtractedWorkoutData.ExerciseSet(
+            StreamSupport.stream(setsNode.spliterator(), false)
+                .map(setNode -> new ExtractedWorkoutData.ExerciseSet(
                     setNode.path("setNumber").asInt(1),
                     setNode.path("weightKg").asDouble(0.0),
                     setNode.path("reps").asInt(1),
                     setNode.path("isWarmup").asBoolean(false)
-                ));
-            }
+                ))
+                .forEach(sets::add);
         }
 
         return new ExtractedWorkoutData.Exercise(
@@ -237,17 +260,6 @@ class WorkoutImageExtractor {
             return null;
         }
         String value = node.asText();
-        if (value.isEmpty() || "null".equals(value)) {
-            return null;
-        }
-        return value;
-    }
-
-    private String parseMuscleGroup(JsonNode muscleGroupNode) {
-        if (muscleGroupNode.isMissingNode() || muscleGroupNode.isNull()) {
-            return null;
-        }
-        String value = muscleGroupNode.asText();
         if (value.isEmpty() || "null".equals(value)) {
             return null;
         }

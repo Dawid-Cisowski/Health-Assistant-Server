@@ -40,7 +40,7 @@ class WorkoutImportController {
         @RequestAttribute("deviceId") String deviceId
     ) {
         log.info("Workout image import request from device {}, file: {}, size: {} bytes",
-            deviceId, image.getOriginalFilename(), image.getSize());
+            maskDeviceId(deviceId), sanitizeForLog(image.getOriginalFilename()), image.getSize());
 
         try {
             WorkoutImportResponse response = workoutImportFacade.importFromImage(
@@ -48,8 +48,39 @@ class WorkoutImportController {
             );
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid image from device {}: {}", deviceId, e.getMessage());
-            return ResponseEntity.badRequest().body(WorkoutImportResponse.failure(e.getMessage()));
+            log.warn("Invalid image from device {}: {}", maskDeviceId(deviceId), sanitizeForLog(e.getMessage()));
+            String safeMessage = mapToSafeErrorMessage(e.getMessage());
+            return ResponseEntity.badRequest().body(WorkoutImportResponse.failure(safeMessage));
         }
+    }
+
+    private String mapToSafeErrorMessage(String errorMessage) {
+        if (errorMessage == null) {
+            return "Invalid image file";
+        }
+        if (errorMessage.contains("empty")) {
+            return "Image file is empty";
+        }
+        if (errorMessage.contains("size")) {
+            return "Image file exceeds maximum size";
+        }
+        if (errorMessage.contains("type")) {
+            return "Invalid image type";
+        }
+        return "Invalid image file";
+    }
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replaceAll("[\\n\\r\\t]", "_");
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
 }

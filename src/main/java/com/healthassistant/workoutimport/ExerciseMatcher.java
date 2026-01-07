@@ -17,6 +17,9 @@ import java.util.stream.Collectors;
 @Slf4j
 class ExerciseMatcher {
 
+    private static final int MAX_EXERCISE_ID_LENGTH = 100;
+    private static final String VALID_ID_PATTERN = "^[a-zA-Z0-9_-]+$";
+
     private final WorkoutFacade workoutFacade;
 
     String buildCatalogPromptSection() {
@@ -25,30 +28,53 @@ class ExerciseMatcher {
         Map<String, List<ExerciseDefinition>> byMuscle = exercises.stream()
                 .collect(Collectors.groupingBy(ExerciseDefinition::primaryMuscle));
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("EXERCISE CATALOG (match exercises to these IDs):\n");
+        return byMuscle.entrySet().stream()
+                .map(entry -> formatMuscleGroupSection(entry.getKey(), entry.getValue()))
+                .collect(Collectors.joining("", "EXERCISE CATALOG (match exercises to these IDs):\n", ""));
+    }
 
-        byMuscle.forEach((muscle, muscleExercises) -> {
-            sb.append("\n").append(muscle).append(":\n");
-            muscleExercises.forEach(ex ->
-                    sb.append(String.format("  - id: \"%s\", name: \"%s\"\n", ex.id(), ex.name()))
-            );
-        });
+    private String formatMuscleGroupSection(String muscle, List<ExerciseDefinition> exercises) {
+        String exerciseLines = exercises.stream()
+                .map(ex -> String.format("  - id: \"%s\", name: \"%s\"",
+                        sanitizeForPrompt(ex.id()), sanitizeForPrompt(ex.name())))
+                .collect(Collectors.joining("\n"));
+        return "\n" + sanitizeForPrompt(muscle) + ":\n" + exerciseLines + "\n";
+    }
 
-        return sb.toString();
+    private String sanitizeForPrompt(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replaceAll("[\"'\\n\\r\\t]", " ").replaceAll("\\s+", " ").trim();
     }
 
     String resolveExerciseId(ExtractedWorkoutData.Exercise extracted) {
-        if (extracted.exerciseId() != null && !extracted.isNewExercise()) {
-            if (workoutFacade.exerciseExists(extracted.exerciseId())) {
-                log.debug("Matched exercise '{}' to catalog ID: {}", extracted.name(), extracted.exerciseId());
-                return extracted.exerciseId();
+        String sanitizedId = sanitizeExerciseId(extracted.exerciseId());
+        if (sanitizedId != null && !extracted.isNewExercise()) {
+            if (workoutFacade.exerciseExists(sanitizedId)) {
+                log.debug("Matched exercise '{}' to catalog ID: {}", extracted.name(), sanitizedId);
+                return sanitizedId;
             }
             log.warn("AI returned non-existent exerciseId '{}' for exercise '{}'",
-                    extracted.exerciseId(), extracted.name());
+                    sanitizedId, extracted.name());
         }
 
         return createNewExercise(extracted);
+    }
+
+    private String sanitizeExerciseId(String exerciseId) {
+        if (exerciseId == null) {
+            return null;
+        }
+        if (exerciseId.length() > MAX_EXERCISE_ID_LENGTH) {
+            log.warn("AI returned exerciseId exceeding max length: {}", exerciseId.length());
+            return null;
+        }
+        if (!exerciseId.matches(VALID_ID_PATTERN)) {
+            log.warn("AI returned exerciseId with invalid characters: {}", exerciseId);
+            return null;
+        }
+        return exerciseId;
     }
 
     private String createNewExercise(ExtractedWorkoutData.Exercise extracted) {

@@ -1,7 +1,7 @@
 package com.healthassistant.workout;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -13,8 +13,7 @@ import java.util.List;
 @Entity
 @Table(name = "exercises")
 @Getter
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class ExerciseDefinitionEntity {
 
     @Id
@@ -37,7 +36,23 @@ class ExerciseDefinitionEntity {
     private Instant createdAt;
 
     @Column(name = "is_auto_created", nullable = false)
-    private Boolean isAutoCreated = false;
+    private Boolean isAutoCreated;
+
+    @Version
+    private Long version;
+
+    private ExerciseDefinitionEntity(
+            String id, String name, String description,
+            String primaryMuscle, List<String> muscles,
+            Instant createdAt, Boolean isAutoCreated) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.primaryMuscle = primaryMuscle;
+        this.muscles = muscles;
+        this.createdAt = createdAt;
+        this.isAutoCreated = isAutoCreated;
+    }
 
     static ExerciseDefinitionEntity createAutoCreated(
             String id, String name, String description,

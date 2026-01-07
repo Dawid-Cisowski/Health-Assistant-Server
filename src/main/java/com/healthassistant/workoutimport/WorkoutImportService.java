@@ -33,13 +33,27 @@ class WorkoutImportService implements WorkoutImportFacade {
     private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
         "image/*", "application/octet-stream"
     );
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final WorkoutImageExtractor imageExtractor;
     private final WorkoutEventMapper eventMapper;
     private final HealthEventsFacade healthEventsFacade;
     private final WorkoutFacade workoutFacade;
+
+    private String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replaceAll("[\\n\\r\\t]", "_");
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
 
     @Override
     @Transactional
@@ -51,7 +65,7 @@ class WorkoutImportService implements WorkoutImportFacade {
 
             if (!extractedData.isValid()) {
                 log.warn("Workout extraction invalid for device {}: {}",
-                    deviceId.value(), extractedData.validationError());
+                    maskDeviceId(deviceId.value()), sanitizeForLog(extractedData.validationError()));
                 return WorkoutImportResponse.failure(
                     "Could not extract valid workout data: " + extractedData.validationError()
                 );
@@ -73,7 +87,7 @@ class WorkoutImportService implements WorkoutImportFacade {
                 String errorMessage = eventResult.error() != null
                     ? eventResult.error().message()
                     : "Validation failed";
-                log.warn("Workout event validation failed: {}", errorMessage);
+                log.warn("Workout event validation failed: {}", sanitizeForLog(errorMessage));
                 return WorkoutImportResponse.failure("Validation error: " + errorMessage);
             }
 
@@ -90,7 +104,7 @@ class WorkoutImportService implements WorkoutImportFacade {
                 .orElse(null);
 
             log.info("Successfully imported workout {} for device {}: {} exercises, {} sets, status={}",
-                workoutId, deviceId.value(), exerciseCount, totalSets, eventResult.status());
+                sanitizeForLog(workoutId), maskDeviceId(deviceId.value()), exerciseCount, totalSets, eventResult.status());
 
             return WorkoutImportResponse.success(
                 workoutId,
@@ -104,7 +118,7 @@ class WorkoutImportService implements WorkoutImportFacade {
             );
 
         } catch (WorkoutExtractionException e) {
-            log.warn("Workout extraction failed for device {}: {}", deviceId.value(), e.getMessage());
+            log.warn("Workout extraction failed for device {}: {}", maskDeviceId(deviceId.value()), sanitizeForLog(e.getMessage()));
             return WorkoutImportResponse.failure(e.getMessage());
         }
     }
@@ -137,9 +151,9 @@ class WorkoutImportService implements WorkoutImportFacade {
     }
 
     private String detectImageType(MultipartFile image) {
-        try {
+        try (var inputStream = image.getInputStream()) {
             byte[] header = new byte[12];
-            int read = image.getInputStream().read(header);
+            int read = inputStream.read(header);
             if (read < 4) {
                 return null;
             }
