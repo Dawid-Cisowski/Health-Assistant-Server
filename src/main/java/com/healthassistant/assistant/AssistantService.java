@@ -104,10 +104,14 @@ class AssistantService implements AssistantFacade {
             """.formatted(currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
     }
 
+    private static final int MAX_MESSAGE_LENGTH = 4000;
+
     @Override
     public Flux<AssistantEvent> streamChat(ChatRequest request, String deviceId) {
         log.info("Processing streaming chat request for device {}: {} (conversationId: {})",
-                deviceId, request.message(), request.conversationId());
+                maskDeviceId(deviceId), sanitizeForLog(request.message()), request.conversationId());
+
+        var validatedMessage = validateUserMessage(request.message());
 
         return Mono.fromCallable(() -> {
                     AssistantContext.setDeviceId(deviceId);
@@ -116,8 +120,8 @@ class AssistantService implements AssistantFacade {
                         var history = conversationService.loadConversationHistory(conversationId);
                         var currentDate = LocalDate.now(POLAND_ZONE);
                         var systemInstruction = buildSystemInstruction(currentDate);
-                        var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
-                        conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
+                        var messages = conversationService.buildMessageList(history, systemInstruction, validatedMessage);
+                        conversationService.saveMessage(conversationId, MessageRole.USER, validatedMessage);
                         return new ConversationContext(conversationId, messages);
                     } catch (Exception e) {
                         AssistantContext.clear();
@@ -148,13 +152,13 @@ class AssistantService implements AssistantFacade {
                                     }
                                 } finally {
                                     AssistantContext.clear();
-                                    log.debug("Cleared AssistantContext for device {}", deviceId);
+                                    log.debug("Cleared AssistantContext for device {}", maskDeviceId(deviceId));
                                 }
                             }));
                 })
                 .doOnCancel(() -> {
                     AssistantContext.clear();
-                    log.debug("Cleared AssistantContext on cancel for device {}", deviceId);
+                    log.debug("Cleared AssistantContext on cancel for device {}", maskDeviceId(deviceId));
                 });
     }
 
@@ -178,5 +182,30 @@ class AssistantService implements AssistantFacade {
     @Override
     public void deleteAllConversations() {
         conversationService.deleteAllConversations();
+    }
+
+    private String validateUserMessage(String message) {
+        if (message == null || message.isBlank()) {
+            throw new IllegalArgumentException("Message cannot be empty");
+        }
+        if (message.length() > MAX_MESSAGE_LENGTH) {
+            throw new IllegalArgumentException("Message too long");
+        }
+        return message;
+    }
+
+    private static String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        var sanitized = input.replaceAll("[\\r\\n\\t]", "_");
+        return sanitized.substring(0, Math.min(sanitized.length(), 200));
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
 }

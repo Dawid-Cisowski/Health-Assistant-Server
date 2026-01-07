@@ -12,8 +12,7 @@ import java.util.Objects;
 @Entity
 @Table(name = "calories_daily_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class CaloriesDailyProjectionJpaEntity {

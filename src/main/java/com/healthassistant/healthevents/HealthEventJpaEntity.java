@@ -1,11 +1,11 @@
 package com.healthassistant.healthevents;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -21,8 +21,7 @@ import java.util.Map;
         @Index(name = "idx_device_occurred", columnList = "device_id,occurred_at")
 })
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class HealthEventJpaEntity {
@@ -70,5 +69,14 @@ class HealthEventJpaEntity {
         if (createdAt == null) {
             createdAt = Instant.now();
         }
+    }
+
+    void markAsDeleted(Instant deletedAt, String deletedByEventId) {
+        this.deletedAt = deletedAt;
+        this.deletedByEventId = deletedByEventId;
+    }
+
+    void markAsSuperseded(String supersededByEventId) {
+        this.supersededByEventId = supersededByEventId;
     }
 }

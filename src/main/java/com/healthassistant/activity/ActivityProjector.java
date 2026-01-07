@@ -104,15 +104,14 @@ class ActivityProjector {
                         .date(date)
                         .build());
 
-        daily.setTotalActiveMinutes(totalMinutes);
-        daily.setFirstActivityTime(firstActivityTime);
-        daily.setLastActivityTime(lastActivityTime);
-        daily.setActiveHoursCount(activeHoursCount);
-
-        if (mostActiveHourData != null) {
-            daily.setMostActiveHour(mostActiveHourData.getHour());
-            daily.setMostActiveHourMinutes(mostActiveHourData.getActiveMinutes());
-        }
+        daily.updateDailySummary(
+            totalMinutes,
+            firstActivityTime,
+            lastActivityTime,
+            activeHoursCount,
+            mostActiveHourData != null ? mostActiveHourData.getHour() : null,
+            mostActiveHourData != null ? mostActiveHourData.getActiveMinutes() : null
+        );
 
         dailyRepository.save(daily);
     }

@@ -31,7 +31,7 @@ class GenerateDailySummaryCommandHandler {
 
         DailySummaryJpaEntity entity = jpaRepository.findByDeviceIdAndDate(command.deviceId(), summary.date())
                 .map(existing -> {
-                    existing.setSummary(summaryMap);
+                    existing.updateSummary(summaryMap);
                     return existing;
                 })
                 .orElseGet(() -> DailySummaryJpaEntity.builder()

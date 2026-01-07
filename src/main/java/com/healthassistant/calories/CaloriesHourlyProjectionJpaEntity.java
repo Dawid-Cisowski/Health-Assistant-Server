@@ -9,8 +9,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "calories_hourly_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class CaloriesHourlyProjectionJpaEntity {

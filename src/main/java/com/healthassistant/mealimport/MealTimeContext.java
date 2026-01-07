@@ -45,13 +45,9 @@ record MealTimeContext(
         if (todaysMeals.isEmpty()) {
             return "No meals today";
         }
-        StringBuilder sb = new StringBuilder();
-        for (TodaysMeal meal : todaysMeals) {
-            sb.append("- ").append(meal.mealType())
-              .append(" at ").append(meal.formattedTime())
-              .append(": ").append(meal.title())
-              .append("\n");
-        }
-        return sb.toString().trim();
+        return todaysMeals.stream()
+            .map(meal -> "- " + meal.mealType() + " at " + meal.formattedTime() + ": " + meal.title())
+            .reduce((a, b) -> a + "\n" + b)
+            .orElse("");
     }
 }

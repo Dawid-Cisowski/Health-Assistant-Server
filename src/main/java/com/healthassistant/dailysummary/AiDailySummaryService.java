@@ -114,8 +114,7 @@ class AiDailySummaryService {
     }
 
     private void cacheAiSummary(DailySummaryJpaEntity entity, String aiSummary) {
-        entity.setAiSummary(aiSummary);
-        entity.setAiSummaryGeneratedAt(Instant.now());
+        entity.cacheAiSummary(aiSummary);
         repository.save(entity);
         log.info("Cached AI summary for date: {}", entity.getDate());
     }

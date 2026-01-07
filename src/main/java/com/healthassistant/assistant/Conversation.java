@@ -25,6 +25,9 @@ class Conversation {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Version
+    private Long version;
+
     @PrePersist
     void onCreate() {
         if (id == null) {

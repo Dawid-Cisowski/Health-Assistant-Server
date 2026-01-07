@@ -9,8 +9,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "activity_daily_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class ActivityDailyProjectionJpaEntity {
@@ -67,5 +66,21 @@ class ActivityDailyProjectionJpaEntity {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    void updateDailySummary(
+        int totalActiveMinutes,
+        Instant firstActivityTime,
+        Instant lastActivityTime,
+        int activeHoursCount,
+        Integer mostActiveHour,
+        Integer mostActiveHourMinutes
+    ) {
+        this.totalActiveMinutes = totalActiveMinutes;
+        this.firstActivityTime = firstActivityTime;
+        this.lastActivityTime = lastActivityTime;
+        this.activeHoursCount = activeHoursCount;
+        this.mostActiveHour = mostActiveHour;
+        this.mostActiveHourMinutes = mostActiveHourMinutes;
     }
 }

@@ -589,9 +589,9 @@ class MealContentExtractor {
 
         if (answers != null && !answers.isEmpty()) {
             prompt.append("ODPOWIEDZI NA PYTANIA:\n");
-            for (QuestionAnswer answer : answers) {
-                prompt.append("- ").append(answer.questionId()).append(": ").append(answer.answer()).append("\n");
-            }
+            answers.forEach(answer ->
+                prompt.append("- ").append(answer.questionId()).append(": ").append(answer.answer()).append("\n")
+            );
             prompt.append("\n");
         }
 

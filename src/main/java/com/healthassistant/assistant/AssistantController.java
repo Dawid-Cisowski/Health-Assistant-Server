@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 class AssistantController {
 
     private static final long RATE_LIMIT_WINDOW_MS = 60_000L;
+    private static final int MAX_RATE_LIMIT_BUCKETS = 10_000;
 
     private final AssistantFacade assistantFacade;
     private final ObjectMapper objectMapper;
@@ -64,17 +65,17 @@ class AssistantController {
             @Valid @RequestBody ChatRequest request,
             @RequestAttribute("deviceId") String deviceId
     ) {
-        log.info("SSE chat request from device {}: {}", deviceId, request.message());
+        log.info("SSE chat request from device {}: {}", maskDeviceId(deviceId), sanitizeForLog(request.message()));
 
         if (!tryAcquireRateLimit(deviceId)) {
-            log.warn("Rate limit exceeded for device {}", deviceId);
+            log.warn("Rate limit exceeded for device {}", maskDeviceId(deviceId));
             return createRateLimitExceededResponse();
         }
 
         return assistantFacade.streamChat(request, deviceId)
                 .map(this::serializeToSseEvent)
-                .doOnComplete(() -> log.info("SSE stream completed for device {}", deviceId))
-                .doOnError(error -> log.error("SSE stream failed for device {}", deviceId, error));
+                .doOnComplete(() -> log.info("SSE stream completed for device {}", maskDeviceId(deviceId)))
+                .doOnError(error -> log.error("SSE stream failed for device {}", maskDeviceId(deviceId), error));
     }
 
     private ServerSentEvent<String> serializeToSseEvent(AssistantEvent event) {
@@ -114,6 +115,8 @@ class AssistantController {
             return true;
         }
 
+        cleanupExpiredBucketsIfNeeded();
+
         var now = Instant.now().toEpochMilli();
         var bucket = rateLimitBuckets.compute(deviceId, (key, existing) -> {
             if (existing == null || now - existing.windowStart > RATE_LIMIT_WINDOW_MS) {
@@ -124,6 +127,31 @@ class AssistantController {
         });
 
         return bucket.requestCount.get() <= maxRequestsPerMinute;
+    }
+
+    private void cleanupExpiredBucketsIfNeeded() {
+        if (rateLimitBuckets.size() > MAX_RATE_LIMIT_BUCKETS) {
+            var now = Instant.now().toEpochMilli();
+            rateLimitBuckets.entrySet().removeIf(entry ->
+                now - entry.getValue().windowStart > RATE_LIMIT_WINDOW_MS
+            );
+            log.debug("Cleaned up rate limit buckets, remaining: {}", rateLimitBuckets.size());
+        }
+    }
+
+    private static String sanitizeForLog(String input) {
+        if (input == null) {
+            return "null";
+        }
+        var sanitized = input.replaceAll("[\\r\\n\\t]", "_");
+        return sanitized.substring(0, Math.min(sanitized.length(), 200));
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
 
     private record RateLimitBucket(long windowStart, AtomicInteger requestCount) {}

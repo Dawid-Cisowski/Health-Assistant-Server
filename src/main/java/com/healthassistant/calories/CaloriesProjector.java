@@ -21,11 +21,13 @@ class CaloriesProjector {
     private final CaloriesHourlyProjectionJpaRepository hourlyRepository;
     private final CaloriesBucketFactory caloriesBucketFactory;
 
+    @Transactional
     public void projectCalories(StoredEventData eventData) {
         caloriesBucketFactory.createFromEvent(eventData)
                 .ifPresent(this::saveProjection);
     }
 
+    @Transactional
     public void projectCorrectedCalories(String deviceId, Map<String, Object> payload, Instant occurredAt) {
         caloriesBucketFactory.createFromCorrectionPayload(deviceId, payload)
                 .ifPresent(this::saveProjection);

@@ -22,14 +22,14 @@ class WorkoutEventsListener {
         log.info("Workout listener received WorkoutEventsStoredEvent with {} events for {} dates",
                 event.events().size(), event.affectedDates().size());
 
-        for (StoredEventData eventData : event.events()) {
+        event.events().forEach(eventData -> {
             try {
                 log.debug("Processing WorkoutRecorded event: {}", eventData.eventId().value());
                 workoutProjector.projectWorkout(eventData);
             } catch (Exception e) {
                 log.error("Failed to project workout for event: {}", eventData.eventId().value(), e);
             }
-        }
+        });
 
         log.info("Workout listener completed processing {} events", event.events().size());
     }

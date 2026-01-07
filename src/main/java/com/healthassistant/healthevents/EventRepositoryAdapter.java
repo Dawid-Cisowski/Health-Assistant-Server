@@ -77,8 +77,7 @@ class EventRepositoryAdapter implements EventRepository {
     @Transactional
     public Optional<CompensationTargetInfo> markAsDeleted(String targetEventId, String deletedByEventId, Instant deletedAt, String requestingDeviceId) {
         return jpaRepository.findByEventIdAndDeviceId(targetEventId, requestingDeviceId).map(entity -> {
-            entity.setDeletedAt(deletedAt);
-            entity.setDeletedByEventId(deletedByEventId);
+            entity.markAsDeleted(deletedAt, deletedByEventId);
             jpaRepository.save(entity);
             log.warn("AUDIT: Marked event {} as deleted by {} for device {}", targetEventId, deletedByEventId, requestingDeviceId);
             return new CompensationTargetInfo(
@@ -94,7 +93,7 @@ class EventRepositoryAdapter implements EventRepository {
     @Transactional
     public Optional<CompensationTargetInfo> markAsSuperseded(String targetEventId, String supersededByEventId, String requestingDeviceId) {
         return jpaRepository.findByEventIdAndDeviceId(targetEventId, requestingDeviceId).map(entity -> {
-            entity.setSupersededByEventId(supersededByEventId);
+            entity.markAsSuperseded(supersededByEventId);
             jpaRepository.save(entity);
             log.warn("AUDIT: Marked event {} as superseded by {} for device {}", targetEventId, supersededByEventId, requestingDeviceId);
             return new CompensationTargetInfo(

@@ -19,8 +19,7 @@ import java.util.Map;
         }
 )
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class DailySummaryJpaEntity {
@@ -67,5 +66,14 @@ class DailySummaryJpaEntity {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    void updateSummary(Map<String, Object> summary) {
+        this.summary = summary;
+    }
+
+    void cacheAiSummary(String aiSummary) {
+        this.aiSummary = aiSummary;
+        this.aiSummaryGeneratedAt = Instant.now();
     }
 }
