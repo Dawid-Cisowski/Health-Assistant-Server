@@ -31,7 +31,7 @@ class SleepProjector {
             doSaveProjection(session);
         } catch (ObjectOptimisticLockingFailureException e) {
             log.warn("Version conflict for sleep session {}/{}, retrying once",
-                    session.deviceId(), session.date());
+                    maskDeviceId(session.deviceId()), session.date());
             doSaveProjection(session);
         }
     }
@@ -86,7 +86,7 @@ class SleepProjector {
             dailyRepository.findByDeviceIdAndDate(deviceId, date)
                     .ifPresent(daily -> {
                         dailyRepository.delete(daily);
-                        log.debug("Deleted empty daily sleep projection for {}/{}", deviceId, date);
+                        log.debug("Deleted empty daily sleep projection for {}/{}", maskDeviceId(deviceId), date);
                     });
             return;
         }
@@ -152,19 +152,28 @@ class SleepProjector {
                         .date(date)
                         .build());
 
-        daily.setTotalSleepMinutes(totalSleepMinutes);
-        daily.setSleepCount(sleepCount);
-        daily.setFirstSleepStart(firstSleepStart);
-        daily.setLastSleepEnd(lastSleepEnd);
-        daily.setLongestSessionMinutes(longestSessionMinutes);
-        daily.setShortestSessionMinutes(shortestSessionMinutes);
-        daily.setAverageSessionMinutes(averageSessionMinutes);
-        daily.setTotalLightSleepMinutes(totalLightSleep);
-        daily.setTotalDeepSleepMinutes(totalDeepSleep);
-        daily.setTotalRemSleepMinutes(totalRemSleep);
-        daily.setTotalAwakeMinutes(totalAwake);
-        daily.setAverageSleepScore(averageSleepScore);
+        daily.updateDailyStats(
+                totalSleepMinutes,
+                sleepCount,
+                firstSleepStart,
+                lastSleepEnd,
+                longestSessionMinutes,
+                shortestSessionMinutes,
+                averageSessionMinutes,
+                totalLightSleep,
+                totalDeepSleep,
+                totalRemSleep,
+                totalAwake,
+                averageSleepScore
+        );
 
         dailyRepository.save(daily);
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
 }

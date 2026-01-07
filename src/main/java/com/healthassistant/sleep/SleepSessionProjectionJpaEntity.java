@@ -9,8 +9,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "sleep_sessions_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class SleepSessionProjectionJpaEntity {

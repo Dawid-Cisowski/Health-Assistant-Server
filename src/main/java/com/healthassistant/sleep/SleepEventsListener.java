@@ -22,14 +22,14 @@ class SleepEventsListener {
         log.info("Sleep listener received SleepEventsStoredEvent with {} events for {} dates",
                 event.events().size(), event.affectedDates().size());
 
-        for (StoredEventData eventData : event.events()) {
+        event.events().forEach(eventData -> {
             try {
                 log.debug("Processing SleepSessionRecorded event: {}", eventData.eventId().value());
                 sleepProjector.projectSleep(eventData);
             } catch (Exception e) {
                 log.error("Failed to project sleep for event: {}", eventData.eventId().value(), e);
             }
-        }
+        });
 
         log.info("Sleep listener completed processing {} events", event.events().size());
     }

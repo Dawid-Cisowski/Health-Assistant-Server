@@ -11,11 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -73,25 +75,12 @@ class SleepService implements SleepFacade {
             dailyRepository.findByDeviceIdAndDateBetweenOrderByDateAsc(deviceId, startDate, endDate);
 
         Map<LocalDate, SleepDailyProjectionJpaEntity> dataByDate = dailyData.stream()
-            .collect(Collectors.toMap(SleepDailyProjectionJpaEntity::getDate, d -> d));
+            .collect(Collectors.toMap(SleepDailyProjectionJpaEntity::getDate, Function.identity()));
 
-        List<SleepRangeSummaryResponse.DailyStats> dailyStats = new ArrayList<>();
-        LocalDate current = startDate;
-
-        while (!current.isAfter(endDate)) {
-            SleepDailyProjectionJpaEntity dayData = dataByDate.get(current);
-
-            dailyStats.add(new SleepRangeSummaryResponse.DailyStats(
-                current,
-                dayData != null ? dayData.getTotalSleepMinutes() : 0,
-                dayData != null ? dayData.getSleepCount() : 0,
-                dayData != null ? dayData.getTotalLightSleepMinutes() : 0,
-                dayData != null ? dayData.getTotalDeepSleepMinutes() : 0,
-                dayData != null ? dayData.getTotalRemSleepMinutes() : 0
-            ));
-
-            current = current.plusDays(1);
-        }
+        List<SleepRangeSummaryResponse.DailyStats> dailyStats = startDate
+            .datesUntil(endDate.plusDays(1))
+            .map(date -> createDailyStats(date, dataByDate.get(date)))
+            .toList();
 
         int totalSleepMinutes = dailyStats.stream()
             .mapToInt(SleepRangeSummaryResponse.DailyStats::totalSleepMinutes)
@@ -150,7 +139,7 @@ class SleepService implements SleepFacade {
     @Override
     @Transactional
     public void deleteProjectionsByDeviceId(String deviceId) {
-        log.debug("Deleting sleep projections for device: {}", deviceId);
+        log.debug("Deleting sleep projections for device: {}", maskDeviceId(deviceId));
         sessionRepository.deleteByDeviceId(deviceId);
         dailyRepository.deleteByDeviceId(deviceId);
     }
@@ -158,7 +147,7 @@ class SleepService implements SleepFacade {
     @Override
     @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
-        log.debug("Deleting sleep projections for device {} date {}", deviceId, date);
+        log.debug("Deleting sleep projections for device {} date {}", maskDeviceId(deviceId), date);
         sessionRepository.deleteByDeviceIdAndDate(deviceId, date);
         dailyRepository.deleteByDeviceIdAndDate(deviceId, date);
     }
@@ -166,48 +155,59 @@ class SleepService implements SleepFacade {
     @Override
     @Transactional
     public int rebuildProjections(String deviceId) {
-        log.info("Rebuilding sleep projections for device: {}", deviceId);
+        log.info("Rebuilding sleep projections for device: {}", maskDeviceId(deviceId));
 
-        int rebuiltCount = 0;
-        int page = 0;
-        int pageSize = 100;
-        List<StoredEventData> events;
+        var pageSize = 100;
+        var rebuiltCount = new AtomicInteger(0);
 
-        do {
-            events = healthEventsFacade.findEventsForReprojection(page, pageSize);
+        Stream.iterate(0, page -> page + 1)
+                .map(page -> healthEventsFacade.findEventsForReprojection(page, pageSize))
+                .takeWhile(events -> !events.isEmpty())
+                .flatMap(events -> events.stream()
+                        .filter(e -> SLEEP_SESSION_V1.equals(e.eventType().value()))
+                        .filter(e -> deviceId.equals(e.deviceId().value())))
+                .forEach(event -> {
+                    try {
+                        sleepProjector.projectSleep(event);
+                        rebuiltCount.incrementAndGet();
+                        log.debug("Rebuilt projection for sleep event: {}", event.eventId().value());
+                    } catch (Exception e) {
+                        log.error("Failed to rebuild projection for sleep event: {}", event.eventId().value(), e);
+                    }
+                });
 
-            List<StoredEventData> sleepEvents = events.stream()
-                    .filter(e -> SLEEP_SESSION_V1.equals(e.eventType().value()))
-                    .filter(e -> deviceId.equals(e.deviceId().value()))
-                    .toList();
-
-            for (StoredEventData event : sleepEvents) {
-                try {
-                    sleepProjector.projectSleep(event);
-                    rebuiltCount++;
-                    log.debug("Rebuilt projection for sleep event: {}", event.eventId().value());
-                } catch (Exception e) {
-                    log.error("Failed to rebuild projection for sleep event: {}", event.eventId().value(), e);
-                }
-            }
-
-            page++;
-        } while (events.size() == pageSize);
-
-        log.info("Rebuilt {} sleep projections for device: {}", rebuiltCount, deviceId);
-        return rebuiltCount;
+        log.info("Rebuilt {} sleep projections for device: {}", rebuiltCount.get(), maskDeviceId(deviceId));
+        return rebuiltCount.get();
     }
 
     @Override
     @Transactional
     public void projectEvents(List<StoredEventData> events) {
         log.debug("Projecting {} sleep events directly", events.size());
-        for (StoredEventData event : events) {
+        events.forEach(event -> {
             try {
                 sleepProjector.projectSleep(event);
             } catch (Exception e) {
                 log.error("Failed to project sleep event: {}", event.eventId().value(), e);
             }
+        });
+    }
+
+    private SleepRangeSummaryResponse.DailyStats createDailyStats(LocalDate date, SleepDailyProjectionJpaEntity dayData) {
+        return new SleepRangeSummaryResponse.DailyStats(
+                date,
+                dayData != null ? dayData.getTotalSleepMinutes() : 0,
+                dayData != null ? dayData.getSleepCount() : 0,
+                dayData != null ? dayData.getTotalLightSleepMinutes() : 0,
+                dayData != null ? dayData.getTotalDeepSleepMinutes() : 0,
+                dayData != null ? dayData.getTotalRemSleepMinutes() : 0
+        );
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) {
+            return "***";
         }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
 }

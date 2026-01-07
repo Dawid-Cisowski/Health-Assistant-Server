@@ -41,7 +41,7 @@ class SleepController {
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving daily sleep detail for device {} and date: {}", deviceId, date);
+        log.info("Retrieving daily sleep detail for device {} and date: {}", maskDeviceId(deviceId), date);
         SleepDailyDetailResponse detail = sleepFacade.getDailyDetail(deviceId, date);
 
         if (detail.totalSleepMinutes() == 0) {
@@ -72,7 +72,7 @@ class SleepController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving sleep range summary for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Retrieving sleep range summary for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
         SleepRangeSummaryResponse summary = sleepFacade.getRangeSummary(deviceId, startDate, endDate);
         return ResponseEntity.ok(summary);
     }
@@ -94,12 +94,19 @@ class SleepController {
             return ResponseEntity.badRequest().body(Map.of("error", "deviceId is required"));
         }
 
-        log.info("Admin request to rebuild sleep projections for device: {}", deviceId);
+        log.info("Admin request to rebuild sleep projections for device: {}", maskDeviceId(deviceId));
         int rebuiltCount = sleepFacade.rebuildProjections(deviceId);
 
         return ResponseEntity.ok(Map.of(
                 "deviceId", deviceId,
                 "rebuiltProjections", rebuiltCount
         ));
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() < 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
 }

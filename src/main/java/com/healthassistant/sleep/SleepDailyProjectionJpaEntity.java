@@ -9,8 +9,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "sleep_daily_projections")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 class SleepDailyProjectionJpaEntity {
@@ -89,5 +88,31 @@ class SleepDailyProjectionJpaEntity {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    void updateDailyStats(int totalSleepMinutes,
+                          int sleepCount,
+                          Instant firstSleepStart,
+                          Instant lastSleepEnd,
+                          Integer longestSessionMinutes,
+                          Integer shortestSessionMinutes,
+                          int averageSessionMinutes,
+                          int totalLightSleepMinutes,
+                          int totalDeepSleepMinutes,
+                          int totalRemSleepMinutes,
+                          int totalAwakeMinutes,
+                          Integer averageSleepScore) {
+        this.totalSleepMinutes = totalSleepMinutes;
+        this.sleepCount = sleepCount;
+        this.firstSleepStart = firstSleepStart;
+        this.lastSleepEnd = lastSleepEnd;
+        this.longestSessionMinutes = longestSessionMinutes;
+        this.shortestSessionMinutes = shortestSessionMinutes;
+        this.averageSessionMinutes = averageSessionMinutes;
+        this.totalLightSleepMinutes = totalLightSleepMinutes;
+        this.totalDeepSleepMinutes = totalDeepSleepMinutes;
+        this.totalRemSleepMinutes = totalRemSleepMinutes;
+        this.totalAwakeMinutes = totalAwakeMinutes;
+        this.averageSleepScore = averageSleepScore;
     }
 }
