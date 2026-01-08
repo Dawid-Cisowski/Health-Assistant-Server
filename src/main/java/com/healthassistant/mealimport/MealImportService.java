@@ -39,8 +39,8 @@ class MealImportService implements MealImportFacade {
     private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
         "image/*", "application/octet-stream"
     );
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
-    private static final long MAX_TOTAL_SIZE = 30 * 1024 * 1024;
+    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
+    private static final long MAX_TOTAL_SIZE = 30L * 1024 * 1024;
     private static final int MAX_FILES_COUNT = 5;
 
     private final MealContentExtractor contentExtractor;

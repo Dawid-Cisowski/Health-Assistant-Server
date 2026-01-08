@@ -33,7 +33,7 @@ class WorkoutImportService implements WorkoutImportFacade {
     private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
         "image/*", "application/octet-stream"
     );
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final WorkoutImageExtractor imageExtractor;
