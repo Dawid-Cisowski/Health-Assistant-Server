@@ -22,4 +22,19 @@ class EvaluationTestConfiguration {
     HealthDataEvaluator healthDataEvaluator(ChatClient.Builder chatClientBuilder) {
         return new HealthDataEvaluator(chatClientBuilder)
     }
+
+    @Bean
+    PromptInjectionEvaluator promptInjectionEvaluator(ChatClient.Builder chatClientBuilder) {
+        return new PromptInjectionEvaluator(chatClientBuilder)
+    }
+
+    @Bean
+    ContentFilteringEvaluator contentFilteringEvaluator(ChatClient.Builder chatClientBuilder) {
+        return new ContentFilteringEvaluator(chatClientBuilder)
+    }
+
+    @Bean
+    DailySummaryEvaluator dailySummaryEvaluator(ChatClient.Builder chatClientBuilder) {
+        return new DailySummaryEvaluator(chatClientBuilder)
+    }
 }

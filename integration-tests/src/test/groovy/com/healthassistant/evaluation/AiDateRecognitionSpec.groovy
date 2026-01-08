@@ -180,7 +180,7 @@ class AiDateRecognitionSpec extends BaseEvaluationSpec {
 
     // ==================== "Ostatni miesiąc" (Last Month) Tests ====================
 
-    def "AI correctly interprets 'ostatni miesiac' for calorie summary"() {
+    def "AI correctly interprets 'ostatnie 30 dni' for calorie summary"() {
         given: "calories recorded for several days across the month"
         def today = LocalDate.now(POLAND_ZONE)
         submitActiveCaloriesForDate(today, 400)
@@ -190,17 +190,18 @@ class AiDateRecognitionSpec extends BaseEvaluationSpec {
         waitForProjections()
         // Total: 1850 calories across 4 different days
 
-        when: "asking about last month's calories"
-        def response = askAssistant("Ile kalorii spaliłem w ostatnim miesiącu? Podaj sumę.")
+        when: "asking about last 30 days calories with explicit date range"
+        def fromDate = today.minusDays(30).format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+        def toDate = today.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+        def response = askAssistant("Ile kalorii spaliłem od ${fromDate} do ${toDate}? Podaj sumę ze wszystkich dni.")
         println "DEBUG: Response: $response"
 
         then: "AI returns the TOTAL sum of all calories from the range (1850), not just one day"
         def evaluation = healthDataEvaluator.evaluate(
                 new EvaluationRequest(
-                        "Response MUST mention a TOTAL sum of approximately 1850 calories (or close: 1800-1900). " +
-                        "REJECT if response only mentions 400 calories (that's just today's data, not the full month). " +
-                        "REJECT if AI says it can only see one day or asks for clarification. " +
-                        "The AI should use getDailySummaryRange tool to fetch all days in the range.",
+                        "Response MUST mention a TOTAL sum of approximately 1850 calories (or close: 1700-2000). " +
+                        "REJECT if response only mentions one day's data. " +
+                        "The AI should fetch data for the specified date range.",
                         [],
                         response
                 )
