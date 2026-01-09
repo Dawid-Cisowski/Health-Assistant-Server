@@ -1,5 +1,7 @@
 # Health Assistant Server
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Dawid-Cisowski_Health-Assistant-Server&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Dawid-Cisowski_Health-Assistant-Server)
+
 Backend server for managing health data with Health Connect integration, AI assistant, and meal/workout tracking.
 
 **Tech Stack**: Java 21 + Spring Boot 3.3 + PostgreSQL 16 + Spring AI (Gemini) + Spring Modulith
