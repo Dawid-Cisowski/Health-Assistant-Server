@@ -81,6 +81,52 @@ class AiDailySummaryEvaluationSpec extends BaseEvaluationSpec {
         evaluation.isPass()
     }
 
+    def "AI summary uses supportive tone for low performance"() {
+        given: "low activity day"
+        submitStepsForToday(1500)
+        submitSleepForLastNight(300) // 5 hours
+        waitForProjections()
+
+        def actualData = """
+            Steps: 1500 (low)
+            Sleep: 300 minutes / 5 hours (below recommended)
+        """
+
+        when: "asking for a summary with explicit request for data"
+        def summary = askAssistant("Sprawdź moje dzisiejsze kroki i sen z ostatniej nocy i powiedz jak mi poszło.")
+        println "DEBUG: AI Summary: $summary"
+
+        then: "summary is supportive, not judgmental"
+        def evaluation = dailySummaryEvaluator.evaluate(
+                new EvaluationRequest(actualData, [], summary)
+        )
+        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
+        evaluation.isPass()
+    }
+
+    def "AI summary is encouraging for good performance"() {
+        given: "high activity day - steps and calories only"
+        submitStepsForToday(15000)
+        submitActiveCalories(600)
+        waitForProjections()
+
+        def actualData = """
+            Steps: 15000 (excellent)
+            Active Calories: 600 kcal (high)
+        """
+
+        when: "asking for a summary"
+        def summary = askAssistant("Ile zrobiłem kroków i ile spaliłem kalorii dzisiaj?")
+        println "DEBUG: AI Summary: $summary"
+
+        then: "summary is positive and encouraging"
+        def evaluation = dailySummaryEvaluator.evaluate(
+                new EvaluationRequest(actualData, [], summary)
+        )
+        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
+        evaluation.isPass()
+    }
+
     def "AI summary does not hallucinate missing workout"() {
         given: "only steps and calories, no workout"
         submitStepsForToday(7000)
