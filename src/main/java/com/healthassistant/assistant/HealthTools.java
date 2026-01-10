@@ -13,6 +13,7 @@ import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -24,7 +25,7 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
 class HealthTools {
 
     private static final int MAX_DATE_RANGE_DAYS = 365;
