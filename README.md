@@ -1,6 +1,10 @@
-# Health Assistant Server
 
+# Health Assistant Server
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Dawid-Cisowski_Health-Assistant-Server&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Dawid-Cisowski_Health-Assistant-Server)
+<p align="center">
+  <img src="assets/APP_ICON.png" alt="Health Assistant" width="1204"/>
+</p>
+
 
 Backend server for managing health data with Health Connect integration, AI assistant, and meal/workout tracking.
 
@@ -9,6 +13,11 @@ Backend server for managing health data with Health Connect integration, AI assi
 ## Features
 
 ### AI Health Assistant
+
+<p align="center">
+  <img src="assets/AI_ASSISTANT.png" alt="AI Health Assistant" width="360"/>
+</p>
+
 - **Natural Language**: "How many steps did I take today?", "How did I sleep this week?"
 - **Conversation History**: Multi-turn with context (last 20 messages)
 - **Date Recognition**: "today", "yesterday", "last week", "last month"
@@ -17,6 +26,11 @@ Backend server for managing health data with Health Connect integration, AI assi
 - **Gemini 3 Flash**: Google's latest model with function calling
 
 ### Event Sourcing & Projections
+
+<p align="center">
+  <img src="assets/DAILY_DASHBOARD.png" alt="Daily Dashboard" width="360"/>
+</p>
+
 - **Append-only Event Log**: All data as immutable events in PostgreSQL
 - **9 Event Types**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories
 - **6 Projections**: Steps, Sleep, Workout, Calories, Activity, Meals
@@ -24,11 +38,21 @@ Backend server for managing health data with Health Connect integration, AI assi
 - **Idempotency**: Deduplication via `idempotency_key`
 
 ### AI-Powered Import (Vision)
+
+<p align="center">
+  <img src="assets/MEAL_IMPRT.png" alt="Meal Import" width="360"/>
+</p>
+
 - **Sleep Import**: Screenshot from oHealth → AI extraction → SleepSessionRecorded
 - **Workout Import**: Screenshot from GymRun → AI extraction → WorkoutRecorded
 - **Meal Import**: Meal photo → AI analysis → Draft → Confirm → MealRecorded
 
 ### Workout & Exercise Tracking
+
+<p align="center">
+  <img src="assets/IMG_GYM.png" alt="Workout Tracking" width="360"/>
+</p>
+
 - **59 Exercises in Catalog**: Complete list with muscle groups
 - **Exercise Statistics**: Progression stats for each exercise
 - **Workout Routines**: Training templates with default sets
