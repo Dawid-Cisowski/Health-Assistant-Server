@@ -12,6 +12,7 @@ import java.util.Map;
     @JsonSubTypes.Type(value = StepsPayload.class),
     @JsonSubTypes.Type(value = DistanceBucketPayload.class),
     @JsonSubTypes.Type(value = HeartRatePayload.class),
+    @JsonSubTypes.Type(value = RestingHeartRatePayload.class),
     @JsonSubTypes.Type(value = SleepSessionPayload.class),
     @JsonSubTypes.Type(value = ActiveCaloriesPayload.class),
     @JsonSubTypes.Type(value = ActiveMinutesPayload.class),
@@ -28,6 +29,7 @@ import java.util.Map;
         StepsPayload.class,
         DistanceBucketPayload.class,
         HeartRatePayload.class,
+        RestingHeartRatePayload.class,
         SleepSessionPayload.class,
         ActiveCaloriesPayload.class,
         ActiveMinutesPayload.class,
@@ -43,6 +45,7 @@ public sealed interface EventPayload permits
     StepsPayload,
     DistanceBucketPayload,
     HeartRatePayload,
+    RestingHeartRatePayload,
     SleepSessionPayload,
     ActiveCaloriesPayload,
     ActiveMinutesPayload,
@@ -62,6 +65,7 @@ public sealed interface EventPayload permits
             case "StepsBucketedRecorded.v1" -> StepsPayload.class;
             case "DistanceBucketRecorded.v1" -> DistanceBucketPayload.class;
             case "HeartRateSummaryRecorded.v1" -> HeartRatePayload.class;
+            case "RestingHeartRateRecorded.v1" -> RestingHeartRatePayload.class;
             case "SleepSessionRecorded.v1" -> SleepSessionPayload.class;
             case "ActiveCaloriesBurnedRecorded.v1" -> ActiveCaloriesPayload.class;
             case "ActiveMinutesRecorded.v1" -> ActiveMinutesPayload.class;

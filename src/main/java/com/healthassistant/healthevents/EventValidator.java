@@ -52,6 +52,7 @@ class EventValidator {
             case ActiveCaloriesPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), "bucketEnd", "bucketStart");
             case ActiveMinutesPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), "bucketEnd", "bucketStart");
             case HeartRatePayload p -> validateHeartRate(p);
+            case RestingHeartRatePayload p -> validateRestingHeartRate(p);
             case SleepSessionPayload p -> validateTimeRange(p.sleepStart(), p.sleepEnd(), "sleepEnd", "sleepStart");
             case WalkingSessionPayload p -> validateTimeRange(p.start(), p.end(), "end", "start");
             case WorkoutPayload p -> validateWorkoutStructure(p);
@@ -130,6 +131,17 @@ class EventValidator {
         List<EventValidationError> errors = new ArrayList<>();
         errors.addAll(validateTimeRange(hr.bucketStart(), hr.bucketEnd(), "bucketEnd", "bucketStart"));
         errors.addAll(HeartRateStats.validate(hr.min(), hr.avg(), hr.max()));
+        return errors;
+    }
+
+    @SuppressWarnings("PMD.UnusedFormalParameter")
+    private List<EventValidationError> validateRestingHeartRate(RestingHeartRatePayload payload) {
+        List<EventValidationError> errors = new ArrayList<>();
+
+        if (payload.measuredAt() != null && payload.measuredAt().isAfter(java.time.Instant.now().plusSeconds(300))) {
+            errors.add(EventValidationError.invalidValue("measuredAt", "cannot be more than 5 minutes in the future"));
+        }
+
         return errors;
     }
 

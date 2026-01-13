@@ -2,6 +2,7 @@ package com.healthassistant.dailysummary;
 
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.dailysummary.api.dto.DailySummary.Activity;
+import com.healthassistant.heartrate.api.HeartRateFacade;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.EventData;
 import com.healthassistant.healthevents.api.dto.payload.*;
@@ -31,6 +32,7 @@ class DailySummaryAggregator {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final HealthEventsFacade healthEventsFacade;
+    private final HeartRateFacade heartRateFacade;
 
     DailySummary aggregate(String deviceId, LocalDate date) {
         Instant dayStart = date.atStartOfDay(POLAND_ZONE).toInstant();
@@ -53,7 +55,7 @@ class DailySummaryAggregator {
         List<Exercise> exercises = aggregateExercises(events);
         List<Workout> workouts = aggregateWorkouts(events);
         List<Sleep> sleep = aggregateSleep(events);
-        Heart heart = aggregateHeart(events);
+        Heart heart = aggregateHeart(events, deviceId, date);
         Nutrition nutrition = aggregateNutrition(events);
         List<Meal> meals = aggregateMeals(events);
 
@@ -213,7 +215,7 @@ class DailySummaryAggregator {
         return new Sleep(sleep.sleepStart(), sleep.sleepEnd(), sleep.totalMinutes());
     }
 
-    private Heart aggregateHeart(List<EventData> events) {
+    private Heart aggregateHeart(List<EventData> events, String deviceId, LocalDate date) {
         var accumulated = events.stream()
                 .map(EventData::payload)
                 .reduce(
@@ -235,8 +237,8 @@ class DailySummaryAggregator {
         List<Integer> heartRates = accumulated.avgRates();
         Integer avgBpm = heartRates.isEmpty() ? null :
                 (int) heartRates.stream().mapToInt(Integer::intValue).average().orElse(0.0);
-        Integer restingBpm = heartRates.isEmpty() ? null :
-                heartRates.stream().mapToInt(Integer::intValue).min().orElse(0);
+
+        Integer restingBpm = heartRateFacade.getRestingBpmForDate(deviceId, date).orElse(null);
 
         return new Heart(restingBpm, avgBpm, accumulated.maxHr());
     }

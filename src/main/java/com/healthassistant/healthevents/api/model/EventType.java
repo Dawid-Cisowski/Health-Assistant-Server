@@ -10,6 +10,7 @@ public sealed interface EventType permits
         StepsBucketedRecorded,
         DistanceBucketRecorded,
         HeartRateSummaryRecorded,
+        RestingHeartRateRecorded,
         SleepSessionRecorded,
         ActiveCaloriesBurnedRecorded,
         ActiveMinutesRecorded,
@@ -29,6 +30,7 @@ public sealed interface EventType permits
             case "StepsBucketedRecorded.v1" -> new StepsBucketedRecorded();
             case "DistanceBucketRecorded.v1" -> new DistanceBucketRecorded();
             case "HeartRateSummaryRecorded.v1" -> new HeartRateSummaryRecorded();
+            case "RestingHeartRateRecorded.v1" -> new RestingHeartRateRecorded();
             case "SleepSessionRecorded.v1" -> new SleepSessionRecorded();
             case "ActiveCaloriesBurnedRecorded.v1" -> new ActiveCaloriesBurnedRecorded();
             case "ActiveMinutesRecorded.v1" -> new ActiveMinutesRecorded();
@@ -62,6 +64,13 @@ record HeartRateSummaryRecorded() implements EventType {
     @Override
     public String value() {
         return "HeartRateSummaryRecorded.v1";
+    }
+}
+
+record RestingHeartRateRecorded() implements EventType {
+    @Override
+    public String value() {
+        return "RestingHeartRateRecorded.v1";
     }
 }
 

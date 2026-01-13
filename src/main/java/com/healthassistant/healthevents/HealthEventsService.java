@@ -14,6 +14,8 @@ import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredE
 import com.healthassistant.healthevents.api.dto.events.MealsEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.SleepEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent;
+import com.healthassistant.healthevents.api.dto.events.HeartRateEventsStoredEvent;
+import com.healthassistant.healthevents.api.dto.events.RestingHeartRateEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.WeightEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.WorkoutEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
@@ -46,6 +48,7 @@ class HealthEventsService implements HealthEventsFacade {
     private static final String ACTIVE_MINUTES_V1 = "ActiveMinutesRecorded.v1";
     private static final String WALKING_SESSION_V1 = "WalkingSessionRecorded.v1";
     private static final String HEART_RATE_V1 = "HeartRateSummaryRecorded.v1";
+    private static final String RESTING_HEART_RATE_V1 = "RestingHeartRateRecorded.v1";
     private static final String ACTIVE_CALORIES_V1 = "ActiveCaloriesBurnedRecorded.v1";
     private static final String MEAL_V1 = "MealRecorded.v1";
     private static final String WEIGHT_V1 = "WeightMeasurementRecorded.v1";
@@ -100,6 +103,8 @@ class HealthEventsService implements HealthEventsFacade {
         publishCaloriesEvents(eventsByType);
         publishMealsEvents(eventsByType);
         publishWeightEvents(eventsByType);
+        publishHeartRateEvents(eventsByType);
+        publishRestingHeartRateEvents(eventsByType);
 
         publishAllEventsStoredEvent(result);
     }
@@ -167,6 +172,24 @@ class HealthEventsService implements HealthEventsFacade {
             Set<LocalDate> dates = extractAffectedDates(events);
             log.info("Publishing WeightEventsStoredEvent with {} events for {} dates", events.size(), dates.size());
             eventPublisher.publishEvent(new WeightEventsStoredEvent(events, dates));
+        }
+    }
+
+    private void publishHeartRateEvents(Map<String, List<StoredEventData>> eventsByType) {
+        List<StoredEventData> events = eventsByType.getOrDefault(HEART_RATE_V1, List.of());
+        if (!events.isEmpty()) {
+            Set<LocalDate> dates = extractAffectedDates(events);
+            log.info("Publishing HeartRateEventsStoredEvent with {} events for {} dates", events.size(), dates.size());
+            eventPublisher.publishEvent(new HeartRateEventsStoredEvent(events, dates));
+        }
+    }
+
+    private void publishRestingHeartRateEvents(Map<String, List<StoredEventData>> eventsByType) {
+        List<StoredEventData> events = eventsByType.getOrDefault(RESTING_HEART_RATE_V1, List.of());
+        if (!events.isEmpty()) {
+            Set<LocalDate> dates = extractAffectedDates(events);
+            log.info("Publishing RestingHeartRateEventsStoredEvent with {} events for {} dates", events.size(), dates.size());
+            eventPublisher.publishEvent(new RestingHeartRateEventsStoredEvent(events, dates));
         }
     }
 

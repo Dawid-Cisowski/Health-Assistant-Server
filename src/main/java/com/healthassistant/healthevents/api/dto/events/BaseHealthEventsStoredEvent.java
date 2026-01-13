@@ -9,7 +9,7 @@ import java.util.Set;
 public sealed interface BaseHealthEventsStoredEvent
         permits StepsEventsStoredEvent, WorkoutEventsStoredEvent, SleepEventsStoredEvent,
                 ActivityEventsStoredEvent, CaloriesEventsStoredEvent, MealsEventsStoredEvent,
-                WeightEventsStoredEvent {
+                WeightEventsStoredEvent, HeartRateEventsStoredEvent, RestingHeartRateEventsStoredEvent {
 
     List<StoredEventData> events();
 
