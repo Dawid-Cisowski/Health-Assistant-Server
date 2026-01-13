@@ -942,7 +942,7 @@ abstract class BaseIntegrationSpec extends Specification {
      * Use this when you need to clean up multiple consecutive days.
      */
     void cleanupProjectionsForDateRange(String deviceId, LocalDate startDate, LocalDate endDate) {
-        startDate.datesUntil(endDate.plusDays(1)).forEach { date ->
+        startDate.datesUntil(endDate.plusDays(1)).toList().each { date ->
             cleanupProjectionsForDevice(deviceId, date)
         }
     }

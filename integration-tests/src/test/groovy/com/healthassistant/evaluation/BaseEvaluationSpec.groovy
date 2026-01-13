@@ -125,7 +125,7 @@ abstract class BaseEvaluationSpec extends Specification {
         def startDate = today.minusMonths(6)
         def endDate = today.plusDays(7)
 
-        startDate.datesUntil(endDate.plusDays(1)).forEach { date ->
+        startDate.datesUntil(endDate.plusDays(1)).toList().each { date ->
             cleanupProjectionsForDate(TEST_DEVICE_ID, date)
         }
     }
