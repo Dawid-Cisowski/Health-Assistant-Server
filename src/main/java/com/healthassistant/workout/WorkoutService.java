@@ -3,6 +3,7 @@ package com.healthassistant.workout;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.workout.api.dto.ExerciseDefinition;
+import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -27,6 +29,7 @@ class WorkoutService implements WorkoutFacade {
     private final WorkoutProjector workoutProjector;
     private final ExerciseCatalog exerciseCatalog;
     private final ExerciseDefinitionRepository exerciseDefinitionRepository;
+    private final ExerciseStatisticsService exerciseStatisticsService;
 
     @Override
     public Optional<WorkoutDetailResponse> getWorkoutDetails(String deviceId, String workoutId) {
@@ -160,6 +163,15 @@ class WorkoutService implements WorkoutFacade {
                 saved.getId(), saved.getName(), saved.getDescription(),
                 saved.getPrimaryMuscle(), saved.getMuscles()
         );
+    }
+
+    @Override
+    public PersonalRecordsResponse getAllPersonalRecords(String deviceId) {
+        Objects.requireNonNull(deviceId, "deviceId cannot be null");
+        if (deviceId.isBlank()) {
+            throw new IllegalArgumentException("deviceId cannot be blank");
+        }
+        return exerciseStatisticsService.getAllPersonalRecords(deviceId);
     }
 
 }

@@ -5,6 +5,8 @@ import com.healthassistant.workout.api.dto.ExerciseStatisticsResponse;
 import com.healthassistant.workout.api.dto.ExerciseStatisticsResponse.ExerciseSummary;
 import com.healthassistant.workout.api.dto.ExerciseStatisticsResponse.SetEntry;
 import com.healthassistant.workout.api.dto.ExerciseStatisticsResponse.WorkoutHistoryEntry;
+import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
+import com.healthassistant.workout.api.dto.PersonalRecordsResponse.PersonalRecordEntry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ class ExerciseStatisticsService {
     private final ExerciseCatalog exerciseCatalog;
     private final WorkoutExerciseProjectionJpaRepository exerciseRepository;
     private final WorkoutSetProjectionJpaRepository setRepository;
+    private final WorkoutProjectionJpaRepository workoutRepository;
 
     boolean exerciseExistsInCatalog(String exerciseId) {
         return exerciseCatalog.findById(exerciseId).isPresent();
@@ -223,5 +226,58 @@ class ExerciseStatisticsService {
 
     private static <T> boolean isNullOrEmpty(List<T> list) {
         return list == null || list.isEmpty();
+    }
+
+    @Transactional(readOnly = true)
+    public PersonalRecordsResponse getAllPersonalRecords(String deviceId) {
+        List<WorkoutSetProjectionJpaRepository.PersonalRecordProjection> allSets =
+                setRepository.findAllSetsForPersonalRecords(deviceId);
+
+        if (allSets.isEmpty()) {
+            return new PersonalRecordsResponse(List.of());
+        }
+
+        Map<String, List<WorkoutSetProjectionJpaRepository.PersonalRecordProjection>> setsByExercise =
+                allSets.stream()
+                        .collect(Collectors.groupingBy(this::getExerciseKey));
+
+        List<PersonalRecordEntry> records = setsByExercise.values().stream()
+                .map(this::buildPersonalRecordEntry)
+                .sorted(Comparator.comparing(PersonalRecordEntry::exerciseName))
+                .toList();
+
+        return new PersonalRecordsResponse(records);
+    }
+
+    private String getExerciseKey(WorkoutSetProjectionJpaRepository.PersonalRecordProjection projection) {
+        return projection.getExerciseId() != null
+                ? projection.getExerciseId()
+                : projection.getExerciseName();
+    }
+
+    private PersonalRecordEntry buildPersonalRecordEntry(
+            List<WorkoutSetProjectionJpaRepository.PersonalRecordProjection> sets) {
+
+        WorkoutSetProjectionJpaRepository.PersonalRecordProjection prSet = sets.stream()
+                .max(Comparator.comparing(WorkoutSetProjectionJpaRepository.PersonalRecordProjection::getWeightKg)
+                        .thenComparing(WorkoutSetProjectionJpaRepository.PersonalRecordProjection::getPerformedDate,
+                                Comparator.reverseOrder()))
+                .orElseThrow();
+
+        String exerciseId = prSet.getExerciseId();
+        String exerciseName = prSet.getExerciseName();
+        String muscleGroup = exerciseId != null
+                ? exerciseCatalog.findById(exerciseId)
+                        .map(ExerciseDefinition::primaryMuscle)
+                        .orElse(null)
+                : null;
+
+        return new PersonalRecordEntry(
+                exerciseId,
+                exerciseName,
+                muscleGroup,
+                prSet.getWeightKg(),
+                prSet.getPerformedDate()
+        );
     }
 }

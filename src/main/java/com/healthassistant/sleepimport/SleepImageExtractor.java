@@ -67,12 +67,12 @@ class SleepImageExtractor {
 
         } catch (IOException e) {
             log.error("Failed to read image file", e);
-            throw new SleepExtractionException("Failed to read image file");
+            throw new SleepExtractionException("Failed to read image file", e);
         } catch (SleepExtractionException e) {
             throw e;
         } catch (Exception e) {
             log.error("AI extraction failed", e);
-            throw new SleepExtractionException("Failed to extract sleep data from image");
+            throw new SleepExtractionException("Failed to extract sleep data from image", e);
         }
     }
 
@@ -235,7 +235,7 @@ class SleepImageExtractor {
         } catch (JsonProcessingException e) {
             log.error("Failed to parse AI response as JSON. Response (truncated): {}",
                     response.length() > 200 ? response.substring(0, 200) + "..." : response, e);
-            throw new SleepExtractionException("Failed to parse AI response as valid JSON");
+            throw new SleepExtractionException("Failed to parse AI response as valid JSON", e);
         }
     }
 

@@ -97,7 +97,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Meal CRUD specs
             "test-meal-crud",
             // Cross-module and edge case specs
-            "test-cross-module", "test-timezone", "test-ratelimit", "test-mealedge"
+            "test-cross-module", "test-timezone", "test-ratelimit", "test-mealedge",
+            // Personal records specs
+            "test-pr"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true

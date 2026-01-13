@@ -2,6 +2,7 @@ package com.healthassistant.workout.api;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.workout.api.dto.ExerciseDefinition;
+import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 
 import java.time.LocalDate;
@@ -28,5 +29,7 @@ public interface WorkoutFacade {
 
     ExerciseDefinition createAutoExercise(String id, String name, String description,
                                           String primaryMuscle, List<String> muscles);
+
+    PersonalRecordsResponse getAllPersonalRecords(String deviceId);
 
 }

@@ -48,4 +48,7 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
     Optional<WorkoutProjectionJpaEntity> findByEventId(String eventId);
 
     void deleteByEventId(String eventId);
+
+    @Query("SELECT w FROM WorkoutProjectionJpaEntity w WHERE w.workoutId IN :workoutIds")
+    List<WorkoutProjectionJpaEntity> findByWorkoutIdIn(@Param("workoutIds") List<String> workoutIds);
 }

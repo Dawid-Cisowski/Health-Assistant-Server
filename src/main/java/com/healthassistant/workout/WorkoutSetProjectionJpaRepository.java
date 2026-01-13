@@ -5,10 +5,35 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
 interface WorkoutSetProjectionJpaRepository extends JpaRepository<WorkoutSetProjectionJpaEntity, Long> {
+
+    interface PersonalRecordProjection {
+        String getExerciseId();
+        String getExerciseName();
+        BigDecimal getWeightKg();
+        String getWorkoutId();
+        LocalDate getPerformedDate();
+    }
+
+    @Query("""
+        SELECT s.exerciseId as exerciseId,
+               s.exerciseName as exerciseName,
+               s.weightKg as weightKg,
+               s.workoutId as workoutId,
+               w.performedDate as performedDate
+        FROM WorkoutSetProjectionJpaEntity s
+        JOIN WorkoutProjectionJpaEntity w ON s.workoutId = w.workoutId
+        WHERE w.deviceId = :deviceId
+          AND s.isWarmup = false
+          AND s.weightKg > 0
+        ORDER BY s.exerciseName, s.weightKg DESC, w.performedDate ASC
+        """)
+    List<PersonalRecordProjection> findAllSetsForPersonalRecords(@Param("deviceId") String deviceId);
 
     List<WorkoutSetProjectionJpaEntity> findByWorkoutIdOrderByExerciseNameAscSetNumberAsc(String workoutId);
 

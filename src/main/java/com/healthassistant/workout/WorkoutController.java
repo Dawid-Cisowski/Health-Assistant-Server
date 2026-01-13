@@ -2,6 +2,7 @@ package com.healthassistant.workout;
 
 import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.workout.api.dto.ExerciseDefinition;
+import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -66,6 +67,24 @@ class WorkoutController {
         log.info("Retrieving workouts for device {} date range: {} to {}", maskDeviceId(deviceId), from, to);
         List<WorkoutDetailResponse> workouts = workoutFacade.getWorkoutsByDateRange(deviceId, from, to);
         return ResponseEntity.ok(workouts);
+    }
+
+    @GetMapping("/personal-records")
+    @Operation(
+            summary = "Get all personal records",
+            description = "Returns all personal records (max weights) across all exercises for the authenticated user. Warmup sets are excluded.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Personal records retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<PersonalRecordsResponse> getAllPersonalRecords(
+            @RequestHeader("X-Device-Id") String deviceId
+    ) {
+        log.info("Retrieving all personal records for device: {}", maskDeviceId(deviceId));
+        PersonalRecordsResponse response = workoutFacade.getAllPersonalRecords(deviceId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/exercises")
