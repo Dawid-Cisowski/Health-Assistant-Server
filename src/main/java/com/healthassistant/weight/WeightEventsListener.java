@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -20,7 +19,6 @@ class WeightEventsListener {
     private final WeightProjector weightProjector;
 
     @ApplicationModuleListener
-    @Transactional
     public void onWeightEventsStored(WeightEventsStoredEvent event) {
         log.info("Weight listener received WeightEventsStoredEvent with {} events for {} dates",
                 event.events().size(), event.affectedDates().size());
@@ -48,7 +46,6 @@ class WeightEventsListener {
     }
 
     @ApplicationModuleListener
-    @Transactional
     public void onCompensationEventsStored(CompensationEventsStoredEvent event) {
         var weightDeletions = event.deletions().stream()
                 .filter(d -> WEIGHT_MEASUREMENT_V1.equals(d.targetEventType()))

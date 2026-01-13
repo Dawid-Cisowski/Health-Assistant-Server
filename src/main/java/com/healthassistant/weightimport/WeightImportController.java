@@ -26,10 +26,11 @@ class WeightImportController {
 
     @PostMapping(value = "/import-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-            summary = "Import weight from smart scale screenshot",
+            summary = "Import weight from smart scale screenshots",
             description = """
-                    Upload a smart scale app screenshot. AI extracts body composition data including
-                    weight, BMI, body fat %, muscle %, hydration, BMR, visceral fat level, and more.
+                    Upload one or more smart scale app screenshots (e.g., scrolled views of the same measurement).
+                    AI extracts body composition data including weight, BMI, body fat %, muscle %,
+                    hydration, BMR, visceral fat level, and more from all provided images.
                     Creates a WeightMeasurementRecorded.v1 event. If a measurement with the same
                     timestamp already exists, it will be updated.
                     """,
@@ -41,21 +42,21 @@ class WeightImportController {
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
     ResponseEntity<WeightImportResponse> importWeightFromImage(
-            @RequestParam("image") MultipartFile image,
+            @RequestParam("images") java.util.List<MultipartFile> images,
             @RequestAttribute("deviceId") String deviceId
     ) {
-        log.info("Weight image import request from device {}, file: {}, size: {} bytes",
+        log.info("Weight image import request from device {}, images count: {}, total size: {} bytes",
                 WeightImportSecurityUtils.maskDeviceId(deviceId),
-                WeightImportSecurityUtils.sanitizeForLog(image.getOriginalFilename()),
-                image.getSize());
+                images.size(),
+                images.stream().mapToLong(MultipartFile::getSize).sum());
 
         try {
-            WeightImportResponse response = weightImportFacade.importFromImage(
-                    image, DeviceId.of(deviceId)
+            WeightImportResponse response = weightImportFacade.importFromImages(
+                    images, DeviceId.of(deviceId)
             );
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid image from device {}: {}", WeightImportSecurityUtils.maskDeviceId(deviceId), e.getMessage());
+            log.warn("Invalid images from device {}: {}", WeightImportSecurityUtils.maskDeviceId(deviceId), e.getMessage());
             return ResponseEntity.badRequest().body(WeightImportResponse.failure(e.getMessage()));
         }
     }

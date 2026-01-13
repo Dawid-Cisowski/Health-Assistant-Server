@@ -33,6 +33,7 @@ class WeightImportService implements WeightImportFacade {
             "image/*", "application/octet-stream"
     );
     private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
+    private static final int MAX_IMAGES = 5;
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final int HASH_PREFIX_LENGTH = 8;
 
@@ -41,11 +42,11 @@ class WeightImportService implements WeightImportFacade {
     private final HealthEventsFacade healthEventsFacade;
 
     @Override
-    public WeightImportResponse importFromImage(MultipartFile image, DeviceId deviceId) {
-        validateImage(image);
+    public WeightImportResponse importFromImages(List<MultipartFile> images, DeviceId deviceId) {
+        validateImages(images);
 
         try {
-            ExtractedWeightData extractedData = imageExtractor.extract(image);
+            ExtractedWeightData extractedData = imageExtractor.extract(images);
 
             if (!extractedData.isValid()) {
                 log.warn("Weight extraction invalid for device {}: {}",
@@ -54,7 +55,7 @@ class WeightImportService implements WeightImportFacade {
             }
 
             IdempotencyKey idempotencyKey = generateIdempotencyKey(deviceId, extractedData);
-            String measurementId = generateMeasurementId(image, extractedData);
+            String measurementId = generateMeasurementId(images, extractedData);
             log.info("Creating weight event with key: {}", idempotencyKey.value());
 
             StoreHealthEventsCommand.EventEnvelope envelope = eventMapper.mapToEventEnvelope(
@@ -114,7 +115,19 @@ class WeightImportService implements WeightImportFacade {
         }
     }
 
-    private void validateImage(MultipartFile image) {
+    private void validateImages(List<MultipartFile> images) {
+        if (images == null || images.isEmpty()) {
+            throw new IllegalArgumentException("At least one image is required");
+        }
+
+        if (images.size() > MAX_IMAGES) {
+            throw new IllegalArgumentException("Maximum " + MAX_IMAGES + " images allowed");
+        }
+
+        images.forEach(this::validateSingleImage);
+    }
+
+    private void validateSingleImage(MultipartFile image) {
         if (image.isEmpty()) {
             throw new IllegalArgumentException("Image file is empty");
         }
@@ -177,10 +190,17 @@ class WeightImportService implements WeightImportFacade {
         return IdempotencyKey.of(keyValue);
     }
 
-    private String generateMeasurementId(MultipartFile image, ExtractedWeightData data) {
+    private String generateMeasurementId(List<MultipartFile> images, ExtractedWeightData data) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(image.getBytes());
+            images.forEach(image -> {
+                try {
+                    digest.update(image.getBytes());
+                } catch (Exception e) {
+                    log.warn("Failed to read image bytes for hash", e);
+                }
+            });
+            byte[] hash = digest.digest();
             String imageHash = HexFormat.of().formatHex(hash).substring(0, HASH_PREFIX_LENGTH);
 
             return String.format("scale-import-%s-%s", data.measurementDate(), imageHash);

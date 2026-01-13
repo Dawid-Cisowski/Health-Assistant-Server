@@ -178,6 +178,13 @@ class MealContentExtractor {
             Priority 3 - Type of food:
             - Beverages (coffee, tea, smoothie, juice) -> DRINK
             - Sweets, cakes, ice cream, cookies -> DESSERT
+            - Large savory main dishes (meat/fish + vegetables/carbs, >400 kcal estimated) -> LUNCH
+            - Small fruits, single items (banana, apple, yogurt) -> SNACK
+
+            Priority 4 - Default when NO time context available:
+            - Full meals with protein source (chicken, beef, fish, eggs with sides) -> LUNCH
+            - Light items or single foods without time context -> SNACK
+            - NEVER default to BREAKFAST without explicit morning time context or breakfast-specific foods (cereal, eggs benedict, pancakes)
 
             HEALTH RATINGS:
             - VERY_HEALTHY: Salads, lean proteins, vegetables

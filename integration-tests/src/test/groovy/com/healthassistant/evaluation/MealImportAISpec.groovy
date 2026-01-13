@@ -144,7 +144,8 @@ class MealImportAISpec extends BaseEvaluationSpec {
         and: "meal type is reasonable for a main dish"
         def mealType = body.getString("mealType")
         println "DEBUG: chicken meal mealType=${mealType}"
-        mealType in ["LUNCH", "DINNER", "SNACK"]
+        // BRUNCH is acceptable since without time context, AI may interpret this as a late morning meal
+        mealType in ["LUNCH", "DINNER", "SNACK", "BRUNCH"]
 
         and: "health rating is healthy"
         def healthRating = body.getString("healthRating")

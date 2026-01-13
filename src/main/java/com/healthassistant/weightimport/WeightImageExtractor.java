@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Set;
 
 @Component
@@ -40,22 +41,29 @@ class WeightImageExtractor {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
 
-    ExtractedWeightData extract(MultipartFile image) throws WeightExtractionException {
+    ExtractedWeightData extract(List<MultipartFile> images) throws WeightExtractionException {
         try {
-            byte[] imageBytes = image.getBytes();
-            String contentType = image.getContentType();
-            final String mimeType = (contentType == null || contentType.equals("application/octet-stream"))
-                    ? "image/jpeg"
-                    : contentType;
-
-            log.info("Extracting weight data from image: {} bytes, type: {}", imageBytes.length, mimeType);
+            log.info("Extracting weight data from {} images, total size: {} bytes",
+                    images.size(),
+                    images.stream().mapToLong(MultipartFile::getSize).sum());
 
             String response = chatClient.prompt()
                     .system(buildSystemPrompt())
-                    .user(userSpec -> userSpec
-                            .text(buildUserPrompt())
-                            .media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes))
-                    )
+                    .user(userSpec -> {
+                        userSpec.text(buildUserPrompt());
+                        images.forEach(image -> {
+                            try {
+                                byte[] imageBytes = image.getBytes();
+                                String contentType = image.getContentType();
+                                String mimeType = (contentType == null || contentType.equals("application/octet-stream"))
+                                        ? "image/jpeg"
+                                        : contentType;
+                                userSpec.media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes));
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to read image bytes", e);
+                            }
+                        });
+                    })
                     .call()
                     .content();
 
@@ -65,9 +73,6 @@ class WeightImageExtractor {
 
             return parseExtractionResponse(response);
 
-        } catch (IOException e) {
-            log.error("Failed to read image file", e);
-            throw new WeightExtractionException("Failed to read image file", e);
         } catch (WeightExtractionException e) {
             throw e;
         } catch (Exception e) {
@@ -159,7 +164,9 @@ class WeightImageExtractor {
 
     private String buildUserPrompt() {
         return """
-            Analyze this smart scale/body composition app screenshot.
+            Analyze the provided smart scale/body composition app screenshot(s).
+            If multiple images are provided, they show the same measurement (scrolled view).
+            Combine data from ALL images to extract the complete set of metrics.
             Extract all weight and body composition metrics visible and return as JSON.
 
             If this is not a weight/body composition screenshot, return:

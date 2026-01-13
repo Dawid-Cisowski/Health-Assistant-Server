@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -17,6 +18,7 @@ class WeightProjector {
     private final WeightMeasurementProjectionJpaRepository repository;
     private final WeightMeasurementFactory weightMeasurementFactory;
 
+    @Transactional
     public void projectWeight(StoredEventData eventData) {
         Objects.requireNonNull(eventData, "eventData cannot be null");
 
@@ -58,6 +60,7 @@ class WeightProjector {
         repository.save(entity);
     }
 
+    @Transactional
     public void deleteByEventId(String eventId) {
         repository.findByEventId(eventId).ifPresent(entity -> {
             repository.deleteByEventId(eventId);

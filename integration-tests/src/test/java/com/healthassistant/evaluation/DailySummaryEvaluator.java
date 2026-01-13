@@ -75,8 +75,7 @@ public class DailySummaryEvaluator implements Evaluator {
             .call()
             .content();
 
-        boolean pass = judgeResponse != null
-            && judgeResponse.trim().toUpperCase().startsWith("YES");
+        boolean pass = EvaluatorUtils.parseYesNoResponse(judgeResponse);
 
         return new EvaluationResponse(pass, judgeResponse, Collections.emptyMap());
     }

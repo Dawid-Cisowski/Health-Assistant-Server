@@ -75,6 +75,7 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/v1/workouts")
             || path.startsWith("/v1/meals")
             || path.startsWith("/v1/sleep")
+            || path.startsWith("/v1/weight")
             || path.startsWith("/v1/admin")
             || path.startsWith("/v1/assistant")
             || path.startsWith("/v1/routines")

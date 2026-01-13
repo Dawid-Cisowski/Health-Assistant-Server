@@ -9,6 +9,7 @@ import com.healthassistant.sleep.api.SleepFacade
 import com.healthassistant.workout.api.WorkoutFacade
 import com.healthassistant.meals.api.MealsFacade
 import com.healthassistant.steps.api.StepsFacade
+import com.healthassistant.weight.api.WeightFacade
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired
@@ -74,6 +75,9 @@ abstract class BaseEvaluationSpec extends Specification {
     @Autowired
     DailySummaryFacade dailySummaryFacade
 
+    @Autowired
+    WeightFacade weightFacade
+
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("test_db")
@@ -130,6 +134,9 @@ abstract class BaseEvaluationSpec extends Specification {
         }
         if (dailySummaryFacade != null) {
             dailySummaryFacade.deleteAllSummaries()
+        }
+        if (weightFacade != null) {
+            weightFacade.deleteAllProjections()
         }
     }
 
