@@ -99,7 +99,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Cross-module and edge case specs
             "test-cross-module", "test-timezone", "test-ratelimit", "test-mealedge",
             // Personal records specs
-            "test-pr"
+            "test-pr",
+            // Weight specs
+            "test-weight", "test-weight-valid"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true

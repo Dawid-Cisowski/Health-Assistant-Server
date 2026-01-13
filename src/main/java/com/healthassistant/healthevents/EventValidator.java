@@ -56,9 +56,20 @@ class EventValidator {
             case WalkingSessionPayload p -> validateTimeRange(p.start(), p.end(), "end", "start");
             case WorkoutPayload p -> validateWorkoutStructure(p);
             case MealRecordedPayload meal -> List.of();
+            case WeightMeasurementPayload weight -> validateWeightMeasurement(weight);
             case EventDeletedPayload p -> validateEventDeleted(p);
             case EventCorrectedPayload p -> validateEventCorrected(p);
         };
+    }
+
+    private List<EventValidationError> validateWeightMeasurement(WeightMeasurementPayload payload) {
+        List<EventValidationError> errors = new ArrayList<>();
+
+        if (payload.measuredAt() != null && payload.measuredAt().isAfter(java.time.Instant.now().plusSeconds(300))) {
+            errors.add(EventValidationError.invalidValue("measuredAt", "cannot be more than 5 minutes in the future"));
+        }
+
+        return errors;
     }
 
     @SuppressWarnings("PMD.UnusedFormalParameter")

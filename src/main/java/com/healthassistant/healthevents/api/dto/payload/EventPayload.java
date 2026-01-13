@@ -18,6 +18,7 @@ import java.util.Map;
     @JsonSubTypes.Type(value = WalkingSessionPayload.class),
     @JsonSubTypes.Type(value = WorkoutPayload.class),
     @JsonSubTypes.Type(value = MealRecordedPayload.class),
+    @JsonSubTypes.Type(value = WeightMeasurementPayload.class),
     @JsonSubTypes.Type(value = EventDeletedPayload.class),
     @JsonSubTypes.Type(value = EventCorrectedPayload.class)
 })
@@ -33,6 +34,7 @@ import java.util.Map;
         WalkingSessionPayload.class,
         WorkoutPayload.class,
         MealRecordedPayload.class,
+        WeightMeasurementPayload.class,
         EventDeletedPayload.class,
         EventCorrectedPayload.class
     }
@@ -47,6 +49,7 @@ public sealed interface EventPayload permits
     WalkingSessionPayload,
     WorkoutPayload,
     MealRecordedPayload,
+    WeightMeasurementPayload,
     EventDeletedPayload,
     EventCorrectedPayload {
 
@@ -65,6 +68,7 @@ public sealed interface EventPayload permits
             case "WalkingSessionRecorded.v1" -> WalkingSessionPayload.class;
             case "WorkoutRecorded.v1" -> WorkoutPayload.class;
             case "MealRecorded.v1" -> MealRecordedPayload.class;
+            case "WeightMeasurementRecorded.v1" -> WeightMeasurementPayload.class;
             case "EventDeleted.v1" -> EventDeletedPayload.class;
             case "EventCorrected.v1" -> EventCorrectedPayload.class;
             default -> throw new IllegalArgumentException("Unknown event type: " + eventTypeValue);

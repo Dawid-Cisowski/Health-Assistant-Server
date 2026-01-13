@@ -28,7 +28,8 @@ class ModularityTests {
         var expectedModules = Set.of(
                 "appevents", "healthevents", "dailysummary", "steps", "workout",
                 "workoutimport", "sleep", "sleepimport", "calories", "activity",
-                "meals", "mealimport", "googlefit", "assistant", "security", "config"
+                "meals", "mealimport", "googlefit", "assistant", "security", "config",
+                "weight", "weightimport"
         );
 
         var actualModules = modules.stream()
@@ -49,8 +50,8 @@ class ModularityTests {
 
     @Test
     void projectionModulesShouldNotDependOnImportModules() {
-        var projectionModules = List.of("steps", "workout", "sleep", "calories", "activity", "meals");
-        var importModules = Set.of("mealimport", "sleepimport", "workoutimport", "googlefit");
+        var projectionModules = List.of("steps", "workout", "sleep", "calories", "activity", "meals", "weight");
+        var importModules = Set.of("mealimport", "sleepimport", "workoutimport", "weightimport", "googlefit");
 
         for (String projName : projectionModules) {
             var module = modules.getModuleByName(projName).orElseThrow();
@@ -66,7 +67,7 @@ class ModularityTests {
 
     @Test
     void healthEventsShouldNotDependOnProjectionModules() {
-        var projectionModules = Set.of("steps", "workout", "sleep", "calories", "activity", "meals", "dailysummary");
+        var projectionModules = Set.of("steps", "workout", "sleep", "calories", "activity", "meals", "weight", "dailysummary");
 
         var module = modules.getModuleByName("healthevents").orElseThrow();
         var dependencies = module.getBootstrapDependencies(modules)
@@ -93,7 +94,9 @@ class ModularityTests {
                 Map.entry("googlefit", "GoogleFitFacade"),
                 Map.entry("mealimport", "MealImportFacade"),
                 Map.entry("sleepimport", "SleepImportFacade"),
-                Map.entry("workoutimport", "WorkoutImportFacade")
+                Map.entry("workoutimport", "WorkoutImportFacade"),
+                Map.entry("weight", "WeightFacade"),
+                Map.entry("weightimport", "WeightImportFacade")
         );
 
         for (var entry : modulesWithFacades.entrySet()) {

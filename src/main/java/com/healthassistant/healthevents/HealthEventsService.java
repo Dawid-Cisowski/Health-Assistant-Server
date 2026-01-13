@@ -14,6 +14,7 @@ import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredE
 import com.healthassistant.healthevents.api.dto.events.MealsEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.SleepEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent;
+import com.healthassistant.healthevents.api.dto.events.WeightEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.WorkoutEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import com.healthassistant.healthevents.api.model.DeviceId;
@@ -47,6 +48,7 @@ class HealthEventsService implements HealthEventsFacade {
     private static final String HEART_RATE_V1 = "HeartRateSummaryRecorded.v1";
     private static final String ACTIVE_CALORIES_V1 = "ActiveCaloriesBurnedRecorded.v1";
     private static final String MEAL_V1 = "MealRecorded.v1";
+    private static final String WEIGHT_V1 = "WeightMeasurementRecorded.v1";
 
     private final StoreHealthEventsCommandHandler commandHandler;
     private final ApplicationEventPublisher eventPublisher;
@@ -97,6 +99,7 @@ class HealthEventsService implements HealthEventsFacade {
         publishActivityEvents(eventsByType);
         publishCaloriesEvents(eventsByType);
         publishMealsEvents(eventsByType);
+        publishWeightEvents(eventsByType);
 
         publishAllEventsStoredEvent(result);
     }
@@ -155,6 +158,15 @@ class HealthEventsService implements HealthEventsFacade {
             Set<LocalDate> dates = extractAffectedDates(events);
             log.info("Publishing MealsEventsStoredEvent with {} events for {} dates", events.size(), dates.size());
             eventPublisher.publishEvent(new MealsEventsStoredEvent(events, dates));
+        }
+    }
+
+    private void publishWeightEvents(Map<String, List<StoredEventData>> eventsByType) {
+        List<StoredEventData> events = eventsByType.getOrDefault(WEIGHT_V1, List.of());
+        if (!events.isEmpty()) {
+            Set<LocalDate> dates = extractAffectedDates(events);
+            log.info("Publishing WeightEventsStoredEvent with {} events for {} dates", events.size(), dates.size());
+            eventPublisher.publishEvent(new WeightEventsStoredEvent(events, dates));
         }
     }
 

@@ -8,6 +8,7 @@ import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.sleep.api.dto.SleepRangeSummaryResponse;
 import com.healthassistant.steps.api.StepsFacade;
 import com.healthassistant.steps.api.dto.StepsRangeSummaryResponse;
+import com.healthassistant.weight.api.WeightFacade;
 import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ class HealthTools {
     private final WorkoutFacade workoutFacade;
     private final DailySummaryFacade dailySummaryFacade;
     private final MealsFacade mealsFacade;
+    private final WeightFacade weightFacade;
 
     @Tool(name = "getStepsData",
           description = "Retrieves user's step data for the given date range. Returns step count, distance, active hours and minutes. " +
@@ -120,6 +122,21 @@ class HealthTools {
         return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
             var result = mealsFacade.getRangeSummary(deviceId, start, end);
             log.info("Meals data fetched: {} total meals over {} days", result.totalMealCount(), result.daysWithData());
+            return result;
+        });
+    }
+
+    @Tool(name = "getWeightData",
+          description = "Retrieves user's weight and body composition data for the given date range. " +
+                        "Returns weight, BMI, body fat %, muscle %, hydration, bone mass, BMR, visceral fat level, metabolic age, and trend analysis. " +
+                        "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
+    public Object getWeightData(String startDate, String endDate) {
+        var deviceId = AssistantContext.getDeviceId();
+        log.info("Fetching weight data for device {} from {} to {}", deviceId, startDate, endDate);
+
+        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+            var result = weightFacade.getRangeSummary(deviceId, start, end);
+            log.info("Weight data fetched: {} measurements over {} days", result.measurementCount(), result.daysWithData());
             return result;
         });
     }

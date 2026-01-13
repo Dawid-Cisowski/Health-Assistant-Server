@@ -16,6 +16,7 @@ public sealed interface EventType permits
         WalkingSessionRecorded,
         WorkoutRecorded,
         MealRecorded,
+        WeightMeasurementRecorded,
         EventDeleted,
         EventCorrected {
 
@@ -34,6 +35,7 @@ public sealed interface EventType permits
             case "WalkingSessionRecorded.v1" -> new WalkingSessionRecorded();
             case "WorkoutRecorded.v1" -> new WorkoutRecorded();
             case "MealRecorded.v1" -> new MealRecorded();
+            case "WeightMeasurementRecorded.v1" -> new WeightMeasurementRecorded();
             case "EventDeleted.v1" -> new EventDeleted();
             case "EventCorrected.v1" -> new EventCorrected();
             default -> throw new IllegalArgumentException("Unknown event type: " + value);
@@ -102,6 +104,13 @@ record MealRecorded() implements EventType {
     @Override
     public String value() {
         return "MealRecorded.v1";
+    }
+}
+
+record WeightMeasurementRecorded() implements EventType {
+    @Override
+    public String value() {
+        return "WeightMeasurementRecorded.v1";
     }
 }
 

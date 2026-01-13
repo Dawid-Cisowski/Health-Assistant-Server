@@ -37,7 +37,8 @@ class ArchitectureRulesTest {
                             "com.healthassistant.activity..",
                             "com.healthassistant.meals..",
                             "com.healthassistant.healthevents..",
-                            "com.healthassistant.dailysummary.."
+                            "com.healthassistant.dailysummary..",
+                            "com.healthassistant.weight.."
                     )
                     .and().resideOutsideOfPackage("..api..")
                     .should().notBePublic()
@@ -72,7 +73,9 @@ class ArchitectureRulesTest {
                             "com.healthassistant.dailysummary..",
                             "com.healthassistant.calories..",
                             "com.healthassistant.activity..",
-                            "com.healthassistant.config.."
+                            "com.healthassistant.config..",
+                            "com.healthassistant.weight..",
+                            "com.healthassistant.weightimport.."
                     )
                     .because("Controllers should only exist in API-facing modules");
 
