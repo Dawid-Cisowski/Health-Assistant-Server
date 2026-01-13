@@ -15,7 +15,5 @@ public interface HeartRateFacade {
 
     Optional<Integer> getRestingBpmForDate(String deviceId, LocalDate date);
 
-    void deleteProjectionsByDeviceId(String deviceId);
-
-    void deleteAllProjections();
+    void deleteProjectionsForDate(String deviceId, LocalDate date);
 }

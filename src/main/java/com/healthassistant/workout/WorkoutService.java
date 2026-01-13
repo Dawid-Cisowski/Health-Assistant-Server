@@ -106,22 +106,6 @@ class WorkoutService implements WorkoutFacade {
 
     @Override
     @Transactional
-    public void deleteAllProjections() {
-        log.warn("Deleting all workout projections");
-        setRepository.deleteAll();
-        exerciseRepository.deleteAll();
-        workoutRepository.deleteAll();
-    }
-
-    @Override
-    @Transactional
-    public void deleteProjectionsByDeviceId(String deviceId) {
-        log.warn("Deleting workout projections for deviceId: {}", deviceId);
-        workoutRepository.deleteByDeviceId(deviceId);
-    }
-
-    @Override
-    @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
         log.debug("Deleting workout projections for device {} date {}", deviceId, date);
         workoutRepository.deleteByDeviceIdAndPerformedDate(deviceId, date);

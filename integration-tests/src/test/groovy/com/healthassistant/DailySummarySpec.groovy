@@ -1,15 +1,5 @@
 package com.healthassistant
 
-import com.healthassistant.activity.api.ActivityFacade
-import com.healthassistant.calories.api.CaloriesFacade
-import com.healthassistant.dailysummary.api.DailySummaryFacade
-import com.healthassistant.meals.api.MealsFacade
-import com.healthassistant.sleep.api.SleepFacade
-import com.healthassistant.steps.api.StepsFacade
-import com.healthassistant.workout.api.WorkoutFacade
-import io.restassured.RestAssured
-import io.restassured.http.ContentType
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.Instant
@@ -26,35 +16,8 @@ class DailySummarySpec extends BaseIntegrationSpec {
     private static final String DEVICE_ID = "test-daily"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
-    @Autowired
-    DailySummaryFacade dailySummaryFacade
-
-    @Autowired
-    StepsFacade stepsFacade
-
-    @Autowired
-    SleepFacade sleepFacade
-
-    @Autowired
-    WorkoutFacade workoutFacade
-
-    @Autowired
-    MealsFacade mealsFacade
-
-    @Autowired
-    CaloriesFacade caloriesFacade
-
-    @Autowired
-    ActivityFacade activityFacade
-
     def setup() {
-        dailySummaryFacade.deleteSummariesByDeviceId(DEVICE_ID)
-        stepsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
-        sleepFacade.deleteProjectionsByDeviceId(DEVICE_ID)
-        workoutFacade.deleteProjectionsByDeviceId(DEVICE_ID)
-        mealsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
-        caloriesFacade.deleteProjectionsByDeviceId(DEVICE_ID)
-        activityFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: Get daily summary after sync with multiple event types"() {

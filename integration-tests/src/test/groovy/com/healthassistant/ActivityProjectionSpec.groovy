@@ -1,8 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.activity.api.ActivityFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
+
+import java.time.LocalDate
 
 /**
  * Integration tests for Activity (Active Minutes) Projections
@@ -13,12 +13,9 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
     private static final String DEVICE_ID = "test-activity"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
-    @Autowired
-    ActivityFacade activityFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        activityFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: ActiveMinutesRecorded event creates hourly and daily projections"() {

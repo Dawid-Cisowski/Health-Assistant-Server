@@ -1,9 +1,7 @@
 package com.healthassistant.evaluation
 
-import com.healthassistant.sleep.api.SleepFacade
 import io.restassured.RestAssured
 import io.restassured.builder.MultiPartSpecBuilder
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Requires
 import spock.lang.Title
 
@@ -29,12 +27,8 @@ class SleepImportAISpec extends BaseEvaluationSpec {
     private static final String SECRET_BASE64 = TEST_SECRET_BASE64
     private static final String IMPORT_ENDPOINT = "/v1/sleep/import-image"
 
-    @Autowired
-    SleepFacade sleepFacade
-
     def setup() {
-        // Clean up before each test
-        sleepFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        // BaseEvaluationSpec.cleanAllData() handles cleanup via date-based deletion
     }
 
     def "sleep_1.png: AI correctly extracts exact sleep data from ohealth screenshot"() {

@@ -1,7 +1,5 @@
 package com.healthassistant
 
-import com.healthassistant.steps.api.StepsFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.LocalDate
@@ -15,12 +13,9 @@ class StepsProjectionSpec extends BaseIntegrationSpec {
     private static final String DEVICE_ID = "test-steps"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
-    @Autowired
-    StepsFacade stepsFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        stepsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: StepsBucketed event creates hourly and daily projections"() {

@@ -113,18 +113,12 @@ class HeartRateService implements HeartRateFacade {
 
     @Override
     @Transactional
-    public void deleteProjectionsByDeviceId(String deviceId) {
-        heartRateRepository.deleteByDeviceId(deviceId);
-        restingHeartRateRepository.deleteByDeviceId(deviceId);
-        log.info("Deleted all HR projections for device {}", maskDeviceId(deviceId));
-    }
-
-    @Override
-    @Transactional
-    public void deleteAllProjections() {
-        heartRateRepository.deleteAll();
-        restingHeartRateRepository.deleteAll();
-        log.info("Deleted all HR projections");
+    public void deleteProjectionsForDate(String deviceId, LocalDate date) {
+        Instant startTime = date.atStartOfDay(POLAND_ZONE).toInstant();
+        Instant endTime = date.plusDays(1).atStartOfDay(POLAND_ZONE).toInstant();
+        heartRateRepository.deleteByDeviceIdAndTimeRange(deviceId, startTime, endTime);
+        restingHeartRateRepository.deleteByDeviceIdAndDate(deviceId, date);
+        log.debug("Deleted HR projections for device {} on date {}", maskDeviceId(deviceId), date);
     }
 
     private HeartRateDataPointResponse toDataPointResponse(HeartRateProjectionJpaEntity entity) {

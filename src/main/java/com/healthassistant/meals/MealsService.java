@@ -372,27 +372,6 @@ class MealsService implements MealsFacade {
 
     @Override
     @Transactional
-    public void deleteAllProjections() {
-        log.warn("Deleting all meal projections");
-        mealRepository.deleteAll();
-        dailyRepository.deleteAll();
-    }
-
-    @Override
-    @Transactional
-    public void deleteProjectionsByDeviceId(String deviceId) {
-        boolean hasData = mealRepository.existsByDeviceId(deviceId);
-        if (hasData) {
-            log.warn("Deleting meal projections for device: {}", sanitizeForLog(deviceId));
-            mealRepository.deleteByDeviceId(deviceId);
-            dailyRepository.deleteByDeviceId(deviceId);
-        } else {
-            log.debug("No meal projections to delete for device: {}", sanitizeForLog(deviceId));
-        }
-    }
-
-    @Override
-    @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
         boolean hasData = mealRepository.existsByDeviceIdAndDate(deviceId, date);
         if (hasData) {

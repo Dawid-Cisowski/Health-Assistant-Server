@@ -1,9 +1,7 @@
 package com.healthassistant.evaluation
 
-import com.healthassistant.weight.api.WeightFacade
 import io.restassured.RestAssured
 import io.restassured.builder.MultiPartSpecBuilder
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Requires
 import spock.lang.Title
 
@@ -15,11 +13,8 @@ class WeightImportAISpec extends BaseEvaluationSpec {
     private static final String SECRET_BASE64 = TEST_SECRET_BASE64
     private static final String IMPORT_ENDPOINT = "/v1/weight/import-image"
 
-    @Autowired
-    WeightFacade weightFacade
-
     def setup() {
-        weightFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        // BaseEvaluationSpec.cleanAllData() handles cleanup via date-based deletion
     }
 
     def "AI correctly extracts ALL body composition data from two-part scale screenshot"() {

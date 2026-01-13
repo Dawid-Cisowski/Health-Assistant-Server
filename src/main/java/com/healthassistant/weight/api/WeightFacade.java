@@ -17,10 +17,6 @@ public interface WeightFacade {
 
     Optional<WeightMeasurementResponse> getMeasurementById(String deviceId, String measurementId);
 
-    void deleteAllProjections();
-
-    void deleteProjectionsByDeviceId(String deviceId);
-
     void deleteProjectionsForDate(String deviceId, LocalDate date);
 
     void projectEvents(List<StoredEventData> events);

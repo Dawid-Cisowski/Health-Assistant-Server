@@ -118,32 +118,42 @@ abstract class BaseEvaluationSpec extends Specification {
     private void cleanAllData() {
         // Delete events first
         if (healthEventsFacade != null) {
-            healthEventsFacade.deleteAllEvents()
+            healthEventsFacade.deleteEventsByDeviceId(TEST_DEVICE_ID)
         }
-        // Delete all projections
+        // Delete all projections for device within a reasonable date range
+        def today = LocalDate.now(POLAND_ZONE)
+        def startDate = today.minusMonths(6)
+        def endDate = today.plusDays(7)
+
+        startDate.datesUntil(endDate.plusDays(1)).forEach { date ->
+            cleanupProjectionsForDate(TEST_DEVICE_ID, date)
+        }
+    }
+
+    private void cleanupProjectionsForDate(String deviceId, LocalDate date) {
         if (stepsFacade != null) {
-            stepsFacade.deleteAllProjections()
+            stepsFacade.deleteProjectionsForDate(deviceId, date)
         }
         if (sleepFacade != null) {
-            sleepFacade.deleteAllProjections()
+            sleepFacade.deleteProjectionsForDate(deviceId, date)
         }
         if (workoutFacade != null) {
-            workoutFacade.deleteAllProjections()
+            workoutFacade.deleteProjectionsForDate(deviceId, date)
         }
         if (mealsFacade != null) {
-            mealsFacade.deleteAllProjections()
+            mealsFacade.deleteProjectionsForDate(deviceId, date)
         }
         if (caloriesFacade != null) {
-            caloriesFacade.deleteAllProjections()
+            caloriesFacade.deleteProjectionsForDate(deviceId, date)
         }
         if (dailySummaryFacade != null) {
-            dailySummaryFacade.deleteAllSummaries()
+            dailySummaryFacade.deleteSummaryForDate(deviceId, date)
         }
         if (weightFacade != null) {
-            weightFacade.deleteAllProjections()
+            weightFacade.deleteProjectionsForDate(deviceId, date)
         }
         if (heartRateFacade != null) {
-            heartRateFacade.deleteAllProjections()
+            heartRateFacade.deleteProjectionsForDate(deviceId, date)
         }
     }
 

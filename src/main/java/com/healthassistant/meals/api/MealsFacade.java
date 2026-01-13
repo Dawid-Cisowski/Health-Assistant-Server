@@ -22,10 +22,6 @@ public interface MealsFacade {
 
     MealResponse updateMeal(String deviceId, String eventId, UpdateMealRequest request);
 
-    void deleteAllProjections();
-
-    void deleteProjectionsByDeviceId(String deviceId);
-
     void deleteProjectionsForDate(String deviceId, LocalDate date);
 
     void projectEvents(List<StoredEventData> events);

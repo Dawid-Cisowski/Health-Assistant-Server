@@ -28,8 +28,8 @@ interface RestingHeartRateRepository extends JpaRepository<RestingHeartRateProje
     );
 
     @Modifying
-    @Query("DELETE FROM RestingHeartRateProjectionJpaEntity r WHERE r.deviceId = :deviceId")
-    void deleteByDeviceId(@Param("deviceId") String deviceId);
+    @Query("DELETE FROM RestingHeartRateProjectionJpaEntity r WHERE r.deviceId = :deviceId AND r.date = :date")
+    void deleteByDeviceIdAndDate(@Param("deviceId") String deviceId, @Param("date") LocalDate date);
 
     @Modifying
     @Query("DELETE FROM RestingHeartRateProjectionJpaEntity r WHERE r.eventId = :eventId")

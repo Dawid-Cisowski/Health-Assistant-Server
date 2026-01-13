@@ -239,25 +239,6 @@ class DailySummaryService implements DailySummaryFacade {
 
     @Override
     @Transactional
-    public void deleteAllSummaries() {
-        log.warn("Deleting all daily summaries");
-        jpaRepository.deleteAll();
-    }
-
-    @Override
-    @Transactional
-    public void deleteSummariesByDeviceId(String deviceId) {
-        Objects.requireNonNull(deviceId, "deviceId must not be null");
-        if (deviceId.isBlank()) {
-            throw new IllegalArgumentException("deviceId must not be blank");
-        }
-        // TODO: Add authorization check - verify caller is allowed to delete data for this deviceId
-        log.warn("Deleting all daily summaries for deviceId: {}", maskDeviceId(deviceId));
-        jpaRepository.deleteByDeviceId(deviceId);
-    }
-
-    @Override
-    @Transactional
     public void deleteSummaryForDate(String deviceId, LocalDate date) {
         Objects.requireNonNull(deviceId, "deviceId must not be null");
         Objects.requireNonNull(date, "date must not be null");

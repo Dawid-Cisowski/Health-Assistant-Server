@@ -1,9 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.dailysummary.api.DailySummaryFacade
-import com.healthassistant.workout.api.WorkoutFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
+
+import java.time.LocalDate
 
 /**
  * Integration tests for Workout Projections
@@ -14,16 +13,9 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
     private static final String DEVICE_ID = "test-workout-proj"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
-    @Autowired
-    WorkoutFacade workoutFacade
-
-    @Autowired
-    DailySummaryFacade dailySummaryFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        workoutFacade.deleteProjectionsByDeviceId(DEVICE_ID)
-        dailySummaryFacade.deleteSummariesByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: WorkoutRecorded event creates complete projection"() {

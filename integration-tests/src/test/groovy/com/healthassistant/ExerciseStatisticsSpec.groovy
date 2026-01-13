@@ -1,7 +1,5 @@
 package com.healthassistant
 
-import com.healthassistant.workout.api.WorkoutFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.LocalDate
@@ -17,12 +15,9 @@ class ExerciseStatisticsSpec extends BaseIntegrationSpec {
     private static final String CHEST_1_ID = "chest_1"
     private static final String BENCH_PRESS_NAME = "Wyciskanie sztangi leżąc (płasko)"
 
-    @Autowired
-    WorkoutFacade workoutFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        workoutFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: Get statistics for exercise with multiple workouts returns complete data"() {

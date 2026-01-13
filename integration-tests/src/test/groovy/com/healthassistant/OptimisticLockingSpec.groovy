@@ -1,7 +1,5 @@
 package com.healthassistant
 
-import com.healthassistant.steps.api.StepsFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.LocalDate
@@ -19,12 +17,12 @@ class OptimisticLockingSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw")
 
-    @Autowired
-    StepsFacade stepsFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        stepsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        // Use dynamic date range based on test dates (test uses LocalDate.now().minusDays(10))
+        def endDate = LocalDate.now(POLAND_ZONE)
+        def startDate = endDate.minusDays(30)
+        cleanupProjectionsForDateRange(DEVICE_ID, startDate, endDate)
     }
 
     def "Scenario 1: Batch of step events for same hour are all accumulated correctly"() {

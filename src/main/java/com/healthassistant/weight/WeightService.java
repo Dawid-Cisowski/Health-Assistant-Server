@@ -162,20 +162,6 @@ class WeightService implements WeightFacade {
 
     @Override
     @Transactional
-    public void deleteAllProjections() {
-        log.warn("Deleting all weight projections");
-        repository.deleteAll();
-    }
-
-    @Override
-    @Transactional
-    public void deleteProjectionsByDeviceId(String deviceId) {
-        log.debug("Deleting weight projections for device: {}", WeightSecurityUtils.maskDeviceId(deviceId));
-        repository.deleteByDeviceId(deviceId);
-    }
-
-    @Override
-    @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
         log.debug("Deleting weight projections for device {} date {}", WeightSecurityUtils.maskDeviceId(deviceId), date);
         repository.deleteByDeviceIdAndDate(deviceId, date);

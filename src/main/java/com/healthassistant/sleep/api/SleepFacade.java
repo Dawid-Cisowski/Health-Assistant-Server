@@ -13,10 +13,6 @@ public interface SleepFacade {
 
     SleepRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
-    void deleteAllProjections();
-
-    void deleteProjectionsByDeviceId(String deviceId);
-
     void deleteProjectionsForDate(String deviceId, LocalDate date);
 
     /**

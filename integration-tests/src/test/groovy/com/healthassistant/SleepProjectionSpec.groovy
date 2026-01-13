@@ -1,7 +1,5 @@
 package com.healthassistant
 
-import com.healthassistant.sleep.api.SleepFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.LocalDate
@@ -15,11 +13,8 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
     private static final String DEVICE_ID = "test-sleep-proj"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
-    @Autowired
-    SleepFacade sleepFacade
-
     def setup() {
-        sleepFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: SleepSession event creates session and daily projections"() {

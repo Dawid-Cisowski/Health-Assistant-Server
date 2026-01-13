@@ -1,8 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.meals.api.MealsFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
+
+import java.time.LocalDate
 
 /**
  * Integration tests for Meal Projections
@@ -13,11 +13,8 @@ class MealProjectionSpec extends BaseIntegrationSpec {
     private static final String DEVICE_ID = "test-meals"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
-    @Autowired
-    MealsFacade mealsFacade
-
     def setup() {
-        mealsFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: MealRecorded event creates meal and daily projections"() {

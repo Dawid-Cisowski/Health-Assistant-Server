@@ -24,8 +24,6 @@ public interface HealthEventsFacade {
 
     long countAllEvents();
 
-    void deleteAllEvents();
-
     void deleteEventsByDeviceId(String deviceId);
 
     Optional<ExistingSleepInfo> findExistingSleepInfo(DeviceId deviceId, Instant sleepStart);

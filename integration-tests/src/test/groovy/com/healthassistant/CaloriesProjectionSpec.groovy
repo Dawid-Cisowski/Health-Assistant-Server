@@ -1,8 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.calories.api.CaloriesFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
+
+import java.time.LocalDate
 
 /**
  * Integration tests for Calories Projections
@@ -13,12 +13,9 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
     private static final String DEVICE_ID = "test-calories"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
-    @Autowired
-    CaloriesFacade caloriesFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        caloriesFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: ActiveCaloriesBurned event creates hourly and daily projections"() {

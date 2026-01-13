@@ -28,7 +28,7 @@ class MealImportAISpec extends BaseEvaluationSpec {
     private static final String IMPORT_ENDPOINT = "/v1/meals/import"
 
     def setup() {
-        mealsFacade.deleteAllProjections()
+        // BaseEvaluationSpec.cleanAllData() handles cleanup via date-based deletion
     }
 
     def "AI correctly estimates banana nutritional values"() {

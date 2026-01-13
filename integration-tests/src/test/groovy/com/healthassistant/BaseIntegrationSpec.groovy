@@ -1,7 +1,15 @@
 package com.healthassistant
 
+import com.healthassistant.activity.api.ActivityFacade
+import com.healthassistant.calories.api.CaloriesFacade
+import com.healthassistant.dailysummary.api.DailySummaryFacade
 import com.healthassistant.healthevents.api.HealthEventsFacade
+import com.healthassistant.heartrate.api.HeartRateFacade
+import com.healthassistant.meals.api.MealsFacade
+import com.healthassistant.sleep.api.SleepFacade
 import com.healthassistant.steps.api.StepsFacade
+import com.healthassistant.weight.api.WeightFacade
+import com.healthassistant.workout.api.WorkoutFacade
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import io.restassured.RestAssured
@@ -22,6 +30,7 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
@@ -55,6 +64,29 @@ abstract class BaseIntegrationSpec extends Specification {
     @Autowired
     StepsFacade stepsFacade
 
+    @Autowired
+    SleepFacade sleepFacade
+
+    @Autowired
+    WorkoutFacade workoutFacade
+
+    @Autowired
+    MealsFacade mealsFacade
+
+    @Autowired
+    CaloriesFacade caloriesFacade
+
+    @Autowired
+    ActivityFacade activityFacade
+
+    @Autowired
+    DailySummaryFacade dailySummaryFacade
+
+    @Autowired
+    WeightFacade weightFacade
+
+    @Autowired
+    HeartRateFacade heartRateFacade
 
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -885,6 +917,34 @@ abstract class BaseIntegrationSpec extends Specification {
             .contentType(ContentType.JSON)
             .body(yesterdayStepsEvent)
             .post("/v1/health-events")
+    }
+
+    /**
+     * Clean up all projections for a specific device and dates.
+     * Use this in spec setup() methods for test isolation.
+     */
+    void cleanupProjectionsForDevice(String deviceId, LocalDate... dates) {
+        dates.each { date ->
+            stepsFacade.deleteProjectionsForDate(deviceId, date)
+            sleepFacade.deleteProjectionsForDate(deviceId, date)
+            workoutFacade.deleteProjectionsForDate(deviceId, date)
+            mealsFacade.deleteProjectionsForDate(deviceId, date)
+            caloriesFacade.deleteProjectionsForDate(deviceId, date)
+            activityFacade.deleteProjectionsForDate(deviceId, date)
+            dailySummaryFacade.deleteSummaryForDate(deviceId, date)
+            weightFacade.deleteProjectionsForDate(deviceId, date)
+            heartRateFacade.deleteProjectionsForDate(deviceId, date)
+        }
+    }
+
+    /**
+     * Clean up all projections for a specific device within a date range.
+     * Use this when you need to clean up multiple consecutive days.
+     */
+    void cleanupProjectionsForDateRange(String deviceId, LocalDate startDate, LocalDate endDate) {
+        startDate.datesUntil(endDate.plusDays(1)).forEach { date ->
+            cleanupProjectionsForDevice(deviceId, date)
+        }
     }
 }
 

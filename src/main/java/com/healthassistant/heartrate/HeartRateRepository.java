@@ -24,8 +24,12 @@ interface HeartRateRepository extends JpaRepository<HeartRateProjectionJpaEntity
     );
 
     @Modifying
-    @Query("DELETE FROM HeartRateProjectionJpaEntity h WHERE h.deviceId = :deviceId")
-    void deleteByDeviceId(@Param("deviceId") String deviceId);
+    @Query("DELETE FROM HeartRateProjectionJpaEntity h WHERE h.deviceId = :deviceId AND h.measuredAt >= :startTime AND h.measuredAt < :endTime")
+    void deleteByDeviceIdAndTimeRange(
+            @Param("deviceId") String deviceId,
+            @Param("startTime") Instant startTime,
+            @Param("endTime") Instant endTime
+    );
 
     @Modifying
     @Query("DELETE FROM HeartRateProjectionJpaEntity h WHERE h.eventId = :eventId")

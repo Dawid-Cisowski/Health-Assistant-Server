@@ -107,20 +107,6 @@ class CaloriesService implements CaloriesFacade {
 
     @Override
     @Transactional
-    public void deleteAllProjections() {
-        hourlyRepository.deleteAll();
-        dailyRepository.deleteAll();
-    }
-
-    @Override
-    @Transactional
-    public void deleteProjectionsByDeviceId(String deviceId) {
-        hourlyRepository.deleteByDeviceId(deviceId);
-        dailyRepository.deleteByDeviceId(deviceId);
-    }
-
-    @Override
-    @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
         log.debug("Deleting calories projections for device {} date {}", deviceId, date);
         hourlyRepository.deleteByDeviceIdAndDate(deviceId, date);

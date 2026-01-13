@@ -1,9 +1,7 @@
 package com.healthassistant
 
-import com.healthassistant.sleep.api.SleepFacade
 import io.restassured.RestAssured
 import io.restassured.builder.MultiPartSpecBuilder
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
 import java.time.Instant
@@ -19,12 +17,9 @@ class SleepImportSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final String IMPORT_ENDPOINT = "/v1/sleep/import-image"
 
-    @Autowired
-    SleepFacade sleepFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        sleepFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2026, 12, 31))
     }
 
     def cleanup() {

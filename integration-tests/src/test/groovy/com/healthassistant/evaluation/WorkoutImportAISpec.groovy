@@ -39,8 +39,7 @@ class WorkoutImportAISpec extends BaseEvaluationSpec {
     private static final String IMPORT_ENDPOINT = "/v1/workouts/import-image"
 
     def setup() {
-        // Clean up workout projections
-        workoutFacade.deleteAllProjections()
+        // BaseEvaluationSpec.cleanAllData() handles cleanup via date-based deletion
     }
 
     /**

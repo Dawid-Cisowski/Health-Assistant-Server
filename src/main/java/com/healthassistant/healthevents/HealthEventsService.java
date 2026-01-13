@@ -336,13 +336,6 @@ class HealthEventsService implements HealthEventsFacade {
 
     @Override
     @Transactional
-    public void deleteAllEvents() {
-        log.warn("Deleting all health events");
-        healthEventJpaRepository.deleteAll();
-    }
-
-    @Override
-    @Transactional
     public void deleteEventsByDeviceId(String deviceId) {
         log.warn("Deleting health events for device: {}", deviceId);
         healthEventJpaRepository.deleteByDeviceId(deviceId);

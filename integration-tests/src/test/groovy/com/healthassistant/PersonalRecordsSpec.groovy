@@ -1,8 +1,8 @@
 package com.healthassistant
 
-import com.healthassistant.workout.api.WorkoutFacade
-import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
+
+import java.time.LocalDate
 
 /**
  * Integration tests for Personal Records API
@@ -17,12 +17,9 @@ class PersonalRecordsSpec extends BaseIntegrationSpec {
     private static final String SQUAT_ID = "legs_1"
     private static final String SQUAT_NAME = "Przysiad ze sztangą"
 
-    @Autowired
-    WorkoutFacade workoutFacade
-
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        workoutFacade.deleteProjectionsByDeviceId(DEVICE_ID)
+        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31))
     }
 
     def "Scenario 1: Get personal records returns PRs for all exercises"() {
