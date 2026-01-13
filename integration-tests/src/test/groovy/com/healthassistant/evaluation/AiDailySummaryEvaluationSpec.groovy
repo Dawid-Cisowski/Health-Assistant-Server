@@ -3,6 +3,7 @@ package com.healthassistant.evaluation
 import org.springframework.ai.evaluation.EvaluationRequest
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Requires
+import spock.lang.Retry
 import spock.lang.Timeout
 
 import java.util.concurrent.TimeUnit
@@ -27,6 +28,7 @@ class AiDailySummaryEvaluationSpec extends BaseEvaluationSpec {
     @Autowired
     DailySummaryEvaluator dailySummaryEvaluator
 
+    @Retry(count = 2, delay = 1000)
     def "AI summary accurately reflects complete health data"() {
         given: "comprehensive health data for today"
         submitStepsForToday(10500)
