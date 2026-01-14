@@ -115,7 +115,7 @@ abstract class BaseEvaluationSpec extends Specification {
         cleanAllData()
     }
 
-    private void cleanAllData() {
+    void cleanAllData() {
         // Delete events first
         if (healthEventsFacade != null) {
             healthEventsFacade.deleteEventsByDeviceId(TEST_DEVICE_ID)
@@ -130,7 +130,7 @@ abstract class BaseEvaluationSpec extends Specification {
         }
     }
 
-    private void cleanupProjectionsForDate(String deviceId, LocalDate date) {
+    void cleanupProjectionsForDate(String deviceId, LocalDate date) {
         if (stepsFacade != null) {
             stepsFacade.deleteProjectionsForDate(deviceId, date)
         }
