@@ -52,8 +52,11 @@ class HeartRateController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving HR range for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
-        HeartRateRangeResponse response = heartRateFacade.getRange(deviceId, startDate, endDate);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
+
+        log.info("Retrieving HR range for device {} from {} to {}", maskDeviceId(deviceId), startDate, effectiveEndDate);
+        HeartRateRangeResponse response = heartRateFacade.getRange(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(response);
     }
 
@@ -78,8 +81,11 @@ class HeartRateController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving resting HR range for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
-        List<RestingHeartRateResponse> response = heartRateFacade.getRestingRange(deviceId, startDate, endDate);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
+
+        log.info("Retrieving resting HR range for device {} from {} to {}", maskDeviceId(deviceId), startDate, effectiveEndDate);
+        List<RestingHeartRateResponse> response = heartRateFacade.getRestingRange(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(response);
     }
 }

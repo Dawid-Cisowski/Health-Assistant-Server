@@ -82,8 +82,11 @@ class MealsController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving meals range summary for device {} from {} to {}", sanitizeForLog(deviceId), startDate, endDate);
-        MealsRangeSummaryResponse summary = mealsFacade.getRangeSummary(deviceId, startDate, endDate);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
+
+        log.info("Retrieving meals range summary for device {} from {} to {}", sanitizeForLog(deviceId), startDate, effectiveEndDate);
+        MealsRangeSummaryResponse summary = mealsFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
 

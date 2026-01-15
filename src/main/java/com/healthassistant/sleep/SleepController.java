@@ -72,8 +72,11 @@ class SleepController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving sleep range summary for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
-        SleepRangeSummaryResponse summary = sleepFacade.getRangeSummary(deviceId, startDate, endDate);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
+
+        log.info("Retrieving sleep range summary for device {} from {} to {}", maskDeviceId(deviceId), startDate, effectiveEndDate);
+        SleepRangeSummaryResponse summary = sleepFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
 

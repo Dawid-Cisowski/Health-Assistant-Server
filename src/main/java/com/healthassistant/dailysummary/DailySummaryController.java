@@ -49,12 +49,9 @@ class DailySummaryController {
     ) {
         log.info("Retrieving daily summary for device {} and date: {}", maskDeviceId(deviceId), date);
 
-        if (date.isAfter(LocalDate.now())) {
-            log.warn("Requested future date: {}", date);
-            return ResponseEntity.badRequest().build();
-        }
+        LocalDate effectiveDate = date.isAfter(LocalDate.now()) ? LocalDate.now() : date;
 
-        return dailySummaryFacade.getDailySummary(deviceId, date)
+        return dailySummaryFacade.getDailySummary(deviceId, effectiveDate)
                 .map(summary -> ResponseEntity.ok(DailySummaryMapper.INSTANCE.toResponse(summary)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -86,13 +83,11 @@ class DailySummaryController {
             return ResponseEntity.badRequest().build();
         }
 
-        if (endDate.isAfter(LocalDate.now())) {
-            log.warn("End date is in the future: {}", endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
 
-        log.info("Retrieving daily summaries range for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
-        DailySummaryRangeSummaryResponse summary = dailySummaryFacade.getRangeSummary(deviceId, startDate, endDate);
+        log.info("Retrieving daily summaries range for device {} from {} to {}", maskDeviceId(deviceId), startDate, effectiveEndDate);
+        DailySummaryRangeSummaryResponse summary = dailySummaryFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
 

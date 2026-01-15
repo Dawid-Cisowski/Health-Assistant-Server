@@ -71,8 +71,11 @@ class CaloriesController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving calories range summary for device: {} from {} to {}", deviceId, startDate, endDate);
-        CaloriesRangeSummaryResponse summary = caloriesFacade.getRangeSummary(deviceId, startDate, endDate);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
+
+        log.info("Retrieving calories range summary for device: {} from {} to {}", deviceId, startDate, effectiveEndDate);
+        CaloriesRangeSummaryResponse summary = caloriesFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
 }

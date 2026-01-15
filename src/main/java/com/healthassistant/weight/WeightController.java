@@ -67,9 +67,12 @@ class WeightController {
             return ResponseEntity.badRequest().build();
         }
 
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
+
         log.info("Retrieving weight range summary for device {} from {} to {}",
-                WeightSecurityUtils.maskDeviceId(deviceId), startDate, endDate);
-        WeightRangeSummaryResponse summary = weightFacade.getRangeSummary(deviceId, startDate, endDate);
+                WeightSecurityUtils.maskDeviceId(deviceId), startDate, effectiveEndDate);
+        WeightRangeSummaryResponse summary = weightFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
 

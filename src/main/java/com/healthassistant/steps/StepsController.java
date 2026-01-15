@@ -79,14 +79,17 @@ class StepsController {
             return ResponseEntity.badRequest().build();
         }
 
-        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
+
+        long daysBetween = ChronoUnit.DAYS.between(startDate, effectiveEndDate);
         if (daysBetween > MAX_DATE_RANGE_DAYS) {
             log.warn("Date range too large: {} days (max {})", daysBetween, MAX_DATE_RANGE_DAYS);
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving steps range summary for device: {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
-        StepsRangeSummaryResponse summary = stepsFacade.getRangeSummary(deviceId, startDate, endDate);
+        log.info("Retrieving steps range summary for device: {} from {} to {}", maskDeviceId(deviceId), startDate, effectiveEndDate);
+        StepsRangeSummaryResponse summary = stepsFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
 }

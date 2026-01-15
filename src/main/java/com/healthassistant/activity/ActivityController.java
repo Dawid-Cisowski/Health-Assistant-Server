@@ -74,19 +74,17 @@ class ActivityController {
             return ResponseEntity.badRequest().build();
         }
 
-        if (endDate.isAfter(LocalDate.now())) {
-            log.warn("Future date requested: {}", endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
 
-        long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate);
+        long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(startDate, effectiveEndDate);
         if (daysBetween > MAX_RANGE_DAYS) {
             log.warn("Requested range {} days exceeds maximum {}", daysBetween, MAX_RANGE_DAYS);
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Retrieving activity range summary for device: {} from {} to {}", deviceId, startDate, endDate);
-        ActivityRangeSummaryResponse summary = activityFacade.getRangeSummary(deviceId, startDate, endDate);
+        log.info("Retrieving activity range summary for device: {} from {} to {}", deviceId, startDate, effectiveEndDate);
+        ActivityRangeSummaryResponse summary = activityFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
 }
