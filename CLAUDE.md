@@ -625,7 +625,7 @@ Events are projected into query-optimized views:
 **Configuration**:
 ```bash
 export GEMINI_API_KEY="your-api-key"
-export GEMINI_MODEL="gemini-3-flash-preview"  # optional, this is default
+export GEMINI_MODEL="gemini-3-pro-preview"  # optional, this is default
 ```
 
 ### Health Data Push Model (Health Connect)
