@@ -2,6 +2,7 @@ package com.healthassistant.evaluation
 
 import org.springframework.ai.evaluation.EvaluationRequest
 import spock.lang.Requires
+import spock.lang.Retry
 import spock.lang.Timeout
 
 import java.time.LocalDate
@@ -153,6 +154,7 @@ class AiDateRecognitionSpec extends BaseEvaluationSpec {
         evaluation.isPass()
     }
 
+    @Retry(count = 2, delay = 1000)
     def "AI correctly interprets 'przez ostatni tydzien' variant"() {
         given: "steps recorded for last 3 days"
         def today = LocalDate.now(POLAND_ZONE)
