@@ -3,7 +3,7 @@ package com.healthassistant.assistant;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.meals.api.MealsFacade;
-import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
+import com.healthassistant.meals.api.dto.EnergyRequirementsResponse;
 import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.sleep.api.dto.SleepRangeSummaryResponse;
 import com.healthassistant.steps.api.StepsFacade;
@@ -138,6 +138,23 @@ class HealthTools {
             var result = weightFacade.getRangeSummary(deviceId, start, end);
             log.info("Weight data fetched: {} measurements over {} days", result.measurementCount(), result.daysWithData());
             return result;
+        });
+    }
+
+    @Tool(name = "getEnergyRequirements",
+          description = "Retrieves user's daily energy requirements and macro targets for a specific date. " +
+                        "Returns target calories, protein/fat/carbs targets, already consumed amounts, and remaining to eat. " +
+                        "Use this to answer questions about: recommended calories, macro goals, how much more to eat, nutrition targets. " +
+                        "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
+    public Object getEnergyRequirements(String date) {
+        var deviceId = AssistantContext.getDeviceId();
+        log.info("Fetching energy requirements for device {} for date {}", deviceId, date);
+
+        return validateAndExecuteSingleDateQuery(date, localDate -> {
+            var result = mealsFacade.getEnergyRequirements(deviceId, localDate);
+            log.info("Energy requirements fetched: {}", result.isPresent() ? "found" : "not available");
+            return result.<Object>map(r -> r)
+                    .orElseGet(() -> new ToolError("Energy requirements not available. Weight data may be missing."));
         });
     }
 

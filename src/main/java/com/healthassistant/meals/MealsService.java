@@ -11,13 +11,14 @@ import com.healthassistant.healthevents.api.dto.payload.MealRecordedPayload;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.meals.api.MealsFacade;
+import com.healthassistant.meals.api.dto.EnergyRequirementsResponse;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.meals.api.dto.MealResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
 import com.healthassistant.meals.api.dto.RecordMealRequest;
 import com.healthassistant.meals.api.dto.UpdateMealRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +34,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
 class MealsService implements MealsFacade {
@@ -51,6 +51,23 @@ class MealsService implements MealsFacade {
     private final MealsProjector mealsProjector;
     private final HealthEventsFacade healthEventsFacade;
     private final ObjectMapper objectMapper;
+    private final EnergyRequirementsService energyRequirementsService;
+
+    MealsService(
+            MealDailyProjectionJpaRepository dailyRepository,
+            MealProjectionJpaRepository mealRepository,
+            MealsProjector mealsProjector,
+            HealthEventsFacade healthEventsFacade,
+            ObjectMapper objectMapper,
+            @Lazy EnergyRequirementsService energyRequirementsService
+    ) {
+        this.dailyRepository = dailyRepository;
+        this.mealRepository = mealRepository;
+        this.mealsProjector = mealsProjector;
+        this.healthEventsFacade = healthEventsFacade;
+        this.objectMapper = objectMapper;
+        this.energyRequirementsService = energyRequirementsService;
+    }
 
     @Override
     public MealDailyDetailResponse getDailyDetail(String deviceId, LocalDate date) {
@@ -394,6 +411,11 @@ class MealsService implements MealsFacade {
                 log.error("Failed to project meal event: {}", sanitizeForLog(event.eventId().value()), e);
             }
         });
+    }
+
+    @Override
+    public Optional<EnergyRequirementsResponse> getEnergyRequirements(String deviceId, LocalDate date) {
+        return energyRequirementsService.calculateEnergyRequirements(new DeviceId(deviceId), date);
     }
 
     private String sanitizeForLog(String value) {
