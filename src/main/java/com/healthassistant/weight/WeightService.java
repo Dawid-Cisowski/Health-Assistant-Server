@@ -161,6 +161,16 @@ class WeightService implements WeightFacade {
     }
 
     @Override
+    public List<WeightMeasurementResponse> getRecentMeasurements(String deviceId, int limit) {
+        return repository.findByDeviceIdOrderByMeasuredAtDesc(
+                        deviceId,
+                        org.springframework.data.domain.PageRequest.of(0, limit)
+                ).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
         log.debug("Deleting weight projections for device {} date {}", WeightSecurityUtils.maskDeviceId(deviceId), date);

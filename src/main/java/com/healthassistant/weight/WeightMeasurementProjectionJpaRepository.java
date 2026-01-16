@@ -25,6 +25,10 @@ interface WeightMeasurementProjectionJpaRepository extends JpaRepository<WeightM
     Optional<WeightMeasurementProjectionJpaEntity> findFirstByDeviceIdOrderByMeasuredAtDesc(
             @Param("deviceId") String deviceId);
 
+    @Query("SELECT w FROM WeightMeasurementProjectionJpaEntity w WHERE w.deviceId = :deviceId ORDER BY w.measuredAt DESC")
+    List<WeightMeasurementProjectionJpaEntity> findByDeviceIdOrderByMeasuredAtDesc(
+            @Param("deviceId") String deviceId, org.springframework.data.domain.Pageable pageable);
+
     @Query("SELECT w FROM WeightMeasurementProjectionJpaEntity w WHERE w.deviceId = :deviceId AND w.date BETWEEN :startDate AND :endDate ORDER BY w.measuredAt ASC")
     List<WeightMeasurementProjectionJpaEntity> findByDeviceIdAndDateBetweenOrderByMeasuredAtAsc(
             @Param("deviceId") String deviceId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);

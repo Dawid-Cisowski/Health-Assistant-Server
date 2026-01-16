@@ -17,6 +17,9 @@ public interface WeightFacade {
 
     Optional<WeightMeasurementResponse> getMeasurementById(String deviceId, String measurementId);
 
+
+    List<WeightMeasurementResponse> getRecentMeasurements(String deviceId, int limit);
+
     void deleteProjectionsForDate(String deviceId, LocalDate date);
 
     void projectEvents(List<StoredEventData> events);

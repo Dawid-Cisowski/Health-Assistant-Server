@@ -116,4 +116,15 @@ app:
     device-id: ${GOOGLE_FIT_DEVICE_ID:google-fit}
   assistant:
     max-iterations: ${ASSISTANT_MAX_ITERATIONS:5}
+  energy-requirements:
+    surplus-kcal: 300
+    base-multiplier: 1.35
+    steps-threshold: 4000
+    steps-interval: 2000
+    kcal-per-interval: 90
+    max-intervals: 8
+    training-bonus: 250
+    protein-per-lbm: 2.8
+    fat-training-day: 50
+    fat-rest-day: 80
 

@@ -27,6 +27,8 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
     List<WorkoutProjectionJpaEntity> findByDeviceIdAndPerformedDateOrderByPerformedAtDesc(
             String deviceId, LocalDate date);
 
+    boolean existsByDeviceIdAndPerformedDate(String deviceId, LocalDate performedDate);
+
     @Query("SELECT w FROM WorkoutProjectionJpaEntity w " +
            "LEFT JOIN FETCH w.exercises e " +
            "WHERE w.workoutId = :workoutId " +

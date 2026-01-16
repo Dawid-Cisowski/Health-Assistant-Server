@@ -105,6 +105,11 @@ class WorkoutService implements WorkoutFacade {
     }
 
     @Override
+    public boolean hasWorkoutOnDate(String deviceId, LocalDate date) {
+        return workoutRepository.existsByDeviceIdAndPerformedDate(deviceId, date);
+    }
+
+    @Override
     @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
         log.debug("Deleting workout projections for device {} date {}", deviceId, date);

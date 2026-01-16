@@ -15,6 +15,8 @@ public interface WorkoutFacade {
 
     List<WorkoutDetailResponse> getWorkoutsByDateRange(String deviceId, LocalDate startDate, LocalDate endDate);
 
+    boolean hasWorkoutOnDate(String deviceId, LocalDate date);
+
     void deleteProjectionsForDate(String deviceId, LocalDate date);
 
     void projectEvents(List<StoredEventData> events);

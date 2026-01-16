@@ -1,6 +1,9 @@
 package com.healthassistant.meals;
 
+import com.healthassistant.config.api.dto.ErrorResponse;
+import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.meals.api.MealsFacade;
+import com.healthassistant.meals.api.dto.EnergyRequirementsResponse;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.meals.api.dto.MealResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
@@ -37,6 +40,32 @@ class MealsController {
     private static final Pattern EVENT_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]{1,100}$");
 
     private final MealsFacade mealsFacade;
+    private final EnergyRequirementsService energyRequirementsService;
+
+    @GetMapping("/energy-requirements/{date}")
+    @Operation(
+            summary = "Get daily energy requirements",
+            description = "Calculates target calories and macronutrients for a specific date using Katch-McArdle formula. " +
+                    "Uses effective LBM (average of last 3 measurements), step activity, and training status to calculate dynamic energy needs.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Energy requirements calculated successfully"),
+            @ApiResponse(responseCode = "400", description = "No weight data available or invalid request parameters"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<?> getEnergyRequirements(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @NotNull LocalDate date,
+            @RequestHeader("X-Device-Id") String deviceIdHeader
+    ) {
+        validateDeviceId(deviceIdHeader);
+        DeviceId deviceId = DeviceId.of(deviceIdHeader);
+        log.info("Calculating energy requirements for device {} and date: {}", sanitizeForLog(deviceIdHeader), date);
+        return energyRequirementsService.calculateEnergyRequirements(deviceId, date)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.badRequest()
+                        .body(new ErrorResponse("WEIGHT_DATA_MISSING", "Unable to calculate energy requirements - weight data not available", null)));
+    }
 
     @GetMapping("/daily/{date}")
     @Operation(
