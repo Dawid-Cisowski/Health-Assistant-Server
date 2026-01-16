@@ -61,8 +61,8 @@ class SleepImportService implements SleepImportFacade {
                 );
             }
 
-            Optional<ExistingSleepInfo> existingInfo = healthEventsFacade.findExistingSleepInfo(
-                    deviceId, extractedData.sleepStart()
+            Optional<ExistingSleepInfo> existingInfo = healthEventsFacade.findOverlappingSleepInfo(
+                    deviceId, extractedData.sleepStart(), extractedData.sleepEnd()
             );
 
             boolean overwrote = existingInfo.isPresent();
@@ -70,8 +70,8 @@ class SleepImportService implements SleepImportFacade {
 
             if (overwrote) {
                 String targetEventId = existingInfo.get().eventId().value();
-                log.info("Found existing sleep with same start time, will delete and recreate: eventId={}",
-                        targetEventId);
+                log.info("Found overlapping sleep session, will delete and recreate: eventId={}, existingRange=[{} - {}]",
+                        targetEventId, existingInfo.get().sleepStart(), existingInfo.get().sleepEnd());
 
                 EventDeletedPayload deletePayload = new EventDeletedPayload(
                         targetEventId,

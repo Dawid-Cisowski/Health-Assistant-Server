@@ -293,7 +293,73 @@ class SleepImportSpec extends BaseIntegrationSpec {
         sleepEvents.size() == 1
     }
 
-    def "Scenario 12: PNG image is accepted"() {
+    def "Scenario 12: Import merges when times overlap but start differs (watch vs oHealth)"() {
+        given: "a Health Connect sleep event from watch with slightly different times"
+        // Watch recorded: 23:15 - 06:20 (overnight)
+        def watchSleepStart = Instant.parse("2025-12-24T22:15:00Z")  // 23:15 Warsaw time
+        def watchSleepEnd = Instant.parse("2025-12-25T05:20:00Z")    // 06:20 Warsaw time
+        submitSleepEvent(DEVICE_ID, "watch-sleep-1", watchSleepStart, watchSleepEnd, 425, "com.google.android.apps.fitness")
+
+        and: "I have a sleep import image with overlapping but different times (23:08 - 06:15)"
+        def imageBytes = createTestImageBytes()
+        // This returns sleepStart=00:08 (meaning 23:08 previous day) and wakeTime=07:15 (06:15 UTC)
+        setupGeminiVisionMock(createValidSleepExtractionResponse())
+
+        when: "I submit the sleep import"
+        def response = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "sleep.jpg", imageBytes, "image/jpeg")
+                .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+
+        then: "response is successful and indicates overwrite (MERGE)"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getString("status") == "success"
+        body.getBoolean("overwrote") == true
+
+        and: "the watch sleep was replaced with import (EventDeleted + new import)"
+        def events = findEventsForDevice(DEVICE_ID)
+        events.size() == 2
+
+        and: "one is the EventDeleted compensation event"
+        def deletedEvents = events.findAll { it.eventType() == "EventDeleted.v1" }
+        deletedEvents.size() == 1
+
+        and: "only one active sleep event exists (from import)"
+        def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 1
+        sleepEvents.first().payload().source() == "OHEALTH_SCREENSHOT"
+    }
+
+    def "Scenario 13: Daytime nap does NOT merge with overnight sleep"() {
+        given: "an overnight Health Connect sleep event exists"
+        def nightSleepStart = Instant.parse("2025-12-24T22:00:00Z")  // 23:00 Warsaw time
+        def nightSleepEnd = Instant.parse("2025-12-25T06:00:00Z")    // 07:00 Warsaw time
+        submitSleepEvent(DEVICE_ID, "night-sleep-1", nightSleepStart, nightSleepEnd, 480, "com.google.android.apps.fitness")
+
+        and: "I have a sleep import image showing a daytime nap (14:00 - 15:30)"
+        def imageBytes = createTestImageBytes()
+        setupGeminiVisionMock(createDaytimeNapResponse())
+
+        when: "I submit the nap import"
+        def response = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "sleep.jpg", imageBytes, "image/jpeg")
+                .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+
+        then: "response is successful and indicates NO overwrite (separate records)"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getString("status") == "success"
+        body.getBoolean("overwrote") == false
+
+        and: "both sleep events exist (night sleep and daytime nap)"
+        def events = findEventsForDevice(DEVICE_ID)
+        def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 2
+    }
+
+    def "Scenario 14: PNG image is accepted"() {
         given: "a valid PNG image"
         def imageBytes = createTestImageBytes()
         setupGeminiVisionMock(createValidSleepExtractionResponse())
@@ -309,7 +375,35 @@ class SleepImportSpec extends BaseIntegrationSpec {
         response.body().jsonPath().getString("status") == "success"
     }
 
-    def "Scenario 13: Sleep projection includes score after import"() {
+    def "Scenario 15: Multiple naps in same day remain separate"() {
+        given: "a morning nap exists"
+        def morningNapStart = Instant.parse("2025-12-25T09:00:00Z")  // 10:00 Warsaw time
+        def morningNapEnd = Instant.parse("2025-12-25T10:30:00Z")    // 11:30 Warsaw time
+        submitSleepEvent(DEVICE_ID, "morning-nap", morningNapStart, morningNapEnd, 90, "com.google.android.apps.fitness")
+
+        and: "I have a sleep import image showing an afternoon nap (14:00 - 15:30)"
+        def imageBytes = createTestImageBytes()
+        setupGeminiVisionMock(createDaytimeNapResponse())
+
+        when: "I submit the afternoon nap import"
+        def response = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "sleep.jpg", imageBytes, "image/jpeg")
+                .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+
+        then: "response is successful and indicates NO overwrite (separate naps)"
+        response.statusCode() == 200
+        def body = response.body().jsonPath()
+        body.getString("status") == "success"
+        body.getBoolean("overwrote") == false
+
+        and: "both nap events exist separately"
+        def events = findEventsForDevice(DEVICE_ID)
+        def sleepEvents = events.findAll { it.eventType() == "SleepSessionRecorded.v1" }
+        sleepEvents.size() == 2
+    }
+
+    def "Scenario 16: Sleep projection includes score after import"() {
         given: "a valid sleep import"
         def imageBytes = createTestImageBytes()
         setupGeminiVisionMock(createValidSleepExtractionResponse())
@@ -442,6 +536,25 @@ class SleepImportSpec extends BaseIntegrationSpec {
                 "awakeMinutes": 40
             },
             "qualityLabel": "Doskonały"
+        }"""
+    }
+
+    String createDaytimeNapResponse() {
+        return """{
+            "isSleepScreenshot": true,
+            "confidence": 0.88,
+            "sleepDate": "2025-12-25",
+            "sleepStart": "14:00",
+            "wakeTime": "15:30",
+            "totalSleepMinutes": 90,
+            "sleepScore": 65,
+            "phases": {
+                "lightSleepMinutes": 50,
+                "deepSleepMinutes": 25,
+                "remSleepMinutes": 10,
+                "awakeMinutes": 5
+            },
+            "qualityLabel": "Drzemka"
         }"""
     }
 }

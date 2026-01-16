@@ -349,6 +349,12 @@ class HealthEventsService implements HealthEventsFacade {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<ExistingSleepInfo> findOverlappingSleepInfo(DeviceId deviceId, Instant sleepStart, Instant sleepEnd) {
+        return eventRepository.findOverlappingSleepInfo(deviceId, sleepStart, sleepEnd);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<StoredEventData> findEventById(String deviceId, String eventId) {
         return healthEventJpaRepository.findByEventIdAndDeviceId(eventId, deviceId)
                 .filter(entity -> entity.getDeletedAt() == null && entity.getSupersededByEventId() == null)

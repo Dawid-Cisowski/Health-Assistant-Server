@@ -127,9 +127,25 @@ class EventRepositoryAdapter implements EventRepository {
         log.debug("Looking for sleep event with deviceId={}, sleepStart={}", deviceId.value(), sleepStart);
 
         return jpaRepository.findSleepInfoByDeviceIdAndSleepStart(deviceId.value(), sleepStart)
-                .map(projection -> new ExistingSleepInfo(
-                        IdempotencyKey.of(projection.getIdempotencyKey()),
-                        EventId.of(projection.getEventId())
-                ));
+                .map(this::toExistingSleepInfo);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ExistingSleepInfo> findOverlappingSleepInfo(DeviceId deviceId, Instant sleepStart, Instant sleepEnd) {
+        log.debug("Looking for overlapping sleep event with deviceId={}, sleepStart={}, sleepEnd={}",
+                deviceId.value(), sleepStart, sleepEnd);
+
+        return jpaRepository.findOverlappingSleepInfo(deviceId.value(), sleepStart, sleepEnd)
+                .map(this::toExistingSleepInfo);
+    }
+
+    private ExistingSleepInfo toExistingSleepInfo(SleepInfoProjection projection) {
+        return new ExistingSleepInfo(
+                IdempotencyKey.of(projection.getIdempotencyKey()),
+                EventId.of(projection.getEventId()),
+                projection.getSleepStart(),
+                projection.getSleepEnd()
+        );
     }
 }

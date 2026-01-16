@@ -25,7 +25,11 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
     List<HealthEventJpaEntity> findByDeviceId(String deviceId);
 
     @Query(value = """
-        SELECT idempotency_key AS idempotencyKey, event_id AS eventId FROM health_events
+        SELECT idempotency_key AS idempotencyKey,
+               event_id AS eventId,
+               (payload->>'sleepStart')::timestamptz AS sleepStart,
+               (payload->>'sleepEnd')::timestamptz AS sleepEnd
+        FROM health_events
         WHERE device_id = :deviceId
         AND event_type = 'SleepSessionRecorded.v1'
         AND (payload->>'sleepStart')::timestamptz = :sleepStart
@@ -36,6 +40,27 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
     Optional<SleepInfoProjection> findSleepInfoByDeviceIdAndSleepStart(
             @Param("deviceId") String deviceId,
             @Param("sleepStart") Instant sleepStart
+    );
+
+    @Query(value = """
+        SELECT idempotency_key AS idempotencyKey,
+               event_id AS eventId,
+               (payload->>'sleepStart')::timestamptz AS sleepStart,
+               (payload->>'sleepEnd')::timestamptz AS sleepEnd
+        FROM health_events
+        WHERE device_id = :deviceId
+        AND event_type = 'SleepSessionRecorded.v1'
+        AND deleted_at IS NULL
+        AND superseded_by_event_id IS NULL
+        AND (payload->>'sleepStart')::timestamptz < :sleepEnd
+        AND (payload->>'sleepEnd')::timestamptz > :sleepStart
+        ORDER BY (payload->>'sleepStart')::timestamptz DESC
+        LIMIT 1
+        """, nativeQuery = true)
+    Optional<SleepInfoProjection> findOverlappingSleepInfo(
+            @Param("deviceId") String deviceId,
+            @Param("sleepStart") Instant sleepStart,
+            @Param("sleepEnd") Instant sleepEnd
     );
 
     void deleteByDeviceId(String deviceId);
