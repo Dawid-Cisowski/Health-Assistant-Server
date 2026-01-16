@@ -128,6 +128,8 @@ abstract class BaseIntegrationSpec extends Specification {
             "test-deletion", "test-correction",
             // Meal CRUD specs
             "test-meal-crud",
+            // Workout CRUD specs
+            "test-workout-crud",
             // Cross-module and edge case specs
             "test-cross-module", "test-timezone", "test-ratelimit", "test-mealedge",
             // Personal records specs

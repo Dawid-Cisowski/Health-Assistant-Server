@@ -3,7 +3,9 @@ package com.healthassistant.workout.api;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.workout.api.dto.ExerciseDefinition;
 import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
+import com.healthassistant.workout.api.dto.UpdateWorkoutRequest;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
+import com.healthassistant.workout.api.dto.WorkoutMutationResponse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -29,5 +31,9 @@ public interface WorkoutFacade {
                                           String primaryMuscle, List<String> muscles);
 
     PersonalRecordsResponse getAllPersonalRecords(String deviceId);
+
+    void deleteWorkout(String deviceId, String eventId);
+
+    WorkoutMutationResponse updateWorkout(String deviceId, String eventId, UpdateWorkoutRequest request);
 
 }
