@@ -142,6 +142,16 @@ tasks.register<Test>("evaluationTest") {
 
     // JVM args for parallel execution
     jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
+
+    // Show test output and exceptions in console
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
 }
 
 tasks.jacocoTestReport {
