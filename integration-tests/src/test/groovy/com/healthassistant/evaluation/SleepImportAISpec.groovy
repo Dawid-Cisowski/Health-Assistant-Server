@@ -23,7 +23,6 @@ import java.time.LocalDate
 class SleepImportAISpec extends BaseEvaluationSpec {
 
     // Use same device as BaseEvaluationSpec (already configured in HMAC)
-    private static final String DEVICE_ID = TEST_DEVICE_ID
     private static final String SECRET_BASE64 = TEST_SECRET_BASE64
     private static final String IMPORT_ENDPOINT = "/v1/sleep/import-image"
 
@@ -36,7 +35,7 @@ class SleepImportAISpec extends BaseEvaluationSpec {
         def imageBytes = loadScreenshot("/screenshots/sleep_1.png")
 
         when: "I import the screenshot via real Gemini API"
-        def importResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "sleep_1.png", imageBytes, "image/png")
+        def importResponse = authenticatedMultipartRequest(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, "sleep_1.png", imageBytes, "image/png")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
@@ -75,7 +74,7 @@ class SleepImportAISpec extends BaseEvaluationSpec {
     def "sleep_1.png: Imported sleep appears in /v1/sleep/daily with correct data"() {
         given: "sleep_1.png is imported"
         def imageBytes = loadScreenshot("/screenshots/sleep_1.png")
-        def importResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "sleep_1.png", imageBytes, "image/png")
+        def importResponse = authenticatedMultipartRequest(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, "sleep_1.png", imageBytes, "image/png")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .statusCode(200)
@@ -86,7 +85,7 @@ class SleepImportAISpec extends BaseEvaluationSpec {
         when: "I query /v1/sleep/daily for 2026-01-02"
         waitForProjections()
         def date = LocalDate.of(2026, 1, 2)
-        def sleepResponse = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/sleep/daily/${date}")
+        def sleepResponse = authenticatedGetRequest(getTestDeviceId(), SECRET_BASE64, "/v1/sleep/daily/${date}")
                 .get("/v1/sleep/daily/${date}")
                 .then()
                 .extract()
@@ -113,14 +112,14 @@ class SleepImportAISpec extends BaseEvaluationSpec {
     def "sleep_1.png: Imported sleep appears in /v1/sleep/range"() {
         given: "sleep_1.png is imported"
         def imageBytes = loadScreenshot("/screenshots/sleep_1.png")
-        authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "sleep_1.png", imageBytes, "image/png")
+        authenticatedMultipartRequest(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, "sleep_1.png", imageBytes, "image/png")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .statusCode(200)
 
         when: "I query /v1/sleep/range for the date range including 2026-01-02"
         waitForProjections()
-        def rangeResponse = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/sleep/range?startDate=2026-01-01&endDate=2026-01-03")
+        def rangeResponse = authenticatedGetRequest(getTestDeviceId(), SECRET_BASE64, "/v1/sleep/range?startDate=2026-01-01&endDate=2026-01-03")
                 .get("/v1/sleep/range?startDate=2026-01-01&endDate=2026-01-03")
                 .then()
                 .extract()

@@ -38,6 +38,9 @@ import java.time.format.DateTimeFormatter
  * which means it uses the REAL Gemini API instead of mocks.
  *
  * Tests extending this class require GEMINI_API_KEY environment variable.
+ *
+ * NOTE: Each test class gets a unique device ID for parallel test isolation.
+ * Use getTestDeviceId() to get the device ID for the current test class.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ContextConfiguration(classes = [HealthAssistantApplication])
@@ -45,9 +48,17 @@ import java.time.format.DateTimeFormatter
 @ActiveProfiles(["test", "evaluation"])
 abstract class BaseEvaluationSpec extends Specification {
 
-    static final String TEST_DEVICE_ID = "test-device"
+    // Each test class gets a unique device ID based on class name for parallel test isolation
     static final String TEST_SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw")
+
+    // Legacy constant for backward compatibility - use getTestDeviceId() instead
+    static final String TEST_DEVICE_ID = "test-device"
+
+    // Generate unique device ID per test class for parallel isolation
+    String getTestDeviceId() {
+        return "eval-${this.class.simpleName.toLowerCase().hashCode().abs() % 10000}"
+    }
 
     @LocalServerPort
     int port
@@ -92,10 +103,37 @@ abstract class BaseEvaluationSpec extends Specification {
     static {
         postgres.start()
 
+        // Generate HMAC devices config with all evaluation test devices for parallel execution
+        // Evaluation spec class names - each gets a unique device ID based on class name hash
+        def evalSpecs = [
+            "AiConversationAccuracySpec",
+            "AiToolErrorHandlingSpec",
+            "AiHallucinationSpec",
+            "AiStreamErrorRecoverySpec",
+            "AiContentFilteringSpec",
+            "AiConcurrentRequestsSpec",
+            "AiMultiToolQuerySpec",
+            "AiPromptInjectionSpec",
+            "AiDailySummaryEvaluationSpec",
+            "MealImportAISpec",
+            "WorkoutImportAISpec",
+            "SleepImportAISpec",
+            "WeightImportAISpec",
+            "AiDateRecognitionSpec"
+        ]
+
+        def devicesMap = new StringBuilder('{')
+        devicesMap.append('"test-device":"dGVzdC1zZWNyZXQtMTIz"')  // Legacy device
+        evalSpecs.each { specName ->
+            def deviceId = "eval-${specName.toLowerCase().hashCode().abs() % 10000}"
+            devicesMap.append(',"').append(deviceId).append('":"dGVzdC1zZWNyZXQtMTIz"')
+        }
+        devicesMap.append('}')
+
         System.setProperty("spring.datasource.url", postgres.getJdbcUrl())
         System.setProperty("spring.datasource.username", postgres.getUsername())
         System.setProperty("spring.datasource.password", postgres.getPassword())
-        System.setProperty("app.hmac.devices-json", '{"test-device":"dGVzdC1zZWNyZXQtMTIz"}')
+        System.setProperty("app.hmac.devices-json", devicesMap.toString())
         System.setProperty("app.hmac.tolerance-seconds", "600")
         System.setProperty("app.nonce.cache-ttl-seconds", "600")
 
@@ -116,9 +154,10 @@ abstract class BaseEvaluationSpec extends Specification {
     }
 
     void cleanAllData() {
+        def deviceId = getTestDeviceId()
         // Delete events first
         if (healthEventsFacade != null) {
-            healthEventsFacade.deleteEventsByDeviceId(TEST_DEVICE_ID)
+            healthEventsFacade.deleteEventsByDeviceId(deviceId)
         }
         // Delete all projections for device within a reasonable date range
         def today = LocalDate.now(POLAND_ZONE)
@@ -126,7 +165,7 @@ abstract class BaseEvaluationSpec extends Specification {
         def endDate = today.plusDays(7)
 
         startDate.datesUntil(endDate.plusDays(1)).toList().each { date ->
-            cleanupProjectionsForDate(TEST_DEVICE_ID, date)
+            cleanupProjectionsForDate(deviceId, date)
         }
     }
 
@@ -165,7 +204,7 @@ abstract class BaseEvaluationSpec extends Specification {
     String askAssistant(String message) {
         def chatRequest = """{"message": "${escapeJson(message)}"}"""
         def response = authenticatedPostRequestWithBody(
-                TEST_DEVICE_ID, TEST_SECRET_BASE64,
+                getTestDeviceId(), TEST_SECRET_BASE64,
                 "/v1/assistant/chat", chatRequest
         )
                 .when()
@@ -215,7 +254,7 @@ abstract class BaseEvaluationSpec extends Specification {
         def bucketStart = bucketEnd.minusSeconds(3600)
 
         def request = [
-            deviceId: TEST_DEVICE_ID,
+            deviceId: getTestDeviceId(),
             events: [[
                 idempotencyKey: UUID.randomUUID().toString(),
                 type: "StepsBucketedRecorded.v1",
@@ -239,7 +278,7 @@ abstract class BaseEvaluationSpec extends Specification {
         def sleepStart = sleepEnd.minusSeconds(totalMinutes * 60L)
 
         def request = [
-            deviceId: TEST_DEVICE_ID,
+            deviceId: getTestDeviceId(),
             events: [[
                 idempotencyKey: UUID.randomUUID().toString(),
                 type: "SleepSessionRecorded.v1",
@@ -263,7 +302,7 @@ abstract class BaseEvaluationSpec extends Specification {
         }
 
         def request = [
-            deviceId: TEST_DEVICE_ID,
+            deviceId: getTestDeviceId(),
             events: [[
                 idempotencyKey: UUID.randomUUID().toString(),
                 type: "WorkoutRecorded.v1",
@@ -290,7 +329,7 @@ abstract class BaseEvaluationSpec extends Specification {
         def bucketStart = bucketEnd.minusSeconds(3600)
 
         def request = [
-            deviceId: TEST_DEVICE_ID,
+            deviceId: getTestDeviceId(),
             events: [[
                 idempotencyKey: UUID.randomUUID().toString(),
                 type: "ActiveCaloriesBurnedRecorded.v1",
@@ -310,7 +349,7 @@ abstract class BaseEvaluationSpec extends Specification {
         def occurredAt = Instant.now()
 
         def request = [
-            deviceId: TEST_DEVICE_ID,
+            deviceId: getTestDeviceId(),
             events: [[
                 idempotencyKey: UUID.randomUUID().toString(),
                 type: "MealRecorded.v1",
@@ -330,7 +369,7 @@ abstract class BaseEvaluationSpec extends Specification {
     }
 
     void submitEvent(String eventJson) {
-        authenticatedPostRequestWithBody(TEST_DEVICE_ID, TEST_SECRET_BASE64, "/v1/health-events", eventJson)
+        authenticatedPostRequestWithBody(getTestDeviceId(), TEST_SECRET_BASE64, "/v1/health-events", eventJson)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)

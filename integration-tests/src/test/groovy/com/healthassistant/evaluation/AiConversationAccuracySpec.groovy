@@ -123,7 +123,7 @@ class AiConversationAccuracySpec extends BaseEvaluationSpec {
         println "DEBUG: Device 1 response: ${device1Response.content}"
 
         when: "device 2 (different device) asks follow-up without context"
-        // Note: askAssistant uses TEST_DEVICE_ID, so this simulates new conversation
+        // Note: askAssistant uses getTestDeviceId(), so this simulates new conversation
         def device2Response = askAssistant("Ile to było?")
         println "DEBUG: Device 2 response: ${device2Response}"
 
@@ -193,7 +193,7 @@ class AiConversationAccuracySpec extends BaseEvaluationSpec {
                 : """{"message": "${escapeJson(message)}"}"""
 
         def response = authenticatedPostRequestWithBody(
-                TEST_DEVICE_ID, TEST_SECRET_BASE64,
+                getTestDeviceId(), TEST_SECRET_BASE64,
                 "/v1/assistant/chat", chatRequest
         )
                 .when()

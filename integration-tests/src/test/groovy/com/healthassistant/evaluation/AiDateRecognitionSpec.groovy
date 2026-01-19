@@ -323,7 +323,7 @@ class AiDateRecognitionSpec extends BaseEvaluationSpec {
         def bucketStart = bucketEnd.minusSeconds(3600)
 
         def request = [
-            deviceId: TEST_DEVICE_ID,
+            deviceId: getTestDeviceId(),
             events: [[
                 idempotencyKey: UUID.randomUUID().toString(),
                 type: "ActiveCaloriesBurnedRecorded.v1",

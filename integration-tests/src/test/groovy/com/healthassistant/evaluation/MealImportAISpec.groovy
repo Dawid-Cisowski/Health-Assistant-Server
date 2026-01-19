@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
 class MealImportAISpec extends BaseEvaluationSpec {
 
-    private static final String DEVICE_ID = TEST_DEVICE_ID
     private static final String SECRET_BASE64 = TEST_SECRET_BASE64
     private static final String IMPORT_ENDPOINT = "/v1/meals/import"
 
@@ -36,7 +35,7 @@ class MealImportAISpec extends BaseEvaluationSpec {
         def description = "banan"
 
         when: "importing via Gemini API"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, description)
+        def response = authenticatedMultipartRequestWithDescription(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, description)
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
@@ -82,7 +81,7 @@ class MealImportAISpec extends BaseEvaluationSpec {
         def description = "kubek czarnej kawy"
 
         when: "importing via Gemini API"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, description)
+        def response = authenticatedMultipartRequestWithDescription(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, description)
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
@@ -108,7 +107,7 @@ class MealImportAISpec extends BaseEvaluationSpec {
         def description = "200g grillowanego kurczaka, 200g brokuła i 100g ryżu"
 
         when: "importing via Gemini API"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, description)
+        def response = authenticatedMultipartRequestWithDescription(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, description)
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()

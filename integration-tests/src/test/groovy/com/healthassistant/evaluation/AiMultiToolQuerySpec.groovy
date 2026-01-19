@@ -36,11 +36,14 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
 
         waitForProjections()
 
+        def peakDate = today.minusDays(2)
+        def fromDate = today.minusDays(5).format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+        def toDate = today.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+
         when: "asking about most active day"
-        def response = askAssistant("Który dzień w ostatnim tygodniu był najbardziej aktywny?")
+        def response = askAssistant("Który dzień od ${fromDate} do ${toDate} miał najwięcej kroków?")
         println "DEBUG: AI response: $response"
 
-        def peakDate = today.minusDays(2)
         then: "AI identifies the day with 15000 steps"
         def evaluation = healthDataEvaluator.evaluate(
                 new EvaluationRequest(
@@ -207,7 +210,7 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
         def sleepStart = sleepEnd.minusSeconds(totalMinutes * 60L)
 
         def request = [
-            deviceId: TEST_DEVICE_ID,
+            deviceId: getTestDeviceId(),
             events: [[
                 idempotencyKey: UUID.randomUUID().toString(),
                 type: "SleepSessionRecorded.v1",

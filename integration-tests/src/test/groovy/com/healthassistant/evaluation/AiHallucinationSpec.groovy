@@ -30,7 +30,7 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
 
         and: "verify data exists via facade"
         def today = LocalDate.now(POLAND_ZONE)
-        def stepsData = stepsFacade.getRangeSummary(TEST_DEVICE_ID, today, today)
+        def stepsData = stepsFacade.getRangeSummary(getTestDeviceId(), today, today)
         assert stepsData != null : "Steps data should exist"
         println "DEBUG: Steps facade returned: totalSteps=${stepsData.totalSteps()}"
 
@@ -70,7 +70,7 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
 
         and: "verify data exists via facade"
         def yesterday = LocalDate.now(POLAND_ZONE).minusDays(1)
-        def sleepData = sleepFacade.getRangeSummary(TEST_DEVICE_ID, yesterday, yesterday)
+        def sleepData = sleepFacade.getRangeSummary(getTestDeviceId(), yesterday, yesterday)
         assert sleepData.totalSleepMinutes() == 420 : "Sleep should be 420 minutes, got ${sleepData.totalSleepMinutes()}"
         println "DEBUG: Sleep facade returned for ${yesterday}: totalSleepMinutes=${sleepData.totalSleepMinutes()}"
 
@@ -93,7 +93,7 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
 
         and: "verify data exists via facade"
         def today = LocalDate.now(POLAND_ZONE)
-        def workouts = workoutFacade.getWorkoutsByDateRange(TEST_DEVICE_ID, today, today)
+        def workouts = workoutFacade.getWorkoutsByDateRange(getTestDeviceId(), today, today)
         assert workouts.size() == 1 : "Should have 1 workout, got ${workouts.size()}"
         println "DEBUG: Workout facade returned for ${today}: ${workouts.size()} workouts"
         workouts.each { println "DEBUG: Workout: $it" }
@@ -117,7 +117,7 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
 
         and: "verify data exists via facade"
         def today = LocalDate.now(POLAND_ZONE)
-        def mealsData = mealsFacade.getRangeSummary(TEST_DEVICE_ID, today, today)
+        def mealsData = mealsFacade.getRangeSummary(getTestDeviceId(), today, today)
         assert mealsData.totalMealCount() == 1 : "Should have 1 meal, got ${mealsData.totalMealCount()}"
         println "DEBUG: Meals facade returned for ${today}: totalMealCount=${mealsData.totalMealCount()}, totalCalories=${mealsData.totalCaloriesKcal()}"
 
@@ -179,7 +179,7 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
 
         and: "verify data exists"
         def weekStart = today.minusDays(6)
-        def stepsData = stepsFacade.getRangeSummary(TEST_DEVICE_ID, weekStart, today)
+        def stepsData = stepsFacade.getRangeSummary(getTestDeviceId(), weekStart, today)
         println "DEBUG: Steps facade returned for ${weekStart} to ${today}: totalSteps=${stepsData.totalSteps()}"
 
         when: "asking about this week's steps"
@@ -205,7 +205,7 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
 
         and: "verify data exists"
         def today = LocalDate.now(POLAND_ZONE)
-        def mealsData = mealsFacade.getRangeSummary(TEST_DEVICE_ID, today, today)
+        def mealsData = mealsFacade.getRangeSummary(getTestDeviceId(), today, today)
         assert mealsData.totalMealCount() == 3 : "Should have 3 meals"
         println "DEBUG: Meals facade: ${mealsData.totalMealCount()} meals, ${mealsData.totalCaloriesKcal()} total calories"
 

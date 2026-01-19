@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
 class WorkoutImportAISpec extends BaseEvaluationSpec {
 
-    private static final String DEVICE_ID = TEST_DEVICE_ID
     private static final String SECRET_BASE64 = TEST_SECRET_BASE64
     private static final String IMPORT_ENDPOINT = "/v1/workouts/import-image"
 
@@ -57,7 +56,7 @@ class WorkoutImportAISpec extends BaseEvaluationSpec {
         def imageBytes = loadScreenshot("/screenshots/workouts/workout_1.png")
 
         when: "I import the screenshot via real Gemini API"
-        def response = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "workout_1.png", imageBytes, "image/png")
+        def response = authenticatedMultipartRequest(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, "workout_1.png", imageBytes, "image/png")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
@@ -92,7 +91,7 @@ class WorkoutImportAISpec extends BaseEvaluationSpec {
     def "workout_1.png: Imported workout appears in /v1/workouts API"() {
         given: "workout_1.png is imported"
         def imageBytes = loadScreenshot("/screenshots/workouts/workout_1.png")
-        def importResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "workout_1.png", imageBytes, "image/png")
+        def importResponse = authenticatedMultipartRequest(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, "workout_1.png", imageBytes, "image/png")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .statusCode(200)
@@ -104,7 +103,7 @@ class WorkoutImportAISpec extends BaseEvaluationSpec {
         when: "I query /v1/workouts for today"
         waitForProjections()
         def today = LocalDate.now(POLAND_ZONE)
-        def workoutsResponse = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/workouts?from=${today}&to=${today}")
+        def workoutsResponse = authenticatedGetRequest(getTestDeviceId(), SECRET_BASE64, "/v1/workouts?from=${today}&to=${today}")
                 .get("/v1/workouts?from=${today}&to=${today}")
                 .then()
                 .extract()
@@ -126,7 +125,7 @@ class WorkoutImportAISpec extends BaseEvaluationSpec {
         def imageBytes = loadScreenshot("/screenshots/workouts/bodyweight_1.png")
 
         when: "I import the screenshot via real Gemini API"
-        def response = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "bodyweight_1.png", imageBytes, "image/png")
+        def response = authenticatedMultipartRequest(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, "bodyweight_1.png", imageBytes, "image/png")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
@@ -151,7 +150,7 @@ class WorkoutImportAISpec extends BaseEvaluationSpec {
         def imageBytes = createMinimalTestImage()
 
         when: "I import the test image"
-        def response = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "test.jpg", imageBytes, "image/jpeg")
+        def response = authenticatedMultipartRequest(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, "test.jpg", imageBytes, "image/jpeg")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()

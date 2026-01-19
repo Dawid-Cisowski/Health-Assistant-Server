@@ -9,7 +9,6 @@ import spock.lang.Title
 @Requires({ System.getenv('GEMINI_API_KEY') })
 class WeightImportAISpec extends BaseEvaluationSpec {
 
-    private static final String DEVICE_ID = TEST_DEVICE_ID
     private static final String SECRET_BASE64 = TEST_SECRET_BASE64
     private static final String IMPORT_ENDPOINT = "/v1/weight/import-image"
 
@@ -24,7 +23,7 @@ class WeightImportAISpec extends BaseEvaluationSpec {
 
         when: "I import both images via real Gemini API"
         def importResponse = authenticatedMultipartRequestMultipleImages(
-                DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT,
+                getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT,
                 ["weight_part1.jpeg": part1, "weight_part2.jpeg": part2]
         )
                 .post(IMPORT_ENDPOINT)
@@ -81,7 +80,7 @@ class WeightImportAISpec extends BaseEvaluationSpec {
         def part1 = loadScreenshot("/screenshots/weight/weight_part1.jpeg")
         def part2 = loadScreenshot("/screenshots/weight/weight_part2.jpeg")
         authenticatedMultipartRequestMultipleImages(
-                DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT,
+                getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT,
                 ["weight_part1.jpeg": part1, "weight_part2.jpeg": part2]
         )
                 .post(IMPORT_ENDPOINT)
@@ -90,7 +89,7 @@ class WeightImportAISpec extends BaseEvaluationSpec {
 
         when: "I query /v1/weight/latest"
         waitForProjections()
-        def latestResponse = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/weight/latest")
+        def latestResponse = authenticatedGetRequest(getTestDeviceId(), SECRET_BASE64, "/v1/weight/latest")
                 .get("/v1/weight/latest")
                 .then()
                 .extract()
@@ -121,7 +120,7 @@ class WeightImportAISpec extends BaseEvaluationSpec {
         def part1 = loadScreenshot("/screenshots/weight/weight_part1.jpeg")
         def part2 = loadScreenshot("/screenshots/weight/weight_part2.jpeg")
         authenticatedMultipartRequestMultipleImages(
-                DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT,
+                getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT,
                 ["weight_part1.jpeg": part1, "weight_part2.jpeg": part2]
         )
                 .post(IMPORT_ENDPOINT)
@@ -130,7 +129,7 @@ class WeightImportAISpec extends BaseEvaluationSpec {
 
         when: "I query /v1/weight/range for 2026-01-12"
         waitForProjections()
-        def rangeResponse = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/weight/range?startDate=2026-01-12&endDate=2026-01-12")
+        def rangeResponse = authenticatedGetRequest(getTestDeviceId(), SECRET_BASE64, "/v1/weight/range?startDate=2026-01-12&endDate=2026-01-12")
                 .get("/v1/weight/range?startDate=2026-01-12&endDate=2026-01-12")
                 .then()
                 .extract()

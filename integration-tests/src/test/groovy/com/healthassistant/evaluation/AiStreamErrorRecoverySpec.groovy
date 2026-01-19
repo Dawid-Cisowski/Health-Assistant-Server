@@ -151,7 +151,7 @@ class AiStreamErrorRecoverySpec extends BaseEvaluationSpec {
         def chatRequest = """{"message": "${escapeJson(message)}"}"""
 
         return authenticatedPostRequestWithBody(
-                TEST_DEVICE_ID, TEST_SECRET_BASE64,
+                getTestDeviceId(), TEST_SECRET_BASE64,
                 "/v1/assistant/chat", chatRequest
         )
                 .when()

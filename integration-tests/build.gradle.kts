@@ -64,13 +64,13 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:spock:1.19.3")
-    
+
     // Spock Framework (Groovy testing)
     testImplementation("org.spockframework:spock-core:2.3-groovy-4.0")
     testImplementation("org.spockframework:spock-spring:2.3-groovy-4.0")
     testImplementation("org.apache.groovy:groovy:4.0.15")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    
+
     // REST Assured for API testing
     testImplementation("io.rest-assured:rest-assured:5.4.0")
     testImplementation("io.rest-assured:json-path:5.4.0")
@@ -78,7 +78,7 @@ dependencies {
     // Awaitility for async testing
     testImplementation("org.awaitility:awaitility:4.2.0")
     testImplementation("org.awaitility:awaitility-groovy:4.2.0")
-    
+
     // WireMock for mocking external APIs
     testImplementation("com.github.tomakehurst:wiremock-jre8-standalone:2.35.0")
 }
@@ -109,7 +109,7 @@ tasks.test {
     exclude("**/evaluation/**")
 
     // Enable parallel test execution
-    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(10)
 
     // JVM args for parallel execution
     jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
@@ -136,6 +136,12 @@ tasks.register<Test>("evaluationTest") {
 
     // Longer timeout for LLM inference
     timeout.set(Duration.ofMinutes(10))
+
+    // Enable parallel test execution (limited to 2 to avoid Gemini API rate limiting)
+    maxParallelForks = 10
+
+    // JVM args for parallel execution
+    jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
 }
 
 tasks.jacocoTestReport {

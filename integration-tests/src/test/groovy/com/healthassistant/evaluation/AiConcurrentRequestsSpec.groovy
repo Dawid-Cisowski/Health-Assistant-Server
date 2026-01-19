@@ -145,7 +145,7 @@ class AiConcurrentRequestsSpec extends BaseEvaluationSpec {
         def chatRequest = """{"message": "${escapeJson(message)}"}"""
 
         return authenticatedPostRequestWithBody(
-                TEST_DEVICE_ID, TEST_SECRET_BASE64,
+                getTestDeviceId(), TEST_SECRET_BASE64,
                 "/v1/assistant/chat", chatRequest
         )
                 .when()
@@ -160,10 +160,10 @@ class AiConcurrentRequestsSpec extends BaseEvaluationSpec {
     String importMeal(String description) {
         String timestamp = generateTimestamp()
         String nonce = generateNonce()
-        String signature = generateHmacSignature("POST", MEAL_IMPORT_ENDPOINT, timestamp, nonce, TEST_DEVICE_ID, "", TEST_SECRET_BASE64)
+        String signature = generateHmacSignature("POST", MEAL_IMPORT_ENDPOINT, timestamp, nonce, getTestDeviceId(), "", TEST_SECRET_BASE64)
 
         return RestAssured.given()
-                .header("X-Device-Id", TEST_DEVICE_ID)
+                .header("X-Device-Id", getTestDeviceId())
                 .header("X-Timestamp", timestamp)
                 .header("X-Nonce", nonce)
                 .header("X-Signature", signature)
