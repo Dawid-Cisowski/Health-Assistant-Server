@@ -137,22 +137,19 @@ class AssistantService implements AssistantFacade {
 
         var validatedMessage = validateUserMessage(request.message());
 
+        AssistantContext.setDeviceId(deviceId);
+
         return Mono.fromCallable(() -> {
-                    AssistantContext.setDeviceId(deviceId);
-                    try {
-                        var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
-                        var history = conversationService.loadConversationHistory(conversationId);
-                        var currentDate = LocalDate.now(POLAND_ZONE);
-                        var systemInstruction = buildSystemInstruction(currentDate);
-                        var messages = conversationService.buildMessageList(history, systemInstruction, validatedMessage);
-                        conversationService.saveMessage(conversationId, MessageRole.USER, validatedMessage);
-                        return new ConversationContext(conversationId, messages);
-                    } catch (Exception e) {
-                        AssistantContext.clear();
-                        throw e;
-                    }
+                    var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
+                    var history = conversationService.loadConversationHistory(conversationId);
+                    var currentDate = LocalDate.now(POLAND_ZONE);
+                    var systemInstruction = buildSystemInstruction(currentDate);
+                    var messages = conversationService.buildMessageList(history, systemInstruction, validatedMessage);
+                    conversationService.saveMessage(conversationId, MessageRole.USER, validatedMessage);
+                    return new ConversationContext(conversationId, messages);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
+                .contextCapture()
                 .flatMapMany(ctx -> {
                     var assistantResponse = new StringBuilder();
                     return chatClient.prompt()
@@ -180,6 +177,7 @@ class AssistantService implements AssistantFacade {
                                 }
                             }));
                 })
+                .contextCapture()
                 .doOnCancel(() -> {
                     AssistantContext.clear();
                     log.debug("Cleared AssistantContext on cancel for device {}", maskDeviceId(deviceId));
