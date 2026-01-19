@@ -146,6 +146,7 @@ abstract class BaseEvaluationSpec extends Specification {
         RestAssured.port = port
         RestAssured.baseURI = "http://localhost"
 
+        println "DEBUG: Test class ${this.class.simpleName} using device ID: ${getTestDeviceId()}"
         cleanAllData()
     }
 
@@ -202,9 +203,11 @@ abstract class BaseEvaluationSpec extends Specification {
      * Send a chat message to the AI assistant and return the response content.
      */
     String askAssistant(String message) {
+        def deviceId = getTestDeviceId()
+        println "DEBUG: Asking assistant for device ${deviceId}: ${message}"
         def chatRequest = """{"message": "${escapeJson(message)}"}"""
         def response = authenticatedPostRequestWithBody(
-                getTestDeviceId(), TEST_SECRET_BASE64,
+                deviceId, TEST_SECRET_BASE64,
                 "/v1/assistant/chat", chatRequest
         )
                 .when()
@@ -215,7 +218,9 @@ abstract class BaseEvaluationSpec extends Specification {
                 .body()
                 .asString()
 
-        return parseSSEContent(response)
+        def content = parseSSEContent(response)
+        println "DEBUG: Assistant response for device ${deviceId}: ${content}"
+        return content
     }
 
     /**
@@ -369,10 +374,12 @@ abstract class BaseEvaluationSpec extends Specification {
     }
 
     void submitEvent(String eventJson) {
-        authenticatedPostRequestWithBody(getTestDeviceId(), TEST_SECRET_BASE64, "/v1/health-events", eventJson)
+        def deviceId = getTestDeviceId()
+        println "DEBUG: Submitting event for device ${deviceId}"
+        def response = authenticatedPostRequestWithBody(deviceId, TEST_SECRET_BASE64, "/v1/health-events", eventJson)
                 .post("/v1/health-events")
-                .then()
-                .statusCode(200)
+        println "DEBUG: Submit response status: ${response.statusCode()}"
+        response.then().statusCode(200)
     }
 
     void submitEventMap(Map request) {
