@@ -32,6 +32,7 @@ class MealImportAISpec extends BaseEvaluationSpec {
 
     def "AI correctly estimates banana nutritional values"() {
         given: "a simple banana description"
+        // Reference: medium banana (~120g): 105-120 kcal, 27-30g carbs, 1.2-1.3g protein, 0.4g fat
         def description = "banan"
 
         when: "importing via Gemini API"
@@ -45,25 +46,25 @@ class MealImportAISpec extends BaseEvaluationSpec {
         def body = response.body().jsonPath()
         body.getString("status") == "success"
 
-        and: "calories are reasonable for banana (80-130 kcal)"
+        and: "calories are reasonable for banana (~112 kcal ±20%: 90-135 kcal)"
         def calories = body.getInt("caloriesKcal")
         println "DEBUG: banana caloriesKcal=${calories}"
-        calories >= 70 && calories <= 150
+        calories >= 90 && calories <= 135
 
-        and: "carbs are dominant macro (20-35g)"
+        and: "carbs are dominant macro (~28.5g ±20%: 23-34g)"
         def carbs = body.getInt("carbohydratesGrams")
         println "DEBUG: banana carbohydratesGrams=${carbs}"
-        carbs >= 15 && carbs <= 40
+        carbs >= 23 && carbs <= 34
 
-        and: "low protein (0-3g)"
+        and: "low protein (~1.25g ±20%: 0-2g)"
         def protein = body.getInt("proteinGrams")
         println "DEBUG: banana proteinGrams=${protein}"
-        protein >= 0 && protein <= 5
+        protein >= 0 && protein <= 2
 
-        and: "very low fat (0-1g)"
+        and: "very low fat (~0.4g ±20%: 0-1g)"
         def fat = body.getInt("fatGrams")
         println "DEBUG: banana fatGrams=${fat}"
-        fat >= 0 && fat <= 3
+        fat >= 0 && fat <= 1
 
         and: "meal type is SNACK"
         def mealType = body.getString("mealType")
