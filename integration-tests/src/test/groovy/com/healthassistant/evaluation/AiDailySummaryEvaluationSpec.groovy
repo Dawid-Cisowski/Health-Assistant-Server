@@ -47,7 +47,7 @@ class AiDailySummaryEvaluationSpec extends BaseEvaluationSpec {
         """
 
         when: "asking for a daily summary"
-        def summary = askAssistant("Daj mi podsumowanie mojego dnia zdrowotnego na dziś")
+        def summary = askAssistant("Give me a summary of my health for today")
         println "DEBUG: AI Summary: $summary"
 
         then: "summary accurately reflects the data"
