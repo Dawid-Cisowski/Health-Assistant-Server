@@ -84,6 +84,14 @@ class AssistantService implements AssistantFacade {
             - IMPORTANT: When a specific metric is not available (e.g., calories, sleep), do NOT estimate or calculate it from other data.
               For example: do NOT estimate calories from steps - they are independent metrics. Only report data that is directly available from tools.
 
+            CRITICAL - Data category separation (NEVER VIOLATE):
+            - Steps and calories are COMPLETELY DIFFERENT metrics. NEVER confuse them.
+            - If user asks about "calories burned" (kalorie spalone), report ONLY the activeCalories/totalActiveCalories field.
+            - If user asks about "steps" (kroki), report ONLY the totalSteps/steps field.
+            - If a field is null, 0, or missing in tool response, say "no data available" for that specific metric.
+            - NEVER report step count as calorie count or vice versa, even if they happen to be similar numbers.
+            - When getDailySummary returns data, carefully read the FIELD NAMES: "totalSteps" is steps, "activeCalories" is calories.
+
             Tool selection and usage:
             - MANDATORY: You MUST call a tool for EVERY health-related question. No exceptions.
             - NEVER respond with "you have 0 steps/calories/sleep" without calling the tool first.
@@ -103,14 +111,14 @@ class AssistantService implements AssistantFacade {
             - IMPORTANT: All date parameters in tool calls MUST be in ISO-8601 format: YYYY-MM-DD (e.g. 2025-11-24).
               Never use words like "today", "yesterday" in tool parameters.
 
-            Time interpretation:
+            Time interpretation (CRITICAL - MUST FOLLOW):
             - Recognize natural time expressions in both English and Polish:
-              EN: "today", "yesterday", "last night", "last week", "last month", "this week", "this month", "last 7 days", "last 30 days"
+              EN: "today", "yesterday", "last night", "last week", "last month", "this week", "this month", "last 7 days", "last 30 days", "X days ago"
               PL: "dzisiaj", "dziś", "wczoraj", "przedwczoraj", "ostatnia noc", "ostatni tydzień", "ostatni miesiąc", "w tym tygodniu", "w tym miesiącu", "ostatnie 7 dni", "ostatnie 30 dni", "X dni temu"
-            - Automatically convert them to actual date ranges in YYYY-MM-DD format based on the CURRENT DATE.
-            - Never ask the user for a date if it can be unambiguously determined from the CURRENT DATE.
-            - If the expression is ambiguous - choose the most natural interpretation,
-              and only ask for clarification if inference is impossible.
+            - ALWAYS automatically convert them to actual date ranges in YYYY-MM-DD format based on the CURRENT DATE.
+            - NEVER ask the user for date clarification or confirmation. Calculate the date yourself and call the tool immediately.
+            - "X dni temu" / "X days ago" is ALWAYS unambiguous: subtract X days from CURRENT DATE and use that as both startDate and endDate.
+            - When you can calculate a date from the CURRENT DATE, you MUST call the tool immediately without asking.
 
             Conversion examples (assuming CURRENT DATE: 2025-11-24):
             - "today" / "dzisiaj" / "dziś" → startDate: "2025-11-24", endDate: "2025-11-24"
