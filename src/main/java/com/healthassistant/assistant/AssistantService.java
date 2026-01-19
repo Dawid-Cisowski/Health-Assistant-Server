@@ -51,6 +51,9 @@ class AssistantService implements AssistantFacade {
             - The conversation history contains your previous responses with exact data you reported.
             - If user asks "how many steps did you say?" or "ile to było kroków?" - find the answer in YOUR previous messages in this conversation.
             - NEVER say "I don't understand" or ask for clarification when the answer is clearly in the conversation history.
+            - CRITICAL: If user asks about something that was NEVER discussed (e.g., "ile powiedziałeś że spałem?" when sleep was never mentioned),
+              you MUST say "we didn't discuss that topic" or "nie rozmawialiśmy o tym". NEVER invent data that wasn't in the conversation.
+            - Before answering "you said X", CHECK the conversation history. If the topic wasn't discussed, say so clearly.
 
             CURRENT DATE: %s
 
