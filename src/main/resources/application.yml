@@ -65,6 +65,10 @@ spring:
         chat:
           options:
             temperature: 1.5
+    chat:
+      observations:
+        include-prompt: false
+        include-completion: false
 
 server:
   port: 8080
@@ -84,6 +88,20 @@ management:
     metrics:
       export:
         enabled: true
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTLP_METRICS_ENABLED:true}
+        url: ${OTLP_METRICS_URL:http://localhost:4318/v1/metrics}
+        step: ${OTLP_METRICS_STEP:1m}
+        aggregationTemporality: cumulative
+        resourceAttributes:
+          service.name: health-assistant-server
+          service.version: 1.0.0
+          deployment.environment: ${SPRING_PROFILES_ACTIVE:local}
+  observations:
+    key-values:
+      application: health-assistant-server
 
 springdoc:
   api-docs:

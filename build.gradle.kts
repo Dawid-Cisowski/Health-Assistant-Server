@@ -80,6 +80,8 @@ dependencies {
     
     // Micrometer for metrics
     implementation("io.micrometer:micrometer-registry-prometheus")
+    // Micrometer OTLP for OpenTelemetry metrics export
+    implementation("io.micrometer:micrometer-registry-otlp")
     
     // Lombok for reducing boilerplate
     compileOnly("org.projectlombok:lombok")

@@ -26,3 +26,18 @@ logging:
     org.springframework.web: WARN
     org.hibernate.SQL: WARN
 
+# OTLP metrics for Cloud Run sidecar
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: true
+        url: http://localhost:4318/v1/metrics
+        step: 1m
+        resourceAttributes:
+          service.name: health-assistant-server
+          service.version: 1.0.0
+          deployment.environment: production
+          cloud.platform: gcp_cloud_run
+          cloud.region: ${CLOUD_RUN_REGION:europe-central2}
+
