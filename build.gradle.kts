@@ -82,8 +82,8 @@ dependencies {
     implementation("io.micrometer:micrometer-registry-prometheus")
     // Micrometer Stackdriver for Google Cloud Monitoring
     implementation("io.micrometer:micrometer-registry-stackdriver")
-    // gRPC dependencies required by Stackdriver
-    implementation("io.grpc:grpc-netty-shaded:1.62.2")
+    // gRPC dependencies - aligned to 1.70.0 to match google-genai transitive deps
+    implementation("io.grpc:grpc-netty-shaded:1.70.0")
 
     // Lombok for reducing boilerplate
     compileOnly("org.projectlombok:lombok")
