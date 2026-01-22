@@ -84,21 +84,15 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
-  prometheus:
+
+  # KONFIGURACJA STACKDRIVER (OPCJA 1)
+  stackdriver:
     metrics:
       export:
         enabled: true
-  otlp:
-    metrics:
-      export:
-        enabled: ${OTLP_METRICS_ENABLED:true}
-        url: ${OTLP_METRICS_URL:http://localhost:4318/v1/metrics}
-        step: ${OTLP_METRICS_STEP:1m}
-        aggregationTemporality: cumulative
-        resourceAttributes:
-          service.name: health-assistant-server
-          service.version: 1.0.0
-          deployment.environment: ${SPRING_PROFILES_ACTIVE:local}
+        projectId: ${GOOGLE_CLOUD_PROJECT:1234}
+        step: 1m
+
   observations:
     key-values:
       application: health-assistant-server

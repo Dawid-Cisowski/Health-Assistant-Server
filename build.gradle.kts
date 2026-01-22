@@ -60,29 +60,30 @@ dependencies {
 
     // Feign client
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.3")
-    
+
     // Database
     implementation("org.postgresql:postgresql:42.7.4")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
-    
+
     // Google Cloud SQL support (for production)
     implementation("com.google.cloud.sql:postgres-socket-factory:1.13.1")
-    
+
     // Cache
     implementation("com.github.ben-manes.caffeine:caffeine")
-    
+
     // OpenAPI documentation
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
-    
+
     // JSON processing
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-    
+
     // Micrometer for metrics
     implementation("io.micrometer:micrometer-registry-prometheus")
     // Micrometer OTLP for OpenTelemetry metrics export
     implementation("io.micrometer:micrometer-registry-otlp")
-    
+    implementation("io.micrometer:micrometer-registry-stackdriver")
+
     // Lombok for reducing boilerplate
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
