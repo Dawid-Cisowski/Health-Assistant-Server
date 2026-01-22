@@ -80,9 +80,10 @@ dependencies {
 
     // Micrometer for metrics
     implementation("io.micrometer:micrometer-registry-prometheus")
-    // Micrometer OTLP for OpenTelemetry metrics export
-    implementation("io.micrometer:micrometer-registry-otlp")
+    // Micrometer Stackdriver for Google Cloud Monitoring
     implementation("io.micrometer:micrometer-registry-stackdriver")
+    // gRPC dependencies required by Stackdriver
+    implementation("io.grpc:grpc-netty-shaded:1.62.2")
 
     // Lombok for reducing boilerplate
     compileOnly("org.projectlombok:lombok")
