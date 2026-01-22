@@ -26,20 +26,12 @@ logging:
     org.springframework.web: WARN
     org.hibernate.SQL: WARN
 
-# OTLP metrics for Cloud Run sidecar
+# Stackdriver metrics config (inherits from application.yml, override projectId here)
 management:
-  otlp:
+  stackdriver:
     metrics:
       export:
         enabled: true
-        url: http://localhost:4318/v1/metrics
-        headers:
-          Content-Type: application/x-protobuf
+        projectId: ${GOOGLE_CLOUD_PROJECT}
         step: 1m
-        resourceAttributes:
-          service.name: health-assistant-server
-          service.version: 1.0.0
-          deployment.environment: production
-          cloud.platform: gcp_cloud_run
-          cloud.region: ${CLOUD_RUN_REGION:europe-central2}
 

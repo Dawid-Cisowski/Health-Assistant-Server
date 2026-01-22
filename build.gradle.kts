@@ -81,7 +81,9 @@ dependencies {
     // Micrometer for metrics
     implementation("io.micrometer:micrometer-registry-prometheus")
     // Micrometer Stackdriver for Google Cloud Monitoring
-    implementation("io.micrometer:micrometer-registry-stackdriver")
+    implementation("io.micrometer:micrometer-registry-stackdriver") {
+        exclude(group = "io.grpc", module = "grpc-xds")
+    }
     // gRPC dependencies - aligned to 1.70.0 to match google-genai transitive deps
     implementation("io.grpc:grpc-netty-shaded:1.70.0")
 
