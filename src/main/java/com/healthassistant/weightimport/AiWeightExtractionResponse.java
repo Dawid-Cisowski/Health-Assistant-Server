@@ -1,0 +1,29 @@
+package com.healthassistant.weightimport;
+
+import java.math.BigDecimal;
+
+record AiWeightExtractionResponse(
+        boolean isWeightScreenshot,
+        double confidence,
+        String measurementDateTime,
+        Integer score,
+        BigDecimal weightKg,
+        BigDecimal bmi,
+        BigDecimal bodyFatPercent,
+        BigDecimal musclePercent,
+        BigDecimal hydrationPercent,
+        BigDecimal boneMassKg,
+        Integer bmrKcal,
+        Integer visceralFatLevel,
+        BigDecimal subcutaneousFatPercent,
+        BigDecimal proteinPercent,
+        Integer metabolicAge,
+        BigDecimal idealWeightKg,
+        BigDecimal weightControlKg,
+        BigDecimal fatMassKg,
+        BigDecimal leanBodyMassKg,
+        BigDecimal muscleMassKg,
+        BigDecimal proteinMassKg,
+        String bodyType,
+        String validationError
+) {}

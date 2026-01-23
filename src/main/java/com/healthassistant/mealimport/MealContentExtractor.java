@@ -1,8 +1,5 @@
 package com.healthassistant.mealimport;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.mealimport.api.dto.ClarifyingQuestion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.StreamSupport;
 
 @Component
 @RequiredArgsConstructor
@@ -54,7 +50,6 @@ class MealContentExtractor {
     );
 
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper;
 
     ExtractedMealData extract(String description, List<MultipartFile> images, MealTimeContext timeContext) {
         log.info("Extracting meal data from description: {}, images: {}, time: {}",
@@ -63,14 +58,17 @@ class MealContentExtractor {
             timeContext != null ? timeContext.formatCurrentTime() : "none");
 
         try {
-            String response = callAI(description, images, timeContext);
-            return parseExtractionResponse(response);
+            AiMealExtractionResponse response = callAI(description, images, timeContext);
+            return transformToExtractedMealData(response);
         } catch (IOException e) {
             throw new MealExtractionException("Failed to read image data: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("AI extraction failed: {}", e.getMessage(), e);
+            throw new MealExtractionException("Failed to extract meal data: " + e.getMessage(), e);
         }
     }
 
-    private String callAI(String description, List<MultipartFile> images, MealTimeContext timeContext) throws IOException {
+    private AiMealExtractionResponse callAI(String description, List<MultipartFile> images, MealTimeContext timeContext) throws IOException {
         var promptBuilder = chatClient.prompt()
             .system(buildSystemPrompt(timeContext));
 
@@ -80,7 +78,7 @@ class MealContentExtractor {
             if (images != null && !images.isEmpty()) {
                 images.forEach(image -> attachImageToSpec(userSpec, image));
             }
-        }).call().content();
+        }).call().entity(AiMealExtractionResponse.class);
     }
 
     private void attachImageToSpec(org.springframework.ai.chat.client.ChatClient.PromptUserSpec userSpec, MultipartFile image) {
@@ -295,91 +293,86 @@ class MealContentExtractor {
         return prompt.toString();
     }
 
-    private ExtractedMealData parseExtractionResponse(String response) {
-        try {
-            String cleanedResponse = cleanJsonResponse(response);
-            JsonNode root = objectMapper.readTree(cleanedResponse);
-
-            boolean isMeal = root.path("isMeal").asBoolean(false);
-            double confidence = root.path("confidence").asDouble(0.0);
-
-            if (!isMeal) {
-                String error = root.path("validationError").asText("Not a meal image/description");
-                return ExtractedMealData.invalid(error, confidence);
-            }
-
-            Instant occurredAt = parseOccurredAt(root);
-
-            String title = getTextOrNull(root, "title");
-            String description = getTextOrNull(root, "description");
-            String mealType = getTextOrNull(root, "mealType");
-            Integer caloriesKcal = validateNutritionalValue(getIntOrNull(root, "caloriesKcal"), "calories", MAX_CALORIES);
-            Integer proteinGrams = validateNutritionalValue(getIntOrNull(root, "proteinGrams"), "protein", MAX_PROTEIN_GRAMS);
-            Integer fatGrams = validateNutritionalValue(getIntOrNull(root, "fatGrams"), "fat", MAX_FAT_GRAMS);
-            Integer carbohydratesGrams = validateNutritionalValue(getIntOrNull(root, "carbohydratesGrams"), "carbs", MAX_CARBS_GRAMS);
-            String healthRating = getTextOrNull(root, "healthRating");
-
-            if (title == null || mealType == null) {
-                return ExtractedMealData.invalid("Missing required fields (title or mealType)", confidence);
-            }
-
-            if (caloriesKcal == null || proteinGrams == null || fatGrams == null || carbohydratesGrams == null) {
-                return ExtractedMealData.invalid("Missing or invalid nutritional values", confidence);
-            }
-
-            if (healthRating == null) {
-                healthRating = "NEUTRAL";
-            }
-
-            double mealTypeConfidence = root.path("mealTypeConfidence").asDouble(1.0);
-            List<ClarifyingQuestion> questions = parseQuestions(root);
-
-            if (mealTypeConfidence < MEAL_TYPE_CONFIDENCE_THRESHOLD && !hasMealTypeQuestion(questions)) {
-                questions = new ArrayList<>(questions);
-                questions.add(createMealTypeQuestion());
-                log.debug("Added meal type clarifying question due to low confidence: {}", mealTypeConfidence);
-            }
-
-            return ExtractedMealData.validWithQuestions(
-                occurredAt, title, description, mealType,
-                caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-                healthRating, confidence, questions
-            );
-
-        } catch (JsonProcessingException e) {
-            log.error("Failed to parse AI response as JSON. Error: {}. Response snippet: {}",
-                e.getMessage(),
-                response != null && response.length() > 300 ? response.substring(0, 300) + "..." : response);
-            throw new MealExtractionException(
-                "Failed to parse AI response as JSON: " + e.getOriginalMessage(), e
-            );
+    private ExtractedMealData transformToExtractedMealData(AiMealExtractionResponse response) {
+        if (response == null) {
+            throw new MealExtractionException("AI returned null response");
         }
+
+        double confidence = response.confidence();
+
+        if (!response.isMeal()) {
+            String error = response.validationError() != null
+                    ? response.validationError()
+                    : "Not a meal image/description";
+            return ExtractedMealData.invalid(error, confidence);
+        }
+
+        Instant occurredAt = parseOccurredAt(response.occurredAt());
+
+        String title = response.title();
+        String description = response.description();
+        String mealType = response.mealType();
+        Integer caloriesKcal = validateNutritionalValue(response.caloriesKcal(), "calories", MAX_CALORIES);
+        Integer proteinGrams = validateNutritionalValue(response.proteinGrams(), "protein", MAX_PROTEIN_GRAMS);
+        Integer fatGrams = validateNutritionalValue(response.fatGrams(), "fat", MAX_FAT_GRAMS);
+        Integer carbohydratesGrams = validateNutritionalValue(response.carbohydratesGrams(), "carbs", MAX_CARBS_GRAMS);
+        String healthRating = response.healthRating();
+
+        if (title == null || mealType == null) {
+            return ExtractedMealData.invalid("Missing required fields (title or mealType)", confidence);
+        }
+
+        if (caloriesKcal == null || proteinGrams == null || fatGrams == null || carbohydratesGrams == null) {
+            return ExtractedMealData.invalid("Missing or invalid nutritional values", confidence);
+        }
+
+        if (healthRating == null) {
+            healthRating = "NEUTRAL";
+        }
+
+        double mealTypeConfidence = response.mealTypeConfidence() != null ? response.mealTypeConfidence() : 1.0;
+        List<ClarifyingQuestion> questions = transformQuestions(response.questions());
+
+        if (mealTypeConfidence < MEAL_TYPE_CONFIDENCE_THRESHOLD && !hasMealTypeQuestion(questions)) {
+            questions = new ArrayList<>(questions);
+            questions.add(createMealTypeQuestion());
+            log.debug("Added meal type clarifying question due to low confidence: {}", mealTypeConfidence);
+        }
+
+        return ExtractedMealData.validWithQuestions(
+            occurredAt, title, description, mealType,
+            caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
+            healthRating, confidence, questions
+        );
     }
 
-    private List<ClarifyingQuestion> parseQuestions(JsonNode root) {
-        JsonNode questionsNode = root.path("questions");
-        if (questionsNode.isMissingNode() || !questionsNode.isArray()) {
+    private List<ClarifyingQuestion> transformQuestions(List<AiMealExtractionResponse.AiQuestion> aiQuestions) {
+        if (aiQuestions == null || aiQuestions.isEmpty()) {
             return List.of();
         }
 
-        return StreamSupport.stream(questionsNode.spliterator(), false)
-            .map(this::parseQuestion)
+        return aiQuestions.stream()
+            .map(this::transformQuestion)
             .flatMap(Optional::stream)
             .toList();
     }
 
-    private Optional<ClarifyingQuestion> parseQuestion(JsonNode questionNode) {
-        String questionId = getTextOrNull(questionNode, "questionId");
-        String questionText = getTextOrNull(questionNode, "questionText");
-        String questionTypeStr = getTextOrNull(questionNode, "questionType");
+    private Optional<ClarifyingQuestion> transformQuestion(AiMealExtractionResponse.AiQuestion aiQuestion) {
+        if (aiQuestion == null) {
+            return Optional.empty();
+        }
+
+        String questionId = aiQuestion.questionId();
+        String questionText = aiQuestion.questionText();
+        String questionTypeStr = aiQuestion.questionType();
 
         if (questionId == null || questionText == null || questionTypeStr == null) {
             return Optional.empty();
         }
 
         ClarifyingQuestion.QuestionType questionType = parseQuestionType(questionTypeStr);
-        List<String> options = parseStringArray(questionNode.path("options"));
-        List<String> affectedFields = parseStringArray(questionNode.path("affectedFields"));
+        List<String> options = aiQuestion.options() != null ? aiQuestion.options() : List.of();
+        List<String> affectedFields = aiQuestion.affectedFields() != null ? aiQuestion.affectedFields() : List.of();
 
         return Optional.of(new ClarifyingQuestion(
             questionId, questionText, questionType, options, affectedFields
@@ -393,16 +386,6 @@ class MealContentExtractor {
             log.debug("Unknown question type: {}", questionTypeStr);
             return ClarifyingQuestion.QuestionType.FREE_TEXT;
         }
-    }
-
-    private List<String> parseStringArray(JsonNode arrayNode) {
-        if (arrayNode.isMissingNode() || !arrayNode.isArray()) {
-            return List.of();
-        }
-        return StreamSupport.stream(arrayNode.spliterator(), false)
-            .filter(JsonNode::isTextual)
-            .map(JsonNode::asText)
-            .toList();
     }
 
     private boolean hasMealTypeQuestion(List<ClarifyingQuestion> questions) {
@@ -421,70 +404,16 @@ class MealContentExtractor {
         );
     }
 
-    private String cleanJsonResponse(String response) {
-        if (response == null || response.isBlank()) {
-            log.warn("AI returned null or blank response");
-            return "{}";
-        }
-
-        String cleaned = response.trim();
-        log.debug("Raw AI response (first 500 chars): {}",
-            cleaned.length() > 500 ? cleaned.substring(0, 500) + "..." : cleaned);
-
-        if (cleaned.startsWith("```json")) {
-            cleaned = cleaned.substring(7);
-        } else if (cleaned.startsWith("```JSON")) {
-            cleaned = cleaned.substring(7);
-        } else if (cleaned.startsWith("```")) {
-            cleaned = cleaned.substring(3);
-        }
-
-        if (cleaned.endsWith("```")) {
-            cleaned = cleaned.substring(0, cleaned.length() - 3);
-        }
-
-        cleaned = cleaned.trim();
-
-        int jsonStart = cleaned.indexOf('{');
-        int jsonEnd = cleaned.lastIndexOf('}');
-
-        if (jsonStart >= 0 && jsonEnd > jsonStart) {
-            cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-        } else {
-            log.warn("Could not find JSON object in response: {}",
-                cleaned.length() > 200 ? cleaned.substring(0, 200) + "..." : cleaned);
-        }
-
-        return cleaned;
-    }
-
-    private Instant parseOccurredAt(JsonNode root) {
-        JsonNode occurredAtNode = root.path("occurredAt");
-        if (occurredAtNode.isMissingNode() || occurredAtNode.isNull()) {
+    private Instant parseOccurredAt(String occurredAtStr) {
+        if (occurredAtStr == null || occurredAtStr.isBlank()) {
             return null;
         }
         try {
-            return Instant.parse(occurredAtNode.asText());
+            return Instant.parse(occurredAtStr);
         } catch (Exception e) {
-            log.debug("Could not parse occurredAt: {}", occurredAtNode.asText());
+            log.debug("Could not parse occurredAt: {}", occurredAtStr);
             return null;
         }
-    }
-
-    private String getTextOrNull(JsonNode root, String field) {
-        JsonNode node = root.path(field);
-        if (node.isMissingNode() || node.isNull()) {
-            return null;
-        }
-        return node.asText();
-    }
-
-    private Integer getIntOrNull(JsonNode root, String field) {
-        JsonNode node = root.path(field);
-        if (node.isMissingNode() || node.isNull()) {
-            return null;
-        }
-        return node.asInt();
     }
 
     private Integer validateNutritionalValue(Integer value, String fieldName, int maxValue) {
@@ -511,13 +440,13 @@ class MealContentExtractor {
         String reAnalysisPrompt = buildReAnalysisPrompt(originalDescription, previousExtraction, answers, userFeedback);
 
         try {
-            String response = chatClient.prompt()
+            AiMealExtractionResponse response = chatClient.prompt()
                 .system(buildReAnalysisSystemPrompt())
                 .user(reAnalysisPrompt)
                 .call()
-                .content();
+                .entity(AiMealExtractionResponse.class);
 
-            return parseExtractionResponse(response);
+            return transformToExtractedMealData(response);
         } catch (Exception e) {
             log.error("Re-analysis failed: {}", e.getMessage(), e);
             throw new MealExtractionException("Failed to re-analyze meal: " + e.getMessage(), e);

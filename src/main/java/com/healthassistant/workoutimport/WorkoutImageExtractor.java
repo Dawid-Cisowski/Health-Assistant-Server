@@ -1,8 +1,5 @@
 package com.healthassistant.workoutimport;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -18,9 +15,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.StreamSupport;
 
 @Component
 @RequiredArgsConstructor
@@ -30,7 +25,6 @@ class WorkoutImageExtractor {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper;
     private final ExerciseMatcher exerciseMatcher;
 
     ExtractedWorkoutData extract(MultipartFile image) throws WorkoutExtractionException {
@@ -40,25 +34,27 @@ class WorkoutImageExtractor {
 
             log.info("Extracting workout data from image: {} bytes, type: {}", imageBytes.length, mimeType);
 
-            String response = chatClient.prompt()
+            AiWorkoutExtractionResponse response = chatClient.prompt()
                 .system(buildSystemPrompt())
                 .user(userSpec -> userSpec
                     .text(buildUserPrompt())
                     .media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes))
                 )
                 .call()
-                .content();
+                .entity(AiWorkoutExtractionResponse.class);
 
-            if (response == null || response.isBlank()) {
-                throw new WorkoutExtractionException("AI returned empty response");
+            if (response == null) {
+                throw new WorkoutExtractionException("AI returned null response");
             }
 
-            log.debug("AI response: {}", response);
+            log.debug("AI response received, isWorkoutScreenshot: {}", response.isWorkoutScreenshot());
 
-            return parseExtractionResponse(response);
+            return transformToExtractedWorkoutData(response);
 
         } catch (IOException e) {
             throw new WorkoutExtractionException("Failed to read image: " + e.getMessage(), e);
+        } catch (WorkoutExtractionException e) {
+            throw e;
         } catch (Exception e) {
             log.error("AI extraction failed", e);
             throw new WorkoutExtractionException("AI extraction failed: " + e.getMessage(), e);
@@ -140,52 +136,80 @@ class WorkoutImageExtractor {
             """;
     }
 
-    private ExtractedWorkoutData parseExtractionResponse(String response) throws WorkoutExtractionException {
-        try {
-            String cleanedResponse = cleanJsonResponse(response);
-            JsonNode root = objectMapper.readTree(cleanedResponse);
-
-            boolean isWorkoutScreenshot = root.path("isWorkoutScreenshot").asBoolean(false);
-            double confidence = root.path("confidence").asDouble(0.0);
-            if (confidence < 0.0 || confidence > 1.0) {
-                log.warn("AI returned invalid confidence: {}, clamping to [0.0, 1.0]", confidence);
-                confidence = Math.max(0.0, Math.min(1.0, confidence));
-            }
-
-            if (!isWorkoutScreenshot) {
-                String error = root.path("validationError").asText("Not a workout screenshot");
-                return ExtractedWorkoutData.invalid(error, confidence);
-            }
-
-            Instant performedAt = parsePerformedAt(root.path("performedAt").asText(null));
-            String note = root.path("note").asText(null);
-
-            List<ExtractedWorkoutData.Exercise> exercises = new ArrayList<>();
-            JsonNode exercisesNode = root.path("exercises");
-
-            if (exercisesNode.isArray()) {
-                StreamSupport.stream(exercisesNode.spliterator(), false)
-                    .map(this::parseExercise)
-                    .forEach(exercises::add);
-            }
-
-            if (exercises.isEmpty()) {
-                return ExtractedWorkoutData.invalid("No exercises found in image", confidence);
-            }
-
-            log.info("Successfully extracted workout: {} exercises, confidence: {}", exercises.size(), confidence);
-            return ExtractedWorkoutData.valid(performedAt, note, exercises, confidence);
-
-        } catch (JsonProcessingException e) {
-            throw new WorkoutExtractionException("Failed to parse AI response as JSON: " + e.getMessage(), e);
+    private ExtractedWorkoutData transformToExtractedWorkoutData(AiWorkoutExtractionResponse response) {
+        double confidence = response.confidence();
+        if (confidence < 0.0 || confidence > 1.0) {
+            log.warn("AI returned invalid confidence: {}, clamping to [0.0, 1.0]", confidence);
+            confidence = Math.max(0.0, Math.min(1.0, confidence));
         }
+
+        if (!response.isWorkoutScreenshot()) {
+            String error = response.validationError() != null
+                    ? response.validationError()
+                    : "Not a workout screenshot";
+            return ExtractedWorkoutData.invalid(error, confidence);
+        }
+
+        Instant performedAt = parsePerformedAt(response.performedAt());
+        String note = response.note();
+
+        List<ExtractedWorkoutData.Exercise> exercises = transformExercises(response.exercises());
+
+        if (exercises.isEmpty()) {
+            return ExtractedWorkoutData.invalid("No exercises found in image", confidence);
+        }
+
+        log.info("Successfully extracted workout: {} exercises, confidence: {}", exercises.size(), confidence);
+        return ExtractedWorkoutData.valid(performedAt, note, exercises, confidence);
     }
 
-    private String cleanJsonResponse(String response) {
-        return response
-            .replaceAll("```json\\s*", "")
-            .replaceAll("```\\s*", "")
-            .trim();
+    private List<ExtractedWorkoutData.Exercise> transformExercises(List<AiWorkoutExtractionResponse.AiExercise> aiExercises) {
+        if (aiExercises == null || aiExercises.isEmpty()) {
+            return List.of();
+        }
+
+        return aiExercises.stream()
+                .map(this::transformExercise)
+                .toList();
+    }
+
+    private ExtractedWorkoutData.Exercise transformExercise(AiWorkoutExtractionResponse.AiExercise aiExercise) {
+        String name = aiExercise.name() != null ? aiExercise.name() : "Unknown Exercise";
+        String exerciseId = aiExercise.exerciseId();
+        double matchConfidence = aiExercise.matchConfidence() != null ? aiExercise.matchConfidence() : 0.0;
+        boolean isNewExercise = aiExercise.isNewExercise() != null && aiExercise.isNewExercise();
+        String suggestedId = aiExercise.suggestedId();
+        String suggestedPrimaryMuscle = aiExercise.suggestedPrimaryMuscle();
+        String suggestedDescription = aiExercise.suggestedDescription();
+        String muscleGroup = aiExercise.muscleGroup();
+        int order = aiExercise.orderInWorkout() != null ? aiExercise.orderInWorkout() : 1;
+
+        List<ExtractedWorkoutData.ExerciseSet> sets = transformSets(aiExercise.sets());
+
+        return new ExtractedWorkoutData.Exercise(
+                name, exerciseId, matchConfidence, isNewExercise,
+                suggestedId, suggestedPrimaryMuscle, suggestedDescription,
+                muscleGroup, order, sets
+        );
+    }
+
+    private List<ExtractedWorkoutData.ExerciseSet> transformSets(List<AiWorkoutExtractionResponse.AiExerciseSet> aiSets) {
+        if (aiSets == null || aiSets.isEmpty()) {
+            return List.of();
+        }
+
+        return aiSets.stream()
+                .map(this::transformSet)
+                .toList();
+    }
+
+    private ExtractedWorkoutData.ExerciseSet transformSet(AiWorkoutExtractionResponse.AiExerciseSet aiSet) {
+        int setNumber = aiSet.setNumber() != null ? aiSet.setNumber() : 1;
+        double weightKg = aiSet.weightKg() != null ? aiSet.weightKg() : 0.0;
+        int reps = aiSet.reps() != null ? aiSet.reps() : 1;
+        boolean isWarmup = aiSet.isWarmup() != null && aiSet.isWarmup();
+
+        return new ExtractedWorkoutData.ExerciseSet(setNumber, weightKg, reps, isWarmup);
     }
 
     private Instant parsePerformedAt(String performedAtStr) {
@@ -221,48 +245,5 @@ class WorkoutImageExtractor {
             return now;
         }
         return date;
-    }
-
-    private ExtractedWorkoutData.Exercise parseExercise(JsonNode node) {
-        String name = node.path("name").asText("Unknown Exercise");
-        String exerciseId = parseNullableString(node.path("exerciseId"));
-        double matchConfidence = node.path("matchConfidence").asDouble(0.0);
-        boolean isNewExercise = node.path("isNewExercise").asBoolean(false);
-        String suggestedId = parseNullableString(node.path("suggestedId"));
-        String suggestedPrimaryMuscle = parseNullableString(node.path("suggestedPrimaryMuscle"));
-        String suggestedDescription = parseNullableString(node.path("suggestedDescription"));
-        String muscleGroup = parseNullableString(node.path("muscleGroup"));
-        int order = node.path("orderInWorkout").asInt(1);
-
-        List<ExtractedWorkoutData.ExerciseSet> sets = new ArrayList<>();
-        JsonNode setsNode = node.path("sets");
-
-        if (setsNode.isArray()) {
-            StreamSupport.stream(setsNode.spliterator(), false)
-                .map(setNode -> new ExtractedWorkoutData.ExerciseSet(
-                    setNode.path("setNumber").asInt(1),
-                    setNode.path("weightKg").asDouble(0.0),
-                    setNode.path("reps").asInt(1),
-                    setNode.path("isWarmup").asBoolean(false)
-                ))
-                .forEach(sets::add);
-        }
-
-        return new ExtractedWorkoutData.Exercise(
-                name, exerciseId, matchConfidence, isNewExercise,
-                suggestedId, suggestedPrimaryMuscle, suggestedDescription,
-                muscleGroup, order, sets
-        );
-    }
-
-    private String parseNullableString(JsonNode node) {
-        if (node.isMissingNode() || node.isNull()) {
-            return null;
-        }
-        String value = node.asText();
-        if (value.isEmpty() || "null".equals(value)) {
-            return null;
-        }
-        return value;
     }
 }

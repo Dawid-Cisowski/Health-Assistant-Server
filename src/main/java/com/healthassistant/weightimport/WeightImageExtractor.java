@@ -1,8 +1,5 @@
 package com.healthassistant.weightimport;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -39,7 +36,6 @@ class WeightImageExtractor {
     );
 
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper;
 
     ExtractedWeightData extract(List<MultipartFile> images) throws WeightExtractionException {
         try {
@@ -47,7 +43,7 @@ class WeightImageExtractor {
                     images.size(),
                     images.stream().mapToLong(MultipartFile::getSize).sum());
 
-            String response = chatClient.prompt()
+            AiWeightExtractionResponse response = chatClient.prompt()
                     .system(buildSystemPrompt())
                     .user(userSpec -> {
                         userSpec.text(buildUserPrompt());
@@ -65,13 +61,16 @@ class WeightImageExtractor {
                         });
                     })
                     .call()
-                    .content();
+                    .entity(AiWeightExtractionResponse.class);
 
-            if (response == null || response.isBlank()) {
-                throw new WeightExtractionException("AI returned empty response");
+            if (response == null) {
+                throw new WeightExtractionException("AI returned null response");
             }
 
-            return parseExtractionResponse(response);
+            // Security check on text fields that could contain injection attempts
+            validateResponseSecurity(response);
+
+            return transformToExtractedWeightData(response);
 
         } catch (WeightExtractionException e) {
             throw e;
@@ -174,136 +173,77 @@ class WeightImageExtractor {
             """;
     }
 
-    private ExtractedWeightData parseExtractionResponse(String response) throws WeightExtractionException {
-        try {
-            // BLOCKER 5: Validate AI response for suspicious patterns
-            if (containsSuspiciousPatterns(response)) {
-                log.warn("Security: Suspicious patterns detected in AI response, rejecting");
-                throw new WeightExtractionException("Security: Suspicious patterns detected in AI response");
-            }
+    private void validateResponseSecurity(AiWeightExtractionResponse response) throws WeightExtractionException {
+        if (containsSuspiciousPatterns(response.bodyType())) {
+            log.warn("Security: Suspicious patterns detected in bodyType field");
+            throw new WeightExtractionException("Security: Suspicious patterns detected in AI response");
+        }
+        if (containsSuspiciousPatterns(response.validationError())) {
+            log.warn("Security: Suspicious patterns detected in validationError field");
+            throw new WeightExtractionException("Security: Suspicious patterns detected in AI response");
+        }
+    }
 
-            String cleanedResponse = cleanJsonResponse(response);
-            JsonNode root = objectMapper.readTree(cleanedResponse);
+    private ExtractedWeightData transformToExtractedWeightData(AiWeightExtractionResponse response) {
+        double confidence = response.confidence();
 
-            boolean isWeightScreenshot = root.path("isWeightScreenshot").asBoolean(false);
-            double confidence = root.path("confidence").asDouble(0.0);
+        if (confidence < 0.0 || confidence > 1.0) {
+            log.warn("AI returned invalid confidence: {}", confidence);
+            confidence = Math.max(0.0, Math.min(1.0, confidence));
+        }
 
-            if (confidence < 0.0 || confidence > 1.0) {
-                log.warn("AI returned invalid confidence: {}", confidence);
-                confidence = Math.max(0.0, Math.min(1.0, confidence));
-            }
+        if (!response.isWeightScreenshot()) {
+            String error = response.validationError() != null
+                    ? response.validationError()
+                    : "Not a weight screenshot";
+            return ExtractedWeightData.invalid(error, confidence);
+        }
 
-            if (!isWeightScreenshot) {
-                String error = root.path("validationError").asText("Not a weight screenshot");
-                return ExtractedWeightData.invalid(error, confidence);
-            }
+        if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+            return ExtractedWeightData.invalid(
+                    String.format("AI confidence too low: %.2f (minimum: %.1f)", confidence, MIN_CONFIDENCE_THRESHOLD),
+                    confidence
+            );
+        }
 
-            if (confidence < MIN_CONFIDENCE_THRESHOLD) {
-                return ExtractedWeightData.invalid(
-                        String.format("AI confidence too low: %.2f (minimum: %.1f)", confidence, MIN_CONFIDENCE_THRESHOLD),
-                        confidence
-                );
-            }
+        BigDecimal weightKg = response.weightKg();
+        if (weightKg == null) {
+            return ExtractedWeightData.invalid("Weight (weightKg) is required but not found", confidence);
+        }
 
-            BigDecimal weightKg = parseNullableBigDecimal(root.path("weightKg"));
-            if (weightKg == null) {
-                return ExtractedWeightData.invalid("Weight (weightKg) is required but not found", confidence);
-            }
+        String measurementDateTimeStr = response.measurementDateTime();
+        LocalDate measurementDate;
+        Instant measuredAt;
 
-            String measurementDateTimeStr = root.path("measurementDateTime").asText(null);
-            LocalDate measurementDate;
-            Instant measuredAt;
-
-            if (measurementDateTimeStr != null && !measurementDateTimeStr.isBlank()) {
-                try {
-                    LocalDateTime ldt = LocalDateTime.parse(measurementDateTimeStr, DATE_TIME_FORMATTER);
-                    measurementDate = ldt.toLocalDate();
-                    measuredAt = ldt.atZone(POLAND_ZONE).toInstant();
-                } catch (DateTimeParseException e) {
-                    log.warn("Could not parse measurement datetime: {}, using current time", measurementDateTimeStr);
-                    measurementDate = LocalDate.now(POLAND_ZONE);
-                    measuredAt = Instant.now();
-                }
-            } else {
+        if (measurementDateTimeStr != null && !measurementDateTimeStr.isBlank()) {
+            try {
+                LocalDateTime ldt = LocalDateTime.parse(measurementDateTimeStr, DATE_TIME_FORMATTER);
+                measurementDate = ldt.toLocalDate();
+                measuredAt = ldt.atZone(POLAND_ZONE).toInstant();
+            } catch (DateTimeParseException e) {
+                log.warn("Could not parse measurement datetime: {}, using current time", measurementDateTimeStr);
                 measurementDate = LocalDate.now(POLAND_ZONE);
                 measuredAt = Instant.now();
             }
-
-            Integer score = parseNullableInt(root.path("score"));
-            BigDecimal bmi = parseNullableBigDecimal(root.path("bmi"));
-            BigDecimal bodyFatPercent = parseNullableBigDecimal(root.path("bodyFatPercent"));
-            BigDecimal musclePercent = parseNullableBigDecimal(root.path("musclePercent"));
-            BigDecimal hydrationPercent = parseNullableBigDecimal(root.path("hydrationPercent"));
-            BigDecimal boneMassKg = parseNullableBigDecimal(root.path("boneMassKg"));
-            Integer bmrKcal = parseNullableInt(root.path("bmrKcal"));
-            Integer visceralFatLevel = parseNullableInt(root.path("visceralFatLevel"));
-            BigDecimal subcutaneousFatPercent = parseNullableBigDecimal(root.path("subcutaneousFatPercent"));
-            BigDecimal proteinPercent = parseNullableBigDecimal(root.path("proteinPercent"));
-            Integer metabolicAge = parseNullableInt(root.path("metabolicAge"));
-            BigDecimal idealWeightKg = parseNullableBigDecimal(root.path("idealWeightKg"));
-            BigDecimal weightControlKg = parseNullableBigDecimal(root.path("weightControlKg"));
-            BigDecimal fatMassKg = parseNullableBigDecimal(root.path("fatMassKg"));
-            BigDecimal leanBodyMassKg = parseNullableBigDecimal(root.path("leanBodyMassKg"));
-            BigDecimal muscleMassKg = parseNullableBigDecimal(root.path("muscleMassKg"));
-            BigDecimal proteinMassKg = parseNullableBigDecimal(root.path("proteinMassKg"));
-            String bodyType = sanitizeBodyType(root.path("bodyType").asText(null));
-
-            log.info("Successfully extracted weight data: date={}, weight={}kg, score={}, BMI={}, confidence={}",
-                    sanitizeForLog(measurementDate.toString()), weightKg, score, bmi, confidence);
-
-            return ExtractedWeightData.valid(
-                    measurementDate, measuredAt, score, weightKg, bmi, bodyFatPercent, musclePercent,
-                    hydrationPercent, boneMassKg, bmrKcal, visceralFatLevel, subcutaneousFatPercent,
-                    proteinPercent, metabolicAge, idealWeightKg, weightControlKg, fatMassKg,
-                    leanBodyMassKg, muscleMassKg, proteinMassKg, bodyType, confidence
-            );
-
-        } catch (JsonProcessingException e) {
-            log.error("Failed to parse AI response as JSON. Response (truncated): {}",
-                    response.length() > 200 ? response.substring(0, 200) + "..." : response, e);
-            throw new WeightExtractionException("Failed to parse AI response as valid JSON", e);
+        } else {
+            measurementDate = LocalDate.now(POLAND_ZONE);
+            measuredAt = Instant.now();
         }
-    }
 
-    private String cleanJsonResponse(String response) {
-        return response
-                .replaceAll("```json\\s*", "")
-                .replaceAll("```\\s*", "")
-                .trim();
-    }
+        String bodyType = sanitizeBodyType(response.bodyType());
 
-    private Integer parseNullableInt(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        if (node.isNumber()) {
-            return node.asInt();
-        }
-        if (node.isTextual()) {
-            try {
-                return Integer.parseInt(node.asText());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
-    }
+        log.info("Successfully extracted weight data: date={}, weight={}kg, score={}, BMI={}, confidence={}",
+                sanitizeForLog(measurementDate.toString()), weightKg, response.score(), response.bmi(), confidence);
 
-    private BigDecimal parseNullableBigDecimal(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        if (node.isNumber()) {
-            return node.decimalValue();
-        }
-        if (node.isTextual()) {
-            try {
-                return new BigDecimal(node.asText());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
+        return ExtractedWeightData.valid(
+                measurementDate, measuredAt, response.score(), weightKg, response.bmi(),
+                response.bodyFatPercent(), response.musclePercent(), response.hydrationPercent(),
+                response.boneMassKg(), response.bmrKcal(), response.visceralFatLevel(),
+                response.subcutaneousFatPercent(), response.proteinPercent(), response.metabolicAge(),
+                response.idealWeightKg(), response.weightControlKg(), response.fatMassKg(),
+                response.leanBodyMassKg(), response.muscleMassKg(), response.proteinMassKg(),
+                bodyType, confidence
+        );
     }
 
     private boolean containsSuspiciousPatterns(String input) {

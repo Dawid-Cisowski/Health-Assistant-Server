@@ -1,8 +1,5 @@
 package com.healthassistant.sleepimport;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -38,7 +35,6 @@ class SleepImageExtractor {
     );
 
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper;
 
     ExtractedSleepData extract(MultipartFile image, int year) throws SleepExtractionException {
         try {
@@ -50,20 +46,20 @@ class SleepImageExtractor {
 
             log.info("Extracting sleep data from image: {} bytes, type: {}, year: {}", imageBytes.length, mimeType, year);
 
-            String response = chatClient.prompt()
+            AiSleepExtractionResponse response = chatClient.prompt()
                     .system(buildSystemPrompt())
                     .user(userSpec -> userSpec
                             .text(buildUserPrompt())
                             .media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes))
                     )
                     .call()
-                    .content();
+                    .entity(AiSleepExtractionResponse.class);
 
-            if (response == null || response.isBlank()) {
-                throw new SleepExtractionException("AI returned empty response");
+            if (response == null) {
+                throw new SleepExtractionException("AI returned null response");
             }
 
-            return parseExtractionResponse(response, year);
+            return transformToExtractedSleepData(response, year);
 
         } catch (IOException e) {
             log.error("Failed to read image file", e);
@@ -163,87 +159,71 @@ class SleepImageExtractor {
             """;
     }
 
-    private ExtractedSleepData parseExtractionResponse(String response, int year) throws SleepExtractionException {
-        try {
-            String cleanedResponse = cleanJsonResponse(response);
-            JsonNode root = objectMapper.readTree(cleanedResponse);
+    private ExtractedSleepData transformToExtractedSleepData(AiSleepExtractionResponse response, int year) {
+        double confidence = response.confidence();
 
-            boolean isSleepScreenshot = root.path("isSleepScreenshot").asBoolean(false);
-            double confidence = root.path("confidence").asDouble(0.0);
-
-            if (confidence < 0.0 || confidence > 1.0) {
-                log.warn("AI returned invalid confidence: {}", confidence);
-                confidence = 0.0;
-            }
-
-            if (!isSleepScreenshot) {
-                String error = root.path("validationError").asText("Not a sleep screenshot");
-                return ExtractedSleepData.invalid(error, confidence);
-            }
-
-            if (confidence < MIN_CONFIDENCE_THRESHOLD) {
-                return ExtractedSleepData.invalid(
-                        String.format("AI confidence too low: %.2f (minimum: %.1f)", confidence, MIN_CONFIDENCE_THRESHOLD),
-                        confidence
-                );
-            }
-
-            LocalDate sleepDate = parseSleepDate(root.path("sleepDate").asText(null), year);
-            String sleepStartStr = root.path("sleepStart").asText(null);
-            String wakeTimeStr = root.path("wakeTime").asText(null);
-
-            if (sleepDate == null || sleepStartStr == null || wakeTimeStr == null) {
-                return ExtractedSleepData.invalid("Missing required date/time fields", confidence);
-            }
-
-            Instant sleepStart = parseLocalTimeToInstant(sleepDate, sleepStartStr, true);
-            Instant sleepEnd = parseLocalTimeToInstant(sleepDate, wakeTimeStr, false);
-
-            if (!sleepStart.isBefore(sleepEnd)) {
-                sleepStart = parseLocalTimeToInstant(sleepDate.minusDays(1), sleepStartStr, true);
-            }
-
-            Integer totalSleepMinutes = parseNullableInt(root.path("totalSleepMinutes"));
-            Integer sleepScore = parseNullableInt(root.path("sleepScore"));
-            String qualityLabel = root.path("qualityLabel").asText(null);
-
-            JsonNode phasesNode = root.path("phases");
-            Integer lightSleepMinutes = parseNullableInt(phasesNode.path("lightSleepMinutes"));
-            Integer deepSleepMinutes = parseNullableInt(phasesNode.path("deepSleepMinutes"));
-            Integer remSleepMinutes = parseNullableInt(phasesNode.path("remSleepMinutes"));
-            Integer awakeMinutes = parseNullableInt(phasesNode.path("awakeMinutes"));
-
-            String rangeValidationError = validateNumericRanges(
-                    totalSleepMinutes, sleepScore, lightSleepMinutes, deepSleepMinutes, remSleepMinutes, awakeMinutes
-            );
-            if (rangeValidationError != null) {
-                return ExtractedSleepData.invalid(rangeValidationError, confidence);
-            }
-
-            ExtractedSleepData.Phases phases = new ExtractedSleepData.Phases(
-                    lightSleepMinutes, deepSleepMinutes, remSleepMinutes, awakeMinutes
-            );
-
-            log.info("Successfully extracted sleep data: date={}, duration={}min, score={}, confidence={}",
-                    sleepDate, totalSleepMinutes, sleepScore, confidence);
-
-            return ExtractedSleepData.valid(
-                    sleepDate, sleepStart, sleepEnd, totalSleepMinutes,
-                    sleepScore, phases, qualityLabel, confidence
-            );
-
-        } catch (JsonProcessingException e) {
-            log.error("Failed to parse AI response as JSON. Response (truncated): {}",
-                    response.length() > 200 ? response.substring(0, 200) + "..." : response, e);
-            throw new SleepExtractionException("Failed to parse AI response as valid JSON", e);
+        if (confidence < 0.0 || confidence > 1.0) {
+            log.warn("AI returned invalid confidence: {}", confidence);
+            confidence = 0.0;
         }
-    }
 
-    private String cleanJsonResponse(String response) {
-        return response
-                .replaceAll("```json\\s*", "")
-                .replaceAll("```\\s*", "")
-                .trim();
+        if (!response.isSleepScreenshot()) {
+            String error = response.validationError() != null
+                    ? response.validationError()
+                    : "Not a sleep screenshot";
+            return ExtractedSleepData.invalid(error, confidence);
+        }
+
+        if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+            return ExtractedSleepData.invalid(
+                    String.format("AI confidence too low: %.2f (minimum: %.1f)", confidence, MIN_CONFIDENCE_THRESHOLD),
+                    confidence
+            );
+        }
+
+        LocalDate sleepDate = parseSleepDate(response.sleepDate(), year);
+        String sleepStartStr = response.sleepStart();
+        String wakeTimeStr = response.wakeTime();
+
+        if (sleepDate == null || sleepStartStr == null || wakeTimeStr == null) {
+            return ExtractedSleepData.invalid("Missing required date/time fields", confidence);
+        }
+
+        Instant sleepStart = parseLocalTimeToInstant(sleepDate, sleepStartStr, true);
+        Instant sleepEnd = parseLocalTimeToInstant(sleepDate, wakeTimeStr, false);
+
+        if (!sleepStart.isBefore(sleepEnd)) {
+            sleepStart = parseLocalTimeToInstant(sleepDate.minusDays(1), sleepStartStr, true);
+        }
+
+        Integer totalSleepMinutes = response.totalSleepMinutes();
+        Integer sleepScore = response.sleepScore();
+        String qualityLabel = response.qualityLabel();
+
+        AiSleepExtractionResponse.AiPhases aiPhases = response.phases();
+        Integer lightSleepMinutes = aiPhases != null ? aiPhases.lightSleepMinutes() : null;
+        Integer deepSleepMinutes = aiPhases != null ? aiPhases.deepSleepMinutes() : null;
+        Integer remSleepMinutes = aiPhases != null ? aiPhases.remSleepMinutes() : null;
+        Integer awakeMinutes = aiPhases != null ? aiPhases.awakeMinutes() : null;
+
+        String rangeValidationError = validateNumericRanges(
+                totalSleepMinutes, sleepScore, lightSleepMinutes, deepSleepMinutes, remSleepMinutes, awakeMinutes
+        );
+        if (rangeValidationError != null) {
+            return ExtractedSleepData.invalid(rangeValidationError, confidence);
+        }
+
+        ExtractedSleepData.Phases phases = new ExtractedSleepData.Phases(
+                lightSleepMinutes, deepSleepMinutes, remSleepMinutes, awakeMinutes
+        );
+
+        log.info("Successfully extracted sleep data: date={}, duration={}min, score={}, confidence={}",
+                sleepDate, totalSleepMinutes, sleepScore, confidence);
+
+        return ExtractedSleepData.valid(
+                sleepDate, sleepStart, sleepEnd, totalSleepMinutes,
+                sleepScore, phases, qualityLabel, confidence
+        );
     }
 
     private LocalDate parseSleepDate(String dateStr, int year) {
@@ -299,23 +279,6 @@ class SleepImageExtractor {
             LocalTime defaultTime = isSleepStart ? LocalTime.of(23, 0) : LocalTime.of(7, 0);
             return ZonedDateTime.of(date, defaultTime, POLAND_ZONE).toInstant();
         }
-    }
-
-    private Integer parseNullableInt(JsonNode node) {
-        if (node == null || node.isNull() || node.isMissingNode()) {
-            return null;
-        }
-        if (node.isNumber()) {
-            return node.asInt();
-        }
-        if (node.isTextual()) {
-            try {
-                return Integer.parseInt(node.asText());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
     }
 
     private String validateNumericRanges(
