@@ -18,13 +18,13 @@ class InputValidationGuardrail implements Guardrail {
             );
         }
 
-        if (profile.maxTextLength() > 0 && input.length() > profile.maxTextLength()) {
-            if (profile.blockOnDetection()) {
-                return GuardrailResult.blocked(
-                        "Message is too long",
-                        "Input length " + input.length() + " exceeds max " + profile.maxTextLength()
-                );
-            }
+        if (profile.maxTextLength() > 0
+                && input.length() > profile.maxTextLength()
+                && profile.blockOnDetection()) {
+            return GuardrailResult.blocked(
+                    "Message is too long",
+                    "Input length " + input.length() + " exceeds max " + profile.maxTextLength()
+            );
         }
 
         return GuardrailResult.allowed();
