@@ -1,0 +1,111 @@
+package com.healthassistant.assistant.advisor;
+
+import com.healthassistant.guardrails.api.GuardrailFacade;
+import com.healthassistant.guardrails.api.GuardrailProfile;
+import com.healthassistant.guardrails.api.GuardrailResult;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+
+import java.util.List;
+
+/**
+ * Guardrail advisor that validates user input before sending to AI.
+ * Blocks prompt injection attempts and validates input constraints.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class ChatGuardrailAdvisor implements CallAdvisor, StreamAdvisor {
+
+    private static final int ORDER = 0; // Execute first, before other advisors
+    private static final String NAME = "ChatGuardrailAdvisor";
+
+    private final GuardrailFacade guardrailFacade;
+
+    @Override
+    public String getName() {
+        return NAME;
+    }
+
+    @Override
+    public int getOrder() {
+        return ORDER;
+    }
+
+    @Override
+    public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
+        GuardrailResult result = validateRequest(request);
+
+        if (result.blocked()) {
+            log.info("Request blocked by guardrail: {}", result.internalReason());
+            return createBlockedResponse(result.userMessage());
+        }
+
+        return chain.nextCall(request);
+    }
+
+    @Override
+    public Flux<ChatClientResponse> adviseStream(ChatClientRequest request, StreamAdvisorChain chain) {
+        GuardrailResult result = validateRequest(request);
+
+        if (result.blocked()) {
+            log.info("Stream request blocked by guardrail: {}", result.internalReason());
+            return Flux.just(createBlockedResponse(result.userMessage()));
+        }
+
+        return chain.nextStream(request);
+    }
+
+    private GuardrailResult validateRequest(ChatClientRequest request) {
+        String userMessage = extractUserMessage(request);
+
+        if (userMessage == null) {
+            return GuardrailResult.allowed();
+        }
+
+        return guardrailFacade.validateText(userMessage, GuardrailProfile.CHAT);
+    }
+
+    private String extractUserMessage(ChatClientRequest request) {
+        if (request == null || request.prompt() == null) {
+            return null;
+        }
+
+        List<Message> messages = request.prompt().getInstructions();
+        if (messages == null || messages.isEmpty()) {
+            return null;
+        }
+
+        // Find the last user message
+        return messages.stream()
+                .filter(UserMessage.class::isInstance)
+                .map(Message::getText)
+                .reduce((first, second) -> second) // Get last
+                .orElse(null);
+    }
+
+    private ChatClientResponse createBlockedResponse(String userMessage) {
+        var generation = new Generation(
+                new org.springframework.ai.chat.messages.AssistantMessage(userMessage)
+        );
+        var chatResponse = ChatResponse.builder()
+                .generations(List.of(generation))
+                .build();
+
+        return ChatClientResponse.builder()
+                .chatResponse(chatResponse)
+                .build();
+    }
+}
