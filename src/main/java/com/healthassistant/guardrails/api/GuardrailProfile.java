@@ -1,23 +1,11 @@
 package com.healthassistant.guardrails.api;
 
-/**
- * Profiles defining different guardrail configurations per use-case.
- */
 public enum GuardrailProfile {
 
-    /**
-     * Chat assistant - full validation with text length limits and injection detection.
-     */
     CHAT(4000, true, true, true),
 
-    /**
-     * Image import (meals, workouts, sleep) - no text length limit, focus on injection detection.
-     */
     IMAGE_IMPORT(2000, true, true, false),
 
-    /**
-     * Data extraction for AI summaries - moderate limits, sanitization focus.
-     */
     DATA_EXTRACTION(100, true, false, true);
 
     private final int maxTextLength;
@@ -45,10 +33,6 @@ public enum GuardrailProfile {
         return checkJsonInjection;
     }
 
-    /**
-     * If true, block the request when injection is detected.
-     * If false, sanitize the input and allow it to proceed.
-     */
     public boolean blockOnDetection() {
         return blockOnDetection;
     }

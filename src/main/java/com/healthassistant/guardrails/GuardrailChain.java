@@ -8,10 +8,6 @@ import org.springframework.stereotype.Component;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Chains multiple guardrails together, executing them in order.
- * Short-circuits on first blocking result.
- */
 @Component
 @Slf4j
 class GuardrailChain {
@@ -30,15 +26,7 @@ class GuardrailChain {
                 this.guardrails.stream().map(g -> g.getClass().getSimpleName()).toList());
     }
 
-    /**
-     * Evaluate input through all guardrails.
-     *
-     * @param input   the input to evaluate
-     * @param profile the guardrail profile
-     * @return result with either blocked status or sanitized input
-     */
     GuardrailResult evaluate(String input, GuardrailProfile profile) {
-        // Run through guardrails - short-circuit on first blocked
         return guardrails.stream()
                 .map(guardrail -> {
                     GuardrailResult result = guardrail.evaluate(input, profile);
@@ -52,7 +40,6 @@ class GuardrailChain {
                 .filter(GuardrailResult::blocked)
                 .findFirst()
                 .orElseGet(() -> {
-                    // If not blocked, sanitize input
                     String sanitized = inputSanitizer.sanitize(input, profile);
                     return GuardrailResult.allowed(sanitized);
                 });

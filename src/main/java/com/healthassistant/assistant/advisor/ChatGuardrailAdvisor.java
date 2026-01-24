@@ -20,16 +20,12 @@ import reactor.core.publisher.Flux;
 
 import java.util.List;
 
-/**
- * Guardrail advisor that validates user input before sending to AI.
- * Blocks prompt injection attempts and validates input constraints.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ChatGuardrailAdvisor implements CallAdvisor, StreamAdvisor {
 
-    private static final int ORDER = 0; // Execute first, before other advisors
+    private static final int ORDER = 0;
     private static final String NAME = "ChatGuardrailAdvisor";
 
     private final GuardrailFacade guardrailFacade;
@@ -88,11 +84,10 @@ public class ChatGuardrailAdvisor implements CallAdvisor, StreamAdvisor {
             return null;
         }
 
-        // Find the last user message
         return messages.stream()
                 .filter(UserMessage.class::isInstance)
                 .map(Message::getText)
-                .reduce((first, second) -> second) // Get last
+                .reduce((first, second) -> second)
                 .orElse(null);
     }
 

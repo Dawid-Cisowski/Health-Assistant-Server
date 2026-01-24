@@ -10,9 +10,6 @@ import java.util.regex.Pattern;
 
 import static com.healthassistant.guardrails.PromptInjectionPatterns.*;
 
-/**
- * Detects prompt injection attempts using pattern matching.
- */
 @Component
 @Slf4j
 class PromptInjectionGuardrail implements Guardrail {
@@ -25,7 +22,6 @@ class PromptInjectionGuardrail implements Guardrail {
             return GuardrailResult.allowed();
         }
 
-        // Check for prompt injection patterns
         if (profile.checkPromptInjection()) {
             Optional<String> detected = detectPattern(input, TEXT_INJECTION_PATTERNS);
             if (detected.isPresent()) {
@@ -38,11 +34,9 @@ class PromptInjectionGuardrail implements Guardrail {
                             "Prompt injection detected: " + detected.get()
                     );
                 }
-                // If not blocking, sanitization will happen later
             }
         }
 
-        // Check for JSON injection patterns
         if (profile.checkJsonInjection()) {
             Optional<String> detected = detectPattern(input, JSON_INJECTION_PATTERNS);
             if (detected.isPresent()) {
