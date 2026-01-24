@@ -388,9 +388,10 @@ abstract class BaseEvaluationSpec extends Specification {
 
     /**
      * Wait for async projections to complete.
+     * Increased timeout to ensure all projections and daily summaries are fully updated.
      */
     void waitForProjections() {
-        Thread.sleep(500)
+        Thread.sleep(1000) // Increased from 500ms to 2000ms for AI evaluation tests
     }
 
     // ==================== HMAC Authentication Helpers ====================

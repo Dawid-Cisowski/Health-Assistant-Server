@@ -89,4 +89,27 @@ public record DailySummary(
         java.time.Instant occurredAt
     ) {
     }
+
+    // Helper methods for easier AI tool access
+    public Integer getTotalSteps() {
+        return activity != null ? activity.steps() : null;
+    }
+
+    public Integer getActiveCalories() {
+        return activity != null ? activity.activeCalories() : null;
+    }
+
+    public Integer getTotalSleepMinutes() {
+        return sleep.stream()
+            .mapToInt(Sleep::totalMinutes)
+            .sum();
+    }
+
+    public int getMealCount() {
+        return meals.size();
+    }
+
+    public int getWorkoutCount() {
+        return workouts.size();
+    }
 }

@@ -91,7 +91,19 @@ class HealthTools {
 
         return validateAndExecuteSingleDateQuery(date, localDate -> {
             var result = dailySummaryFacade.getDailySummary(deviceId, localDate);
-            log.info("Daily summary fetched: {}", result.isPresent() ? "found" : "not found");
+            if (result.isPresent()) {
+                var summary = result.get();
+                log.info("Daily summary fetched for {}: steps={}, calories={}, sleep={} min, meals={}, workouts={}",
+                    localDate,
+                    summary.getTotalSteps(),
+                    summary.getActiveCalories(),
+                    summary.getTotalSleepMinutes(),
+                    summary.getMealCount(),
+                    summary.getWorkoutCount()
+                );
+            } else {
+                log.info("Daily summary not found for date {}", localDate);
+            }
             return result;
         });
     }

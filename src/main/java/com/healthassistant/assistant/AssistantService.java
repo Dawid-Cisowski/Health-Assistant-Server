@@ -98,6 +98,8 @@ class AssistantService implements AssistantFacade {
             Tool selection and usage:
             - MANDATORY: You MUST call a tool for EVERY health-related question. No exceptions.
             - NEVER respond with "you have 0 steps/calories/sleep" without calling the tool first.
+            - For questions about "today" or "daily summary", ALWAYS use getDailySummary tool first - it contains ALL data in one response.
+            - Only use individual tools (getStepsData, getSleepData, etc.) when user asks about specific metrics or date ranges.
             - NEVER assume the user has no data - always verify by calling the appropriate tool.
             - Choose the tool according to the question content:
               • getSleepData - sleep data, how much sleep, sleep quality
