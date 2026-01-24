@@ -53,10 +53,9 @@ class InputSanitizer {
     }
 
     private String sanitizePatterns(String input, java.util.List<Pattern> patterns, String replacement) {
-        String result = input;
-        for (Pattern pattern : patterns) {
-            result = pattern.matcher(result).replaceAll(replacement);
-        }
-        return result;
+        return patterns.stream()
+                .reduce(input,
+                        (result, pattern) -> pattern.matcher(result).replaceAll(replacement),
+                        (a, b) -> b);
     }
 }

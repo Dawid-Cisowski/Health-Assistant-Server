@@ -38,19 +38,23 @@ class GuardrailChain {
      * @return result with either blocked status or sanitized input
      */
     GuardrailResult evaluate(String input, GuardrailProfile profile) {
-        // Run through guardrails
-        for (Guardrail guardrail : guardrails) {
-            GuardrailResult result = guardrail.evaluate(input, profile);
-            if (result.blocked()) {
-                log.debug("Input blocked by {}: {}",
-                        guardrail.getClass().getSimpleName(),
-                        result.internalReason());
-                return result;
-            }
-        }
-
-        // If not blocked, sanitize input
-        String sanitized = inputSanitizer.sanitize(input, profile);
-        return GuardrailResult.allowed(sanitized);
+        // Run through guardrails - short-circuit on first blocked
+        return guardrails.stream()
+                .map(guardrail -> {
+                    GuardrailResult result = guardrail.evaluate(input, profile);
+                    if (result.blocked()) {
+                        log.debug("Input blocked by {}: {}",
+                                guardrail.getClass().getSimpleName(),
+                                result.internalReason());
+                    }
+                    return result;
+                })
+                .filter(GuardrailResult::blocked)
+                .findFirst()
+                .orElseGet(() -> {
+                    // If not blocked, sanitize input
+                    String sanitized = inputSanitizer.sanitize(input, profile);
+                    return GuardrailResult.allowed(sanitized);
+                });
     }
 }
