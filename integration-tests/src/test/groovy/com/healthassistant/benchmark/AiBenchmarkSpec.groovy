@@ -241,7 +241,11 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
         BenchmarkReporter.printConsoleReport()
 
         // Write JSON report
-        def reportPath = Paths.get("build/reports/benchmark/benchmark-report.json")
-        BenchmarkReporter.writeJsonReport(reportPath)
+        def jsonPath = Paths.get("build/reports/benchmark/benchmark-report.json")
+        BenchmarkReporter.writeJsonReport(jsonPath)
+
+        // Write HTML report
+        def htmlPath = Paths.get("build/reports/benchmark/benchmark-report.html")
+        BenchmarkReporter.writeHtmlReport(htmlPath)
     }
 }

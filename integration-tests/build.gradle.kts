@@ -197,7 +197,9 @@ tasks.register<Test>("benchmarkTest") {
 
     doLast {
         println("")
-        println("Benchmark report: ${layout.buildDirectory.get()}/reports/benchmark/benchmark-report.json")
+        println("Benchmark reports:")
+        println("  JSON: ${layout.buildDirectory.get()}/reports/benchmark/benchmark-report.json")
+        println("  HTML: ${layout.buildDirectory.get()}/reports/benchmark/benchmark-report.html")
     }
 }
 
