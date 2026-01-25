@@ -32,8 +32,8 @@ Backend server for managing health data with Health Connect integration, AI assi
 </p>
 
 - **Append-only Event Log**: All data as immutable events in PostgreSQL
-- **9 Event Types**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories
-- **6 Projections**: Steps, Sleep, Workout, Calories, Activity, Meals
+- **11 Event Types**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories, Weight, RestingHeartRate
+- **8 Projections**: Steps, Sleep, Workout, Calories, Activity, Meals, Weight, HeartRate
 - **Optimistic Locking**: `@Version` on all entities with automatic retry
 - **Idempotency**: Deduplication via `idempotency_key`
 
@@ -46,6 +46,7 @@ Backend server for managing health data with Health Connect integration, AI assi
 - **Sleep Import**: Screenshot from oHealth → AI extraction → SleepSessionRecorded
 - **Workout Import**: Screenshot from GymRun → AI extraction → WorkoutRecorded
 - **Meal Import**: Meal photo → AI analysis → Draft → Confirm → MealRecorded
+- **Weight Import**: Screenshot from scale app → AI extraction → WeightMeasured
 
 ### Workout & Exercise Tracking
 
@@ -63,11 +64,12 @@ Backend server for managing health data with Health Connect integration, AI assi
 - **Replay Protection**: Nonce cache with TTL
 - **Log Sanitization**: Protection against log injection
 - **Prompt Injection Protection**: AI message validation
+- **AI Guardrails**: Content filtering and safety checks
 - **Constant-time Signature Verification**: Protection against timing attacks
 
 ## Architecture
 
-### 16 Modules (Spring Modulith)
+### 20 Modules (Spring Modulith)
 
 ```
 com.healthassistant/
@@ -83,6 +85,10 @@ com.healthassistant/
 ├── activity/        # Activity projections
 ├── meals/           # Meal projections
 ├── mealimport/      # AI meal import (draft flow)
+├── weight/          # Weight measurement projections
+├── weightimport/    # AI weight import from screenshots
+├── heartrate/       # Heart rate projections (summary + resting)
+├── guardrails/      # AI safety guardrails and content filtering
 ├── assistant/       # AI chat with Gemini
 ├── googlefit/       # Historical sync with Google Fit
 ├── security/        # HMAC filter, nonce cache
@@ -105,7 +111,9 @@ StoreHealthEventsCommandHandler
     │   ├── WorkoutProjector
     │   ├── CaloriesProjector
     │   ├── ActivityProjector
-    │   └── MealsProjector
+    │   ├── MealsProjector
+    │   ├── WeightProjector
+    │   └── HeartRateProjector
     └── DailySummaryAggregator
 ```
 
@@ -190,6 +198,18 @@ StoreHealthEventsCommandHandler
 | PATCH | `/v1/meals/import/{draftId}` | Update draft |
 | POST | `/v1/meals/import/{draftId}/confirm` | Confirm draft |
 
+### Weight
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/weight/latest` | Latest weight measurement |
+| GET | `/v1/weight/range` | Weight measurements in range |
+| POST | `/v1/weight/import-image` | AI import from screenshot |
+
+### Heart Rate
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/heartrate/range` | Heart rate data in range |
+
 ### Google Fit (Legacy)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -213,6 +233,8 @@ StoreHealthEventsCommandHandler
 | `WalkingSessionRecorded.v1` | sessionId, start, end, durationMinutes | duration ≥ 0 |
 | `WorkoutRecorded.v1` | workoutId, performedAt, exercises[] | exercises non-empty |
 | `MealRecorded.v1` | title, mealType, macros, healthRating | macros ≥ 0 |
+| `WeightMeasured.v1` | weightKg, measuredAt | weightKg > 0 |
+| `RestingHeartRateRecorded.v1` | measuredAt, beatsPerMinute | bpm > 0 |
 
 **Meal Types**: BREAKFAST, BRUNCH, LUNCH, DINNER, SNACK, DESSERT, DRINK
 
@@ -220,7 +242,7 @@ StoreHealthEventsCommandHandler
 
 ## Database Schema
 
-### 35 Flyway Migrations (V1-V35)
+### 39 Flyway Migrations (V1-V39)
 
 **Core Tables**:
 - `health_events` - Event log (JSONB payload, GIN index, version)
@@ -235,6 +257,8 @@ StoreHealthEventsCommandHandler
 - `calories_hourly_projections`, `calories_daily_projections`
 - `activity_hourly_projections`, `activity_daily_projections`
 - `meal_projections`, `meal_daily_projections`
+- `weight_measurement_projections`
+- `heart_rate_projections`, `resting_heart_rate_projections`
 
 **Domain Tables**:
 - `exercises` - Catalog of 59 exercises
@@ -305,14 +329,18 @@ docker run --name postgres-dev \
 open integration-tests/build/reports/tests/test/index.html
 ```
 
-### 420 Integration Tests (49 Spec Files)
-- **Event Validation**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories
-- **Projections**: Steps, Sleep, Workout, Calories, Activity, Meals, ExerciseStatistics
-- **Features**: DailySummary, Assistant, ConversationHistory, GoogleFitSync, HmacAuthentication, BatchEventIngestion, Routines
-- **Import**: WorkoutImport, MealImport, SleepImport, MealImportDraft
-- **Security**: HmacAuthentication, EventSecurity, GlobalExceptionHandler
+### Integration Tests (64 Spec Files)
+- **Event Validation**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories, Weight
+- **Projections**: Steps, Sleep, Workout, Calories, Activity, Meals, Weight, ExerciseStatistics, PersonalRecords
+- **Features**: DailySummary, Assistant, ConversationHistory, GoogleFitSync, HmacAuthentication, BatchEventIngestion, Routines, MealCrud, WorkoutCrud
+- **Import**: WorkoutImport, MealImport, SleepImport, MealImportDraft, MealImportEdgeCases
+- **AI Evaluation**: Hallucination, ToolErrorHandling, ConversationAccuracy, ContentFiltering, PromptInjection, StreamErrorRecovery, ConcurrentRequests, MultiToolQuery
+- **AI Import**: WorkoutImportAI, SleepImportAI, MealImportAI, WeightImportAI
+- **Security**: HmacAuthentication, EventSecurity, GlobalExceptionHandler, RateLimiting, Guardrails
 - **Concurrency**: OptimisticLocking
-- **AI**: AiDailySummary, AiDailySummaryCache
+- **AI Features**: AiDailySummary, AiDailySummaryCache
+- **Cross-cutting**: TimezoneBoundary, CrossModuleConsistency, EventCorrection, EventDeletion
+- **Benchmarks**: AiBenchmark
 
 ## Tech Stack
 
