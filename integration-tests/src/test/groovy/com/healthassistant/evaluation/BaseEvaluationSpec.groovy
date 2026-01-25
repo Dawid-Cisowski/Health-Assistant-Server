@@ -118,7 +118,8 @@ abstract class BaseEvaluationSpec extends Specification {
             "MealImportAISpec",
             "WorkoutImportAISpec",
             "SleepImportAISpec",
-            "WeightImportAISpec"
+            "WeightImportAISpec",
+            "AiBenchmarkSpec"
         ]
 
         def devicesMap = new StringBuilder('{')
