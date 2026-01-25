@@ -157,6 +157,9 @@ tasks.register<Test>("evaluationTest") {
 }
 
 // Separate task for AI benchmark tests (quality, cost, time metrics)
+// Usage:
+//   Single model:  GEMINI_API_KEY=key ./gradlew :integration-tests:benchmarkTest
+//   Multi-model:   GEMINI_API_KEY=key BENCHMARK_MODELS="gemini-2.0-flash,gemini-2.0-pro-exp-02-05" ./gradlew :integration-tests:benchmarkTest
 tasks.register<Test>("benchmarkTest") {
     description = "Run AI benchmark tests measuring quality, cost, and latency (requires GEMINI_API_KEY)"
     group = "verification"
@@ -169,8 +172,12 @@ tasks.register<Test>("benchmarkTest") {
     // Set profiles - evaluation profile uses real Gemini, not mock
     systemProperty("spring.profiles.active", "test,evaluation")
 
-    // Pass through GEMINI_API_KEY and GEMINI_MODEL from environment
+    // Pass through environment variables
+    // GEMINI_API_KEY - required for API access
+    // BENCHMARK_MODELS - comma-separated list of models to compare (e.g., "gemini-2.0-flash,gemini-2.0-pro-exp-02-05")
+    // GEMINI_MODEL - fallback single model if BENCHMARK_MODELS not set
     environment("GEMINI_API_KEY", System.getenv("GEMINI_API_KEY") ?: "")
+    environment("BENCHMARK_MODELS", System.getenv("BENCHMARK_MODELS") ?: "")
     environment("GEMINI_MODEL", System.getenv("GEMINI_MODEL") ?: "gemini-2.0-flash")
 
     // Longer timeout for LLM inference

@@ -445,15 +445,25 @@ def "BM-01: Simple steps query - #modelName"() {
 ## Uruchamianie
 
 ```bash
-# Oba modele
+# Pojedynczy model (domyślnie gemini-2.0-flash)
 GEMINI_API_KEY=your-key ./gradlew :integration-tests:benchmarkTest
 
-# Tylko Pro
-GEMINI_API_KEY=your-key GEMINI_MODEL=gemini-3-pro-preview ./gradlew :integration-tests:benchmarkTest
+# Porównanie wielu modeli - AUTOMATYCZNE!
+GEMINI_API_KEY=your-key \
+  BENCHMARK_MODELS="gemini-2.0-flash,gemini-2.0-pro-exp-02-05" \
+  ./gradlew :integration-tests:benchmarkTest
 
-# Tylko Flash
-GEMINI_API_KEY=your-key GEMINI_MODEL=gemini-3-flash-preview ./gradlew :integration-tests:benchmarkTest
+# Każdy test odpala się dla KAŻDEGO modelu z listy
+# Raport HTML automatycznie porównuje wyniki
 ```
+
+### Zmienne środowiskowe
+
+| Zmienna | Opis | Przykład |
+|---------|------|----------|
+| `GEMINI_API_KEY` | Klucz API (wymagany) | `your-key` |
+| `BENCHMARK_MODELS` | Lista modeli do porównania (rozdzielona przecinkami) | `gemini-2.0-flash,gemini-2.0-pro-exp-02-05` |
+| `GEMINI_MODEL` | Pojedynczy model (fallback jeśli BENCHMARK_MODELS nie ustawione) | `gemini-2.0-flash` |
 
 ---
 

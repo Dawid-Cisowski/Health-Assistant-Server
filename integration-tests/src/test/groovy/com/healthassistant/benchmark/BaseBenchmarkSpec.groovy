@@ -14,14 +14,35 @@ import java.time.LocalDate
  * Base class for AI benchmark tests.
  * Extends BaseEvaluationSpec and adds benchmark-specific methods for measuring
  * quality, cost (tokens), and time metrics.
+ *
+ * Supports multiple models via BENCHMARK_MODELS environment variable (comma-separated).
+ * Example: BENCHMARK_MODELS="gemini-2.0-flash,gemini-2.0-pro-exp-02-05"
  */
 abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
 
+    /**
+     * List of models to benchmark. Parsed from BENCHMARK_MODELS env var.
+     * If not set, falls back to GEMINI_MODEL or default "gemini-2.0-flash".
+     */
     @Shared
-    String currentModel = System.getenv("GEMINI_MODEL") ?: "gemini-2.0-flash"
+    static List<String> BENCHMARK_MODELS = parseModels()
+
+    // Current model being tested (set per test via where: block)
+    String currentModel
+
+    private static List<String> parseModels() {
+        def modelsEnv = System.getenv("BENCHMARK_MODELS")
+        if (modelsEnv) {
+            return modelsEnv.split(",").collect { it.trim() }.findAll { it }
+        }
+        // Fallback to single model
+        def singleModel = System.getenv("GEMINI_MODEL") ?: "gemini-2.0-flash"
+        return [singleModel]
+    }
 
     def setupSpec() {
         BenchmarkReporter.clear()
+        println "=== BENCHMARK MODELS: ${BENCHMARK_MODELS.join(', ')} ==="
     }
 
     def cleanupSpec() {

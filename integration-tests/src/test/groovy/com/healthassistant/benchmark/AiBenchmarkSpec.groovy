@@ -3,6 +3,7 @@ package com.healthassistant.benchmark
 import spock.lang.Requires
 import spock.lang.Timeout
 import spock.lang.Title
+import spock.lang.Unroll
 
 import java.nio.file.Paths
 import java.time.LocalDate
@@ -12,17 +13,18 @@ import java.util.concurrent.TimeUnit
  * AI Benchmark Tests - Happy Path
  *
  * 10 tests measuring quality, cost, and time metrics.
- * Each test records all metrics together for comparison between models.
+ * Each test runs for ALL models specified in BENCHMARK_MODELS env var.
  *
- * Run with: GEMINI_API_KEY=your-key ./gradlew :integration-tests:test --tests "*AiBenchmarkSpec"
+ * Run with single model:
+ *   GEMINI_API_KEY=key ./gradlew :integration-tests:benchmarkTest
  *
- * To compare models, run twice with different GEMINI_MODEL env var:
- * - GEMINI_MODEL=gemini-2.0-flash-001 (default)
- * - GEMINI_MODEL=gemini-2.0-pro-exp-02-05
+ * Run with multiple models for comparison:
+ *   GEMINI_API_KEY=key BENCHMARK_MODELS="gemini-2.0-flash,gemini-2.0-pro-exp-02-05" \
+ *     ./gradlew :integration-tests:benchmarkTest
  */
 @Title("AI Benchmark Tests - Happy Path")
 @Requires({ System.getenv('GEMINI_API_KEY') })
-@Timeout(value = 180, unit = TimeUnit.SECONDS)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
     def today = LocalDate.now(POLAND_ZONE)
@@ -30,8 +32,12 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
     // ==================== Test 1: Simple Chat - Steps Query ====================
 
-    def "BM-01: Simple steps query"() {
-        given: "8500 steps recorded today"
+    @Unroll
+    def "BM-01: Simple steps query [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "8500 steps recorded today"
         submitStepsForToday(8500)
         waitForProjections()
 
@@ -44,12 +50,22 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-01", "Simple steps query", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 2: Multi-turn Conversation ====================
 
-    def "BM-02: Multi-turn conversation"() {
-        given: "health data exists"
+    @Unroll
+    def "BM-02: Multi-turn conversation [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "health data exists"
         submitStepsForToday(10000)
         submitSleepForLastNight(420) // 7h
         waitForProjections()
@@ -68,12 +84,22 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-02", "Multi-turn conversation", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 3: AI Daily Summary Generation ====================
 
-    def "BM-03: AI daily summary generation"() {
-        given: "comprehensive health data for today"
+    @Unroll
+    def "BM-03: AI daily summary generation [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "comprehensive health data for today"
         submitStepsForToday(12000)
         submitSleepForLastNight(480) // 8h
         submitActiveCalories(450)
@@ -89,11 +115,21 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-03", "AI daily summary", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 4: Meal Import - Simple (Banana) ====================
 
-    def "BM-04: Meal import - banana"() {
+    @Unroll
+    def "BM-04: Meal import - banana [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
         when: "importing a banana"
         def result = benchmarkMealImport("banan")
 
@@ -106,11 +142,21 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-04", "Meal import - banana", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 5: Meal Import - Complex (Chicken meal) ====================
 
-    def "BM-05: Meal import - chicken with rice and broccoli"() {
+    @Unroll
+    def "BM-05: Meal import - chicken with rice and broccoli [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
         when: "importing a complex meal"
         def result = benchmarkMealImport("200g grillowanego kurczaka, 200g brokuła i 100g ryżu")
 
@@ -127,12 +173,22 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-05", "Meal import - complex", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 6: Sleep Import from Screenshot ====================
 
-    def "BM-06: Sleep import from screenshot"() {
-        given: "sleep screenshot exists"
+    @Unroll
+    def "BM-06: Sleep import from screenshot [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "sleep screenshot exists"
         def imageBytes = loadScreenshot("/screenshots/sleep_1.png")
 
         when: "importing sleep from screenshot"
@@ -147,12 +203,22 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-06", "Sleep import - screenshot", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 7: Polish Language Query ====================
 
-    def "BM-07: Polish language query"() {
-        given: "steps recorded today"
+    @Unroll
+    def "BM-07: Polish language query [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "steps recorded today"
         submitStepsForToday(7500)
         waitForProjections()
 
@@ -165,12 +231,22 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-07", "Polish language query", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 8: Date Recognition - "Yesterday" ====================
 
-    def "BM-08: Date recognition - yesterday"() {
-        given: "sleep recorded for yesterday"
+    @Unroll
+    def "BM-08: Date recognition - yesterday [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "sleep recorded for yesterday"
         submitSleepForDate(yesterday, 450) // 7.5h
         waitForProjections()
 
@@ -186,12 +262,22 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-08", "Date recognition - yesterday", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 9: Multi-tool Query ====================
 
-    def "BM-09: Multi-tool query"() {
-        given: "various health data"
+    @Unroll
+    def "BM-09: Multi-tool query [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "various health data"
         submitStepsForToday(9000)
         submitActiveCalories(380)
         submitSleepForLastNight(420)
@@ -208,12 +294,22 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-09", "Multi-tool query", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Test 10: Weekly Summary Query ====================
 
-    def "BM-10: Weekly summary query"() {
-        given: "steps recorded for 7 days"
+    @Unroll
+    def "BM-10: Weekly summary query [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "steps recorded for 7 days"
         (0..6).each { daysAgo ->
             submitStepsForDate(today.minusDays(daysAgo), 5000 + (daysAgo * 500))
         }
@@ -232,6 +328,12 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "metrics recorded"
         recordBenchmark("BM-10", "Weekly summary query", result)
+
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
     }
 
     // ==================== Cleanup - Generate Report ====================
