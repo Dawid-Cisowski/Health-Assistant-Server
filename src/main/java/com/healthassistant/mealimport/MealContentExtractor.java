@@ -259,10 +259,7 @@ class MealContentExtractor {
             }
         }
 
-        prompt.append("\nExtract nutritional information and return as JSON.\n");
-        prompt.append("Include mealTypeConfidence field indicating your confidence in the meal type determination.\n");
-        prompt.append("If this is not food-related, return:\n");
-        prompt.append("{\"isMeal\": false, \"confidence\": X, \"mealTypeConfidence\": 0, \"validationError\": \"Reason\"}");
+        prompt.append("\nExtract nutritional information and return as JSON.");
 
         return prompt.toString();
     }
