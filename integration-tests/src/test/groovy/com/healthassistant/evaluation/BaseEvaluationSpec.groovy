@@ -276,10 +276,10 @@ abstract class BaseEvaluationSpec extends Specification {
     }
 
     void submitSleepForLastNight(int totalMinutes) {
-        // Sleep ends yesterday (so it's attributed to yesterday in projections)
+        // Sleep ends today morning (attributed to today in daily summary)
         // Example: sleep from Dec 16 22:00 to Dec 17 05:00 → attributed to Dec 17
-        def yesterday = LocalDate.now(POLAND_ZONE).minusDays(1)
-        def sleepEnd = yesterday.atTime(5, 0).atZone(POLAND_ZONE).toInstant()
+        def today = LocalDate.now(POLAND_ZONE)
+        def sleepEnd = today.atTime(5, 0).atZone(POLAND_ZONE).toInstant()
         def sleepStart = sleepEnd.minusSeconds(totalMinutes * 60L)
 
         def request = [
