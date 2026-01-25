@@ -1,5 +1,7 @@
 package com.healthassistant.mealimport;
 
+import com.healthassistant.guardrails.api.GuardrailFacade;
+import com.healthassistant.guardrails.api.GuardrailProfile;
 import com.healthassistant.mealimport.api.dto.ClarifyingQuestion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +18,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -24,32 +25,13 @@ import java.util.regex.Pattern;
 class MealContentExtractor {
 
     private static final double MEAL_TYPE_CONFIDENCE_THRESHOLD = 0.5;
-    private static final int MAX_USER_INPUT_LENGTH = 2000;
     private static final int MAX_CALORIES = 10000;
     private static final int MAX_PROTEIN_GRAMS = 500;
     private static final int MAX_FAT_GRAMS = 500;
     private static final int MAX_CARBS_GRAMS = 1000;
 
-    private static final Pattern IGNORE_INSTRUCTIONS_PATTERN = Pattern.compile(
-        "(?i)ignore\\s+(all\\s+)?previous\\s+instructions?"
-    );
-    private static final Pattern DISREGARD_PATTERN = Pattern.compile(
-        "(?i)disregard\\s+(all\\s+)?previous"
-    );
-    private static final Pattern SYSTEM_PROMPT_PATTERN = Pattern.compile(
-        "(?i)system\\s*:"
-    );
-    private static final Pattern SYSTEM_TAG_PATTERN = Pattern.compile(
-        "(?i)<\\|system\\|>"
-    );
-    private static final Pattern JSON_INJECTION_PATTERN = Pattern.compile(
-        "\\{\\s*\"(isMeal|caloriesKcal|proteinGrams)\"\\s*:"
-    );
-    private static final Pattern EXCESSIVE_NEWLINES_PATTERN = Pattern.compile(
-        "[\\r\\n]{3,}"
-    );
-
     private final ChatClient chatClient;
+    private final GuardrailFacade guardrailFacade;
 
     ExtractedMealData extract(String description, List<MultipartFile> images, MealTimeContext timeContext) {
         log.info("Extracting meal data from description: {}, images: {}, time: {}",
@@ -244,15 +226,7 @@ class MealContentExtractor {
         if (input == null) {
             return null;
         }
-
-        var sanitized = IGNORE_INSTRUCTIONS_PATTERN.matcher(input).replaceAll("[filtered]");
-        sanitized = DISREGARD_PATTERN.matcher(sanitized).replaceAll("[filtered]");
-        sanitized = SYSTEM_PROMPT_PATTERN.matcher(sanitized).replaceAll("[filtered]");
-        sanitized = SYSTEM_TAG_PATTERN.matcher(sanitized).replaceAll("[filtered]");
-        sanitized = JSON_INJECTION_PATTERN.matcher(sanitized).replaceAll("[filtered-json]");
-        sanitized = EXCESSIVE_NEWLINES_PATTERN.matcher(sanitized).replaceAll("\n\n");
-
-        return sanitized.substring(0, Math.min(sanitized.length(), MAX_USER_INPUT_LENGTH));
+        return guardrailFacade.sanitizeOnly(input, GuardrailProfile.IMAGE_IMPORT);
     }
 
     private String buildUserPrompt(String description, List<MultipartFile> images, MealTimeContext timeContext) {

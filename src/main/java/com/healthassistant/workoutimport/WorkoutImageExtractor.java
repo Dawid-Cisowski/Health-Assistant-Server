@@ -1,5 +1,6 @@
 package com.healthassistant.workoutimport;
 
+import com.healthassistant.guardrails.api.GuardrailFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -26,6 +27,8 @@ class WorkoutImageExtractor {
 
     private final ChatClient chatClient;
     private final ExerciseMatcher exerciseMatcher;
+    @SuppressWarnings("unused") // Reserved for future image content moderation
+    private final GuardrailFacade guardrailFacade;
 
     ExtractedWorkoutData extract(MultipartFile image) throws WorkoutExtractionException {
         try {

@@ -137,7 +137,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Weight specs
             "test-weight", "test-weight-valid",
             // Energy requirements specs
-            "test-energy"
+            "test-energy",
+            // Guardrail specs
+            "test-guardrail"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true

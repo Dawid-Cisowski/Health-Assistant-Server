@@ -3,6 +3,8 @@ package com.healthassistant.dailysummary;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.dailysummary.api.dto.AiDailySummaryResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
+import com.healthassistant.guardrails.api.GuardrailFacade;
+import com.healthassistant.guardrails.api.GuardrailProfile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -10,11 +12,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -29,16 +29,10 @@ class AiDailySummaryService {
     private static final int GOAL_CALORIES = 2500;
     private static final int GOAL_ACTIVITY_MINUTES = 300;
 
-    private static final int MAX_USER_INPUT_LENGTH = 100;
-    private static final Pattern PROMPT_INJECTION_PATTERN = Pattern.compile(
-            "(?i)(ignore|disregard|forget).{0,20}(previous|instruction|above|system|prompt)",
-            Pattern.CASE_INSENSITIVE
-    );
-    private static final Pattern CONTROL_CHARS_PATTERN = Pattern.compile("[\\p{Cntrl}&&[^\t]]");
-
     private final DailySummaryFacade dailySummaryFacade;
     private final DailySummaryJpaRepository repository;
     private final ChatClient chatClient;
+    private final GuardrailFacade guardrailFacade;
 
     private static final String SYSTEM_PROMPT = """
         You are a health assistant that writes very short daily summaries.
@@ -235,17 +229,11 @@ class AiDailySummaryService {
         return sb.toString();
     }
 
-    private static String sanitizeForPrompt(String input) {
+    private String sanitizeForPrompt(String input) {
         if (input == null) {
             return "";
         }
-        String sanitized = CONTROL_CHARS_PATTERN.matcher(input).replaceAll("");
-        sanitized = sanitized.replace("\n", " ").replace("\r", " ");
-        sanitized = PROMPT_INJECTION_PATTERN.matcher(sanitized).replaceAll("[filtered]");
-        if (sanitized.length() > MAX_USER_INPUT_LENGTH) {
-            sanitized = sanitized.substring(0, MAX_USER_INPUT_LENGTH) + "...";
-        }
-        return sanitized.trim();
+        return guardrailFacade.sanitizeOnly(input, GuardrailProfile.DATA_EXTRACTION);
     }
 
     private static String maskDeviceId(String deviceId) {
