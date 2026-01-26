@@ -104,6 +104,12 @@ class MealContentExtractor {
             9. ALWAYS provide detailed description with component breakdown
             10. Report mealTypeConfidence (0.0 to 1.0) - your confidence in the meal type determination
 
+            CRITICAL - REQUIRED FIELDS (NEVER NULL):
+            - "title": MUST ALWAYS be provided when isMeal=true. Generate a descriptive name in Polish for the dish.
+            - "mealType": MUST ALWAYS be provided when isMeal=true. Use your best judgment based on the rules below.
+            - If you cannot determine title, create one from the ingredients (e.g., "Kurczak z brokułami i ryżem")
+            - If you cannot determine mealType with high confidence, use LUNCH as default for main dishes, SNACK for small items
+
             DESCRIPTION FIELD RULES:
             - Write in Polish language
             - List each identified component/ingredient separately
@@ -178,9 +184,9 @@ class MealContentExtractor {
               "isMeal": boolean,
               "confidence": number (0.0-1.0),
               "mealTypeConfidence": number (0.0-1.0),
-              "title": "dish name in Polish" or null,
+              "title": "dish name in Polish" (REQUIRED when isMeal=true, NEVER null),
               "description": "detailed component breakdown in Polish" or null,
-              "mealType": "BREAKFAST" | "BRUNCH" | "LUNCH" | "DINNER" | "SNACK" | "DESSERT" | "DRINK",
+              "mealType": "BREAKFAST" | "BRUNCH" | "LUNCH" | "DINNER" | "SNACK" | "DESSERT" | "DRINK" (REQUIRED when isMeal=true),
               "occurredAt": "ISO-8601 datetime" or null,
               "caloriesKcal": number,
               "proteinGrams": number,

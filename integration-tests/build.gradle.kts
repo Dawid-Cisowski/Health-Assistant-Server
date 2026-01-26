@@ -105,8 +105,9 @@ tasks.test {
     ignoreFailures = true  // Allow coverage report even when tests fail
     finalizedBy(tasks.jacocoTestReport)
 
-    // Exclude AI evaluation tests from regular test run (they require real Gemini API)
+    // Exclude AI evaluation and benchmark tests from regular test run (they require real Gemini API)
     exclude("**/evaluation/**")
+    exclude("**/benchmark/**")
 
     // Enable parallel test execution
     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(10)
@@ -125,8 +126,9 @@ tasks.register<Test>("evaluationTest") {
 
     useJUnitPlatform()
 
-    // Only run evaluation tests from evaluation package
+    // Only run evaluation tests from evaluation package (exclude benchmark)
     include("**/evaluation/**")
+    exclude("**/benchmark/**")
 
     // Set profiles - evaluation profile uses real Gemini, not mock
     systemProperty("spring.profiles.active", "test,evaluation")
@@ -151,6 +153,60 @@ tasks.register<Test>("evaluationTest") {
         showCauses = true
         showStackTraces = true
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
+
+// Separate task for AI benchmark tests (quality, cost, time metrics)
+// Usage:
+//   Single model:  GEMINI_API_KEY=key ./gradlew :integration-tests:benchmarkTest
+//   Multi-model:   GEMINI_API_KEY=key BENCHMARK_MODELS="gemini-2.0-flash,gemini-2.0-pro-exp-02-05" ./gradlew :integration-tests:benchmarkTest
+tasks.register<Test>("benchmarkTest") {
+    description = "Run AI benchmark tests measuring quality, cost, and latency (requires GEMINI_API_KEY)"
+    group = "verification"
+
+    useJUnitPlatform()
+
+    // Only run benchmark tests
+    include("**/benchmark/**")
+
+    // Set profiles - evaluation profile uses real Gemini, not mock
+    systemProperty("spring.profiles.active", "test,evaluation")
+
+    // Pass through environment variables
+    // GEMINI_API_KEY - required for API access
+    // BENCHMARK_MODELS - comma-separated list of models to compare (e.g., "gemini-2.0-flash,gemini-2.0-pro-exp-02-05")
+    // GEMINI_MODEL - fallback single model if BENCHMARK_MODELS not set
+    environment("GEMINI_API_KEY", System.getenv("GEMINI_API_KEY") ?: "")
+    environment("BENCHMARK_MODELS", System.getenv("BENCHMARK_MODELS") ?: "")
+    environment("GEMINI_MODEL", System.getenv("GEMINI_MODEL") ?: "gemini-2.0-flash")
+
+    // Longer timeout for LLM inference
+    timeout.set(Duration.ofMinutes(15))
+
+    // Run sequentially to get accurate timing measurements
+    maxParallelForks = 1
+
+    // JVM args
+    jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
+
+    // Output benchmark report directory
+    outputs.dir(layout.buildDirectory.dir("reports/benchmark"))
+
+    // Show test output and exceptions in console
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+
+    doLast {
+        println("")
+        println("Benchmark reports:")
+        println("  JSON: ${layout.buildDirectory.get()}/reports/benchmark/benchmark-report.json")
+        println("  HTML: ${layout.buildDirectory.get()}/reports/benchmark/benchmark-report.html")
     }
 }
 

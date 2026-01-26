@@ -165,7 +165,9 @@ class AiDailySummaryEvaluationSpec extends BaseEvaluationSpec {
         """
 
         when: "asking about sleep"
-        def summary = askAssistant("Ile spałem wczoraj?")
+        // Note: submitSleepForLastNight creates sleep that ends today morning,
+        // so we ask about today's sleep data (sleep ending today is attributed to today)
+        def summary = askAssistant("Ile mam dzisiaj godzin snu?")
         println "DEBUG: AI Summary: $summary"
 
         then: "summary uses reasonable time format"

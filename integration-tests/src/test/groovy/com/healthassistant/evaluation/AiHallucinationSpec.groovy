@@ -63,19 +63,21 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
         evaluation.isPass()
     }
 
-    def "AI returns correct sleep data - 7 hours yesterday"() {
-        given: "7 hours of sleep recorded for yesterday"
+    def "AI returns correct sleep data - 7 hours last night"() {
+        given: "7 hours of sleep recorded (last night, attributed to today)"
+        // Note: submitSleepForLastNight creates sleep ending today morning,
+        // which is attributed to today's date in daily summary
         submitSleepForLastNight(420)
         waitForProjections()
 
         and: "verify data exists via facade"
-        def yesterday = LocalDate.now(POLAND_ZONE).minusDays(1)
-        def sleepData = sleepFacade.getRangeSummary(getTestDeviceId(), yesterday, yesterday)
+        def today = LocalDate.now(POLAND_ZONE)
+        def sleepData = sleepFacade.getRangeSummary(getTestDeviceId(), today, today)
         assert sleepData.totalSleepMinutes() == 420 : "Sleep should be 420 minutes, got ${sleepData.totalSleepMinutes()}"
-        println "DEBUG: Sleep facade returned for ${yesterday}: totalSleepMinutes=${sleepData.totalSleepMinutes()}"
+        println "DEBUG: Sleep facade returned for ${today}: totalSleepMinutes=${sleepData.totalSleepMinutes()}"
 
         when: "asking the AI assistant"
-        def response = askAssistant("How much sleep did I get yesterday?")
+        def response = askAssistant("Ile dzisiaj spałem?")
         println "DEBUG: AI response: $response"
 
         then: "LLM judge verifies response contains correct data"

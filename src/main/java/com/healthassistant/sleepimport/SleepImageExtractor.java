@@ -148,10 +148,9 @@ class SleepImageExtractor {
     private String buildUserPrompt() {
         return """
             Analyze this sleep tracking app screenshot from ohealth.
-            Extract all sleep data including phases and return as JSON.
+            Extract all sleep data including phases and return as JSON according to the response format.
 
-            If this is not a sleep summary screenshot, return:
-            {"isSleepScreenshot": false, "confidence": 0.9, "validationError": "Reason for rejection"}
+            If this is not a sleep summary screenshot, set isSleepScreenshot to false and include the reason in validationError.
             """;
     }
 

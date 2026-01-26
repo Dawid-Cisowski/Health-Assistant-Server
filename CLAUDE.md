@@ -497,7 +497,7 @@ return ResponseEntity.ok(sanitizedResponse);
 
 The codebase follows a modular architecture organized by feature/bounded context:
 
-**Package Structure** (16 modules verified by Spring Modulith):
+**Package Structure** (20 modules verified by Spring Modulith):
 - `appevents/` - App-facing health events submission API
 - `healthevents/` - Core event storage and management (event log, validation)
 - `dailysummary/` - Daily aggregated summaries from health events
@@ -510,6 +510,10 @@ The codebase follows a modular architecture organized by feature/bounded context
 - `activity/` - Activity minutes projections
 - `meals/` - Meal tracking projections and queries
 - `mealimport/` - Meal import from external sources (with AI-powered drafts)
+- `weight/` - Weight measurement projections and queries
+- `weightimport/` - Weight import from external sources
+- `heartrate/` - Heart rate projections (summary and resting HR)
+- `guardrails/` - AI safety guardrails and content filtering
 - `googlefit/` - Google Fit synchronization and OAuth
 - `assistant/` - AI health assistant with Gemini integration (SSE streaming)
 - `security/` - HMAC authentication filters
@@ -564,6 +568,16 @@ Events are projected into query-optimized views:
 **Meals Projection** (`MealsProjector.java`):
 - Input: `MealRecorded.v1` events
 - Output: `meal_projections`
+
+**Weight Projection** (`WeightProjector.java`):
+- Input: `WeightMeasured.v1` events
+- Output: `weight_measurement_projections`
+- Purpose: Weight tracking, trend analysis, latest measurement
+
+**Heart Rate Projection** (`HeartRateProjector.java`):
+- Input: `HeartRateSummaryRecorded.v1`, `RestingHeartRateRecorded.v1` events
+- Output: `heart_rate_projections`, `resting_heart_rate_projections`
+- Purpose: Heart rate summaries and resting HR tracking
 
 **Important**: Projections are eventually consistent. Projection failures don't block event ingestion.
 
@@ -707,10 +721,12 @@ export NONCE_CACHE_TTL_SEC=600
 - `calories_hourly_projections`, `calories_daily_projections`
 - `activity_hourly_projections`, `activity_daily_projections`
 - `meal_projections`, `meal_daily_projections`
+- `weight_measurement_projections`
+- `heart_rate_projections`, `resting_heart_rate_projections`
 - `meal_import_drafts` (AI-powered meal import)
 - `exercise_name_mappings` (maps exercise names to catalog IDs for statistics)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V35)
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V39)
 
 ---
 
@@ -735,6 +751,8 @@ All events have:
 | `WalkingSessionRecorded.v1` | `sessionId`, `start`, `end`, `durationMinutes` | duration ≥ 0 |
 | `WorkoutRecorded.v1` | `workoutId`, `performedAt`, `exercises[]` | exercises non-empty |
 | `MealRecorded.v1` | `title`, `mealType`, `caloriesKcal`, `proteinGrams`, `fatGrams`, `carbohydratesGrams`, `healthRating` | macros ≥ 0, valid enums |
+| `WeightMeasured.v1` | `weightKg`, `measuredAt` | weightKg > 0 |
+| `RestingHeartRateRecorded.v1` | `measuredAt`, `beatsPerMinute` | bpm > 0 |
 
 **Meal Types**: `BREAKFAST`, `BRUNCH`, `LUNCH`, `DINNER`, `SNACK`, `DESSERT`, `DRINK`
 
@@ -749,19 +767,23 @@ See `EventValidator.java` for detailed validation rules.
 **Test Framework**: Spock (Groovy) with Spring Boot Test + Testcontainers
 
 **Integration Tests** (`integration-tests/` module):
-- 420 Spock specifications
+- 64 Spock specification files
 - PostgreSQL via Testcontainers
 - REST Assured for API testing
 - WireMock for mocking external APIs
 
 **Test Spec Files**:
-- Event validation: `StepsEventValidationSpec`, `SleepEventValidationSpec`, `WorkoutSpec`, `MealEventSpec`, `HeartRateEventSpec`, `DistanceEventSpec`, `WalkingSessionEventSpec`, `ActiveMinutesEventSpec`, `ActiveCaloriesEventSpec`
-- Projections: `StepsProjectionSpec`, `SleepProjectionSpec`, `WorkoutProjectionSpec`, `CaloriesProjectionSpec`, `ActivityProjectionSpec`, `MealProjectionSpec`, `ExerciseStatisticsSpec`
-- Features: `DailySummarySpec`, `AssistantSpec`, `ConversationHistorySpec`, `GoogleFitSyncSpec`, `HmacAuthenticationSpec`, `BatchEventIngestionSpec`
-- Import: `WorkoutImportSpec`, `MealImportSpec`, `SleepImportSpec`, `MealImportDraftSpec`
-- AI Evaluation: `evaluation/AiHallucinationSpec`, `AiDateRecognitionSpec`, `AiToolErrorHandlingSpec`, `AiConversationAccuracySpec`
+- Event validation: `StepsEventValidationSpec`, `SleepEventValidationSpec`, `WorkoutSpec`, `MealEventSpec`, `HeartRateEventSpec`, `DistanceEventSpec`, `WalkingSessionEventSpec`, `ActiveMinutesEventSpec`, `ActiveCaloriesEventSpec`, `WeightEventValidationSpec`
+- Projections: `StepsProjectionSpec`, `SleepProjectionSpec`, `WorkoutProjectionSpec`, `CaloriesProjectionSpec`, `ActivityProjectionSpec`, `MealProjectionSpec`, `WeightProjectionSpec`, `ExerciseStatisticsSpec`, `PersonalRecordsSpec`
+- Features: `DailySummarySpec`, `AssistantSpec`, `ConversationHistorySpec`, `GoogleFitSyncSpec`, `HmacAuthenticationSpec`, `BatchEventIngestionSpec`, `RoutineSpec`, `MealCrudSpec`, `WorkoutCrudSpec`
+- Import: `WorkoutImportSpec`, `MealImportSpec`, `SleepImportSpec`, `MealImportDraftSpec`, `MealImportEdgeCasesSpec`
+- AI Evaluation: `evaluation/AiHallucinationSpec`, `AiToolErrorHandlingSpec`, `AiConversationAccuracySpec`, `AiContentFilteringSpec`, `AiPromptInjectionSpec`, `AiStreamErrorRecoverySpec`, `AiConcurrentRequestsSpec`, `AiMultiToolQuerySpec`, `AiDailySummaryEvaluationSpec`
+- AI Import: `evaluation/WorkoutImportAISpec`, `SleepImportAISpec`, `MealImportAISpec`, `WeightImportAISpec`
 - Concurrency: `OptimisticLockingSpec`
 - AI Features: `AiDailySummarySpec`, `AiDailySummaryCacheSpec`
+- Security: `EventSecuritySpec`, `GlobalExceptionHandlerSpec`, `RateLimitingSpec`, `GuardrailSpec`
+- Cross-cutting: `TimezoneBoundarySpec`, `CrossModuleConsistencySpec`, `EventCorrectionSpec`, `EventDeletionSpec`
+- Benchmarks: `benchmark/AiBenchmarkSpec`
 
 **Running Tests**:
 ```bash
@@ -805,7 +827,7 @@ open integration-tests/build/reports/tests/test/index.html
 - **SpotBugs**: Static analysis (`./gradlew spotbugsMain`, config: `config/spotbugs/exclude.xml`)
 - **PMD**: Code style checking (`./gradlew pmdMain`, config: `config/pmd/ruleset.xml`)
 - **JaCoCo**: Code coverage (`./gradlew jacocoTestReport`, reports in `build/reports/jacoco/`)
-- **Modularity Tests**: `ModularityTests.java` verifies module boundaries (16 modules)
+- **Modularity Tests**: `ModularityTests.java` verifies module boundaries (20 modules)
 
 ---
 
@@ -830,6 +852,7 @@ open integration-tests/build/reports/tests/test/index.html
 - `POST /v1/sleep/import-image?year=YYYY` - Import sleep from screenshot (year optional, default: current year)
 - `POST /v1/workouts/import-image` - Import workout from screenshot
 - `POST /v1/meals/import-image` - Import meal from image (returns draft for confirmation)
+- `POST /v1/weight/import-image` - Import weight from screenshot
 
 ### Query APIs
 - `GET /v1/steps/daily/{date}` - Daily step breakdown
@@ -838,6 +861,9 @@ open integration-tests/build/reports/tests/test/index.html
 - `GET /v1/workouts?from={date}&to={date}` - Workouts by date range
 - `GET /v1/sleep/range?from={date}&to={date}` - Sleep data range
 - `GET /v1/meals/range?from={date}&to={date}` - Meals data range
+- `GET /v1/weight/latest` - Latest weight measurement
+- `GET /v1/weight/range?from={date}&to={date}` - Weight measurements in range
+- `GET /v1/heartrate/range?from={date}&to={date}` - Heart rate data in range
 - `GET /v1/exercises/{exerciseId}/statistics?from={date}&to={date}` - Exercise statistics with progression analysis (HMAC auth required)
 
 ### Monitoring
