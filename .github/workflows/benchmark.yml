@@ -36,6 +36,15 @@ jobs:
           BENCHMARK_MODELS: ${{ github.event.inputs.models || 'gemini-2.0-flash,gemini-2.5-pro-preview-05-06' }}
         run: ./gradlew :integration-tests:benchmarkTest --no-daemon
 
+      - name: Display Benchmark Summary
+        if: always()
+        run: |
+          if [ -f integration-tests/build/reports/benchmark/benchmark-report.md ]; then
+            cat integration-tests/build/reports/benchmark/benchmark-report.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Benchmark report not generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload Benchmark Reports
         uses: actions/upload-artifact@v4
         if: always()

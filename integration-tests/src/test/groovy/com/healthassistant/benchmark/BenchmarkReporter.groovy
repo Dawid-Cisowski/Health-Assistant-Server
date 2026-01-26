@@ -528,6 +528,94 @@ class BenchmarkReporter {
         println "HTML report written to: ${outputPath}"
     }
 
+    /**
+     * Generate Markdown report for GitHub Job Summary.
+     */
+    static void writeMarkdownReport(Path outputPath) {
+        def grouped = results.groupBy { it.model }
+        def models = grouped.keySet().sort()
+
+        def totalPassed = results.count { it.passed }
+        def totalFailed = results.count { !it.passed }
+        def totalTokens = results.sum { it.totalTokens } ?: 0
+        def totalCost = results.sum { it.estimatedCostUsd } ?: 0.0
+        def avgTime = results.isEmpty() ? 0 : results.sum { it.responseTimeMs } / results.size()
+
+        def sb = new StringBuilder()
+
+        sb.append("# 🚀 AI Benchmark Report\n\n")
+        sb.append("**Generated:** ${formatDate(Instant.now())}\n\n")
+
+        // Summary badges
+        def passRate = results.isEmpty() ? 0 : (totalPassed * 100 / results.size()) as int
+        def passEmoji = passRate == 100 ? "✅" : passRate >= 80 ? "⚠️" : "❌"
+        sb.append("${passEmoji} **${totalPassed}/${results.size()}** tests passed ")
+        sb.append("| 🪙 **${String.format('%,d', totalTokens)}** tokens ")
+        sb.append("| 💰 **\$${String.format('%.4f', totalCost)}** ")
+        sb.append("| ⏱️ **${String.format('%.1f', avgTime / 1000.0)}s** avg\n\n")
+
+        // Model comparison table
+        sb.append("## 📊 Model Comparison\n\n")
+        sb.append("| Model | Pass Rate | Input Tokens | Output Tokens | Cost | Avg Time |\n")
+        sb.append("|-------|-----------|--------------|---------------|------|----------|\n")
+
+        models.each { model ->
+            def modelResults = grouped[model]
+            def passed = modelResults.count { it.passed }
+            def inputTokens = modelResults.sum { it.inputTokens } ?: 0
+            def outputTokens = modelResults.sum { it.outputTokens } ?: 0
+            def modelCost = modelResults.sum { it.estimatedCostUsd } ?: 0.0
+            def modelAvgTime = modelResults.sum { it.responseTimeMs } / modelResults.size()
+            def modelShort = model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
+            def modelEmoji = passed == modelResults.size() ? "✅" : "⚠️"
+
+            sb.append("| **${modelShort}** ")
+            sb.append("| ${modelEmoji} ${passed}/${modelResults.size()} ")
+            sb.append("| ${String.format('%,d', inputTokens)} ")
+            sb.append("| ${String.format('%,d', outputTokens)} ")
+            sb.append("| \$${String.format('%.4f', modelCost)} ")
+            sb.append("| ${String.format('%.1fs', modelAvgTime / 1000.0)} |\n")
+        }
+
+        sb.append("\n")
+
+        // Detailed results table
+        sb.append("## 📋 Test Results\n\n")
+        sb.append("| Test | Model | Status | Tokens | Cost | Time |\n")
+        sb.append("|------|-------|--------|--------|------|------|\n")
+
+        results.sort { a, b -> a.testId <=> b.testId ?: a.model <=> b.model }.each { result ->
+            def modelShort = result.model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
+            def statusEmoji = result.passed ? "✅" : "❌"
+            def tokensStr = "${result.inputTokens}/${result.outputTokens}"
+
+            sb.append("| ${result.testId}: ${result.testName ?: '-'} ")
+            sb.append("| ${modelShort} ")
+            sb.append("| ${statusEmoji} ")
+            sb.append("| ${tokensStr} ")
+            sb.append("| \$${String.format('%.4f', result.estimatedCostUsd)} ")
+            sb.append("| ${String.format('%.2fs', result.responseTimeMs / 1000.0)} |\n")
+        }
+
+        // Failed tests details
+        def failedTests = results.findAll { !it.passed }
+        if (failedTests) {
+            sb.append("\n## ❌ Failed Tests\n\n")
+            failedTests.each { result ->
+                def modelShort = result.model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
+                sb.append("### ${result.testId} - ${modelShort}\n")
+                sb.append("**Test:** ${result.testName}\n\n")
+                if (result.errorMessage) {
+                    sb.append("**Error:**\n```\n${result.errorMessage}\n```\n\n")
+                }
+            }
+        }
+
+        Files.createDirectories(outputPath.parent)
+        outputPath.toFile().text = sb.toString()
+        println "Markdown report written to: ${outputPath}"
+    }
+
     private static String formatDate(Instant instant) {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 .withZone(ZoneId.systemDefault())

@@ -349,5 +349,9 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
         // Write HTML report
         def htmlPath = Paths.get("build/reports/benchmark/benchmark-report.html")
         BenchmarkReporter.writeHtmlReport(htmlPath)
+
+        // Write Markdown report (for GitHub Job Summary)
+        def mdPath = Paths.get("build/reports/benchmark/benchmark-report.md")
+        BenchmarkReporter.writeMarkdownReport(mdPath)
     }
 }
