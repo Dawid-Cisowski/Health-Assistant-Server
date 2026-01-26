@@ -156,10 +156,9 @@ class WeightImageExtractor {
             Analyze the provided smart scale/body composition app screenshot(s).
             If multiple images are provided, they show the same measurement (scrolled view).
             Combine data from ALL images to extract the complete set of metrics.
-            Extract all weight and body composition metrics visible and return as JSON.
+            Extract all weight and body composition metrics visible and return as JSON according to the response format.
 
-            If this is not a weight/body composition screenshot, return:
-            {"isWeightScreenshot": false, "confidence": 0.9, "validationError": "Reason for rejection"}
+            If this is not a weight/body composition screenshot, set isWeightScreenshot to false and include the reason in validationError.
             """;
     }
 

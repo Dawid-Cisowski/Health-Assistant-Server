@@ -9,7 +9,7 @@ import java.time.Instant
  * Data class holding benchmark test results for a single test execution.
  * Captures quality, cost, and time metrics.
  */
-@Builder
+@Builder(excludes = ['totalTokens'])
 @ToString(includeNames = true)
 class BenchmarkResult {
     String testId

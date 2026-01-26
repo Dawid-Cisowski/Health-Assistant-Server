@@ -132,10 +132,9 @@ class WorkoutImageExtractor {
     private String buildUserPrompt() {
         return """
             Analyze this workout app screenshot.
-            Extract all workout data and return as JSON.
+            Extract all workout data and return as JSON according to the response format.
 
-            If this is not a workout summary screenshot, return:
-            {"isWorkoutScreenshot": false, "confidence": 0.9, "validationError": "Reason for rejection"}
+            If this is not a workout summary screenshot, set isWorkoutScreenshot to false and include the reason in validationError.
             """;
     }
 
