@@ -151,17 +151,21 @@ class AssistantService implements AssistantFacade {
                 .contextCapture()
                 .flatMapMany(ctx -> {
                     var assistantResponse = new StringBuilder();
+                    var tokenUsage = new TokenUsageAccumulator();
                     return chatClient.prompt()
                             .messages(ctx.messages())
                             .stream()
                             .chatResponse()
+                            .doOnNext(response -> tokenUsage.accumulate(response))
                             .flatMap(this::mapToAssistantEvents)
                             .doOnNext(event -> {
                                 if (event instanceof ContentEvent(String content)) {
                                     assistantResponse.append(content);
                                 }
                             })
-                            .concatWith(Flux.just(new DoneEvent(ctx.conversationId())))
+                            .concatWith(Flux.defer(() -> Flux.just(
+                                    new DoneEvent(ctx.conversationId(), tokenUsage.getPromptTokens(), tokenUsage.getCompletionTokens())
+                            )))
                             .doOnError(error -> log.error("Error in stream chat", error))
                             .onErrorResume(error -> Flux.just(createErrorEvent(error)))
                             .doFinally(signal -> Schedulers.boundedElastic().schedule(() -> {
@@ -184,6 +188,31 @@ class AssistantService implements AssistantFacade {
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages) {}
+
+    private static class TokenUsageAccumulator {
+        private long promptTokens = 0;
+        private long completionTokens = 0;
+
+        void accumulate(org.springframework.ai.chat.model.ChatResponse response) {
+            if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+                var usage = response.getMetadata().getUsage();
+                if (usage.getPromptTokens() != null && usage.getPromptTokens() > 0) {
+                    promptTokens = usage.getPromptTokens();
+                }
+                if (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0) {
+                    completionTokens = usage.getCompletionTokens();
+                }
+            }
+        }
+
+        Long getPromptTokens() {
+            return promptTokens > 0 ? promptTokens : null;
+        }
+
+        Long getCompletionTokens() {
+            return completionTokens > 0 ? completionTokens : null;
+        }
+    }
 
     private Flux<AssistantEvent> mapToAssistantEvents(org.springframework.ai.chat.model.ChatResponse response) {
         var content = response.getResult().getOutput().getText();

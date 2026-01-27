@@ -53,7 +53,7 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
 
     /**
      * Send chat message and measure all metrics.
-     * Returns BenchmarkResult with response, tokens, and timing.
+     * Returns BenchmarkResult with response, tokens (real from API), and timing.
      */
     BenchmarkResult benchmarkChat(String message) {
         def deviceId = getTestDeviceId()
@@ -76,13 +76,14 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
 
         // Parse SSE response
         def content = parseSSEContent(responseBody)
-        def tokenInfo = parseSSETokenUsage(responseBody)
 
         // Calculate TTFT from first content event timestamp (approximation)
         ttft = parseSSETTFT(responseBody, startTime)
 
-        def inputTokens = tokenInfo.inputTokens ?: 0L
-        def outputTokens = tokenInfo.outputTokens ?: 0L
+        // Parse real token usage from done event
+        def tokenUsage = parseSSETokenUsage(responseBody)
+        def inputTokens = tokenUsage.promptTokens ?: 0L
+        def outputTokens = tokenUsage.completionTokens ?: 0L
 
         return BenchmarkResult.builder()
                 .model(currentModel)
@@ -96,6 +97,33 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
                 .ttftMs(ttft)
                 .timestamp(Instant.now())
                 .build()
+    }
+
+    /**
+     * Parse token usage from SSE done event.
+     */
+    private Map parseSSETokenUsage(String sseResponse) {
+        Long promptTokens = null
+        Long completionTokens = null
+
+        sseResponse.split("\n\n").each { event ->
+            event.split("\n").each { line ->
+                if (line.startsWith("data:")) {
+                    def json = line.substring(5).trim()
+                    if (json && json.contains('"type":"done"')) {
+                        try {
+                            def parsed = new JsonSlurper().parseText(json)
+                            promptTokens = parsed.promptTokens as Long
+                            completionTokens = parsed.completionTokens as Long
+                        } catch (Exception ignored) {
+                            // Token info parsing failed
+                        }
+                    }
+                }
+            }
+        }
+
+        return [promptTokens: promptTokens, completionTokens: completionTokens]
     }
 
     /**
@@ -265,36 +293,6 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
     }
 
     // ==================== Helper Methods ====================
-
-    /**
-     * Parse token usage from SSE response (from done event).
-     */
-    Map parseSSETokenUsage(String sseResponse) {
-        def inputTokens = 0L
-        def outputTokens = 0L
-
-        sseResponse.split("\n\n").each { event ->
-            event.split("\n").each { line ->
-                if (line.startsWith("data:")) {
-                    def json = line.substring(5).trim()
-                    if (json && json.contains('"type":"done"')) {
-                        // Try to extract token info from done event
-                        try {
-                            def parsed = new JsonSlurper().parseText(json)
-                            if (parsed.usage) {
-                                inputTokens = parsed.usage.promptTokens ?: parsed.usage.inputTokens ?: 0L
-                                outputTokens = parsed.usage.completionTokens ?: parsed.usage.outputTokens ?: 0L
-                            }
-                        } catch (Exception ignored) {
-                            // Token info not available in response
-                        }
-                    }
-                }
-            }
-        }
-
-        return [inputTokens: inputTokens, outputTokens: outputTokens]
-    }
 
     /**
      * Estimate TTFT from SSE response timing.
