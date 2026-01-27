@@ -43,13 +43,11 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "asking about today's steps"
         def result = benchmarkChat("How many steps did I take today?")
+        recordBenchmark("BM-01", "Simple steps query", result)
 
         then: "response contains 8500"
         result.passed
         result.response.contains("8500") || result.response.contains("8,500") || result.response.contains("8 500")
-
-        and: "metrics recorded"
-        recordBenchmark("BM-01", "Simple steps query", result)
 
         cleanup:
         cleanAllData()
@@ -75,15 +73,13 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         and: "follow-up about sleep"
         def result = benchmarkChat("And how did I sleep last night?")
+        recordBenchmark("BM-02", "Multi-turn conversation", result)
 
         then: "response mentions sleep duration (~7 hours or 420 minutes)"
         result.passed
         result.response.toLowerCase().contains("7") ||
                 result.response.contains("420") ||
                 result.response.toLowerCase().contains("sleep")
-
-        and: "metrics recorded"
-        recordBenchmark("BM-02", "Multi-turn conversation", result)
 
         cleanup:
         cleanAllData()
@@ -108,13 +104,11 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "requesting AI summary"
         def result = benchmarkAiSummary(today)
+        recordBenchmark("BM-03", "AI daily summary", result)
 
         then: "summary is generated with reasonable content"
         result.passed
         result.response.length() > 30
-
-        and: "metrics recorded"
-        recordBenchmark("BM-03", "AI daily summary", result)
 
         cleanup:
         cleanAllData()
@@ -132,6 +126,7 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "importing a banana"
         def result = benchmarkMealImport("banan")
+        recordBenchmark("BM-04", "Meal import - banana", result)
 
         then: "import succeeds"
         result.passed
@@ -139,9 +134,6 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
         and: "calories are reasonable for a banana (~90-135 kcal)"
         def calories = result.parsedResponse.caloriesKcal
         calories != null && calories >= 70 && calories <= 150
-
-        and: "metrics recorded"
-        recordBenchmark("BM-04", "Meal import - banana", result)
 
         cleanup:
         cleanAllData()
@@ -159,6 +151,7 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "importing a complex meal"
         def result = benchmarkMealImport("200g grillowanego kurczaka, 200g brokuła i 100g ryżu")
+        recordBenchmark("BM-05", "Meal import - complex", result)
 
         then: "import succeeds"
         result.passed
@@ -170,9 +163,6 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
         and: "protein is high (~35-90g)"
         def protein = result.parsedResponse.proteinGrams
         protein != null && protein >= 30 && protein <= 100
-
-        and: "metrics recorded"
-        recordBenchmark("BM-05", "Meal import - complex", result)
 
         cleanup:
         cleanAllData()
@@ -193,6 +183,7 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "importing sleep from screenshot"
         def result = benchmarkSleepImport(imageBytes, "sleep_1.png")
+        recordBenchmark("BM-06", "Sleep import - screenshot", result)
 
         then: "import succeeds"
         result.passed
@@ -200,9 +191,6 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
         and: "total sleep minutes is approximately 378 (±10%)"
         def totalMinutes = result.parsedResponse.totalSleepMinutes
         totalMinutes != null && totalMinutes >= 340 && totalMinutes <= 420
-
-        and: "metrics recorded"
-        recordBenchmark("BM-06", "Sleep import - screenshot", result)
 
         cleanup:
         cleanAllData()
@@ -224,13 +212,11 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "asking in Polish"
         def result = benchmarkChat("Ile kroków zrobiłem dzisiaj?")
+        recordBenchmark("BM-07", "Polish language query", result)
 
         then: "response contains the step count"
         result.passed
         result.response.contains("7500") || result.response.contains("7,500") || result.response.contains("7 500")
-
-        and: "metrics recorded"
-        recordBenchmark("BM-07", "Polish language query", result)
 
         cleanup:
         cleanAllData()
@@ -252,6 +238,7 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "asking about yesterday"
         def result = benchmarkChat("How did I sleep yesterday?")
+        recordBenchmark("BM-08", "Date recognition - yesterday", result)
 
         then: "response mentions sleep data"
         result.passed
@@ -259,9 +246,6 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
                 result.response.contains("450") ||
                 result.response.toLowerCase().contains("sleep") ||
                 result.response.toLowerCase().contains("hour")
-
-        and: "metrics recorded"
-        recordBenchmark("BM-08", "Date recognition - yesterday", result)
 
         cleanup:
         cleanAllData()
@@ -285,15 +269,13 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "asking for complete health summary"
         def result = benchmarkChat("Give me a complete health summary for today including steps, calories, and sleep")
+        recordBenchmark("BM-09", "Multi-tool query", result)
 
         then: "response contains multiple metrics"
         result.passed
         // At least steps should be mentioned
         result.response.contains("9000") || result.response.contains("9,000") ||
                 result.response.toLowerCase().contains("step")
-
-        and: "metrics recorded"
-        recordBenchmark("BM-09", "Multi-tool query", result)
 
         cleanup:
         cleanAllData()
@@ -318,6 +300,7 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
 
         when: "asking about weekly total"
         def result = benchmarkChat("How many steps did I take this week in total?")
+        recordBenchmark("BM-10", "Weekly summary query", result)
 
         then: "response contains approximate total"
         result.passed
@@ -326,8 +309,61 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
                 result.response.toLowerCase().contains("week") ||
                 result.response.toLowerCase().contains("total")
 
-        and: "metrics recorded"
-        recordBenchmark("BM-10", "Weekly summary query", result)
+        cleanup:
+        cleanAllData()
+
+        where:
+        modelName << BENCHMARK_MODELS
+    }
+
+    // ==================== Test 11: Long Multi-turn Conversation ====================
+
+    @Unroll
+    def "BM-11: Long conversation with multiple queries [#modelName]"() {
+        given: "model is set"
+        currentModel = modelName
+
+        and: "comprehensive health data for multiple days"
+        // Today's data
+        submitStepsForToday(12500)
+        submitSleepForLastNight(450)
+        submitActiveCalories(520)
+        submitMeal("Oatmeal with banana", "BREAKFAST", 380, 12, 8, 65)
+        submitMeal("Grilled chicken salad", "LUNCH", 450, 45, 18, 20)
+
+        // Yesterday's data
+        submitStepsForDate(yesterday, 9800)
+        submitSleepForDate(yesterday, 420)
+
+        // Day before yesterday
+        submitStepsForDate(today.minusDays(2), 11200)
+
+        waitForProjections()
+
+        when: "conducting a long multi-turn conversation"
+        // Turn 1: Ask about today's steps
+        askAssistant("How many steps did I take today?")
+
+        // Turn 2: Follow-up about sleep
+        askAssistant("And how was my sleep last night?")
+
+        // Turn 3: Compare with yesterday
+        askAssistant("How does today compare to yesterday in terms of steps?")
+
+        // Turn 4: Ask about calories
+        askAssistant("What about my calorie burn today?")
+
+        // Turn 5: Ask about meals
+        askAssistant("What did I eat today?")
+
+        // Turn 6: Final summary question - this is the one we benchmark
+        def result = benchmarkChat("Based on all this information, give me a brief overall health assessment for today. How am I doing?")
+        recordBenchmark("BM-11", "Long conversation (6 turns)", result)
+
+        then: "response provides a coherent summary mentioning multiple metrics"
+        result.passed
+        // Response should be substantial and mention at least some health aspects
+        result.response.length() > 100
 
         cleanup:
         cleanAllData()

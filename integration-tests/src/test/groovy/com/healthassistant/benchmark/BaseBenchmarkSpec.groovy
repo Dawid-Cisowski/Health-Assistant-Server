@@ -54,6 +54,10 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
     /**
      * Send chat message and measure all metrics.
      * Returns BenchmarkResult with response, tokens, and timing.
+     *
+     * Note: Token counts are estimated since the SSE endpoint doesn't return usage data.
+     * - Input: ~1500 (system prompt) + message tokens
+     * - Output: response content tokens
      */
     BenchmarkResult benchmarkChat(String message) {
         def deviceId = getTestDeviceId()
@@ -76,26 +80,38 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
 
         // Parse SSE response
         def content = parseSSEContent(responseBody)
-        def tokenInfo = parseSSETokenUsage(responseBody)
 
         // Calculate TTFT from first content event timestamp (approximation)
         ttft = parseSSETTFT(responseBody, startTime)
 
-        def inputTokens = tokenInfo.inputTokens ?: 0L
-        def outputTokens = tokenInfo.outputTokens ?: 0L
+        // Estimate tokens (SSE endpoint doesn't return usage data)
+        // System prompt ~1500 tokens + user message
+        def estimatedInputTokens = 1500L + estimateTokens(message)
+        // Output based on response length
+        def estimatedOutputTokens = estimateTokens(content ?: "")
 
         return BenchmarkResult.builder()
                 .model(currentModel)
                 .response(content)
                 .passed(statusCode == 200 && content?.length() > 0)
                 .errorMessage(statusCode != 200 ? "HTTP ${statusCode}" : null)
-                .inputTokens(inputTokens)
-                .outputTokens(outputTokens)
-                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, inputTokens, outputTokens))
+                .inputTokens(estimatedInputTokens)
+                .outputTokens(estimatedOutputTokens)
+                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, estimatedInputTokens, estimatedOutputTokens))
                 .responseTimeMs(endTime - startTime)
                 .ttftMs(ttft)
                 .timestamp(Instant.now())
                 .build()
+    }
+
+    /**
+     * Estimate token count from text.
+     * Rough approximation: ~4 characters per token for English, ~2 for Polish/mixed.
+     */
+    private static long estimateTokens(String text) {
+        if (text == null || text.isEmpty()) return 0L
+        // Use ~3 chars per token as middle ground for mixed content
+        return Math.max(1L, (text.length() / 3) as long)
     }
 
     /**
@@ -265,36 +281,6 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
     }
 
     // ==================== Helper Methods ====================
-
-    /**
-     * Parse token usage from SSE response (from done event).
-     */
-    Map parseSSETokenUsage(String sseResponse) {
-        def inputTokens = 0L
-        def outputTokens = 0L
-
-        sseResponse.split("\n\n").each { event ->
-            event.split("\n").each { line ->
-                if (line.startsWith("data:")) {
-                    def json = line.substring(5).trim()
-                    if (json && json.contains('"type":"done"')) {
-                        // Try to extract token info from done event
-                        try {
-                            def parsed = new JsonSlurper().parseText(json)
-                            if (parsed.usage) {
-                                inputTokens = parsed.usage.promptTokens ?: parsed.usage.inputTokens ?: 0L
-                                outputTokens = parsed.usage.completionTokens ?: parsed.usage.outputTokens ?: 0L
-                            }
-                        } catch (Exception ignored) {
-                            // Token info not available in response
-                        }
-                    }
-                }
-            }
-        }
-
-        return [inputTokens: inputTokens, outputTokens: outputTokens]
-    }
 
     /**
      * Estimate TTFT from SSE response timing.
