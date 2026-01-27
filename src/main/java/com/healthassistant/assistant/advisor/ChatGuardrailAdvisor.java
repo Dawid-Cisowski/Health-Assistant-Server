@@ -5,6 +5,7 @@ import com.healthassistant.guardrails.api.GuardrailProfile;
 import com.healthassistant.guardrails.api.GuardrailResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
@@ -41,7 +42,7 @@ public class ChatGuardrailAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     @Override
-    public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
+    public @NonNull ChatClientResponse adviseCall(@NonNull ChatClientRequest request, @NonNull CallAdvisorChain chain) {
         GuardrailResult result = validateRequest(request);
 
         if (result.blocked()) {
@@ -53,7 +54,7 @@ public class ChatGuardrailAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     @Override
-    public Flux<ChatClientResponse> adviseStream(ChatClientRequest request, StreamAdvisorChain chain) {
+    public @NonNull Flux<ChatClientResponse> adviseStream(@NonNull ChatClientRequest request, @NonNull StreamAdvisorChain chain) {
         GuardrailResult result = validateRequest(request);
 
         if (result.blocked()) {

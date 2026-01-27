@@ -3,6 +3,7 @@ package com.healthassistant.workout;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,19 +37,27 @@ class WorkoutProjector {
     }
 
     private void doSaveProjection(Workout workout) {
-        if (workoutRepository.existsByWorkoutId(workout.workoutId())) {
-            log.debug("Workout projection already exists for workoutId: {}, skipping", workout.workoutId());
-            return;
-        }
+        setRepository.deleteByWorkoutId(workout.workoutId());
 
-        workoutRepository.save(WorkoutProjectionJpaEntity.from(workout));
+        if (!workoutRepository.existsByWorkoutId(workout.workoutId())) {
+            try {
+                workoutRepository.save(WorkoutProjectionJpaEntity.from(workout));
+                log.info("Created workout projection for workoutId: {}", workout.workoutId());
+            } catch (DataIntegrityViolationException e) {
+                log.debug("Workout projection for workoutId: {} created by concurrent thread", workout.workoutId());
+            }
+        } else {
+            log.debug("Workout projection already exists for workoutId: {}", workout.workoutId());
+        }
 
         List<WorkoutSetProjectionJpaEntity> sets = WorkoutProjectionJpaEntity.setsFrom(workout);
         if (!sets.isEmpty()) {
-            setRepository.saveAll(sets);
+            try {
+                setRepository.saveAll(sets);
+            } catch (DataIntegrityViolationException e) {
+                log.debug("Sets for workoutId: {} created by concurrent thread", workout.workoutId());
+            }
         }
-
-        log.info("Created workout projection for workoutId: {}", workout.workoutId());
     }
 
     public void deleteByEventId(String eventId) {

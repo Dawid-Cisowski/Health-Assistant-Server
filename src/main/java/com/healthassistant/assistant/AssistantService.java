@@ -200,11 +200,6 @@ class AssistantService implements AssistantFacade {
         return new ErrorEvent("Sorry, an error occurred while processing your question.");
     }
 
-    @Override
-    public void deleteAllConversations() {
-        conversationService.deleteAllConversations();
-    }
-
     private static String sanitizeForLog(String input) {
         if (input == null) {
             return "null";

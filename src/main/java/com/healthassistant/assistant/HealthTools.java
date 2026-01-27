@@ -1,16 +1,11 @@
 package com.healthassistant.assistant;
 
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
-import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.meals.api.MealsFacade;
-import com.healthassistant.meals.api.dto.EnergyRequirementsResponse;
 import com.healthassistant.sleep.api.SleepFacade;
-import com.healthassistant.sleep.api.dto.SleepRangeSummaryResponse;
 import com.healthassistant.steps.api.StepsFacade;
-import com.healthassistant.steps.api.dto.StepsRangeSummaryResponse;
 import com.healthassistant.weight.api.WeightFacade;
 import com.healthassistant.workout.api.WorkoutFacade;
-import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -20,8 +15,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
