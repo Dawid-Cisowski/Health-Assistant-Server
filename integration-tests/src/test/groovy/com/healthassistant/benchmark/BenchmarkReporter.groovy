@@ -21,6 +21,20 @@ class BenchmarkReporter {
         results.add(result)
     }
 
+    /**
+     * Update the passed status of the last recorded result for a given test ID.
+     * Used after LLM judge evaluation to reflect actual pass/fail status.
+     */
+    static void updateLastResult(String testId, boolean passed, String errorMessage = null) {
+        def lastResult = results.reverse().find { it.testId == testId }
+        if (lastResult) {
+            lastResult.passed = passed
+            if (errorMessage) {
+                lastResult.errorMessage = errorMessage
+            }
+        }
+    }
+
     static void clear() {
         results.clear()
     }
@@ -75,7 +89,7 @@ class BenchmarkReporter {
 
         // Print totals per model
         println "TOTALS BY MODEL:"
-        println "-" * 60
+        println "-" * 80
         models.each { model ->
             def modelResults = grouped[model]
             def passed = modelResults.count { it.passed }
@@ -83,13 +97,34 @@ class BenchmarkReporter {
             def totalInputTokens = modelResults.sum { it.inputTokens } ?: 0
             def totalOutputTokens = modelResults.sum { it.outputTokens } ?: 0
             def totalCost = modelResults.sum { it.estimatedCostUsd } ?: 0.0
-            def avgTime = modelResults.sum { it.responseTimeMs } / modelResults.size()
+            def totalTime = modelResults.sum { it.responseTimeMs } ?: 0
+            def avgTime = totalTime / modelResults.size()
             def modelShort = model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
 
-            printf "%-20s: %d/%d passed │ Tokens: %d/%d │ Cost: \$%.4f │ Avg Time: %.1fs%n",
-                    modelShort, passed, total, totalInputTokens, totalOutputTokens, totalCost, avgTime / 1000.0
+            printf "%-20s: %d/%d passed │ Tokens: %d/%d │ Cost: \$%.4f%n",
+                    modelShort, passed, total, totalInputTokens, totalOutputTokens, totalCost
+            printf "                    │ Total Time: %.1fs │ Avg Time: %.1fs%n",
+                    totalTime / 1000.0, avgTime / 1000.0
         }
 
+        println "=" * 90
+        println ""
+
+        // Cost projections
+        println "COST PROJECTIONS (Monthly):"
+        println "-" * 80
+        printf "%-20s │ %-15s │ %-15s │ %-15s%n", "Model", "Per Request", "1K/day (30d)", "10K/day (30d)"
+        println "-" * 80
+        models.each { model ->
+            def modelResults = grouped[model]
+            def avgCostPerRequest = (modelResults.sum { it.estimatedCostUsd } ?: 0.0) / modelResults.size()
+            def cost1kMonth = avgCostPerRequest * 1000 * 30
+            def cost10kMonth = avgCostPerRequest * 10000 * 30
+            def modelShort = model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
+
+            printf "%-20s │ \$%-14.6f │ \$%-14.2f │ \$%-14.2f%n",
+                    modelShort, avgCostPerRequest, cost1kMonth, cost10kMonth
+        }
         println "=" * 90
         println ""
     }
@@ -154,7 +189,26 @@ class BenchmarkReporter {
         def totalFailed = results.count { !it.passed }
         def totalTokens = results.sum { it.totalTokens } ?: 0
         def totalCost = results.sum { it.estimatedCostUsd } ?: 0.0
-        def avgTime = results.isEmpty() ? 0 : results.sum { it.responseTimeMs } / results.size()
+        def totalTime = results.sum { it.responseTimeMs } ?: 0
+        def avgTime = results.isEmpty() ? 0 : totalTime / results.size()
+
+        // Calculate cost projections per model
+        def costProjections = models.collect { model ->
+            def modelResults = grouped[model]
+            def avgCostPerRequest = (modelResults.sum { it.estimatedCostUsd } ?: 0.0) / modelResults.size()
+            def modelTotalTime = modelResults.sum { it.responseTimeMs } ?: 0
+            def modelAvgTime = modelTotalTime / modelResults.size()
+            [
+                model: model,
+                modelShort: model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown",
+                avgCost: avgCostPerRequest,
+                cost1kMonth: avgCostPerRequest * 1000 * 30,
+                cost10kMonth: avgCostPerRequest * 10000 * 30,
+                totalTime: modelTotalTime,
+                avgTime: modelAvgTime
+            ]
+        }
+        def maxCost10k = costProjections.max { it.cost10kMonth }?.cost10kMonth ?: 1
 
         def html = """
 <!DOCTYPE html>
@@ -393,10 +447,113 @@ class BenchmarkReporter {
             margin-top: 2rem;
         }
 
+        .chart-section {
+            padding: 1.25rem;
+        }
+
+        .chart-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .bar-label {
+            width: 120px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+
+        .bar-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bar-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .bar {
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+            min-width: 60px;
+            transition: width 0.3s ease;
+        }
+
+        .bar.cost-1k {
+            background: linear-gradient(90deg, var(--accent-blue), #4a9eff);
+        }
+
+        .bar.cost-10k {
+            background: linear-gradient(90deg, var(--accent-orange), #e5a82b);
+        }
+
+        .bar-legend {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .legend-color.blue {
+            background: linear-gradient(90deg, var(--accent-blue), #4a9eff);
+        }
+
+        .legend-color.orange {
+            background: linear-gradient(90deg, var(--accent-orange), #e5a82b);
+        }
+
+        .time-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
         @media (max-width: 768px) {
             body { padding: 1rem; }
             .summary-cards { grid-template-columns: 1fr 1fr; }
             th, td { padding: 0.5rem; font-size: 0.875rem; }
+            .bar-label { width: 80px; }
         }
     </style>
 </head>
@@ -417,6 +574,10 @@ class BenchmarkReporter {
             <div class="card">
                 <div class="card-label">Total Cost</div>
                 <div class="card-value warning">\$${String.format('%.4f', totalCost)}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Total Time</div>
+                <div class="card-value">${String.format('%.1f', totalTime / 1000.0)}s</div>
             </div>
             <div class="card">
                 <div class="card-label">Avg Response Time</div>
@@ -463,6 +624,10 @@ class BenchmarkReporter {
                             <div class="stat-value" style="color: var(--accent-orange)">\$${String.format('%.4f', modelCost)}</div>
                         </div>
                         <div class="stat">
+                            <div class="stat-label">Total Time</div>
+                            <div class="stat-value">${String.format('%.1f', (modelResults.sum { it.responseTimeMs } ?: 0) / 1000.0)}s</div>
+                        </div>
+                        <div class="stat">
                             <div class="stat-label">Avg Time</div>
                             <div class="stat-value">${String.format('%.1f', modelAvgTime / 1000.0)}s</div>
                         </div>
@@ -470,6 +635,49 @@ class BenchmarkReporter {
                 </div>
                     """
                 }.join('')}
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">💰 Monthly Cost Projections</div>
+            <div class="chart-section">
+                <div class="bar-legend">
+                    <div class="legend-item">
+                        <div class="legend-color blue"></div>
+                        <span>1,000 requests/day (30 days)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color orange"></div>
+                        <span>10,000 requests/day (30 days)</span>
+                    </div>
+                </div>
+                <div class="bar-chart">
+                    ${costProjections.collect { proj ->
+                        def width1k = Math.max(5, (proj.cost1kMonth / maxCost10k * 100) as int)
+                        def width10k = Math.max(5, (proj.cost10kMonth / maxCost10k * 100) as int)
+                        """
+                    <div class="bar-row">
+                        <div class="bar-label">${proj.modelShort}</div>
+                        <div class="bar-container">
+                            <div class="bar-group">
+                                <div class="bar cost-1k" style="width: ${width1k}%">\$${String.format('%.2f', proj.cost1kMonth)}</div>
+                                <div class="bar cost-10k" style="width: ${width10k}%">\$${String.format('%.2f', proj.cost10kMonth)}</div>
+                            </div>
+                        </div>
+                    </div>
+                        """
+                    }.join('')}
+                </div>
+                <div class="time-stats">
+                    ${costProjections.collect { proj ->
+                        """
+                    <div class="stat">
+                        <div class="stat-label">${proj.modelShort}</div>
+                        <div class="stat-value">\$${String.format('%.6f', proj.avgCost)}/req</div>
+                    </div>
+                        """
+                    }.join('')}
+                </div>
             </div>
         </div>
 
@@ -539,7 +747,8 @@ class BenchmarkReporter {
         def totalFailed = results.count { !it.passed }
         def totalTokens = results.sum { it.totalTokens } ?: 0
         def totalCost = results.sum { it.estimatedCostUsd } ?: 0.0
-        def avgTime = results.isEmpty() ? 0 : results.sum { it.responseTimeMs } / results.size()
+        def totalTime = results.sum { it.responseTimeMs } ?: 0
+        def avgTime = results.isEmpty() ? 0 : totalTime / results.size()
 
         def sb = new StringBuilder()
 
@@ -552,12 +761,13 @@ class BenchmarkReporter {
         sb.append("${passEmoji} **${totalPassed}/${results.size()}** tests passed ")
         sb.append("| 🪙 **${String.format('%,d', totalTokens)}** tokens ")
         sb.append("| 💰 **\$${String.format('%.4f', totalCost)}** ")
-        sb.append("| ⏱️ **${String.format('%.1f', avgTime / 1000.0)}s** avg\n\n")
+        sb.append("| ⏱️ **${String.format('%.1f', totalTime / 1000.0)}s** total ")
+        sb.append("| **${String.format('%.1f', avgTime / 1000.0)}s** avg\n\n")
 
         // Model comparison table
         sb.append("## 📊 Model Comparison\n\n")
-        sb.append("| Model | Pass Rate | Input Tokens | Output Tokens | Cost | Avg Time |\n")
-        sb.append("|-------|-----------|--------------|---------------|------|----------|\n")
+        sb.append("| Model | Pass Rate | Input Tokens | Output Tokens | Cost | Total Time | Avg Time |\n")
+        sb.append("|-------|-----------|--------------|---------------|------|------------|----------|\n")
 
         models.each { model ->
             def modelResults = grouped[model]
@@ -565,7 +775,8 @@ class BenchmarkReporter {
             def inputTokens = modelResults.sum { it.inputTokens } ?: 0
             def outputTokens = modelResults.sum { it.outputTokens } ?: 0
             def modelCost = modelResults.sum { it.estimatedCostUsd } ?: 0.0
-            def modelAvgTime = modelResults.sum { it.responseTimeMs } / modelResults.size()
+            def modelTotalTime = modelResults.sum { it.responseTimeMs } ?: 0
+            def modelAvgTime = modelTotalTime / modelResults.size()
             def modelShort = model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
             def modelEmoji = passed == modelResults.size() ? "✅" : "⚠️"
 
@@ -574,10 +785,47 @@ class BenchmarkReporter {
             sb.append("| ${String.format('%,d', inputTokens)} ")
             sb.append("| ${String.format('%,d', outputTokens)} ")
             sb.append("| \$${String.format('%.4f', modelCost)} ")
+            sb.append("| ${String.format('%.1fs', modelTotalTime / 1000.0)} ")
             sb.append("| ${String.format('%.1fs', modelAvgTime / 1000.0)} |\n")
         }
 
         sb.append("\n")
+
+        // Cost projections section (after Model Comparison)
+        sb.append("## 💰 Monthly Cost Projections\n\n")
+        sb.append("Based on average cost per request, projected monthly costs at scale:\n\n")
+        sb.append("| Model | Per Request | 1K/day (30d) | 10K/day (30d) |\n")
+        sb.append("|-------|-------------|--------------|---------------|\n")
+
+        // Calculate projections
+        def costProjections = models.collect { model ->
+            def modelResults = grouped[model]
+            def avgCostPerRequest = (modelResults.sum { it.estimatedCostUsd } ?: 0.0) / modelResults.size()
+            [
+                modelShort: model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown",
+                avgCost: avgCostPerRequest,
+                cost1kMonth: avgCostPerRequest * 1000 * 30,
+                cost10kMonth: avgCostPerRequest * 10000 * 30
+            ]
+        }
+        def maxCost = costProjections.max { it.cost10kMonth }?.cost10kMonth ?: 1
+
+        costProjections.each { proj ->
+            sb.append("| **${proj.modelShort}** ")
+            sb.append("| \$${String.format('%.6f', proj.avgCost)} ")
+            sb.append("| \$${String.format('%.2f', proj.cost1kMonth)} ")
+            sb.append("| \$${String.format('%.2f', proj.cost10kMonth)} |\n")
+        }
+
+        // ASCII bar chart
+        sb.append("\n### 📊 Cost Visualization (10K requests/day, monthly)\n\n")
+        sb.append("```\n")
+        costProjections.each { proj ->
+            def barLength = Math.max(1, (proj.cost10kMonth / maxCost * 40) as int)
+            def bar = "█" * barLength
+            sb.append(String.format("%-15s │ %s \$%.2f\n", proj.modelShort, bar, proj.cost10kMonth))
+        }
+        sb.append("```\n\n")
 
         // Detailed results table
         sb.append("## 📋 Test Results\n\n")

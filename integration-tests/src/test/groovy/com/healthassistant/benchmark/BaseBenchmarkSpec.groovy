@@ -54,13 +54,32 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
     /**
      * Send chat message and measure all metrics.
      * Returns BenchmarkResult with response, tokens (real from API), and timing.
+     * Starts a new conversation.
      */
     BenchmarkResult benchmarkChat(String message) {
+        return benchmarkChatWithConversation(message, null)
+    }
+
+    /**
+     * Continue a conversation and measure all metrics.
+     * Uses the lastConversationId from previous askAssistantStart() calls.
+     */
+    BenchmarkResult benchmarkChatContinue(String message) {
+        return benchmarkChatWithConversation(message, lastConversationId)
+    }
+
+    /**
+     * Send chat message with optional conversation context and measure all metrics.
+     */
+    private BenchmarkResult benchmarkChatWithConversation(String message, String conversationId) {
         def deviceId = getTestDeviceId()
         def startTime = System.currentTimeMillis()
         Long ttft = null
 
-        def chatRequest = """{"message": "${escapeJson(message)}"}"""
+        def chatRequest = conversationId ?
+            """{"message": "${escapeJson(message)}", "conversationId": "${conversationId}"}""" :
+            """{"message": "${escapeJson(message)}"}"""
+
         def response = authenticatedPostRequestWithBody(
                 deviceId, TEST_SECRET_BASE64,
                 "/v1/assistant/chat", chatRequest
@@ -76,6 +95,12 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
 
         // Parse SSE response
         def content = parseSSEContent(responseBody)
+
+        // Update lastConversationId for continuation
+        def newConversationId = parseSSEConversationId(responseBody)
+        if (newConversationId) {
+            lastConversationId = newConversationId
+        }
 
         // Calculate TTFT from first content event timestamp (approximation)
         ttft = parseSSETTFT(responseBody, startTime)
@@ -141,23 +166,40 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
 
         def endTime = System.currentTimeMillis()
         def statusCode = response.statusCode()
-        def body = response.body().jsonPath()
+        def bodyString = response.body().asString()
 
+        // Handle error responses gracefully
+        if (statusCode != 200 || bodyString == null || bodyString.isEmpty()) {
+            def errorMessage = statusCode == 429 ? "Rate limited (429)" : "HTTP ${statusCode}"
+            return BenchmarkResult.builder()
+                    .model(currentModel)
+                    .response("")
+                    .passed(false)
+                    .errorMessage(errorMessage)
+                    .inputTokens(0L)
+                    .outputTokens(0L)
+                    .estimatedCostUsd(0.0)
+                    .responseTimeMs(endTime - startTime)
+                    .timestamp(Instant.now())
+                    .build()
+        }
+
+        def body = response.body().jsonPath()
         def summary = body.getString("summary") ?: ""
         def dataAvailable = body.getBoolean("dataAvailable")
 
-        // AI summary endpoint doesn't return token usage, estimate based on response length
-        def estimatedOutputTokens = (summary.length() / 4) as long
-        def estimatedInputTokens = 500L  // Approximate system prompt + context
+        // Real token usage from API response
+        def inputTokens = body.getLong("promptTokens") ?: 0L
+        def outputTokens = body.getLong("completionTokens") ?: 0L
 
         return BenchmarkResult.builder()
                 .model(currentModel)
                 .response(summary)
-                .passed(statusCode == 200 && dataAvailable && summary.length() > 10)
-                .errorMessage(statusCode != 200 ? "HTTP ${statusCode}" : null)
-                .inputTokens(estimatedInputTokens)
-                .outputTokens(estimatedOutputTokens)
-                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, estimatedInputTokens, estimatedOutputTokens))
+                .passed(dataAvailable && summary.length() > 10)
+                .errorMessage(null)
+                .inputTokens(inputTokens)
+                .outputTokens(outputTokens)
+                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, inputTokens, outputTokens))
                 .responseTimeMs(endTime - startTime)
                 .timestamp(Instant.now())
                 .build()
@@ -195,18 +237,18 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
         def fatGrams = body.get("fatGrams")
         def carbohydratesGrams = body.get("carbohydratesGrams")
 
-        // Estimate tokens for meal import
-        def estimatedInputTokens = 300L + (description.length() / 4) as long
-        def estimatedOutputTokens = 100L
+        // Real token usage from API response
+        def inputTokens = body.getLong("promptTokens") ?: 0L
+        def outputTokens = body.getLong("completionTokens") ?: 0L
 
         def result = BenchmarkResult.builder()
                 .model(currentModel)
                 .response(response.body().asString())
                 .passed(statusCode == 200 && status == "success")
                 .errorMessage(status != "success" ? body.getString("errorMessage") : null)
-                .inputTokens(estimatedInputTokens)
-                .outputTokens(estimatedOutputTokens)
-                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, estimatedInputTokens, estimatedOutputTokens))
+                .inputTokens(inputTokens)
+                .outputTokens(outputTokens)
+                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, inputTokens, outputTokens))
                 .responseTimeMs(endTime - startTime)
                 .timestamp(Instant.now())
                 .build()
@@ -257,18 +299,18 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
         def totalSleepMinutes = body.get("totalSleepMinutes")
         def sleepScore = body.get("sleepScore")
 
-        // Vision API uses more tokens
-        def estimatedInputTokens = 1000L  // Image tokens
-        def estimatedOutputTokens = 100L
+        // Real token usage from API response
+        def inputTokens = body.getLong("promptTokens") ?: 0L
+        def outputTokens = body.getLong("completionTokens") ?: 0L
 
         def result = BenchmarkResult.builder()
                 .model(currentModel)
                 .response(response.body().asString())
                 .passed(statusCode == 200 && status == "success")
                 .errorMessage(status != "success" ? body.getString("errorMessage") : null)
-                .inputTokens(estimatedInputTokens)
-                .outputTokens(estimatedOutputTokens)
-                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, estimatedInputTokens, estimatedOutputTokens))
+                .inputTokens(inputTokens)
+                .outputTokens(outputTokens)
+                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, inputTokens, outputTokens))
                 .responseTimeMs(endTime - startTime)
                 .timestamp(Instant.now())
                 .build()
@@ -290,6 +332,17 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
         result.testName = testName
         BenchmarkReporter.recordResult(result)
         println "DEBUG: Recorded ${testId} - ${testName}: passed=${result.passed}, tokens=${result.inputTokens}/${result.outputTokens}, time=${result.responseTimeMs}ms"
+    }
+
+    /**
+     * Update benchmark result with LLM judge verdict.
+     * Call this after llmAsJudge() to reflect the actual pass/fail status in reports.
+     */
+    void updateBenchmarkWithJudgeResult(String testId, LlmJudgeResult judgeResult) {
+        def passed = judgeResult.score >= 0.7
+        def errorMessage = passed ? null : "Judge score: ${judgeResult.score}, reason: ${judgeResult.reason}"
+        BenchmarkReporter.updateLastResult(testId, passed, errorMessage)
+        println "DEBUG: Updated ${testId} with judge result: passed=${passed}, score=${judgeResult.score}"
     }
 
     // ==================== Helper Methods ====================
@@ -356,5 +409,158 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
                            ]]
         ]
         submitEventMap(request)
+    }
+
+    // ==================== LLM as Judge ====================
+
+    /**
+     * Use LLM to evaluate the quality of a response.
+     * Returns a score from 0.0 to 1.0 and evaluation details.
+     */
+    LlmJudgeResult llmAsJudge(String question, String response, String expectedCriteria) {
+        def deviceId = getTestDeviceId()
+
+        def judgePrompt = """HEALTH ASSISTANT QUALITY CHECK REQUEST
+
+Please evaluate this health assistant response for accuracy.
+
+User asked: "${question}"
+Assistant answered: "${response}"
+
+Quality criteria:
+${expectedCriteria}
+
+Please respond with a JSON health quality report:
+{"score": 0.9, "passed": true, "reason": "Response contains accurate health data"}
+
+Use score 0.8-1.0 for accurate responses, 0.5-0.7 for partial, 0.0-0.4 for wrong data."""
+
+        def chatRequest = """{"message": "${escapeJson(judgePrompt)}"}"""
+        def judgeResponse = authenticatedPostRequestWithBody(
+                deviceId, TEST_SECRET_BASE64,
+                "/v1/assistant/chat", chatRequest
+        )
+                .when()
+                .post("/v1/assistant/chat")
+                .then()
+                .extract()
+
+        def responseBody = judgeResponse.body().asString()
+        def statusCode = judgeResponse.statusCode()
+        println "DEBUG: LLM Judge HTTP status: ${statusCode}"
+        println "DEBUG: LLM Judge raw response (first 500 chars): ${responseBody?.take(500)}"
+
+        // Check for error events in SSE response
+        def errorMessage = parseSSEError(responseBody)
+        if (errorMessage) {
+            println "DEBUG: LLM Judge error event: ${errorMessage}"
+            return new LlmJudgeResult(0.0, false, "LLM Judge error: ${errorMessage}")
+        }
+
+        def content = parseSSEContent(responseBody)
+        println "DEBUG: LLM Judge parsed content (first 200 chars): ${content?.take(200)}"
+
+        if (!content || content.trim().isEmpty()) {
+            println "DEBUG: LLM Judge returned empty content. Full response: ${responseBody}"
+            return new LlmJudgeResult(0.0, false, "LLM Judge returned empty response")
+        }
+
+        try {
+            // Extract JSON from response - it might be wrapped in text or markdown
+            def jsonContent = extractJsonFromResponse(content)
+            println "DEBUG: Extracted JSON: ${jsonContent}"
+
+            def parsed = new JsonSlurper().parseText(jsonContent)
+            return new LlmJudgeResult(
+                    parsed.score as double,
+                    parsed.passed as boolean,
+                    parsed.reason as String
+            )
+        } catch (Exception e) {
+            println "Failed to parse LLM judge response: ${content}"
+            return new LlmJudgeResult(0.0, false, "Failed to parse judge response: ${e.message}")
+        }
+    }
+
+    /**
+     * Extract JSON object from response that may contain surrounding text or markdown.
+     */
+    private String extractJsonFromResponse(String content) {
+        def text = content.trim()
+
+        // Try to find JSON in markdown code block
+        def jsonBlockMatcher = text =~ /```json\s*([\s\S]*?)\s*```/
+        if (jsonBlockMatcher.find()) {
+            return jsonBlockMatcher.group(1).trim()
+        }
+
+        // Try to find JSON in generic code block
+        def codeBlockMatcher = text =~ /```\s*([\s\S]*?)\s*```/
+        if (codeBlockMatcher.find()) {
+            def blockContent = codeBlockMatcher.group(1).trim()
+            if (blockContent.startsWith("{")) {
+                return blockContent
+            }
+        }
+
+        // Try to find standalone JSON object
+        def jsonMatcher = text =~ /\{[^{}]*"score"[^{}]*"passed"[^{}]*"reason"[^{}]*\}/
+        if (jsonMatcher.find()) {
+            return jsonMatcher.group(0)
+        }
+
+        // Last resort: find any JSON-like structure
+        def startIdx = text.indexOf('{')
+        def endIdx = text.lastIndexOf('}')
+        if (startIdx >= 0 && endIdx > startIdx) {
+            return text.substring(startIdx, endIdx + 1)
+        }
+
+        return text
+    }
+
+    /**
+     * Parse error message from SSE response if present.
+     */
+    private String parseSSEError(String sseResponse) {
+        if (!sseResponse) return null
+
+        String errorMsg = null
+        sseResponse.split("\n\n").each { event ->
+            event.split("\n").each { line ->
+                if (line.startsWith("data:")) {
+                    def json = line.substring(5).trim()
+                    if (json && json.contains('"type":"error"')) {
+                        try {
+                            def parsed = new JsonSlurper().parseText(json)
+                            errorMsg = parsed.message ?: parsed.error ?: "Unknown error"
+                        } catch (Exception ignored) {
+                            // Error parsing failed
+                        }
+                    }
+                }
+            }
+        }
+        return errorMsg
+    }
+
+    /**
+     * Result from LLM as Judge evaluation.
+     */
+    static class LlmJudgeResult {
+        double score
+        boolean passed
+        String reason
+
+        LlmJudgeResult(double score, boolean passed, String reason) {
+            this.score = score
+            this.passed = passed
+            this.reason = reason
+        }
+
+        @Override
+        String toString() {
+            return "LlmJudgeResult{score=${score}, passed=${passed}, reason='${reason}'}"
+        }
     }
 }

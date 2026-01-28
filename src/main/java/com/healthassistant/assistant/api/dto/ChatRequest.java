@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public record ChatRequest(
         @NotBlank(message = "Message cannot be blank")
-        @Size(max = 1000, message = "Message too long (max 1000 characters)")
+        @Size(max = 4000, message = "Message too long (max 4000 characters)")
         String message,
 
         UUID conversationId

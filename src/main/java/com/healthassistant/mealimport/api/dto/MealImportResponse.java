@@ -18,7 +18,9 @@ public record MealImportResponse(
     Integer carbohydratesGrams,
     String healthRating,
     Double confidence,
-    String errorMessage
+    String errorMessage,
+    Long promptTokens,
+    Long completionTokens
 ) {
     public static MealImportResponse success(
         String mealId,
@@ -36,7 +38,29 @@ public record MealImportResponse(
         return new MealImportResponse(
             "success", mealId, eventId, occurredAt, title, mealType,
             caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-            healthRating, confidence, null
+            healthRating, confidence, null, null, null
+        );
+    }
+
+    public static MealImportResponse successWithTokens(
+        String mealId,
+        String eventId,
+        Instant occurredAt,
+        String title,
+        String mealType,
+        Integer caloriesKcal,
+        Integer proteinGrams,
+        Integer fatGrams,
+        Integer carbohydratesGrams,
+        String healthRating,
+        double confidence,
+        Long promptTokens,
+        Long completionTokens
+    ) {
+        return new MealImportResponse(
+            "success", mealId, eventId, occurredAt, title, mealType,
+            caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
+            healthRating, confidence, null, promptTokens, completionTokens
         );
     }
 
@@ -44,7 +68,7 @@ public record MealImportResponse(
         return new MealImportResponse(
             "failed", null, null, null, null, null,
             null, null, null, null,
-            null, null, errorMessage
+            null, null, errorMessage, null, null
         );
     }
 }

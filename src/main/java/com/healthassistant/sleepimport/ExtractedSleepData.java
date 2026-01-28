@@ -13,7 +13,9 @@ record ExtractedSleepData(
         Integer sleepScore,
         Phases phases,
         String qualityLabel,
-        double confidence
+        double confidence,
+        Long promptTokens,
+        Long completionTokens
 ) {
 
     record Phases(
@@ -44,13 +46,32 @@ record ExtractedSleepData(
     ) {
         return new ExtractedSleepData(
                 true, null, sleepDate, sleepStart, sleepEnd,
-                totalSleepMinutes, sleepScore, phases, qualityLabel, confidence
+                totalSleepMinutes, sleepScore, phases, qualityLabel, confidence, null, null
+        );
+    }
+
+    static ExtractedSleepData validWithTokens(
+            LocalDate sleepDate,
+            Instant sleepStart,
+            Instant sleepEnd,
+            Integer totalSleepMinutes,
+            Integer sleepScore,
+            Phases phases,
+            String qualityLabel,
+            double confidence,
+            Long promptTokens,
+            Long completionTokens
+    ) {
+        return new ExtractedSleepData(
+                true, null, sleepDate, sleepStart, sleepEnd,
+                totalSleepMinutes, sleepScore, phases, qualityLabel, confidence,
+                promptTokens, completionTokens
         );
     }
 
     static ExtractedSleepData invalid(String error, double confidence) {
         return new ExtractedSleepData(
-                false, error, null, null, null, null, null, Phases.empty(), null, confidence
+                false, error, null, null, null, null, null, Phases.empty(), null, confidence, null, null
         );
     }
 }

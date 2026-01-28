@@ -61,9 +61,9 @@ spring:
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
-        model: ${GEMINI_MODEL:gemini-3-flash-preview}
         chat:
           options:
+            model: ${GEMINI_MODEL:gemini-3-pro-preview}
             temperature: 1.5
     chat:
       observations:

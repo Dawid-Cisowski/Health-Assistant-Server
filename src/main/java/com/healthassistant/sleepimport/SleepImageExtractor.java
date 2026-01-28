@@ -1,9 +1,11 @@
 package com.healthassistant.sleepimport;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
@@ -38,6 +40,7 @@ class SleepImageExtractor {
     private final ChatClient chatClient;
     @SuppressWarnings("unused") // Reserved for future image content moderation
     private final GuardrailFacade guardrailFacade;
+    private final ObjectMapper objectMapper;
 
     ExtractedSleepData extract(MultipartFile image, int year) throws SleepExtractionException {
         try {
@@ -49,20 +52,48 @@ class SleepImageExtractor {
 
             log.info("Extracting sleep data from image: {} bytes, type: {}, year: {}", imageBytes.length, mimeType, year);
 
-            AiSleepExtractionResponse response = chatClient.prompt()
+            ChatResponse chatResponse = chatClient.prompt()
                     .system(buildSystemPrompt())
                     .user(userSpec -> userSpec
                             .text(buildUserPrompt())
                             .media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes))
                     )
                     .call()
-                    .entity(AiSleepExtractionResponse.class);
+                    .chatResponse();
+
+            String jsonContent = chatResponse.getResult() != null
+                    ? chatResponse.getResult().getOutput().getText()
+                    : null;
+
+            if (jsonContent == null || jsonContent.isBlank()) {
+                throw new SleepExtractionException("AI returned empty response");
+            }
+
+            // Clean JSON content (remove markdown code blocks if present)
+            jsonContent = cleanJsonResponse(jsonContent);
+
+            AiSleepExtractionResponse response;
+            try {
+                response = objectMapper.readValue(jsonContent, AiSleepExtractionResponse.class);
+            } catch (Exception e) {
+                log.error("Failed to parse AI response as JSON: {}", jsonContent, e);
+                throw new SleepExtractionException("Failed to parse AI response: " + e.getMessage(), e);
+            }
 
             if (response == null) {
                 throw new SleepExtractionException("AI returned null response");
             }
 
-            return transformToExtractedSleepData(response, year);
+            Long promptTokens = null;
+            Long completionTokens = null;
+            if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+                completionTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+            }
+
+            log.debug("AI call completed: tokens {}/{}", promptTokens, completionTokens);
+            return transformToExtractedSleepData(response, year, promptTokens, completionTokens);
 
         } catch (IOException e) {
             log.error("Failed to read image file", e);
@@ -73,6 +104,20 @@ class SleepImageExtractor {
             log.error("AI extraction failed", e);
             throw new SleepExtractionException("Failed to extract sleep data from image", e);
         }
+    }
+
+    private String cleanJsonResponse(String content) {
+        if (content == null) return null;
+        String cleaned = content.trim();
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        return cleaned.trim();
     }
 
     private String buildSystemPrompt() {
@@ -154,7 +199,8 @@ class SleepImageExtractor {
             """;
     }
 
-    private ExtractedSleepData transformToExtractedSleepData(AiSleepExtractionResponse response, int year) {
+    private ExtractedSleepData transformToExtractedSleepData(AiSleepExtractionResponse response, int year,
+                                                              Long promptTokens, Long completionTokens) {
         double confidence = response.confidence();
 
         if (confidence < 0.0 || confidence > 1.0) {
@@ -212,12 +258,12 @@ class SleepImageExtractor {
                 lightSleepMinutes, deepSleepMinutes, remSleepMinutes, awakeMinutes
         );
 
-        log.info("Successfully extracted sleep data: date={}, duration={}min, score={}, confidence={}",
-                sleepDate, totalSleepMinutes, sleepScore, confidence);
+        log.info("Successfully extracted sleep data: date={}, duration={}min, score={}, confidence={}, tokens={}/{}",
+                sleepDate, totalSleepMinutes, sleepScore, confidence, promptTokens, completionTokens);
 
-        return ExtractedSleepData.valid(
+        return ExtractedSleepData.validWithTokens(
                 sleepDate, sleepStart, sleepEnd, totalSleepMinutes,
-                sleepScore, phases, qualityLabel, confidence
+                sleepScore, phases, qualityLabel, confidence, promptTokens, completionTokens
         );
     }
 

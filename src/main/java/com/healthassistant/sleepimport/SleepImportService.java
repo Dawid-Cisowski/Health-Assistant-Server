@@ -121,11 +121,12 @@ class SleepImportService implements SleepImportFacade {
                     ? sleepEventResult.eventId().value()
                     : null;
 
-            log.info("Successfully imported sleep {} for device {}: {}min, score={}, status={}, overwrote={}",
+            log.info("Successfully imported sleep {} for device {}: {}min, score={}, status={}, overwrote={}, tokens={}/{}",
                     sleepId, deviceId.value(), extractedData.totalSleepMinutes(),
-                    extractedData.sleepScore(), sleepEventResult.status(), overwrote);
+                    extractedData.sleepScore(), sleepEventResult.status(), overwrote,
+                    extractedData.promptTokens(), extractedData.completionTokens());
 
-            return SleepImportResponse.success(
+            return SleepImportResponse.successWithTokens(
                     sleepId,
                     eventId,
                     extractedData.sleepStart(),
@@ -137,7 +138,9 @@ class SleepImportService implements SleepImportFacade {
                     extractedData.phases().remSleepMinutes(),
                     extractedData.phases().awakeMinutes(),
                     extractedData.confidence(),
-                    overwrote
+                    overwrote,
+                    extractedData.promptTokens(),
+                    extractedData.completionTokens()
             );
 
         } catch (SleepExtractionException e) {

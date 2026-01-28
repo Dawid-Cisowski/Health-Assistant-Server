@@ -8,6 +8,7 @@ import com.healthassistant.guardrails.api.GuardrailProfile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,12 +91,15 @@ class AiDailySummaryService {
         String timeOfDay = getTimeOfDayContext();
         return dailySummaryFacade.getDailySummary(deviceId, date)
                 .map(summary -> {
-                    String aiText = generateFromData(summary, timeOfDay);
-                    cacheAiSummary(entity, aiText);
-                    return new AiDailySummaryResponse(date, aiText, true);
+                    AiGenerationResult result = generateFromData(summary, timeOfDay);
+                    cacheAiSummary(entity, result.content());
+                    return AiDailySummaryResponse.withTokens(date, result.content(), true,
+                            result.promptTokens(), result.completionTokens());
                 })
                 .orElse(AiDailySummaryResponse.noData(date));
     }
+
+    private record AiGenerationResult(String content, Long promptTokens, Long completionTokens) {}
 
     private boolean isCacheValid(DailySummaryJpaEntity entity) {
         if (entity.getAiSummary() == null || entity.getAiSummaryGeneratedAt() == null) {
@@ -123,18 +127,31 @@ class AiDailySummaryService {
         return "NIGHT";
     }
 
-    private String generateFromData(DailySummary summary, String timeOfDay) {
+    private AiGenerationResult generateFromData(DailySummary summary, String timeOfDay) {
         String dataContext = buildDataContext(summary, timeOfDay);
 
         try {
-            String result = chatClient.prompt()
+            ChatResponse chatResponse = chatClient.prompt()
                     .system(SYSTEM_PROMPT)
                     .user("Write a short summary of this day based on the data:\n\n" + dataContext)
                     .call()
-                    .content();
+                    .chatResponse();
 
-            log.info("AI summary generated: {} chars", result != null ? result.length() : 0);
-            return result;
+            String content = chatResponse.getResult() != null
+                    ? chatResponse.getResult().getOutput().getText()
+                    : null;
+
+            Long promptTokens = null;
+            Long completionTokens = null;
+            if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+                completionTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+            }
+
+            log.info("AI summary generated: {} chars, tokens: {}/{}",
+                    content != null ? content.length() : 0, promptTokens, completionTokens);
+            return new AiGenerationResult(content, promptTokens, completionTokens);
         } catch (Exception e) {
             log.error("Failed to generate AI summary", e);
             throw new AiSummaryGenerationException("Failed to generate AI summary", e);

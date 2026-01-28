@@ -184,7 +184,7 @@ tasks.register<Test>("benchmarkTest") {
     timeout.set(Duration.ofMinutes(15))
 
     // Run sequentially to get accurate timing measurements
-    maxParallelForks = 1
+    maxParallelForks = 10
 
     // JVM args
     jvmArgs("-Xmx1g", "-XX:+UseParallelGC")

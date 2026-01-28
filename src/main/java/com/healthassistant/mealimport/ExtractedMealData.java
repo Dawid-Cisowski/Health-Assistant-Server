@@ -18,7 +18,9 @@ record ExtractedMealData(
         Integer carbohydratesGrams,
         String healthRating,
         double confidence,
-        List<ClarifyingQuestion> questions
+        List<ClarifyingQuestion> questions,
+        Long promptTokens,
+        Long completionTokens
 ) {
     static ExtractedMealData valid(
             Instant occurredAt,
@@ -35,7 +37,7 @@ record ExtractedMealData(
         return new ExtractedMealData(
                 true, null, occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-                healthRating, confidence, List.of()
+                healthRating, confidence, List.of(), null, null
         );
     }
 
@@ -55,7 +57,30 @@ record ExtractedMealData(
         return new ExtractedMealData(
                 true, null, occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-                healthRating, confidence, questions != null ? questions : List.of()
+                healthRating, confidence, questions != null ? questions : List.of(), null, null
+        );
+    }
+
+    static ExtractedMealData validWithTokens(
+            Instant occurredAt,
+            String title,
+            String description,
+            String mealType,
+            Integer caloriesKcal,
+            Integer proteinGrams,
+            Integer fatGrams,
+            Integer carbohydratesGrams,
+            String healthRating,
+            double confidence,
+            List<ClarifyingQuestion> questions,
+            Long promptTokens,
+            Long completionTokens
+    ) {
+        return new ExtractedMealData(
+                true, null, occurredAt, title, description, mealType,
+                caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
+                healthRating, confidence, questions != null ? questions : List.of(),
+                promptTokens, completionTokens
         );
     }
 
@@ -63,7 +88,7 @@ record ExtractedMealData(
         return new ExtractedMealData(
                 false, error, null, null, null, null,
                 null, null, null, null,
-                null, confidence, List.of()
+                null, confidence, List.of(), null, null
         );
     }
 }

@@ -199,13 +199,52 @@ abstract class BaseEvaluationSpec extends Specification {
 
     // ==================== Assistant Helpers ====================
 
+    // Store last conversation ID for multi-turn tests
+    protected String lastConversationId = null
+
     /**
      * Send a chat message to the AI assistant and return the response content.
+     * Does NOT maintain conversation context - each call starts a new conversation.
      */
     String askAssistant(String message) {
+        def result = askAssistantWithContext(message, null)
+        return result.content
+    }
+
+    /**
+     * Send a chat message continuing a conversation.
+     * Maintains conversation context using lastConversationId.
+     * Use this for multi-turn conversation tests.
+     */
+    String askAssistantContinue(String message) {
+        def result = askAssistantWithContext(message, lastConversationId)
+        lastConversationId = result.conversationId
+        return result.content
+    }
+
+    /**
+     * Start a new conversation and track it for follow-up messages.
+     * Use askAssistantContinue() for subsequent messages in the same conversation.
+     */
+    String askAssistantStart(String message) {
+        lastConversationId = null
+        def result = askAssistantWithContext(message, null)
+        lastConversationId = result.conversationId
+        return result.content
+    }
+
+    /**
+     * Send a chat message with optional conversation context.
+     * Returns both content and conversationId for multi-turn conversations.
+     */
+    Map askAssistantWithContext(String message, String conversationId) {
         def deviceId = getTestDeviceId()
-        println "DEBUG: Asking assistant for device ${deviceId}: ${message}"
-        def chatRequest = """{"message": "${escapeJson(message)}"}"""
+        println "DEBUG: Asking assistant for device ${deviceId}: ${message} (conversationId: ${conversationId ?: 'new'})"
+
+        def chatRequest = conversationId ?
+            """{"message": "${escapeJson(message)}", "conversationId": "${conversationId}"}""" :
+            """{"message": "${escapeJson(message)}"}"""
+
         def response = authenticatedPostRequestWithBody(
                 deviceId, TEST_SECRET_BASE64,
                 "/v1/assistant/chat", chatRequest
@@ -219,8 +258,32 @@ abstract class BaseEvaluationSpec extends Specification {
                 .asString()
 
         def content = parseSSEContent(response)
-        println "DEBUG: Assistant response for device ${deviceId}: ${content}"
-        return content
+        def newConversationId = parseSSEConversationId(response)
+        println "DEBUG: Assistant response for device ${deviceId}: ${content?.take(100)}... (conversationId: ${newConversationId})"
+
+        return [content: content, conversationId: newConversationId]
+    }
+
+    /**
+     * Extract conversationId from SSE done event.
+     */
+    String parseSSEConversationId(String sseResponse) {
+        def jsonSlurper = new groovy.json.JsonSlurper()
+        String conversationId = null
+        sseResponse.split("\n\n").each { event ->
+            event.split("\n").each { line ->
+                if (line.startsWith("data:")) {
+                    def json = line.substring(5).trim()
+                    if (json && json.contains('"type":"done"')) {
+                        try {
+                            def parsed = jsonSlurper.parseText(json)
+                            conversationId = parsed.conversationId
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        }
+        return conversationId
     }
 
     /**
@@ -228,18 +291,19 @@ abstract class BaseEvaluationSpec extends Specification {
      */
     String parseSSEContent(String sseResponse) {
         def content = new StringBuilder()
+        def jsonSlurper = new groovy.json.JsonSlurper()
         sseResponse.split("\n\n").each { event ->
             event.split("\n").each { line ->
                 if (line.startsWith("data:")) {
                     def json = line.substring(5).trim()
                     if (json && json.contains('"type":"content"')) {
-                        def matcher = json =~ /"content":"([^"]*(?:\\.[^"]*)*)"/
-                        if (matcher.find()) {
-                            def extracted = matcher.group(1)
-                                    .replace('\\n', '\n')
-                                    .replace('\\"', '"')
-                                    .replace('\\\\', '\\')
-                            content.append(extracted)
+                        try {
+                            def parsed = jsonSlurper.parseText(json)
+                            if (parsed.content) {
+                                content.append(parsed.content)
+                            }
+                        } catch (Exception ignored) {
+                            // JSON parsing failed, skip this chunk
                         }
                     }
                 }

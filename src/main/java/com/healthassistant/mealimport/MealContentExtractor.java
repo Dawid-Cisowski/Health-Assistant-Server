@@ -1,11 +1,13 @@
 package com.healthassistant.mealimport;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import com.healthassistant.guardrails.api.GuardrailProfile;
 import com.healthassistant.mealimport.api.dto.ClarifyingQuestion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
@@ -32,6 +34,9 @@ class MealContentExtractor {
 
     private final ChatClient chatClient;
     private final GuardrailFacade guardrailFacade;
+    private final ObjectMapper objectMapper;
+
+    private record AiCallResult(AiMealExtractionResponse response, Long promptTokens, Long completionTokens) {}
 
     ExtractedMealData extract(String description, List<MultipartFile> images, MealTimeContext timeContext) {
         log.info("Extracting meal data from description: {}, images: {}, time: {}",
@@ -40,8 +45,8 @@ class MealContentExtractor {
             timeContext != null ? timeContext.formatCurrentTime() : "none");
 
         try {
-            AiMealExtractionResponse response = callAI(description, images, timeContext);
-            return transformToExtractedMealData(response);
+            AiCallResult result = callAI(description, images, timeContext);
+            return transformToExtractedMealData(result.response(), result.promptTokens(), result.completionTokens());
         } catch (IOException e) {
             throw new MealExtractionException("Failed to read image data: " + e.getMessage(), e);
         } catch (Exception e) {
@@ -50,17 +55,61 @@ class MealContentExtractor {
         }
     }
 
-    private AiMealExtractionResponse callAI(String description, List<MultipartFile> images, MealTimeContext timeContext) throws IOException {
+    private AiCallResult callAI(String description, List<MultipartFile> images, MealTimeContext timeContext) throws IOException {
         var promptBuilder = chatClient.prompt()
             .system(buildSystemPrompt(timeContext));
 
-        return promptBuilder.user(userSpec -> {
+        ChatResponse chatResponse = promptBuilder.user(userSpec -> {
             userSpec.text(buildUserPrompt(description, images, timeContext));
 
             if (images != null && !images.isEmpty()) {
                 images.forEach(image -> attachImageToSpec(userSpec, image));
             }
-        }).call().entity(AiMealExtractionResponse.class);
+        }).call().chatResponse();
+
+        String jsonContent = chatResponse.getResult() != null
+            ? chatResponse.getResult().getOutput().getText()
+            : null;
+
+        if (jsonContent == null || jsonContent.isBlank()) {
+            throw new MealExtractionException("AI returned empty response");
+        }
+
+        // Clean JSON content (remove markdown code blocks if present)
+        jsonContent = cleanJsonResponse(jsonContent);
+
+        AiMealExtractionResponse response;
+        try {
+            response = objectMapper.readValue(jsonContent, AiMealExtractionResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to parse AI response as JSON: {}", jsonContent, e);
+            throw new MealExtractionException("Failed to parse AI response: " + e.getMessage(), e);
+        }
+
+        Long promptTokens = null;
+        Long completionTokens = null;
+        if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+            var usage = chatResponse.getMetadata().getUsage();
+            promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+            completionTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+        }
+
+        log.debug("AI call completed: tokens {}/{}", promptTokens, completionTokens);
+        return new AiCallResult(response, promptTokens, completionTokens);
+    }
+
+    private String cleanJsonResponse(String content) {
+        if (content == null) return null;
+        String cleaned = content.trim();
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        return cleaned.trim();
     }
 
     private void attachImageToSpec(org.springframework.ai.chat.client.ChatClient.PromptUserSpec userSpec, MultipartFile image) {
@@ -270,7 +319,8 @@ class MealContentExtractor {
         return prompt.toString();
     }
 
-    private ExtractedMealData transformToExtractedMealData(AiMealExtractionResponse response) {
+    private ExtractedMealData transformToExtractedMealData(AiMealExtractionResponse response,
+                                                           Long promptTokens, Long completionTokens) {
         if (response == null) {
             throw new MealExtractionException("AI returned null response");
         }
@@ -316,10 +366,10 @@ class MealContentExtractor {
             log.debug("Added meal type clarifying question due to low confidence: {}", mealTypeConfidence);
         }
 
-        return ExtractedMealData.validWithQuestions(
+        return ExtractedMealData.validWithTokens(
             occurredAt, title, description, mealType,
             caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-            healthRating, confidence, questions
+            healthRating, confidence, questions, promptTokens, completionTokens
         );
     }
 
@@ -417,13 +467,34 @@ class MealContentExtractor {
         String reAnalysisPrompt = buildReAnalysisPrompt(originalDescription, previousExtraction, answers, userFeedback);
 
         try {
-            AiMealExtractionResponse response = chatClient.prompt()
+            ChatResponse chatResponse = chatClient.prompt()
                 .system(buildReAnalysisSystemPrompt())
                 .user(reAnalysisPrompt)
                 .call()
-                .entity(AiMealExtractionResponse.class);
+                .chatResponse();
 
-            return transformToExtractedMealData(response);
+            String jsonContent = chatResponse.getResult() != null
+                ? chatResponse.getResult().getOutput().getText()
+                : null;
+
+            if (jsonContent == null || jsonContent.isBlank()) {
+                throw new MealExtractionException("AI returned empty response during re-analysis");
+            }
+
+            jsonContent = cleanJsonResponse(jsonContent);
+            AiMealExtractionResponse response = objectMapper.readValue(jsonContent, AiMealExtractionResponse.class);
+
+            Long promptTokens = null;
+            Long completionTokens = null;
+            if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+                completionTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+            }
+
+            return transformToExtractedMealData(response, promptTokens, completionTokens);
+        } catch (MealExtractionException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Re-analysis failed: {}", e.getMessage(), e);
             throw new MealExtractionException("Failed to re-analyze meal: " + e.getMessage(), e);

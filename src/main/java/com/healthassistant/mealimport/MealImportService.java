@@ -97,11 +97,12 @@ class MealImportService implements MealImportFacade {
                 ? eventResult.eventId().value()
                 : null;
 
-            log.info("Successfully imported meal {} for device {}: {} ({} kcal), status={}",
+            log.info("Successfully imported meal {} for device {}: {} ({} kcal), status={}, tokens: {}/{}",
                 mealId, deviceId.value(), extractedData.title(),
-                extractedData.caloriesKcal(), eventResult.status());
+                extractedData.caloriesKcal(), eventResult.status(),
+                extractedData.promptTokens(), extractedData.completionTokens());
 
-            return MealImportResponse.success(
+            return MealImportResponse.successWithTokens(
                 mealId,
                 eventId,
                 occurredAt,
@@ -112,7 +113,9 @@ class MealImportService implements MealImportFacade {
                 extractedData.fatGrams(),
                 extractedData.carbohydratesGrams(),
                 extractedData.healthRating(),
-                extractedData.confidence()
+                extractedData.confidence(),
+                extractedData.promptTokens(),
+                extractedData.completionTokens()
             );
 
         } catch (MealExtractionException e) {
