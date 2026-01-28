@@ -16,4 +16,8 @@ interface ConversationRepository extends JpaRepository<Conversation, UUID> {
     @Modifying
     @Query("DELETE FROM Conversation c WHERE c.updatedAt < :cutoff")
     int deleteByUpdatedAtBefore(@Param("cutoff") Instant cutoff);
+
+    @Modifying
+    @Query("DELETE FROM Conversation c WHERE c.deviceId = :deviceId")
+    int deleteByDeviceId(@Param("deviceId") String deviceId);
 }

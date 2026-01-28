@@ -93,6 +93,9 @@ abstract class BaseEvaluationSpec extends Specification {
     @Autowired
     HeartRateFacade heartRateFacade
 
+    @Autowired(required = false)
+    com.healthassistant.assistant.api.AssistantFacade assistantFacade
+
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("test_db")
@@ -159,6 +162,10 @@ abstract class BaseEvaluationSpec extends Specification {
         // Delete events first
         if (healthEventsFacade != null) {
             healthEventsFacade.deleteEventsByDeviceId(deviceId)
+        }
+        // Delete conversations for device
+        if (assistantFacade != null) {
+            assistantFacade.deleteConversationsByDeviceId(deviceId)
         }
         // Delete all projections for device within a reasonable date range
         def today = LocalDate.now(POLAND_ZONE)

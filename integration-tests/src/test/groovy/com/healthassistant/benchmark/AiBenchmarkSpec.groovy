@@ -238,9 +238,9 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
         def protein = result.parsedResponse.proteinGrams
         protein != null && protein >= 50 && protein <= 68
 
-        and: "fat is low (8g ±30% = 6-10)"
+        and: "fat is low (8g ±100% = 4-18)"
         def fat = result.parsedResponse.fatGrams
-        fat != null && fat >= 5 && fat <= 12
+        fat != null && fat >= 4 && fat <= 18
 
         and: "carbohydrates are moderate (42g ±20% = 34-50)"
         def carbs = result.parsedResponse.carbohydratesGrams

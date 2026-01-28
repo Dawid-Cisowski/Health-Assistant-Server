@@ -243,4 +243,9 @@ class AssistantService implements AssistantFacade {
         }
         return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
     }
+
+    @Override
+    public void deleteConversationsByDeviceId(String deviceId) {
+        conversationService.deleteConversationsByDeviceId(deviceId);
+    }
 }

@@ -89,4 +89,10 @@ class ConversationService {
         messageRepository.deleteAll();
         conversationRepository.deleteAll();
     }
+
+    @Transactional
+    public void deleteConversationsByDeviceId(String deviceId) {
+        log.warn("Deleting conversations for device: {}", deviceId);
+        conversationRepository.deleteByDeviceId(deviceId);
+    }
 }
