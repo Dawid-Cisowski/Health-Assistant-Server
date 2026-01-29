@@ -180,573 +180,357 @@ class BenchmarkReporter {
     /**
      * Generate HTML report with styled table.
      */
+    /**
+     * Generate Modern HTML Dashboard for GitHub Pages
+     */
     static void writeHtmlReport(Path outputPath) {
         def grouped = results.groupBy { it.model }
         def models = grouped.keySet().sort()
-        def testIds = results.collect { it.testId }.unique().sort()
 
+        // --- 1. PREPARE DATA ---
         def totalPassed = results.count { it.passed }
-        def totalFailed = results.count { !it.passed }
-        def totalTokens = results.sum { it.totalTokens } ?: 0
-        def totalCost = results.sum { it.estimatedCostUsd } ?: 0.0
-        def totalTime = results.sum { it.responseTimeMs } ?: 0
-        def avgTime = results.isEmpty() ? 0 : totalTime / results.size()
+        def totalTests = results.size()
+        def passRate = totalTests > 0 ? (totalPassed / totalTests * 100).toInteger() : 0
 
-        // Calculate cost projections per model
-        def costProjections = models.collect { model ->
-            def modelResults = grouped[model]
-            def avgCostPerRequest = (modelResults.sum { it.estimatedCostUsd } ?: 0.0) / modelResults.size()
-            def modelTotalTime = modelResults.sum { it.responseTimeMs } ?: 0
-            def modelAvgTime = modelTotalTime / modelResults.size()
-            [
-                model: model,
-                modelShort: model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown",
-                avgCost: avgCostPerRequest,
-                cost1kMonth: avgCostPerRequest * 1000 * 30,
-                cost10kMonth: avgCostPerRequest * 10000 * 30,
-                totalTime: modelTotalTime,
-                avgTime: modelAvgTime
-            ]
-        }
-        def maxCost10k = costProjections.max { it.cost10kMonth }?.cost10kMonth ?: 1
+        // Cost calculations
+        def flashModel = models.find { it.contains("flash") }
+        def proModel = models.find { it.contains("pro") }
 
+        def flashCost = flashModel ? (grouped[flashModel].sum { it.estimatedCostUsd } / grouped[flashModel].size() * 10000 * 30) : 0
+        def proCost = proModel ? (grouped[proModel].sum { it.estimatedCostUsd } / grouped[proModel].size() * 10000 * 30) : 0
+
+        def savingsPercent = (proCost > 0 && flashCost > 0) ? ((1 - (flashCost / proCost)) * 100).toInteger() : 0
+        def savingsAmount = proCost - flashCost
+
+        // Latency
+        def flashTime = flashModel ? (grouped[flashModel].sum { it.responseTimeMs } / grouped[flashModel].size() / 1000.0) : 0
+        def proTime = proModel ? (grouped[proModel].sum { it.responseTimeMs } / grouped[proModel].size() / 1000.0) : 0
+
+        // HTML Content
         def html = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Benchmark Report - ${formatDate(Instant.now())}</title>
+    <title>AI Benchmark Dashboard</title>
     <style>
         :root {
-            --bg-primary: #0d1117;
-            --bg-secondary: #161b22;
-            --bg-tertiary: #21262d;
-            --text-primary: #c9d1d9;
-            --text-secondary: #8b949e;
-            --border-color: #30363d;
-            --accent-green: #3fb950;
-            --accent-red: #f85149;
-            --accent-blue: #58a6ff;
-            --accent-purple: #a371f7;
-            --accent-orange: #d29922;
+            --bg-body: #0d1117;
+            --bg-card: #161b22;
+            --bg-header: #010409;
+            --border: #30363d;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --color-flash: #58a6ff;
+            --color-pro: #d29922;
+            --color-success: #3fb950;
+            --color-danger: #f85149;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.5;
-            padding: 2rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding-bottom: 50px;
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
+            padding: 20px;
         }
 
-        h1 {
-            font-size: 2rem;
+        /* --- HEADER --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 { font-size: 1.8rem; font-weight: 600; }
+        .badge-live { 
+            background: rgba(63, 185, 80, 0.15); 
+            color: var(--color-success); 
+            padding: 5px 12px; 
+            border-radius: 20px; 
+            font-size: 0.8rem; 
+            border: 1px solid var(--color-success);
             font-weight: 600;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
 
-        .subtitle {
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-        }
-
-        .summary-cards {
+        /* --- KPI GRID --- */
+        .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
         }
 
         .card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 1.25rem;
-        }
-
-        .card-label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .card-value {
-            font-size: 1.75rem;
-            font-weight: 600;
-        }
-
-        .card-value.success { color: var(--accent-green); }
-        .card-value.error { color: var(--accent-red); }
-        .card-value.info { color: var(--accent-blue); }
-        .card-value.warning { color: var(--accent-orange); }
-
-        .section {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            margin-bottom: 2rem;
+            padding: 25px;
+            position: relative;
             overflow: hidden;
         }
 
-        .section-header {
-            background: var(--bg-tertiary);
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border-color);
-            font-weight: 600;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            background: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 0.75rem;
+        .card-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: 10px;
         }
 
-        tr:hover {
-            background: var(--bg-tertiary);
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
         }
 
-        tr:last-child td {
-            border-bottom: none;
-        }
+        .card-sub { font-size: 0.9rem; color: var(--text-muted); }
+        .text-flash { color: var(--color-flash); }
+        .text-pro { color: var(--color-pro); }
+        .text-success { color: var(--color-success); }
 
-        .status {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-
-        .status.pass {
-            background: rgba(63, 185, 80, 0.15);
-            color: var(--accent-green);
-        }
-
-        .status.fail {
-            background: rgba(248, 81, 73, 0.15);
-            color: var(--accent-red);
-        }
-
-        .model-badge {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-        }
-
-        .model-badge.flash {
-            border-color: var(--accent-blue);
-            color: var(--accent-blue);
-        }
-
-        .model-badge.pro {
-            border-color: var(--accent-purple);
-            color: var(--accent-purple);
-        }
-
-        .tokens {
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 0.875rem;
-        }
-
-        .tokens .input { color: var(--accent-blue); }
-        .tokens .output { color: var(--accent-green); }
-        .tokens .separator { color: var(--text-secondary); }
-
-        .cost {
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            color: var(--accent-orange);
-        }
-
-        .time {
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            color: var(--text-secondary);
-        }
-
-        .model-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-            padding: 1.25rem;
-        }
-
-        .model-card {
-            background: var(--bg-tertiary);
+        /* --- CHART SECTION --- */
+        .chart-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 1.25rem;
+            padding: 30px;
+            margin-bottom: 40px;
         }
 
-        .model-card h3 {
-            font-size: 1rem;
-            margin-bottom: 1rem;
+        .chart-title { margin-bottom: 20px; font-weight: 600; }
+
+        .bar-wrapper {
+            margin-bottom: 25px;
+        }
+
+        .bar-info {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
         }
 
-        .model-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-        }
-
-        .stat {
-            font-size: 0.875rem;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-        }
-
-        .stat-value {
-            font-weight: 600;
-            font-family: 'SF Mono', 'Fira Code', monospace;
-        }
-
-        .footer {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-top: 2rem;
-        }
-
-        .chart-section {
-            padding: 1.25rem;
-        }
-
-        .chart-title {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-        }
-
-        .bar-chart {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .bar-row {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .bar-label {
-            width: 120px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            flex-shrink: 0;
-        }
-
-        .bar-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .bar-group {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .bar {
+        .progress-bg {
+            background: #21262d;
             height: 24px;
-            border-radius: 4px;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
             display: flex;
             align-items: center;
-            padding: 0 0.5rem;
+            padding-right: 10px;
+            justify-content: flex-end;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #fff;
+            transition: width 1s ease-in-out;
+            width: 0%; /* Will be animated by JS */
+        }
+
+        /* --- TABLE --- */
+        .table-controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button.btn-filter {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        button.btn-filter:hover, button.btn-filter.active {
+            background: var(--border);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 12px 15px;
+            background: #21262d;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'SF Mono', Consolas, monospace;
+        }
+
+        .data-table tr:hover { background: #21262d; }
+        
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 12px;
             font-size: 0.75rem;
             font-weight: 600;
-            color: white;
-            min-width: 60px;
-            transition: width 0.3s ease;
         }
+        
+        .status-pass { background: rgba(63, 185, 80, 0.15); color: var(--color-success); }
+        .status-fail { background: rgba(248, 81, 73, 0.15); color: var(--color-danger); }
 
-        .bar.cost-1k {
-            background: linear-gradient(90deg, var(--accent-blue), #4a9eff);
-        }
-
-        .bar.cost-10k {
-            background: linear-gradient(90deg, var(--accent-orange), #e5a82b);
-        }
-
-        .bar-legend {
-            display: flex;
-            gap: 1.5rem;
-            margin-bottom: 1rem;
-            font-size: 0.875rem;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-        }
-
-        .legend-color.blue {
-            background: linear-gradient(90deg, var(--accent-blue), #4a9eff);
-        }
-
-        .legend-color.orange {
-            background: linear-gradient(90deg, var(--accent-orange), #e5a82b);
-        }
-
-        .time-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            padding: 1rem;
-            background: var(--bg-tertiary);
-            border-radius: 8px;
-            margin-top: 1rem;
-        }
-
-        @media (max-width: 768px) {
-            body { padding: 1rem; }
-            .summary-cards { grid-template-columns: 1fr 1fr; }
-            th, td { padding: 0.5rem; font-size: 0.875rem; }
-            .bar-label { width: 80px; }
-        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚀 AI Benchmark Report</h1>
-        <p class="subtitle">Generated: ${formatDate(Instant.now())} • Health Assistant Server</p>
 
-        <div class="summary-cards">
-            <div class="card">
-                <div class="card-label">Tests Passed</div>
-                <div class="card-value success">${totalPassed}/${results.size()}</div>
-            </div>
-            <div class="card">
-                <div class="card-label">Total Tokens</div>
-                <div class="card-value info">${String.format('%,d', totalTokens)}</div>
-            </div>
-            <div class="card">
-                <div class="card-label">Total Cost</div>
-                <div class="card-value warning">\$${String.format('%.4f', totalCost)}</div>
-            </div>
-            <div class="card">
-                <div class="card-label">Total Time</div>
-                <div class="card-value">${String.format('%.1f', totalTime / 1000.0)}s</div>
-            </div>
-            <div class="card">
-                <div class="card-label">Avg Response Time</div>
-                <div class="card-value">${String.format('%.1f', avgTime / 1000.0)}s</div>
+<div class="container">
+    <header>
+        <div>
+            <h1>🚀 AI Benchmark Dashboard</h1>
+            <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">
+                Generated: ${formatDate(Instant.now())}
             </div>
         </div>
+        <div class="badge-live">LIVE REPORT</div>
+    </header>
 
-        <div class="section">
-            <div class="section-header">📊 Model Comparison</div>
-            <div class="model-summary">
-                ${models.collect { model ->
-                    def modelResults = grouped[model]
-                    def passed = modelResults.count { it.passed }
-                    def failed = modelResults.count { !it.passed }
-                    def inputTokens = modelResults.sum { it.inputTokens } ?: 0
-                    def outputTokens = modelResults.sum { it.outputTokens } ?: 0
-                    def modelCost = modelResults.sum { it.estimatedCostUsd } ?: 0.0
-                    def modelAvgTime = modelResults.sum { it.responseTimeMs } / modelResults.size()
-                    def modelShort = model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
-                    def badgeClass = model?.contains("flash") ? "flash" : "pro"
-
-                    """
-                <div class="model-card">
-                    <h3><span class="model-badge ${badgeClass}">${modelShort}</span></h3>
-                    <div class="model-stats">
-                        <div class="stat">
-                            <div class="stat-label">Passed</div>
-                            <div class="stat-value" style="color: var(--accent-green)">${passed}/${modelResults.size()}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Failed</div>
-                            <div class="stat-value" style="color: var(--accent-red)">${failed}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Input Tokens</div>
-                            <div class="stat-value" style="color: var(--accent-blue)">${String.format('%,d', inputTokens)}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Output Tokens</div>
-                            <div class="stat-value" style="color: var(--accent-green)">${String.format('%,d', outputTokens)}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Total Cost</div>
-                            <div class="stat-value" style="color: var(--accent-orange)">\$${String.format('%.4f', modelCost)}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Total Time</div>
-                            <div class="stat-value">${String.format('%.1f', (modelResults.sum { it.responseTimeMs } ?: 0) / 1000.0)}s</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Avg Time</div>
-                            <div class="stat-value">${String.format('%.1f', modelAvgTime / 1000.0)}s</div>
-                        </div>
-                    </div>
-                </div>
-                    """
-                }.join('')}
-            </div>
+    <div class="kpi-grid">
+        <div class="card">
+            <div class="card-label">Cost Reduction</div>
+            <div class="card-value text-flash">${savingsPercent}%</div>
+            <div class="card-sub">Flash vs Pro (Monthly)</div>
+        </div>
+        
+        <div class="card">
+            <div class="card-label">Pass Rate</div>
+            <div class="card-value text-success">${passRate}%</div>
+            <div class="card-sub">${totalPassed} / ${totalTests} tests passed</div>
         </div>
 
-        <div class="section">
-            <div class="section-header">💰 Monthly Cost Projections</div>
-            <div class="chart-section">
-                <div class="bar-legend">
-                    <div class="legend-item">
-                        <div class="legend-color blue"></div>
-                        <span>1,000 requests/day (30 days)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color orange"></div>
-                        <span>10,000 requests/day (30 days)</span>
-                    </div>
-                </div>
-                <div class="bar-chart">
-                    <div class="scale-group">
-                        <div class="scale-label" style="font-weight: 600; margin-bottom: 0.5rem; color: var(--accent-blue);">1K requests/day (monthly)</div>
-                        ${costProjections.collect { proj ->
-                            def width1k = Math.max(5, (proj.cost1kMonth / maxCost10k * 100) as int)
-                            """
-                        <div class="bar-row">
-                            <div class="bar-label">${proj.modelShort}</div>
-                            <div class="bar-container">
-                                <div class="bar cost-1k" style="width: ${width1k}%">\$${String.format('%.2f', proj.cost1kMonth)}</div>
-                            </div>
-                        </div>
-                            """
-                        }.join('')}
-                    </div>
-                    <div class="scale-group" style="margin-top: 1.5rem;">
-                        <div class="scale-label" style="font-weight: 600; margin-bottom: 0.5rem; color: var(--accent-orange);">10K requests/day (monthly)</div>
-                        ${costProjections.collect { proj ->
-                            def width10k = Math.max(5, (proj.cost10kMonth / maxCost10k * 100) as int)
-                            """
-                        <div class="bar-row">
-                            <div class="bar-label">${proj.modelShort}</div>
-                            <div class="bar-container">
-                                <div class="bar cost-10k" style="width: ${width10k}%">\$${String.format('%.2f', proj.cost10kMonth)}</div>
-                            </div>
-                        </div>
-                            """
-                        }.join('')}
-                    </div>
-                </div>
-                <div class="time-stats">
-                    ${costProjections.collect { proj ->
-                        """
-                    <div class="stat">
-                        <div class="stat-label">${proj.modelShort}</div>
-                        <div class="stat-value">\$${String.format('%.6f', proj.avgCost)}/req</div>
-                    </div>
-                        """
-                    }.join('')}
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-header">📋 Test Results</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Test ID</th>
-                        <th>Test Name</th>
-                        <th>Model</th>
-                        <th>Status</th>
-                        <th>Tokens (In/Out)</th>
-                        <th>Cost</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${results.sort { a, b -> a.testId <=> b.testId ?: a.model <=> b.model }.collect { result ->
-                        def modelShort = result.model?.replace("-preview", "")?.replace("gemini-", "") ?: "unknown"
-                        def badgeClass = result.model?.contains("flash") ? "flash" : "pro"
-                        def statusClass = result.passed ? "pass" : "fail"
-                        def statusIcon = result.passed ? "✓" : "✗"
-                        def statusText = result.passed ? "Pass" : "Fail"
-
-                        """
-                    <tr>
-                        <td><strong>${result.testId}</strong></td>
-                        <td>${result.testName ?: '-'}</td>
-                        <td><span class="model-badge ${badgeClass}">${modelShort}</span></td>
-                        <td><span class="status ${statusClass}">${statusIcon} ${statusText}</span></td>
-                        <td class="tokens">
-                            <span class="input">${String.format('%,d', result.inputTokens)}</span>
-                            <span class="separator">/</span>
-                            <span class="output">${String.format('%,d', result.outputTokens)}</span>
-                        </td>
-                        <td class="cost">\$${String.format('%.4f', result.estimatedCostUsd)}</td>
-                        <td class="time">${String.format('%.2f', result.responseTimeMs / 1000.0)}s</td>
-                    </tr>
-                        """
-                    }.join('')}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="footer">
-            <p>Generated by Health Assistant AI Benchmark Suite</p>
+        <div class="card">
+            <div class="card-label">Avg Latency</div>
+            <div class="card-value" style="color: white;">${String.format('%.1f', flashTime)}s</div>
+            <div class="card-sub">vs ${String.format('%.1f', proTime)}s (Pro)</div>
         </div>
     </div>
+
+    <div class="chart-container">
+        <div class="chart-title">💰 Monthly Cost Projection (10k requests/day)</div>
+        
+        <div class="bar-wrapper">
+            <div class="bar-info">
+                <span>⚡ <strong>Gemini Flash</strong></span>
+                <span class="text-flash">\$${String.format('%.2f', flashCost)}</span>
+            </div>
+            <div class="progress-bg">
+                <div class="progress-fill" style="background: var(--color-flash); width: 0%" data-width="${(flashCost / proCost * 100).toInteger()}%"></div>
+            </div>
+        </div>
+
+        <div class="bar-wrapper">
+            <div class="bar-info">
+                <span>🧠 <strong>Gemini Pro</strong></span>
+                <span class="text-pro">\$${String.format('%.2f', proCost)}</span>
+            </div>
+            <div class="progress-bg">
+                <div class="progress-fill" style="background: var(--color-pro); width: 0%" data-width="100%"></div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px; font-size: 0.9rem; color: var(--text-muted); text-align: right;">
+            Est. annual savings: <strong style="color: white;">\$${String.format('%,.0f', savingsAmount * 12)}</strong>
+        </div>
+    </div>
+
+    <div class="table-controls">
+        <button class="btn-filter active" onclick="filterTable('all')">All Tests</button>
+        <button class="btn-filter" onclick="filterTable('fail')">Failed Only</button>
+    </div>
+
+    <table class="data-table" id="benchmarkTable">
+        <thead>
+            <tr>
+                <th>Test Case</th>
+                <th>Model</th>
+                <th>Status</th>
+                <th>Tokens (In/Out)</th>
+                <th>Cost</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${results.collect { r ->
+            def statusClass = r.passed ? 'status-pass' : 'status-fail'
+            def statusText = r.passed ? 'PASS' : 'FAIL'
+            def modelClass = r.model.contains('flash') ? 'text-flash' : 'text-pro'
+            def rowClass = r.passed ? 'row-pass' : 'row-fail'
+            """
+                <tr class="${rowClass}">
+                    <td style="font-weight: 500;">${r.testName} <div style="font-size:0.75rem; color:#8b949e;">${r.testId}</div></td>
+                    <td class="${modelClass}">${r.model.replace('gemini-','').replace('-preview','')}</td>
+                    <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+                    <td>${r.inputTokens} / ${r.outputTokens}</td>
+                    <td>\$${String.format('%.4f', r.estimatedCostUsd)}</td>
+                    <td>${String.format('%.2f', r.responseTimeMs/1000)}s</td>
+                </tr>
+                """
+        }.join('\n')}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Animate bars on load
+    window.onload = function() {
+        document.querySelectorAll('.progress-fill').forEach(bar => {
+            bar.style.width = bar.getAttribute('data-width');
+        });
+    };
+
+    // Simple Table Filter
+    function filterTable(type) {
+        document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        const rows = document.querySelectorAll('#benchmarkTable tbody tr');
+        rows.forEach(row => {
+            if (type === 'all') {
+                row.style.display = '';
+            } else if (type === 'fail') {
+                row.style.display = row.classList.contains('row-fail') ? '' : 'none';
+            }
+        });
+    }
+</script>
+
 </body>
 </html>
-"""
+        """
 
+        // Write file
         Files.createDirectories(outputPath.parent)
         outputPath.toFile().text = html
-        println "HTML report written to: ${outputPath}"
+        println "HTML Dashboard written to: ${outputPath}"
     }
 
     /**
