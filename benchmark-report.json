@@ -1,29 +1,29 @@
 {
-    "timestamp": "2026-01-29T08:56:11.411594288Z",
+    "timestamp": "2026-01-29T09:45:39.121102373Z",
     "summary": {
         "totalTests": 22,
         "passedTests": 22,
         "failedTests": 0,
-        "totalTokens": 96517,
-        "totalCostUsd": 0.069978575,
-        "avgResponseMs": 1579.6818181818
+        "totalTokens": 90607,
+        "totalCostUsd": 0.065206525,
+        "avgResponseMs": 1483.9090909091
     },
     "byModel": {
         "gemini-3-pro-preview": {
             "passed": 11,
             "failed": 0,
-            "inputTokens": 46929,
-            "outputTokens": 1477,
-            "totalCostUsd": 0.06604625,
-            "avgResponseMs": 1565.3636363636
+            "inputTokens": 43830,
+            "outputTokens": 1337,
+            "totalCostUsd": 0.06147250000000001,
+            "avgResponseMs": 1552.3636363636
         },
         "gemini-3-flash-preview": {
             "passed": 11,
             "failed": 0,
-            "inputTokens": 46671,
-            "outputTokens": 1440,
-            "totalCostUsd": 0.0039323249999999995,
-            "avgResponseMs": 1594
+            "inputTokens": 43991,
+            "outputTokens": 1449,
+            "totalCostUsd": 0.003734025,
+            "avgResponseMs": 1415.4545454546
         }
     },
     "tests": [
@@ -33,11 +33,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 5571,
-            "outputTokens": 61,
-            "estimatedCostUsd": 0.00726875,
-            "responseTimeMs": 1965,
+            "outputTokens": 65,
+            "estimatedCostUsd": 0.00728875,
+            "responseTimeMs": 2401,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:53:46.999584394Z",
+            "timestamp": "2026-01-29T09:43:20.448105247Z",
             "errorMessage": null
         },
         {
@@ -46,11 +46,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 5571,
-            "outputTokens": 53,
-            "estimatedCostUsd": 4.33725E-4,
-            "responseTimeMs": 1301,
+            "outputTokens": 55,
+            "estimatedCostUsd": 4.34325E-4,
+            "responseTimeMs": 1420,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:53:54.592796568Z",
+            "timestamp": "2026-01-29T09:43:28.257732369Z",
             "errorMessage": null
         },
         {
@@ -58,12 +58,12 @@
             "testName": "Multi-turn conversation",
             "model": "gemini-3-pro-preview",
             "passed": true,
-            "inputTokens": 5767,
-            "outputTokens": 88,
-            "estimatedCostUsd": 0.00764875,
-            "responseTimeMs": 1229,
+            "inputTokens": 2813,
+            "outputTokens": 77,
+            "estimatedCostUsd": 0.00390125,
+            "responseTimeMs": 715,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:02.955497794Z",
+            "timestamp": "2026-01-29T09:43:36.137634491Z",
             "errorMessage": null
         },
         {
@@ -71,12 +71,12 @@
             "testName": "Multi-turn conversation",
             "model": "gemini-3-flash-preview",
             "passed": true,
-            "inputTokens": 5674,
-            "outputTokens": 41,
-            "estimatedCostUsd": 4.3785E-4,
-            "responseTimeMs": 1234,
+            "inputTokens": 2811,
+            "outputTokens": 31,
+            "estimatedCostUsd": 2.20125E-4,
+            "responseTimeMs": 583,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:10.357007754Z",
+            "timestamp": "2026-01-29T09:43:42.874098090Z",
             "errorMessage": null
         },
         {
@@ -85,11 +85,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 1300,
-            "outputTokens": 45,
-            "estimatedCostUsd": 0.00185,
-            "responseTimeMs": 1037,
+            "outputTokens": 34,
+            "estimatedCostUsd": 0.001795,
+            "responseTimeMs": 834,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:16.548754013Z",
+            "timestamp": "2026-01-29T09:43:48.822997041Z",
             "errorMessage": null
         },
         {
@@ -98,11 +98,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 1300,
-            "outputTokens": 33,
-            "estimatedCostUsd": 1.074E-4,
-            "responseTimeMs": 1094,
+            "outputTokens": 24,
+            "estimatedCostUsd": 1.047E-4,
+            "responseTimeMs": 721,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:22.245410414Z",
+            "timestamp": "2026-01-29T09:43:54.112949061Z",
             "errorMessage": null
         },
         {
@@ -111,11 +111,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 2265,
-            "outputTokens": 195,
-            "estimatedCostUsd": 0.00380625,
-            "responseTimeMs": 1926,
+            "outputTokens": 214,
+            "estimatedCostUsd": 0.00390125,
+            "responseTimeMs": 1937,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:27.622707311Z",
+            "timestamp": "2026-01-29T09:43:58.984222156Z",
             "errorMessage": null
         },
         {
@@ -124,11 +124,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 2265,
-            "outputTokens": 263,
-            "estimatedCostUsd": 2.48775E-4,
-            "responseTimeMs": 2699,
+            "outputTokens": 238,
+            "estimatedCostUsd": 2.41275E-4,
+            "responseTimeMs": 1891,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:33.085708315Z",
+            "timestamp": "2026-01-29T09:44:03.483013406Z",
             "errorMessage": null
         },
         {
@@ -137,11 +137,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 2292,
-            "outputTokens": 347,
-            "estimatedCostUsd": 0.0046,
-            "responseTimeMs": 2791,
+            "outputTokens": 358,
+            "estimatedCostUsd": 0.004655,
+            "responseTimeMs": 2807,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:38.898916218Z",
+            "timestamp": "2026-01-29T09:44:08.923500379Z",
             "errorMessage": null
         },
         {
@@ -150,11 +150,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 2292,
-            "outputTokens": 325,
-            "estimatedCostUsd": 2.694E-4,
-            "responseTimeMs": 2665,
+            "outputTokens": 350,
+            "estimatedCostUsd": 2.769E-4,
+            "responseTimeMs": 2752,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:44.293252524Z",
+            "timestamp": "2026-01-29T09:44:14.466900809Z",
             "errorMessage": null
         },
         {
@@ -165,9 +165,9 @@
             "inputTokens": 3944,
             "outputTokens": 155,
             "estimatedCostUsd": 0.005705,
-            "responseTimeMs": 2418,
+            "responseTimeMs": 2634,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:49.442361042Z",
+            "timestamp": "2026-01-29T09:44:19.520104959Z",
             "errorMessage": null
         },
         {
@@ -176,11 +176,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 3944,
-            "outputTokens": 155,
-            "estimatedCostUsd": 3.423E-4,
-            "responseTimeMs": 2634,
+            "outputTokens": 154,
+            "estimatedCostUsd": 3.42E-4,
+            "responseTimeMs": 2523,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:54:55.004299095Z",
+            "timestamp": "2026-01-29T09:44:24.858446038Z",
             "errorMessage": null
         },
         {
@@ -189,11 +189,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 5571,
-            "outputTokens": 54,
-            "estimatedCostUsd": 0.00723375,
-            "responseTimeMs": 1319,
+            "outputTokens": 52,
+            "estimatedCostUsd": 0.00722375,
+            "responseTimeMs": 1266,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:00.268125126Z",
+            "timestamp": "2026-01-29T09:44:29.966551255Z",
             "errorMessage": null
         },
         {
@@ -202,11 +202,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 5571,
-            "outputTokens": 64,
-            "estimatedCostUsd": 4.37025E-4,
-            "responseTimeMs": 1301,
+            "outputTokens": 55,
+            "estimatedCostUsd": 4.34325E-4,
+            "responseTimeMs": 1215,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:06.141849508Z",
+            "timestamp": "2026-01-29T09:44:35.622990383Z",
             "errorMessage": null
         },
         {
@@ -215,11 +215,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 5649,
-            "outputTokens": 77,
-            "estimatedCostUsd": 0.00744625,
-            "responseTimeMs": 1365,
+            "outputTokens": 83,
+            "estimatedCostUsd": 0.00747625,
+            "responseTimeMs": 1195,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:12.087189730Z",
+            "timestamp": "2026-01-29T09:44:41.582388960Z",
             "errorMessage": null
         },
         {
@@ -228,11 +228,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 5649,
-            "outputTokens": 88,
-            "estimatedCostUsd": 4.50075E-4,
-            "responseTimeMs": 1160,
+            "outputTokens": 79,
+            "estimatedCostUsd": 4.47375E-4,
+            "responseTimeMs": 1185,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:17.922157494Z",
+            "timestamp": "2026-01-29T09:44:47.434156867Z",
             "errorMessage": null
         },
         {
@@ -241,11 +241,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 5598,
-            "outputTokens": 147,
-            "estimatedCostUsd": 0.0077325,
-            "responseTimeMs": 1352,
+            "outputTokens": 133,
+            "estimatedCostUsd": 0.0076625,
+            "responseTimeMs": 1230,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:24.477604595Z",
+            "timestamp": "2026-01-29T09:44:53.496326917Z",
             "errorMessage": null
         },
         {
@@ -254,11 +254,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 5598,
-            "outputTokens": 174,
-            "estimatedCostUsd": 4.7205E-4,
-            "responseTimeMs": 1576,
+            "outputTokens": 151,
+            "estimatedCostUsd": 4.6515E-4,
+            "responseTimeMs": 1249,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:31.623172218Z",
+            "timestamp": "2026-01-29T09:44:59.866226614Z",
             "errorMessage": null
         },
         {
@@ -267,11 +267,11 @@
             "model": "gemini-3-pro-preview",
             "passed": true,
             "inputTokens": 5771,
-            "outputTokens": 117,
-            "estimatedCostUsd": 0.00779875,
-            "responseTimeMs": 1188,
+            "outputTokens": 123,
+            "estimatedCostUsd": 0.00782875,
+            "responseTimeMs": 1420,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:37.717492811Z",
+            "timestamp": "2026-01-29T09:45:06.504403429Z",
             "errorMessage": null
         },
         {
@@ -280,11 +280,11 @@
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 5771,
-            "outputTokens": 78,
-            "estimatedCostUsd": 4.56225E-4,
-            "responseTimeMs": 1305,
+            "outputTokens": 111,
+            "estimatedCostUsd": 4.66125E-4,
+            "responseTimeMs": 1370,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:43.626204157Z",
+            "timestamp": "2026-01-29T09:45:12.490165308Z",
             "errorMessage": null
         },
         {
@@ -292,12 +292,12 @@
             "testName": "Long conversation (6 turns)",
             "model": "gemini-3-pro-preview",
             "passed": true,
-            "inputTokens": 3201,
-            "outputTokens": 191,
-            "estimatedCostUsd": 0.00495625,
-            "responseTimeMs": 629,
+            "inputTokens": 3056,
+            "outputTokens": 43,
+            "estimatedCostUsd": 0.004035,
+            "responseTimeMs": 637,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:55:57.071621Z",
+            "timestamp": "2026-01-29T09:45:22.691022188Z",
             "errorMessage": null
         },
         {
@@ -305,12 +305,12 @@
             "testName": "Long conversation (6 turns)",
             "model": "gemini-3-flash-preview",
             "passed": true,
-            "inputTokens": 3036,
-            "outputTokens": 166,
-            "estimatedCostUsd": 2.775E-4,
-            "responseTimeMs": 565,
+            "inputTokens": 3219,
+            "outputTokens": 201,
+            "estimatedCostUsd": 3.01725E-4,
+            "responseTimeMs": 661,
             "ttftMs": null,
-            "timestamp": "2026-01-29T08:56:09.142101688Z",
+            "timestamp": "2026-01-29T09:45:36.870603862Z",
             "errorMessage": null
         }
     ]
