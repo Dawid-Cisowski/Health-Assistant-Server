@@ -652,21 +652,34 @@ class BenchmarkReporter {
                     </div>
                 </div>
                 <div class="bar-chart">
-                    ${costProjections.collect { proj ->
-                        def width1k = Math.max(5, (proj.cost1kMonth / maxCost10k * 100) as int)
-                        def width10k = Math.max(5, (proj.cost10kMonth / maxCost10k * 100) as int)
-                        """
-                    <div class="bar-row">
-                        <div class="bar-label">${proj.modelShort}</div>
-                        <div class="bar-container">
-                            <div class="bar-group">
+                    <div class="scale-group">
+                        <div class="scale-label" style="font-weight: 600; margin-bottom: 0.5rem; color: var(--accent-blue);">1K requests/day (monthly)</div>
+                        ${costProjections.collect { proj ->
+                            def width1k = Math.max(5, (proj.cost1kMonth / maxCost10k * 100) as int)
+                            """
+                        <div class="bar-row">
+                            <div class="bar-label">${proj.modelShort}</div>
+                            <div class="bar-container">
                                 <div class="bar cost-1k" style="width: ${width1k}%">\$${String.format('%.2f', proj.cost1kMonth)}</div>
+                            </div>
+                        </div>
+                            """
+                        }.join('')}
+                    </div>
+                    <div class="scale-group" style="margin-top: 1.5rem;">
+                        <div class="scale-label" style="font-weight: 600; margin-bottom: 0.5rem; color: var(--accent-orange);">10K requests/day (monthly)</div>
+                        ${costProjections.collect { proj ->
+                            def width10k = Math.max(5, (proj.cost10kMonth / maxCost10k * 100) as int)
+                            """
+                        <div class="bar-row">
+                            <div class="bar-label">${proj.modelShort}</div>
+                            <div class="bar-container">
                                 <div class="bar cost-10k" style="width: ${width10k}%">\$${String.format('%.2f', proj.cost10kMonth)}</div>
                             </div>
                         </div>
+                            """
+                        }.join('')}
                     </div>
-                        """
-                    }.join('')}
                 </div>
                 <div class="time-stats">
                     ${costProjections.collect { proj ->
@@ -817,13 +830,20 @@ class BenchmarkReporter {
             sb.append("| \$${String.format('%.2f', proj.cost10kMonth)} |\n")
         }
 
-        // ASCII bar chart
-        sb.append("\n### 📊 Cost Visualization (10K requests/day, monthly)\n\n")
+        // ASCII bar chart - grouped by scale to show cost growth
+        sb.append("\n### 📊 Cost Visualization (Monthly)\n\n")
         sb.append("```\n")
+        sb.append("1K requests/day:\n")
+        costProjections.each { proj ->
+            def barLength = Math.max(1, (proj.cost1kMonth / maxCost * 40) as int)
+            def bar = "█" * barLength
+            sb.append(String.format("  %-13s │ %s \$%.2f\n", proj.modelShort, bar, proj.cost1kMonth))
+        }
+        sb.append("\n10K requests/day:\n")
         costProjections.each { proj ->
             def barLength = Math.max(1, (proj.cost10kMonth / maxCost * 40) as int)
             def bar = "█" * barLength
-            sb.append(String.format("%-15s │ %s \$%.2f\n", proj.modelShort, bar, proj.cost10kMonth))
+            sb.append(String.format("  %-13s │ %s \$%.2f\n", proj.modelShort, bar, proj.cost10kMonth))
         }
         sb.append("```\n\n")
 
