@@ -12,6 +12,9 @@ on:
         default: 'gemini-3-pro-preview,gemini-3-flash-preview'
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   benchmark:
     runs-on: ubuntu-latest
@@ -50,15 +53,13 @@ jobs:
         if: always()
         with:
           name: benchmark-reports-${{ github.run_number }}
-          path: |
-            integration-tests/build/reports/benchmark/
+          path: integration-tests/build/reports/benchmark/
           retention-days: 90
 
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
+
+      - name: Deploy Report to GitHub Pages 🚀
+        uses: peaceiris/actions-gh-pages@v4
         if: always()
         with:
-          name: benchmark-test-results-${{ github.run_number }}
-          path: |
-            integration-tests/build/reports/tests/benchmarkTest/
-          retention-days: 30
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: integration-tests/build/reports/benchmark/
