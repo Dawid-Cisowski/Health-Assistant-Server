@@ -1,8 +1,8 @@
 plugins {
     java
     jacoco
-    id("org.springframework.boot") version "3.3.5"
-    id("io.spring.dependency-management") version "1.1.6"
+    id("org.springframework.boot") version "4.0.2"
+    id("io.spring.dependency-management") version "1.1.7"
     id("com.github.spotbugs") version "6.0.26"
     id("org.sonarqube") version "5.1.0.4882"
     pmd
@@ -38,8 +38,9 @@ repositories {
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.ai:spring-ai-bom:1.1.2")
-        mavenBom("org.springframework.modulith:spring-modulith-bom:1.3.1")
+        mavenBom("org.springframework.ai:spring-ai-bom:2.0.0-M2")
+        mavenBom("org.springframework.modulith:spring-modulith-bom:2.0.1")
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.0")
     }
 }
 
@@ -58,8 +59,8 @@ dependencies {
     // Spring AI
     implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
 
-    // Feign client
-    implementation("org.springframework.cloud:spring-cloud-starter-openfeign:4.1.3")
+    // Feign client (version managed by Spring Cloud BOM)
+    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 
     // Database
     implementation("org.postgresql:postgresql:42.7.4")
@@ -72,8 +73,8 @@ dependencies {
     // Cache
     implementation("com.github.ben-manes.caffeine:caffeine")
 
-    // OpenAPI documentation
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
+    // OpenAPI documentation (Spring Boot 4.0 compatible)
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0-M1")
 
     // JSON processing
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")

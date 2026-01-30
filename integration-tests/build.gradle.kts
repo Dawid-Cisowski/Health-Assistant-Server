@@ -3,8 +3,8 @@ import java.time.Duration
 plugins {
     groovy
     jacoco
-    id("org.springframework.boot") version "3.3.5"
-    id("io.spring.dependency-management") version "1.1.6"
+    id("org.springframework.boot") version "4.0.2"
+    id("io.spring.dependency-management") version "1.1.7"
 }
 
 group = "com.healthassistant"
@@ -36,8 +36,8 @@ repositories {
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.ai:spring-ai-bom:1.1.2")
-        mavenBom("org.springframework.modulith:spring-modulith-bom:1.3.1")
+        mavenBom("org.springframework.ai:spring-ai-bom:2.0.0-M2")
+        mavenBom("org.springframework.modulith:spring-modulith-bom:2.0.1")
     }
 }
 
