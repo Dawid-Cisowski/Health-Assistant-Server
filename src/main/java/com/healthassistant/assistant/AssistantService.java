@@ -150,35 +150,36 @@ class AssistantService implements AssistantFacade {
                 .subscribeOn(Schedulers.boundedElastic())
                 .contextCapture()
                 .flatMapMany(ctx -> {
-                    var assistantResponse = new StringBuilder();
-                    var tokenUsage = new TokenUsageAccumulator();
-                    return chatClient.prompt()
-                            .messages(ctx.messages())
-                            .stream()
-                            .chatResponse()
-                            .doOnNext(response -> tokenUsage.accumulate(response))
-                            .flatMap(this::mapToAssistantEvents)
-                            .doOnNext(event -> {
-                                if (event instanceof ContentEvent(String content)) {
-                                    assistantResponse.append(content);
+                    // Use synchronous call() instead of stream() due to Spring AI 2.0.0-M2 bug
+                    // where tool calling doesn't work properly with streaming
+                    // See: https://github.com/spring-projects/spring-ai/issues/3366
+                    return Mono.fromCallable(() -> chatClient.prompt()
+                                    .messages(ctx.messages())
+                                    .call()
+                                    .chatResponse())
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMapMany(response -> {
+                                var content = response.getResult().getOutput().getText();
+                                var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
+                                Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+                                Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+
+                                if (content != null && !content.isBlank()) {
+                                    conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
+                                    log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
                                 }
+
+                                return Flux.<AssistantEvent>just(
+                                        new ContentEvent(content != null ? content : ""),
+                                        new DoneEvent(ctx.conversationId(), promptTokens, completionTokens)
+                                );
                             })
-                            .concatWith(Flux.defer(() -> Flux.just(
-                                    new DoneEvent(ctx.conversationId(), tokenUsage.getPromptTokens(), tokenUsage.getCompletionTokens())
-                            )))
-                            .doOnError(error -> log.error("Error in stream chat", error))
-                            .onErrorResume(error -> Flux.just(createErrorEvent(error)))
-                            .doFinally(signal -> Schedulers.boundedElastic().schedule(() -> {
-                                try {
-                                    if (!assistantResponse.isEmpty()) {
-                                        conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, assistantResponse.toString());
-                                        log.info("Saved assistant response ({} chars) to conversation {}", assistantResponse.length(), ctx.conversationId());
-                                    }
-                                } finally {
-                                    AssistantContext.clear();
-                                    log.debug("Cleared AssistantContext for device {}", maskDeviceId(deviceId));
-                                }
-                            }));
+                            .doOnError(error -> log.error("Error in chat call", error))
+                            .onErrorResume(error -> Flux.<AssistantEvent>just(createErrorEvent(error)))
+                            .doFinally(signal -> {
+                                AssistantContext.clear();
+                                log.debug("Cleared AssistantContext for device {}", maskDeviceId(deviceId));
+                            });
                 })
                 .contextCapture()
                 .doOnCancel(() -> {
@@ -188,41 +189,6 @@ class AssistantService implements AssistantFacade {
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages) {}
-
-    private static class TokenUsageAccumulator {
-        private long promptTokens = 0;
-        private long completionTokens = 0;
-
-        void accumulate(org.springframework.ai.chat.model.ChatResponse response) {
-            if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
-                var usage = response.getMetadata().getUsage();
-                if (usage.getPromptTokens() != null && usage.getPromptTokens() > 0) {
-                    promptTokens = usage.getPromptTokens();
-                }
-                if (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0) {
-                    completionTokens = usage.getCompletionTokens();
-                }
-            }
-        }
-
-        Long getPromptTokens() {
-            return promptTokens > 0 ? promptTokens : null;
-        }
-
-        Long getCompletionTokens() {
-            return completionTokens > 0 ? completionTokens : null;
-        }
-    }
-
-    private Flux<AssistantEvent> mapToAssistantEvents(org.springframework.ai.chat.model.ChatResponse response) {
-        var content = response.getResult().getOutput().getText();
-
-        if (content == null || content.isBlank()) {
-            return Flux.empty();
-        }
-
-        return Flux.just(new ContentEvent(content));
-    }
 
     private AssistantEvent createErrorEvent(Throwable error) {
         log.error("Chat processing error", error);
