@@ -64,7 +64,8 @@ dependencies {
 
     // Database
     implementation("org.postgresql:postgresql:42.7.4")
-    implementation("org.flywaydb:flyway-core")
+    // Spring Boot 4.0 requires starter for Flyway autoconfiguration
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-database-postgresql")
 
     // Google Cloud SQL support (for production)

@@ -71,6 +71,13 @@
         <Bug pattern="REC_CATCH_EXCEPTION"/>
     </Match>
 
+    <!-- AI extraction needs catch-all for Spring AI runtime exceptions -->
+    <Match>
+        <Class name="com.healthassistant.sleepimport.SleepImageExtractor"/>
+        <Method name="extract"/>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+    </Match>
+
     <!-- Local records with combine() for Stream.reduce() - needed for parallel stream contract -->
     <Match>
         <Class name="~com\.healthassistant\.workout\.ExerciseStatisticsCalculator\$\d+.*"/>

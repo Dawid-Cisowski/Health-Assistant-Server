@@ -5,7 +5,7 @@ import com.healthassistant.security.api.DeviceSecretProvider;
 import com.healthassistant.security.api.NonceCache;
 import com.healthassistant.config.AppProperties;
 import com.healthassistant.healthevents.api.model.DeviceId;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

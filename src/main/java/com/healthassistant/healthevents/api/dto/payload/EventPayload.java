@@ -2,7 +2,7 @@ package com.healthassistant.healthevents.api.dto.payload;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.healthevents.api.model.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 

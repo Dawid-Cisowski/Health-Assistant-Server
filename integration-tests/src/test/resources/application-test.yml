@@ -2,15 +2,17 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration
+      - org.springframework.boot.micrometer.metrics.autoconfigure.export.stackdriver.StackdriverMetricsExportAutoConfiguration
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
 
   flyway:
     enabled: true
     clean-disabled: false
+    locations: classpath:db/migration
 
   modulith:
     events:
@@ -33,4 +35,5 @@ logging:
     com.healthassistant: INFO
     org.springframework: WARN
     org.testcontainers: WARN
-
+    org.flywaydb: DEBUG
+    org.springframework.boot.flyway: DEBUG

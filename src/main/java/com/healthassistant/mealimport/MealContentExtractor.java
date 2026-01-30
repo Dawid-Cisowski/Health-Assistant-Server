@@ -1,6 +1,6 @@
 package com.healthassistant.mealimport;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import com.healthassistant.guardrails.api.GuardrailProfile;
 import com.healthassistant.mealimport.api.dto.ClarifyingQuestion;

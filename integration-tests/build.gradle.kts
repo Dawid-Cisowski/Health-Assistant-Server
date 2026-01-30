@@ -38,6 +38,8 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.ai:spring-ai-bom:2.0.0-M2")
         mavenBom("org.springframework.modulith:spring-modulith-bom:2.0.1")
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.0")
+        mavenBom("org.testcontainers:testcontainers-bom:1.20.4")
     }
 }
 
@@ -60,24 +62,25 @@ dependencies {
     // Spring Modulith events core for serialization tests
     testImplementation("org.springframework.modulith:spring-modulith-events-core")
 
-    // Testcontainers
+    // Testcontainers (versions managed by BOM)
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
-    testImplementation("org.testcontainers:spock:1.19.3")
+    testImplementation("org.testcontainers:spock")
 
-    // Spock Framework (Groovy testing)
-    testImplementation("org.spockframework:spock-core:2.3-groovy-4.0")
-    testImplementation("org.spockframework:spock-spring:2.3-groovy-4.0")
-    testImplementation("org.apache.groovy:groovy:4.0.15")
+    // Spock Framework (Groovy testing) - Groovy 5.0 for Spring Boot 4.0 compatibility
+    testImplementation("org.spockframework:spock-core:2.4-groovy-5.0")
+    testImplementation("org.spockframework:spock-spring:2.4-groovy-5.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
-    // REST Assured for API testing
-    testImplementation("io.rest-assured:rest-assured:5.4.0")
-    testImplementation("io.rest-assured:json-path:5.4.0")
+    // REST Assured for API testing (6.0.0+ for Groovy 5 support)
+    testImplementation("io.rest-assured:rest-assured:6.0.0")
+    testImplementation("io.rest-assured:json-path:6.0.0")
 
-    // Awaitility for async testing
+    // Awaitility for async testing (exclude old Groovy package for Spring Boot 4.0 compatibility)
     testImplementation("org.awaitility:awaitility:4.2.0")
-    testImplementation("org.awaitility:awaitility-groovy:4.2.0")
+    testImplementation("org.awaitility:awaitility-groovy:4.2.0") {
+        exclude(group = "org.codehaus.groovy", module = "groovy")
+    }
 
     // WireMock for mocking external APIs
     testImplementation("com.github.tomakehurst:wiremock-jre8-standalone:2.35.0")

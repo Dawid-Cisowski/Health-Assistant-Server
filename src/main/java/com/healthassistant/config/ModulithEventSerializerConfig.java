@@ -1,11 +1,11 @@
 package com.healthassistant.config;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
-import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.dto.events.BaseHealthEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
@@ -45,15 +45,13 @@ class ModulithEventSerializerConfig {
     }
 
     private ObjectMapper createSecureObjectMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new JavaTimeModule());
-
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
+        // Jackson 3.x uses builder pattern and has JavaTimeModule built-in
         PolymorphicTypeValidator ptv = buildSecureTypeValidator();
-        mapper.setPolymorphicTypeValidator(ptv);
 
-        return mapper;
+        return JsonMapper.builder()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .polymorphicTypeValidator(ptv)
+                .build();
     }
 
     private PolymorphicTypeValidator buildSecureTypeValidator() {
@@ -162,7 +160,7 @@ class ModulithEventSerializerConfig {
                 String serialized = objectMapper.writeValueAsString(event);
                 log.debug("Serialized event of type {}", event.getClass().getSimpleName());
                 return serialized;
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.error("Failed to serialize event of type {}: {}", event.getClass().getName(), e.getMessage());
                 throw new IllegalArgumentException("Failed to serialize event: " + event, e);
             }
@@ -174,7 +172,7 @@ class ModulithEventSerializerConfig {
                 T deserialized = objectMapper.readValue((String) serialized, type);
                 log.debug("Deserialized event to type {}", type.getSimpleName());
                 return deserialized;
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.error("Failed to deserialize event to {}: {}", type.getName(), e.getMessage());
                 throw new IllegalArgumentException("Failed to deserialize event to " + type.getName(), e);
             }

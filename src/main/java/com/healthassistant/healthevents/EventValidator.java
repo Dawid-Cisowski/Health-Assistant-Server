@@ -1,6 +1,6 @@
 package com.healthassistant.healthevents;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.healthevents.api.dto.payload.*;
 import com.healthassistant.healthevents.api.model.EventType;
 import jakarta.validation.ConstraintViolation;
