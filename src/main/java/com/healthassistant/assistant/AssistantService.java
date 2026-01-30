@@ -151,29 +151,37 @@ class AssistantService implements AssistantFacade {
                 .contextCapture()
                 .flatMapMany(ctx -> {
                     // Use synchronous call() instead of stream() due to Spring AI 2.0.0-M2 bug
-                    // where tool calling doesn't work properly with streaming
+                    // where tool calling doesn't work properly with streaming.
                     // See: https://github.com/spring-projects/spring-ai/issues/3366
-                    return Mono.fromCallable(() -> chatClient.prompt()
-                                    .messages(ctx.messages())
-                                    .call()
-                                    .chatResponse())
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .flatMapMany(response -> {
-                                var content = response.getResult().getOutput().getText();
-                                var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
-                                Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
-                                Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+                    // Tool calling is imperative and works reliably only with call().
+                    return Mono.fromCallable(() -> {
+                                var response = chatClient.prompt()
+                                        .messages(ctx.messages())
+                                        .call()
+                                        .chatResponse();
+
+                                var content = response.getResult() != null && response.getResult().getOutput() != null
+                                        ? response.getResult().getOutput().getText()
+                                        : null;
 
                                 if (content != null && !content.isBlank()) {
                                     conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
                                     log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
+                                } else {
+                                    log.warn("Empty response from AI for conversation {}", ctx.conversationId());
                                 }
 
-                                return Flux.<AssistantEvent>just(
-                                        new ContentEvent(content != null ? content : ""),
-                                        new DoneEvent(ctx.conversationId(), promptTokens, completionTokens)
-                                );
+                                var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
+                                Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+                                Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+
+                                return new ChatResult(content != null ? content : "", promptTokens, completionTokens);
                             })
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMapMany(result -> Flux.<AssistantEvent>just(
+                                    new ContentEvent(result.content()),
+                                    new DoneEvent(ctx.conversationId(), result.promptTokens(), result.completionTokens())
+                            ))
                             .doOnError(error -> log.error("Error in chat call", error))
                             .onErrorResume(error -> Flux.<AssistantEvent>just(createErrorEvent(error)))
                             .doFinally(signal -> {
@@ -189,6 +197,8 @@ class AssistantService implements AssistantFacade {
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages) {}
+
+    private record ChatResult(String content, Long promptTokens, Long completionTokens) {}
 
     private AssistantEvent createErrorEvent(Throwable error) {
         log.error("Chat processing error", error);
