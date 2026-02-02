@@ -120,7 +120,7 @@ class WorkoutProjectionJpaEntity {
         return workout.exercises().stream()
                 .flatMap(exercise -> exercise.sets().stream()
                         .map(set -> WorkoutSetProjectionJpaEntity.from(
-                                workout.workoutId(), exercise.name(), exercise.exerciseId(), set)))
+                                workout.workoutId(), exercise.name(), exercise.exerciseId(), exercise.orderInWorkout(), set)))
                 .toList();
     }
 }
