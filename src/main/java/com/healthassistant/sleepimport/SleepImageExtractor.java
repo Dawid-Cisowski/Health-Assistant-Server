@@ -45,10 +45,7 @@ class SleepImageExtractor {
     ExtractedSleepData extract(MultipartFile image, int year) throws SleepExtractionException {
         try {
             byte[] imageBytes = image.getBytes();
-            String contentType = image.getContentType();
-            final String mimeType = (contentType == null || contentType.equals("application/octet-stream"))
-                    ? "image/jpeg"
-                    : contentType;
+            final String mimeType = resolveImageMimeType(image.getContentType());
 
             log.info("Extracting sleep data from image: {} bytes, type: {}, year: {}", imageBytes.length, mimeType, year);
 
@@ -349,5 +346,25 @@ class SleepImageExtractor {
             return String.format("Invalid awakeMinutes: %d (must be 0-%d)", awakeMinutes, MAX_MINUTES_IN_DAY);
         }
         return null;
+    }
+
+    private String resolveImageMimeType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "image/jpeg";
+        }
+        if (contentType.contains("*")) {
+            return "image/jpeg";
+        }
+        if (contentType.equals("application/octet-stream")) {
+            return "image/jpeg";
+        }
+        return switch (contentType.toLowerCase()) {
+            case "image/jpeg", "image/jpg" -> "image/jpeg";
+            case "image/png" -> "image/png";
+            case "image/gif" -> "image/gif";
+            case "image/webp" -> "image/webp";
+            case "image/heic", "image/heif" -> "image/heic";
+            default -> "image/jpeg";
+        };
     }
 }

@@ -47,10 +47,7 @@ class WeightImageExtractor {
                         images.forEach(image -> {
                             try {
                                 byte[] imageBytes = image.getBytes();
-                                String contentType = image.getContentType();
-                                String mimeType = (contentType == null || contentType.equals("application/octet-stream"))
-                                        ? "image/jpeg"
-                                        : contentType;
+                                String mimeType = resolveImageMimeType(image.getContentType());
                                 userSpec.media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes));
                             } catch (IOException e) {
                                 throw new RuntimeException("Failed to read image bytes", e);
@@ -264,5 +261,25 @@ class WeightImageExtractor {
             return null;
         }
         return guardrailFacade.sanitizeOnly(bodyType, GuardrailProfile.DATA_EXTRACTION);
+    }
+
+    private String resolveImageMimeType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "image/jpeg";
+        }
+        if (contentType.contains("*")) {
+            return "image/jpeg";
+        }
+        if (contentType.equals("application/octet-stream")) {
+            return "image/jpeg";
+        }
+        return switch (contentType.toLowerCase()) {
+            case "image/jpeg", "image/jpg" -> "image/jpeg";
+            case "image/png" -> "image/png";
+            case "image/gif" -> "image/gif";
+            case "image/webp" -> "image/webp";
+            case "image/heic", "image/heif" -> "image/heic";
+            default -> "image/jpeg";
+        };
     }
 }

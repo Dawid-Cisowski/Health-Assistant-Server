@@ -33,7 +33,7 @@ class WorkoutImageExtractor {
     ExtractedWorkoutData extract(MultipartFile image) throws WorkoutExtractionException {
         try {
             byte[] imageBytes = image.getBytes();
-            String mimeType = image.getContentType();
+            String mimeType = resolveImageMimeType(image.getContentType());
 
             log.info("Extracting workout data from image: {} bytes, type: {}", imageBytes.length, mimeType);
 
@@ -247,5 +247,25 @@ class WorkoutImageExtractor {
             return now;
         }
         return date;
+    }
+
+    private String resolveImageMimeType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "image/jpeg";
+        }
+        if (contentType.contains("*")) {
+            return "image/jpeg";
+        }
+        if (contentType.equals("application/octet-stream")) {
+            return "image/jpeg";
+        }
+        return switch (contentType.toLowerCase()) {
+            case "image/jpeg", "image/jpg" -> "image/jpeg";
+            case "image/png" -> "image/png";
+            case "image/gif" -> "image/gif";
+            case "image/webp" -> "image/webp";
+            case "image/heic", "image/heif" -> "image/heic";
+            default -> "image/jpeg";
+        };
     }
 }
