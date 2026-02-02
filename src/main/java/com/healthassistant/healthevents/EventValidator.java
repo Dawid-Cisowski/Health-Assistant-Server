@@ -58,6 +58,7 @@ class EventValidator {
             case WorkoutPayload p -> validateWorkoutStructure(p);
             case MealRecordedPayload meal -> List.of();
             case WeightMeasurementPayload weight -> validateWeightMeasurement(weight);
+            case BodyMeasurementPayload body -> validateBodyMeasurement(body);
             case EventDeletedPayload p -> validateEventDeleted(p);
             case EventCorrectedPayload p -> validateEventCorrected(p);
         };
@@ -71,6 +72,56 @@ class EventValidator {
         }
 
         return errors;
+    }
+
+    private List<EventValidationError> validateBodyMeasurement(BodyMeasurementPayload payload) {
+        List<EventValidationError> errors = new ArrayList<>();
+
+        if (payload.measuredAt() != null && payload.measuredAt().isAfter(java.time.Instant.now().plusSeconds(300))) {
+            errors.add(EventValidationError.invalidValue("measuredAt", "cannot be more than 5 minutes in the future"));
+        }
+
+        // Validate notes field for dangerous content
+        if (payload.notes() != null) {
+            errors.addAll(validateNotesField(payload.notes()));
+        }
+
+        // At least one measurement must be provided
+        if (hasNoMeasurements(payload)) {
+            errors.add(EventValidationError.invalidValue("payload", "at least one body measurement must be provided"));
+        }
+
+        return errors;
+    }
+
+    private List<EventValidationError> validateNotesField(String notes) {
+        List<EventValidationError> errors = new ArrayList<>();
+
+        // Check for control characters (except space, tab is not allowed in notes)
+        if (notes.matches(".*[\\x00-\\x1F].*")) {
+            errors.add(EventValidationError.invalidValue("notes", "contains invalid control characters"));
+        }
+
+        return errors;
+    }
+
+    private boolean hasNoMeasurements(BodyMeasurementPayload payload) {
+        return java.util.stream.Stream.of(
+                payload.bicepsLeftCm(),
+                payload.bicepsRightCm(),
+                payload.forearmLeftCm(),
+                payload.forearmRightCm(),
+                payload.chestCm(),
+                payload.waistCm(),
+                payload.abdomenCm(),
+                payload.hipsCm(),
+                payload.neckCm(),
+                payload.shouldersCm(),
+                payload.thighLeftCm(),
+                payload.thighRightCm(),
+                payload.calfLeftCm(),
+                payload.calfRightCm()
+        ).allMatch(java.util.Objects::isNull);
     }
 
     @SuppressWarnings("PMD.UnusedFormalParameter")
