@@ -360,4 +360,13 @@ class HealthEventsService implements HealthEventsFacade {
                 .filter(entity -> entity.getDeletedAt() == null && entity.getSupersededByEventId() == null)
                 .map(this::toStoredEventData);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoredEventData> findActiveEventsByDeviceIdAndEventType(String deviceId, String eventType) {
+        return healthEventJpaRepository.findActiveByDeviceIdAndEventType(deviceId, eventType)
+                .stream()
+                .map(this::toStoredEventData)
+                .toList();
+    }
 }

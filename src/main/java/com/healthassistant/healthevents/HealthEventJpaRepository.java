@@ -87,4 +87,14 @@ interface HealthEventJpaRepository extends JpaRepository<HealthEventJpaEntity, L
     @Query("SELECT e FROM HealthEventJpaEntity e WHERE e.deviceId = :deviceId " +
            "AND e.deletedAt IS NULL AND e.supersededByEventId IS NULL")
     List<HealthEventJpaEntity> findActiveByDeviceId(@Param("deviceId") String deviceId);
+
+    @Query("SELECT e FROM HealthEventJpaEntity e " +
+           "WHERE e.deviceId = :deviceId " +
+           "AND e.eventType = :eventType " +
+           "AND e.deletedAt IS NULL " +
+           "AND e.supersededByEventId IS NULL " +
+           "ORDER BY e.occurredAt ASC")
+    List<HealthEventJpaEntity> findActiveByDeviceIdAndEventType(
+            @Param("deviceId") String deviceId,
+            @Param("eventType") String eventType);
 }

@@ -31,4 +31,6 @@ public interface HealthEventsFacade {
     Optional<ExistingSleepInfo> findOverlappingSleepInfo(DeviceId deviceId, Instant sleepStart, Instant sleepEnd);
 
     Optional<StoredEventData> findEventById(String deviceId, String eventId);
+
+    List<StoredEventData> findActiveEventsByDeviceIdAndEventType(String deviceId, String eventType);
 }

@@ -17,9 +17,11 @@ import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
 import com.healthassistant.workout.api.dto.UpdateWorkoutRequest;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import com.healthassistant.workout.api.dto.WorkoutMutationResponse;
+import com.healthassistant.workout.api.dto.WorkoutReprojectionResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -364,6 +366,40 @@ class WorkoutService implements WorkoutFacade {
     private String sanitizeForLog(String value) {
         if (value == null) return "null";
         return value.replaceAll("[^a-zA-Z0-9_-]", "_");
+    }
+
+    private String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public WorkoutReprojectionResponse reprojectAllWorkouts(String deviceId) {
+        log.info("Starting workout reprojection for device {}", maskDeviceId(deviceId));
+
+        workoutRepository.deleteByDeviceId(deviceId);
+
+        List<StoredEventData> events = healthEventsFacade
+                .findActiveEventsByDeviceIdAndEventType(deviceId, WORKOUT_V1);
+
+        int[] counter = {0, 0};
+        events.forEach(event -> {
+            try {
+                workoutProjector.projectWorkout(event);
+                counter[0]++;
+            } catch (Exception e) {
+                log.error("Failed to reproject event {}: {}", event.eventId().value(), e.getMessage());
+                counter[1]++;
+            }
+        });
+
+        log.info("Reprojection completed: {} success, {} failed, {} total",
+                counter[0], counter[1], events.size());
+
+        return new WorkoutReprojectionResponse(counter[0], counter[1], events.size());
     }
 
 }
