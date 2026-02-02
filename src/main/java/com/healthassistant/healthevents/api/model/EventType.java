@@ -1,7 +1,7 @@
 package com.healthassistant.healthevents.api.model;
 
 import com.fasterxml.jackson.annotation.JsonValue;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 import java.util.Objects;
 

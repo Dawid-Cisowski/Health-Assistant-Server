@@ -1,7 +1,7 @@
 package com.healthassistant.appevents.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonDeserialize;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;

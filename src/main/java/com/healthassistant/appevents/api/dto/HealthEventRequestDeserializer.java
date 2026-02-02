@@ -1,16 +1,14 @@
 package com.healthassistant.appevents.api.dto;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.JsonNode;
 import com.healthassistant.healthevents.api.dto.payload.EventPayload;
 import com.healthassistant.healthevents.api.model.EventType;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
@@ -18,15 +16,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
-public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealthEventsRequest.HealthEventRequest> {
+public class HealthEventRequestDeserializer extends ValueDeserializer<SubmitHealthEventsRequest.HealthEventRequest> {
 
     private static final Pattern TYPE_NAME_PATTERN = Pattern.compile("`([^`]+)`");
 
     @Override
-    public SubmitHealthEventsRequest.HealthEventRequest deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException {
-        ObjectMapper mapper = (ObjectMapper) p.getCodec();
-        JsonNode node = mapper.readTree(p);
+    public SubmitHealthEventsRequest.HealthEventRequest deserialize(JsonParser p, DeserializationContext ctxt) {
+        JsonNode node = ctxt.readTree(p);
 
         String idempotencyKey = extractStringField(node, "idempotencyKey").orElse(null);
         String type = extractStringField(node, "type").orElse(null);
@@ -38,11 +34,11 @@ public class HealthEventRequestDeserializer extends JsonDeserializer<SubmitHealt
             try {
                 EventType eventType = EventType.from(type);
                 Class<? extends EventPayload> payloadClass = EventPayload.payloadClassFor(eventType);
-                payload = mapper.treeToValue(node.get("payload"), payloadClass);
+                payload = ctxt.readTreeAsValue(node.get("payload"), payloadClass);
             } catch (IllegalArgumentException e) {
                 deserializationError = "Unknown event type: " + type;
                 log.debug("Failed to deserialize event: {}", deserializationError);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 deserializationError = extractMeaningfulError(e);
                 log.debug("Failed to deserialize payload for type {}: {}", type, deserializationError);
             } catch (RuntimeException e) {

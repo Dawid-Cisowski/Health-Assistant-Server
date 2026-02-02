@@ -1,8 +1,8 @@
 package com.healthassistant.config;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +48,7 @@ public class AppProperties {
             try {
                 Map<String, String> devices = parseDevicesJson(devicesJson);
                 loadDeviceSecrets(devices);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.error("Failed to parse HMAC devices JSON: invalid JSON format", e);
                 throw new IllegalStateException("Invalid HMAC_DEVICES_JSON configuration: malformed JSON", e);
             } catch (IllegalArgumentException e) {
@@ -57,7 +57,7 @@ public class AppProperties {
             }
         }
 
-        private Map<String, String> parseDevicesJson(String json) throws JsonProcessingException {
+        private Map<String, String> parseDevicesJson(String json) throws JacksonException {
             ObjectMapper mapper = new ObjectMapper();
             return mapper.readValue(json, new TypeReference<>() {});
         }

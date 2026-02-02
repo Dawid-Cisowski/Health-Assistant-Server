@@ -2,9 +2,7 @@ spring:
   application:
     name: health-assistant-event-collector
 
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
+  # Jackson 3.x defaults to ISO-8601 date serialization
 
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
@@ -63,7 +61,7 @@ spring:
         api-key: ${GEMINI_API_KEY}
         chat:
           options:
-            model: ${GEMINI_MODEL:gemini-3-pro-preview}
+            model: ${GEMINI_MODEL:gemini-3-flash-preview}
             temperature: 1.5
     chat:
       observations:

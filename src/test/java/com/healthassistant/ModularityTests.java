@@ -29,7 +29,7 @@ class ModularityTests {
                 "appevents", "healthevents", "dailysummary", "steps", "workout",
                 "workoutimport", "sleep", "sleepimport", "calories", "activity",
                 "meals", "mealimport", "googlefit", "assistant", "security", "config",
-                "weight", "weightimport", "heartrate"
+                "weight", "weightimport", "heartrate", "guardrails"
         );
 
         var actualModules = modules.stream()

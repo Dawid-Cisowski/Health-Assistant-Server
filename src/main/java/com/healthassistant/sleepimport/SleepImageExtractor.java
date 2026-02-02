@@ -1,6 +1,6 @@
 package com.healthassistant.sleepimport;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +20,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
+
+import static java.util.Locale.ROOT;
 
 @Component
 @RequiredArgsConstructor
@@ -292,7 +294,7 @@ class SleepImageExtractor {
 
     private LocalDate parsePolishDate(String dateStr, int year) {
         try {
-            String[] parts = dateStr.toLowerCase(java.util.Locale.ROOT).split("\\s+");
+            String[] parts = dateStr.toLowerCase(ROOT).split("\\s+");
             if (parts.length >= 2) {
                 int day = Integer.parseInt(parts[0]);
                 String monthStr = parts[1].replace(",", "");
@@ -358,7 +360,7 @@ class SleepImageExtractor {
         if (contentType.equals("application/octet-stream")) {
             return "image/jpeg";
         }
-        return switch (contentType.toLowerCase()) {
+        return switch (contentType.toLowerCase(ROOT)) {
             case "image/jpeg", "image/jpg" -> "image/jpeg";
             case "image/png" -> "image/png";
             case "image/gif" -> "image/gif";

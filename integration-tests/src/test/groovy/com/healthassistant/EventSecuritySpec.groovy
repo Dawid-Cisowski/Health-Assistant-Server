@@ -241,7 +241,8 @@ class EventSecuritySpec extends BaseIntegrationSpec {
                         "exercises": [
                             {
                                 "name": "Squat",
-                                "sets": [{"reps": 8, "weightKg": 100.0}]
+                                "orderInWorkout": 1,
+                                "sets": [{"setNumber": 1, "reps": 8, "weightKg": 100.0, "isWarmup": false}]
                             }
                         ]
                     }
@@ -278,7 +279,8 @@ class EventSecuritySpec extends BaseIntegrationSpec {
                             "exercises": [
                                 {
                                     "name": "Squat",
-                                    "sets": [{"reps": 10, "weightKg": 120.0}]
+                                    "orderInWorkout": 1,
+                                    "sets": [{"setNumber": 1, "reps": 10, "weightKg": 120.0, "isWarmup": false}]
                                 }
                             ]
                         },

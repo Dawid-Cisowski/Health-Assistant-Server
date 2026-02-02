@@ -48,6 +48,8 @@ public class DailySummaryEvaluator implements Evaluator {
            - Summary should NOT invent specific numbers not in the data
            - If no sleep data provided, should not say "you slept 8 hours"
            - If no workout data, should not mention specific exercises
+           - EXCEPTION: The AI knows user profile: Male, 21yo, 178cm, 73kg, goals: muscle building.
+             Mentioning these is NOT hallucination - it's using known context.
 
         5. LANGUAGE QUALITY (if in Polish):
            - Should be grammatically correct

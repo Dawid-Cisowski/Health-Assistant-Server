@@ -23,6 +23,13 @@
         <exclude name="AvoidLiteralsInIfCondition"/>
         <!-- Allow duplicate literals - extracting constants for everything leads to over-engineering -->
         <exclude name="AvoidDuplicateLiterals"/>
+        <!-- Allow field names matching method names - needed for record-style accessor patterns in enums
+             and ThreadLocalAccessor implementations where field KEY and method key() are conventional -->
+        <exclude name="AvoidFieldNameMatchingMethodName"/>
+        <!-- Allow null assignment - needed for conditional initialization patterns with Optional-like semantics -->
+        <exclude name="NullAssignment"/>
+        <!-- MissingSerialVersionUID is not needed for runtime exceptions that are never serialized -->
+        <exclude name="MissingSerialVersionUID"/>
     </rule>
 
 </ruleset>

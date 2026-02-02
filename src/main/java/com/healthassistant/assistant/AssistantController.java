@@ -1,6 +1,6 @@
 package com.healthassistant.assistant;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.assistant.api.AssistantFacade;
 import com.healthassistant.assistant.api.dto.AssistantEvent;
 import com.healthassistant.assistant.api.dto.ChatRequest;

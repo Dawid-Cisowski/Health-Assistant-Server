@@ -1,6 +1,6 @@
 package com.healthassistant.meals;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
@@ -311,7 +311,7 @@ class MealsService implements MealsFacade {
 
         Map<String, Object> payloadMap = objectMapper.convertValue(
                 correctedPayload,
-                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
+                new tools.jackson.core.type.TypeReference<Map<String, Object>>() {}
         );
 
         EventCorrectedPayload payload = new EventCorrectedPayload(

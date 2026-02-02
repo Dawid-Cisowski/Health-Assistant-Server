@@ -232,7 +232,8 @@ class EventCorrectionSpec extends BaseIntegrationSpec {
                         "exercises": [
                             {
                                 "name": "Squat",
-                                "sets": [{"reps": 5, "weightKg": 100.0}]
+                                "orderInWorkout": 1,
+                                "sets": [{"setNumber": 1, "reps": 5, "weightKg": 100.0, "isWarmup": false}]
                             }
                         ]
                     }
@@ -269,7 +270,8 @@ class EventCorrectionSpec extends BaseIntegrationSpec {
                             "exercises": [
                                 {
                                     "name": "Squat",
-                                    "sets": [{"reps": 5, "weightKg": 120.0}]
+                                    "orderInWorkout": 1,
+                                    "sets": [{"setNumber": 1, "reps": 5, "weightKg": 120.0, "isWarmup": false}]
                                 }
                             ]
                         },

@@ -21,9 +21,9 @@ class ExerciseCatalogSpec extends BaseIntegrationSpec {
         then: "response status is 200"
         response.statusCode() == 200
 
-        and: "response contains all 59 exercises"
+        and: "response contains all 62 exercises"
         def exercises = response.body().jsonPath().getList("")
-        exercises.size() == 59
+        exercises.size() == 62
 
         and: "each exercise has required fields"
         exercises.every { exercise ->
@@ -159,9 +159,9 @@ class ExerciseCatalogSpec extends BaseIntegrationSpec {
         def absExercises = exercises.findAll { it.id.startsWith("abs_") }
 
         chestExercises.size() == 11
-        backExercises.size() == 11
-        legsExercises.size() == 11
-        shouldersExercises.size() == 8
+        backExercises.size() == 12
+        legsExercises.size() == 12
+        shouldersExercises.size() == 9
         bicepsExercises.size() == 6
         tricepsExercises.size() == 6
         absExercises.size() == 6

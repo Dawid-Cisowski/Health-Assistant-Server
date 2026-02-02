@@ -61,7 +61,7 @@ class AssistantSpec extends BaseIntegrationSpec {
 
     def "POST /v1/assistant/chat should reject message that is too long"() {
         when: "authenticated request with very long message is sent"
-        String longMessage = "a" * 1001  // Max is 1000
+        String longMessage = "a" * 4001  // Max is 4000
         def chatRequest = "{\"message\": \"${longMessage}\"}"
         def response = authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/assistant/chat", chatRequest)
                 .when()
