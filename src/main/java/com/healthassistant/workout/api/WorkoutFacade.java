@@ -6,6 +6,7 @@ import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
 import com.healthassistant.workout.api.dto.UpdateWorkoutRequest;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import com.healthassistant.workout.api.dto.WorkoutMutationResponse;
+import com.healthassistant.workout.api.dto.WorkoutReprojectionResponse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -35,5 +36,7 @@ public interface WorkoutFacade {
     void deleteWorkout(String deviceId, String eventId);
 
     WorkoutMutationResponse updateWorkout(String deviceId, String eventId, UpdateWorkoutRequest request);
+
+    WorkoutReprojectionResponse reprojectAllWorkouts(String deviceId);
 
 }

@@ -6,6 +6,7 @@ import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
 import com.healthassistant.workout.api.dto.UpdateWorkoutRequest;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import com.healthassistant.workout.api.dto.WorkoutMutationResponse;
+import com.healthassistant.workout.api.dto.WorkoutReprojectionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -177,6 +178,25 @@ class WorkoutController {
         log.info("Updating workout {} for device {}", sanitizeForLog(eventId), maskDeviceId(deviceId));
         WorkoutMutationResponse response = workoutFacade.updateWorkout(deviceId, eventId, request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reproject")
+    @Operation(
+            summary = "Reproject all workouts",
+            description = "Deletes all workout projections and re-projects from event log",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Reprojection completed successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<WorkoutReprojectionResponse> reprojectWorkouts(
+            @RequestHeader("X-Device-Id") String deviceId
+    ) {
+        validateDeviceId(deviceId);
+        log.info("Reprojection requested for device {}", maskDeviceId(deviceId));
+        return ResponseEntity.ok(workoutFacade.reprojectAllWorkouts(deviceId));
     }
 
     @ExceptionHandler(WorkoutNotFoundException.class)

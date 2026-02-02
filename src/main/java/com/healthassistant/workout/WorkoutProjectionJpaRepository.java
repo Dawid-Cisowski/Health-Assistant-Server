@@ -1,9 +1,11 @@
 package com.healthassistant.workout;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -43,12 +45,18 @@ interface WorkoutProjectionJpaRepository extends JpaRepository<WorkoutProjection
             @Param("endDate") LocalDate endDate
     );
 
+    @Modifying
+    @Transactional
     void deleteByDeviceId(String deviceId);
 
+    @Modifying
+    @Transactional
     void deleteByDeviceIdAndPerformedDate(String deviceId, LocalDate performedDate);
 
     Optional<WorkoutProjectionJpaEntity> findByEventId(String eventId);
 
+    @Modifying
+    @Transactional
     void deleteByEventId(String eventId);
 
     @Query("SELECT w FROM WorkoutProjectionJpaEntity w WHERE w.workoutId IN :workoutIds")
