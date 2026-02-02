@@ -36,7 +36,7 @@ repositories {
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.ai:spring-ai-bom:1.1.0")
+        mavenBom("org.springframework.ai:spring-ai-bom:1.1.2")
         mavenBom("org.springframework.modulith:spring-modulith-bom:1.3.1")
     }
 }
