@@ -166,10 +166,6 @@ class WeightImageExtractor {
             log.warn("Security: Suspicious patterns detected in bodyType field");
             throw new WeightExtractionException("Security: Suspicious patterns detected in AI response");
         }
-        if (containsSuspiciousPatterns(response.validationError())) {
-            log.warn("Security: Suspicious patterns detected in validationError field");
-            throw new WeightExtractionException("Security: Suspicious patterns detected in AI response");
-        }
     }
 
     private ExtractedWeightData transformToExtractedWeightData(AiWeightExtractionResponse response) {
