@@ -59,8 +59,9 @@ class BatchEventIngestionSpec extends BaseIntegrationSpec {
                         "exercises": [
                             {
                                 "name": "Bench Press",
+                                "orderInWorkout": 1,
                                 "sets": [
-                                    {"reps": 10, "weightKg": 60.0}
+                                    {"setNumber": 1, "reps": 10, "weightKg": 60.0, "isWarmup": false}
                                 ]
                             }
                         ]
