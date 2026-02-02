@@ -46,7 +46,7 @@ final class PromptInjectionPatterns {
 
     static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("[\\r\\n]{3,}");
 
-    static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cntrl}&&[^\t]]");
+    static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cntrl}&&[^\t\n\r]]");
 
     static final String FILTERED_PLACEHOLDER = "[filtered]";
 

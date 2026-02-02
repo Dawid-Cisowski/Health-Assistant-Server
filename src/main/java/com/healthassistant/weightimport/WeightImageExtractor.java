@@ -21,6 +21,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
+import static java.util.Locale.*;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -273,7 +275,7 @@ class WeightImageExtractor {
         if (contentType.equals("application/octet-stream")) {
             return "image/jpeg";
         }
-        return switch (contentType.toLowerCase()) {
+        return switch (contentType.toLowerCase(ROOT)) {
             case "image/jpeg", "image/jpg" -> "image/jpeg";
             case "image/png" -> "image/png";
             case "image/gif" -> "image/gif";
