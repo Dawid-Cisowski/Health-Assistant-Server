@@ -65,7 +65,8 @@ public record DailySummary(
 
     public record Workout(
         String workoutId,
-        String note
+        String note,
+        java.time.Instant performedAt
     ) {
     }
 
