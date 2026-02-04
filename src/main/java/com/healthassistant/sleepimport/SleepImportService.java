@@ -1,5 +1,8 @@
 package com.healthassistant.sleepimport;
 
+import com.healthassistant.config.ImageValidationUtils;
+import com.healthassistant.config.ImportConstants;
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.ExistingSleepInfo;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
@@ -17,12 +20,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -30,14 +31,6 @@ import java.util.UUID;
 @Slf4j
 class SleepImportService implements SleepImportFacade {
 
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg", "image/jpg", "image/png", "image/webp"
-    );
-    private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
-            "image/*", "application/octet-stream"
-    );
-    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
-    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final int HASH_PREFIX_LENGTH = 8;
 
     private final SleepImageExtractor imageExtractor;
@@ -46,16 +39,16 @@ class SleepImportService implements SleepImportFacade {
 
     @Override
     public SleepImportResponse importFromImage(MultipartFile image, DeviceId deviceId, Integer year) {
-        validateImage(image);
+        ImageValidationUtils.validateImage(image);
 
-        int effectiveYear = year != null ? year : LocalDate.now(POLAND_ZONE).getYear();
+        int effectiveYear = year != null ? year : LocalDate.now(ImportConstants.POLAND_ZONE).getYear();
 
         try {
             ExtractedSleepData extractedData = imageExtractor.extract(image, effectiveYear);
 
             if (!extractedData.isValid()) {
                 log.warn("Sleep extraction invalid for device {}: {}",
-                        deviceId.value(), extractedData.validationError());
+                        SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
                 return SleepImportResponse.failure(
                         "Could not extract valid sleep data: " + extractedData.validationError()
                 );
@@ -122,7 +115,7 @@ class SleepImportService implements SleepImportFacade {
                     : null;
 
             log.info("Successfully imported sleep {} for device {}: {}min, score={}, status={}, overwrote={}, tokens={}/{}",
-                    sleepId, deviceId.value(), extractedData.totalSleepMinutes(),
+                    sleepId, SecurityUtils.maskDeviceId(deviceId.value()), extractedData.totalSleepMinutes(),
                     extractedData.sleepScore(), sleepEventResult.status(), overwrote,
                     extractedData.promptTokens(), extractedData.completionTokens());
 
@@ -144,63 +137,8 @@ class SleepImportService implements SleepImportFacade {
             );
 
         } catch (SleepExtractionException e) {
-            log.warn("Sleep extraction failed for device {}: {}", deviceId.value(), e.getMessage());
+            log.warn("Sleep extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
             return SleepImportResponse.failure(e.getMessage());
-        }
-    }
-
-    private void validateImage(MultipartFile image) {
-        if (image.isEmpty()) {
-            throw new IllegalArgumentException("Image file is empty");
-        }
-
-        if (image.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("Image file exceeds maximum size of 10MB");
-        }
-
-        String contentType = image.getContentType();
-        if (contentType != null && ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            return;
-        }
-
-        if (contentType != null && GENERIC_IMAGE_TYPES.contains(contentType)) {
-            String detectedType = detectImageType(image);
-            if (detectedType != null && ALLOWED_CONTENT_TYPES.contains(detectedType)) {
-                log.debug("Detected image type {} from magic bytes (client sent {})", detectedType, contentType);
-                return;
-            }
-        }
-
-        throw new IllegalArgumentException(
-                "Invalid image type '" + contentType + "'. Allowed: JPEG, PNG, WebP"
-        );
-    }
-
-    private String detectImageType(MultipartFile image) {
-        try {
-            byte[] header = new byte[12];
-            int read = image.getInputStream().read(header);
-            if (read < 4) {
-                return null;
-            }
-
-            if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8 && header[2] == (byte) 0xFF) {
-                return "image/jpeg";
-            }
-
-            if (header[0] == (byte) 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
-                return "image/png";
-            }
-
-            if (read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
-                    && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) {
-                return "image/webp";
-            }
-
-            return null;
-        } catch (Exception e) {
-            log.warn("Failed to detect image type from magic bytes", e);
-            return null;
         }
     }
 

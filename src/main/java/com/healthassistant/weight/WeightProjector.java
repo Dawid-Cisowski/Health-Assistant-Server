@@ -1,5 +1,6 @@
 package com.healthassistant.weight;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ class WeightProjector {
             doSaveProjection(measurement);
         } catch (ObjectOptimisticLockingFailureException e) {
             log.warn("Version conflict for weight measurement {}/{}, retrying once",
-                    WeightSecurityUtils.maskDeviceId(measurement.deviceId()), measurement.date());
+                    SecurityUtils.maskDeviceId(measurement.deviceId()), measurement.date());
             doSaveProjection(measurement);
         }
     }

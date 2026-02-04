@@ -1,5 +1,6 @@
 package com.healthassistant.bodymeasurements;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ class BodyMeasurementsProjector {
             doSaveProjection(measurement);
         } catch (ObjectOptimisticLockingFailureException e) {
             log.warn("Version conflict for body measurement {}/{}, retrying once",
-                    BodyMeasurementsSecurityUtils.maskDeviceId(measurement.deviceId()), measurement.date());
+                    SecurityUtils.maskDeviceId(measurement.deviceId()), measurement.date());
             doSaveProjection(measurement);
         }
     }

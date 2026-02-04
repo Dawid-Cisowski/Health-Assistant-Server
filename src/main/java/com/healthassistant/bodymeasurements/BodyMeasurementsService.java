@@ -7,6 +7,7 @@ import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementSummaryResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyPart;
 import com.healthassistant.bodymeasurements.api.dto.BodyPartHistoryResponse;
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -235,7 +236,7 @@ class BodyMeasurementsService implements BodyMeasurementsFacade {
     @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
         log.debug("Deleting body measurement projections for device {} date {}",
-                BodyMeasurementsSecurityUtils.maskDeviceId(deviceId), date);
+                SecurityUtils.maskDeviceId(deviceId), date);
         repository.deleteByDeviceIdAndDate(deviceId, date);
     }
 

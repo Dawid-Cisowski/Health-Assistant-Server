@@ -1,5 +1,8 @@
 package com.healthassistant.mealimport;
 
+import com.healthassistant.config.ImageValidationUtils;
+import com.healthassistant.config.ImportConstants;
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
@@ -18,14 +21,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -33,13 +33,6 @@ import java.util.UUID;
 @Slf4j
 class MealImportService implements MealImportFacade {
 
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-        "image/jpeg", "image/jpg", "image/png", "image/webp"
-    );
-    private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
-        "image/*", "application/octet-stream"
-    );
-    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
     private static final long MAX_TOTAL_SIZE = 30L * 1024 * 1024;
     private static final int MAX_FILES_COUNT = 5;
 
@@ -55,7 +48,7 @@ class MealImportService implements MealImportFacade {
         validateInput(description, images);
 
         if (images != null && !images.isEmpty()) {
-            images.forEach(this::validateImage);
+            images.forEach(ImageValidationUtils::validateImage);
         }
 
         try {
@@ -63,7 +56,7 @@ class MealImportService implements MealImportFacade {
             ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
-                    deviceId.value(), extractedData.validationError());
+                    SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
                 return MealImportResponse.failure(
                     "Could not extract valid meal data: " + extractedData.validationError()
                 );
@@ -98,7 +91,7 @@ class MealImportService implements MealImportFacade {
                 : null;
 
             log.info("Successfully imported meal {} for device {}: {} ({} kcal), status={}, tokens: {}/{}",
-                mealId, deviceId.value(), extractedData.title(),
+                mealId, SecurityUtils.maskDeviceId(deviceId.value()), extractedData.title(),
                 extractedData.caloriesKcal(), eventResult.status(),
                 extractedData.promptTokens(), extractedData.completionTokens());
 
@@ -119,7 +112,7 @@ class MealImportService implements MealImportFacade {
             );
 
         } catch (MealExtractionException e) {
-            log.warn("Meal extraction failed for device {}: {}", deviceId.value(), e.getMessage());
+            log.warn("Meal extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
             return MealImportResponse.failure(e.getMessage());
         }
     }
@@ -144,61 +137,6 @@ class MealImportService implements MealImportFacade {
         }
     }
 
-    private void validateImage(MultipartFile image) {
-        if (image.isEmpty()) {
-            throw new IllegalArgumentException("Image file is empty");
-        }
-
-        if (image.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("Image file exceeds maximum size of 10MB");
-        }
-
-        String contentType = image.getContentType();
-        if (contentType != null && ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            return;
-        }
-
-        if (contentType != null && GENERIC_IMAGE_TYPES.contains(contentType)) {
-            String detectedType = detectImageType(image);
-            if (detectedType != null && ALLOWED_CONTENT_TYPES.contains(detectedType)) {
-                log.debug("Detected image type {} from magic bytes (client sent {})", detectedType, contentType);
-                return;
-            }
-        }
-
-        throw new IllegalArgumentException(
-            "Invalid image type '" + contentType + "'. Allowed: JPEG, PNG, WebP"
-        );
-    }
-
-    private String detectImageType(MultipartFile image) {
-        try (InputStream is = image.getInputStream()) {
-            byte[] header = new byte[12];
-            int read = is.read(header);
-            if (read < 4) {
-                return null;
-            }
-
-            if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8 && header[2] == (byte) 0xFF) {
-                return "image/jpeg";
-            }
-
-            if (header[0] == (byte) 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
-                return "image/png";
-            }
-
-            if (read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
-                && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) {
-                return "image/webp";
-            }
-
-            return null;
-        } catch (IOException e) {
-            log.warn("Failed to detect image type from magic bytes", e);
-            return null;
-        }
-    }
-
     private String generateMealId() {
         return "meal-" + UUID.randomUUID().toString().substring(0, 12);
     }
@@ -209,7 +147,7 @@ class MealImportService implements MealImportFacade {
         validateInput(description, images);
 
         if (images != null && !images.isEmpty()) {
-            images.forEach(this::validateImage);
+            images.forEach(ImageValidationUtils::validateImage);
         }
 
         try {
@@ -217,7 +155,7 @@ class MealImportService implements MealImportFacade {
             ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
-                    deviceId.value(), extractedData.validationError());
+                    SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
                 return MealDraftResponse.failure(
                     "Could not extract valid meal data: " + extractedData.validationError()
                 );
@@ -247,13 +185,13 @@ class MealImportService implements MealImportFacade {
             draft = draftRepository.save(draft);
 
             log.info("Created meal draft {} for device {}: {} ({} kcal), confidence={}",
-                draft.getId(), deviceId.value(), draft.getTitle(),
+                draft.getId(), SecurityUtils.maskDeviceId(deviceId.value()), draft.getTitle(),
                 draft.getCaloriesKcal(), draft.getConfidence());
 
             return mapToResponse(draft);
 
         } catch (MealExtractionException e) {
-            log.warn("Meal extraction failed for device {}: {}", deviceId.value(), e.getMessage());
+            log.warn("Meal extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
             return MealDraftResponse.failure(e.getMessage());
         }
     }
@@ -308,7 +246,7 @@ class MealImportService implements MealImportFacade {
         draft.applyUpdate(request);
         draft = draftRepository.save(draft);
 
-        log.info("Updated meal draft {} for device {}", draftId, deviceId.value());
+        log.info("Updated meal draft {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId.value()));
 
         return mapToResponse(draft);
     }
@@ -385,7 +323,7 @@ class MealImportService implements MealImportFacade {
             : null;
 
         log.info("Confirmed meal draft {} as meal {} for device {}: {} ({} kcal)",
-            draftId, mealId, deviceId.value(), draft.getTitle(), draft.getCaloriesKcal());
+            draftId, mealId, SecurityUtils.maskDeviceId(deviceId.value()), draft.getTitle(), draft.getCaloriesKcal());
 
         return MealImportResponse.success(
             mealId,

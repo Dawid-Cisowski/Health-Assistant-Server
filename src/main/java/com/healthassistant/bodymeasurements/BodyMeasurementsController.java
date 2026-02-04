@@ -7,6 +7,7 @@ import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementSummaryResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyPart;
 import com.healthassistant.bodymeasurements.api.dto.BodyPartHistoryResponse;
+import com.healthassistant.config.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -43,7 +44,7 @@ class BodyMeasurementsController {
     ResponseEntity<BodyMeasurementLatestResponse> getLatest(
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.debug("Retrieving latest body measurement for device {}", BodyMeasurementsSecurityUtils.maskDeviceId(deviceId));
+        log.debug("Retrieving latest body measurement for device {}", SecurityUtils.maskDeviceId(deviceId));
         return bodyMeasurementsFacade.getLatestMeasurement(deviceId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -74,7 +75,7 @@ class BodyMeasurementsController {
         LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
 
         log.debug("Retrieving body measurement range summary for device {} from {} to {}",
-                BodyMeasurementsSecurityUtils.maskDeviceId(deviceId), startDate, effectiveEndDate);
+                SecurityUtils.maskDeviceId(deviceId), startDate, effectiveEndDate);
         BodyMeasurementRangeSummaryResponse summary = bodyMeasurementsFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
@@ -94,7 +95,7 @@ class BodyMeasurementsController {
             @PathVariable String measurementId,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.debug("Retrieving body measurement {} for device {}", measurementId, BodyMeasurementsSecurityUtils.maskDeviceId(deviceId));
+        log.debug("Retrieving body measurement {} for device {}", measurementId, SecurityUtils.maskDeviceId(deviceId));
         return bodyMeasurementsFacade.getMeasurementById(deviceId, measurementId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -113,7 +114,7 @@ class BodyMeasurementsController {
     ResponseEntity<BodyMeasurementSummaryResponse> getSummary(
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.debug("Retrieving body measurement summary for device {}", BodyMeasurementsSecurityUtils.maskDeviceId(deviceId));
+        log.debug("Retrieving body measurement summary for device {}", SecurityUtils.maskDeviceId(deviceId));
         return ResponseEntity.ok(bodyMeasurementsFacade.getSummary(deviceId));
     }
 
@@ -143,7 +144,7 @@ class BodyMeasurementsController {
         try {
             part = BodyPart.fromValue(bodyPart);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid body part: {}", BodyMeasurementsSecurityUtils.sanitizeForLog(bodyPart));
+            log.warn("Invalid body part: {}", SecurityUtils.sanitizeForLog(bodyPart));
             return ResponseEntity.badRequest().build();
         }
 
@@ -151,7 +152,7 @@ class BodyMeasurementsController {
         LocalDate effectiveTo = to.isAfter(today) ? today : to;
 
         log.debug("Retrieving {} history for device {} from {} to {}",
-                BodyMeasurementsSecurityUtils.sanitizeForLog(bodyPart), BodyMeasurementsSecurityUtils.maskDeviceId(deviceId), from, effectiveTo);
+                SecurityUtils.sanitizeForLog(bodyPart), SecurityUtils.maskDeviceId(deviceId), from, effectiveTo);
         BodyPartHistoryResponse history = bodyMeasurementsFacade.getBodyPartHistory(deviceId, part, from, effectiveTo);
         return ResponseEntity.ok(history);
     }
