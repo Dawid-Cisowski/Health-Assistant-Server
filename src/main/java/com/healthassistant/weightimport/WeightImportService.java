@@ -1,5 +1,8 @@
 package com.healthassistant.weightimport;
 
+import com.healthassistant.config.ImageValidationUtils;
+import com.healthassistant.config.ImportConstants;
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
@@ -13,12 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.MessageDigest;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -26,15 +26,7 @@ import java.util.UUID;
 @Slf4j
 class WeightImportService implements WeightImportFacade {
 
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg", "image/jpg", "image/png", "image/webp"
-    );
-    private static final Set<String> GENERIC_IMAGE_TYPES = Set.of(
-            "image/*", "application/octet-stream"
-    );
-    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
     private static final int MAX_IMAGES = 5;
-    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final int HASH_PREFIX_LENGTH = 8;
 
     private final WeightImageExtractor imageExtractor;
@@ -50,7 +42,7 @@ class WeightImportService implements WeightImportFacade {
 
             if (!extractedData.isValid()) {
                 log.warn("Weight extraction invalid for device {}: {}",
-                        WeightImportSecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
+                        SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
                 return WeightImportResponse.failure(mapToSafeErrorMessage(extractedData.validationError()));
             }
 
@@ -86,7 +78,7 @@ class WeightImportService implements WeightImportFacade {
             boolean overwrote = eventResult.status() == StoreHealthEventsResult.EventStatus.duplicate;
 
             log.info("Successfully imported weight {} for device {}: {}kg, score={}, BMI={}, status={}, overwrote={}",
-                    measurementId, WeightImportSecurityUtils.maskDeviceId(deviceId.value()), extractedData.weightKg(),
+                    measurementId, SecurityUtils.maskDeviceId(deviceId.value()), extractedData.weightKg(),
                     extractedData.score(), extractedData.bmi(), eventResult.status(), overwrote);
 
             return WeightImportResponse.success(
@@ -110,7 +102,7 @@ class WeightImportService implements WeightImportFacade {
 
         } catch (WeightExtractionException e) {
             log.warn("Weight extraction failed for device {}: {}",
-                    WeightImportSecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
+                    SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
             return WeightImportResponse.failure(mapToSafeErrorMessage(e.getMessage()));
         }
     }
@@ -124,62 +116,7 @@ class WeightImportService implements WeightImportFacade {
             throw new IllegalArgumentException("Maximum " + MAX_IMAGES + " images allowed");
         }
 
-        images.forEach(this::validateSingleImage);
-    }
-
-    private void validateSingleImage(MultipartFile image) {
-        if (image.isEmpty()) {
-            throw new IllegalArgumentException("Image file is empty");
-        }
-
-        if (image.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("Image file exceeds maximum size of 10MB");
-        }
-
-        String contentType = image.getContentType();
-        if (contentType != null && ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            return;
-        }
-
-        if (contentType != null && GENERIC_IMAGE_TYPES.contains(contentType)) {
-            String detectedType = detectImageType(image);
-            if (detectedType != null && ALLOWED_CONTENT_TYPES.contains(detectedType)) {
-                log.debug("Detected image type {} from magic bytes (client sent {})", detectedType, contentType);
-                return;
-            }
-        }
-
-        throw new IllegalArgumentException(
-                "Invalid image type '" + contentType + "'. Allowed: JPEG, PNG, WebP"
-        );
-    }
-
-    private String detectImageType(MultipartFile image) {
-        try {
-            byte[] header = new byte[12];
-            int read = image.getInputStream().read(header);
-            if (read < 4) {
-                return null;
-            }
-
-            if (header[0] == (byte) 0xFF && header[1] == (byte) 0xD8 && header[2] == (byte) 0xFF) {
-                return "image/jpeg";
-            }
-
-            if (header[0] == (byte) 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) {
-                return "image/png";
-            }
-
-            if (read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
-                    && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) {
-                return "image/webp";
-            }
-
-            return null;
-        } catch (Exception e) {
-            log.warn("Failed to detect image type from magic bytes", e);
-            return null;
-        }
+        images.forEach(ImageValidationUtils::validateImage);
     }
 
     private IdempotencyKey generateIdempotencyKey(DeviceId deviceId, ExtractedWeightData data) {
@@ -216,19 +153,19 @@ class WeightImportService implements WeightImportFacade {
             return "Failed to extract weight data";
         }
         String lowerMessage = errorMessage.toLowerCase(java.util.Locale.ROOT);
-        if (errorMessage.contains("empty response")) {
+        if (lowerMessage.contains("empty response")) {
             return "AI processing failed";
         }
         if (lowerMessage.contains("confidence")) {
             return "Low confidence in extracted data";
         }
-        if (lowerMessage.contains("not a weight") || errorMessage.contains("isWeightScreenshot")) {
+        if (lowerMessage.contains("not a weight") || lowerMessage.contains("isweightscreenshot")) {
             return "Image does not appear to be a weight measurement";
         }
         if (lowerMessage.contains("security") || lowerMessage.contains("suspicious")) {
             return "Security validation failed";
         }
-        if (errorMessage.contains("required but not found")) {
+        if (lowerMessage.contains("required but not found")) {
             return "Could not find required weight data in image";
         }
         return "Failed to process image";

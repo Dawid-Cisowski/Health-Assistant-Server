@@ -1,5 +1,6 @@
 package com.healthassistant.weight;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.weight.api.WeightFacade;
 import com.healthassistant.weight.api.dto.WeightLatestResponse;
@@ -173,7 +174,7 @@ class WeightService implements WeightFacade {
     @Override
     @Transactional
     public void deleteProjectionsForDate(String deviceId, LocalDate date) {
-        log.debug("Deleting weight projections for device {} date {}", WeightSecurityUtils.maskDeviceId(deviceId), date);
+        log.debug("Deleting weight projections for device {} date {}", SecurityUtils.maskDeviceId(deviceId), date);
         repository.deleteByDeviceIdAndDate(deviceId, date);
     }
 

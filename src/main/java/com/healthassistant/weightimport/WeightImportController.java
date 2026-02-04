@@ -1,5 +1,6 @@
 package com.healthassistant.weightimport;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.weightimport.api.WeightImportFacade;
 import com.healthassistant.weightimport.api.dto.WeightImportResponse;
@@ -46,7 +47,7 @@ class WeightImportController {
             @RequestAttribute("deviceId") String deviceId
     ) {
         log.info("Weight image import request from device {}, images count: {}, total size: {} bytes",
-                WeightImportSecurityUtils.maskDeviceId(deviceId),
+                SecurityUtils.maskDeviceId(deviceId),
                 images.size(),
                 images.stream().mapToLong(MultipartFile::getSize).sum());
 
@@ -56,7 +57,7 @@ class WeightImportController {
             );
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid images from device {}: {}", WeightImportSecurityUtils.maskDeviceId(deviceId), e.getMessage());
+            log.warn("Invalid images from device {}: {}", SecurityUtils.maskDeviceId(deviceId), e.getMessage());
             return ResponseEntity.badRequest().body(WeightImportResponse.failure(e.getMessage()));
         }
     }

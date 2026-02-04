@@ -1,5 +1,6 @@
 package com.healthassistant.weight;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.weight.api.WeightFacade;
 import com.healthassistant.weight.api.dto.WeightLatestResponse;
 import com.healthassistant.weight.api.dto.WeightMeasurementResponse;
@@ -40,7 +41,7 @@ class WeightController {
     ResponseEntity<WeightLatestResponse> getLatest(
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving latest weight measurement for device {}", WeightSecurityUtils.maskDeviceId(deviceId));
+        log.info("Retrieving latest weight measurement for device {}", SecurityUtils.maskDeviceId(deviceId));
         return weightFacade.getLatestMeasurement(deviceId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -71,7 +72,7 @@ class WeightController {
         LocalDate effectiveEndDate = endDate.isAfter(today) ? today : endDate;
 
         log.info("Retrieving weight range summary for device {} from {} to {}",
-                WeightSecurityUtils.maskDeviceId(deviceId), startDate, effectiveEndDate);
+                SecurityUtils.maskDeviceId(deviceId), startDate, effectiveEndDate);
         WeightRangeSummaryResponse summary = weightFacade.getRangeSummary(deviceId, startDate, effectiveEndDate);
         return ResponseEntity.ok(summary);
     }
@@ -91,7 +92,7 @@ class WeightController {
             @PathVariable String measurementId,
             @RequestHeader("X-Device-Id") String deviceId
     ) {
-        log.info("Retrieving weight measurement {} for device {}", measurementId, WeightSecurityUtils.maskDeviceId(deviceId));
+        log.info("Retrieving weight measurement {} for device {}", measurementId, SecurityUtils.maskDeviceId(deviceId));
         return weightFacade.getMeasurementById(deviceId, measurementId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
