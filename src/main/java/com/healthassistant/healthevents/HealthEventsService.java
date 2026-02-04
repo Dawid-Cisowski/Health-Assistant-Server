@@ -29,6 +29,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -83,13 +86,17 @@ class HealthEventsService implements HealthEventsFacade {
 
         StoreHealthEventsResult result = commandHandler.handle(command);
 
-        if (!result.affectedDates().isEmpty()) {
-            publishTypedEvents(result);
-        }
-
-        if (!result.compensationTargets().isEmpty()) {
-            publishCompensationEvents(result, command.deviceId().value());
-        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                if (!result.affectedDates().isEmpty()) {
+                    publishTypedEvents(result);
+                }
+                if (!result.compensationTargets().isEmpty()) {
+                    publishCompensationEvents(result, command.deviceId().value());
+                }
+            }
+        });
 
         return result;
     }
