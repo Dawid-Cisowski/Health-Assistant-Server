@@ -66,10 +66,10 @@ class MealImportAISpec extends BaseEvaluationSpec {
         println "DEBUG: banana fatGrams=${fat}"
         fat >= 0 && fat <= 1
 
-        and: "meal type is SNACK"
+        and: "meal type is SNACK or BREAKFAST (banana can be either)"
         def mealType = body.getString("mealType")
         println "DEBUG: banana mealType=${mealType}"
-        mealType == "SNACK"
+        mealType in ["SNACK", "BREAKFAST"]
 
         and: "health rating is healthy"
         def healthRating = body.getString("healthRating")

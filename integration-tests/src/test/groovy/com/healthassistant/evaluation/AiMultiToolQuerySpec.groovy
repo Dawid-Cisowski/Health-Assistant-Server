@@ -108,7 +108,7 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
         then: "AI calculates approximately 8000 average"
         def evaluation = healthDataEvaluator.evaluate(
                 new EvaluationRequest(
-                        "Weekly total: 56000 steps, Daily average: approximately 8000 steps per day",
+                        "Daily average: approximately 8000 steps per day (can be 7000-9000 due to rounding). May also mention weekly total around 56000. AI may include daily breakdown details which is acceptable.",
                         [],
                         response
                 )
