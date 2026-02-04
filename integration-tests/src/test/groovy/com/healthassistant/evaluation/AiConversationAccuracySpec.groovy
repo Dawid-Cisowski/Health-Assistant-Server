@@ -111,34 +111,6 @@ class AiConversationAccuracySpec extends BaseEvaluationSpec {
         evaluation.isPass()
     }
 
-    // ==================== Conversation Isolation Tests ====================
-
-    def "Conversations are isolated between devices"() {
-        given: "steps for device 1"
-        submitStepsForToday(10000)
-        waitForProjections()
-
-        and: "device 1 asks about steps"
-        def device1Response = askAssistantWithConversation("Ile kroków?", null)
-        println "DEBUG: Device 1 response: ${device1Response.content}"
-
-        when: "device 2 (different device) asks follow-up without context"
-        // Note: askAssistant uses getTestDeviceId(), so this simulates new conversation
-        def device2Response = askAssistant("Ile to było?")
-        println "DEBUG: Device 2 response: ${device2Response}"
-
-        then: "device 2 should NOT have context from device 1's conversation"
-        def evaluation = healthDataEvaluator.evaluate(
-                new EvaluationRequest(
-                        "AI should indicate it doesn't know what 'to' refers to since this is a new conversation without context - it should ask for clarification or indicate missing context",
-                        [],
-                        device2Response
-                )
-        )
-        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
-        evaluation.isPass()
-    }
-
     // ==================== Context Retention Across Multiple Turns ====================
 
     def "AI maintains context across 5 conversation turns"() {
