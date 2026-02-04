@@ -1,5 +1,7 @@
 package com.healthassistant.assistant;
 
+import com.healthassistant.bodymeasurements.api.BodyMeasurementsFacade;
+import com.healthassistant.bodymeasurements.api.dto.BodyPart;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.sleep.api.SleepFacade;
@@ -8,6 +10,7 @@ import com.healthassistant.weight.api.WeightFacade;
 import com.healthassistant.workout.api.WorkoutFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -22,6 +25,8 @@ import java.time.temporal.ChronoUnit;
 @ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
 class HealthTools {
 
+    static final String TOOL_CONTEXT_DEVICE_ID = "deviceId";
+
     private static final int MAX_DATE_RANGE_DAYS = 365;
     private static final int MAX_HISTORICAL_YEARS = 5;
 
@@ -31,12 +36,13 @@ class HealthTools {
     private final DailySummaryFacade dailySummaryFacade;
     private final MealsFacade mealsFacade;
     private final WeightFacade weightFacade;
+    private final BodyMeasurementsFacade bodyMeasurementsFacade;
 
     @Tool(name = "getStepsData",
           description = "Retrieves user's step data for the given date range. Returns step count, distance, active hours and minutes. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getStepsData(String startDate, String endDate) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getStepsData(String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching steps data for device {} from {} to {}", deviceId, startDate, endDate);
 
         return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
@@ -49,8 +55,8 @@ class HealthTools {
     @Tool(name = "getSleepData",
           description = "Retrieves user's sleep data for the given date range. Returns information about sleep duration, quality and sleep sessions. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getSleepData(String startDate, String endDate) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getSleepData(String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching sleep data for device {} from {} to {}", deviceId, startDate, endDate);
 
         return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
@@ -63,8 +69,8 @@ class HealthTools {
     @Tool(name = "getWorkoutData",
           description = "Retrieves user's strength training data for the given date range. Returns a list of workouts with exercises, sets and volume. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getWorkoutData(String startDate, String endDate) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getWorkoutData(String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching workout data for device {} from {} to {}", deviceId, startDate, endDate);
 
         return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
@@ -78,8 +84,8 @@ class HealthTools {
           description = "Retrieves complete daily summary for a SINGLE day. Contains all data: activity (steps, calories), sleep, heart rate, meals and workouts. " +
                         "Use getDailySummaryRange for multi-day queries (last week, last month). " +
                         "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getDailySummary(String date) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getDailySummary(String date, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching daily summary for device {} for date {}", deviceId, date);
 
         return validateAndExecuteSingleDateQuery(date, localDate -> {
@@ -106,8 +112,8 @@ class HealthTools {
                         "Returns totals and averages for: active calories burned, steps, distance, sleep, heart rate, meals. " +
                         "USE THIS for questions about 'last week', 'last month', or any multi-day period. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getDailySummaryRange(String startDate, String endDate) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getDailySummaryRange(String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching daily summary range for device {} from {} to {}", deviceId, startDate, endDate);
 
         return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
@@ -120,8 +126,8 @@ class HealthTools {
     @Tool(name = "getMealsData",
           description = "Retrieves user's meal data for the given date range. Returns information about calories, macronutrients (protein, fat, carbohydrates), meal types and health ratings. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getMealsData(String startDate, String endDate) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getMealsData(String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching meals data for device {} from {} to {}", deviceId, startDate, endDate);
 
         return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
@@ -135,8 +141,8 @@ class HealthTools {
           description = "Retrieves user's weight and body composition data for the given date range. " +
                         "Returns weight, BMI, body fat %, muscle %, hydration, bone mass, BMR, visceral fat level, metabolic age, and trend analysis. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getWeightData(String startDate, String endDate) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getWeightData(String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching weight data for device {} from {} to {}", deviceId, startDate, endDate);
 
         return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
@@ -146,13 +152,53 @@ class HealthTools {
         });
     }
 
+    @Tool(name = "getBodyMeasurementsData",
+          description = "Retrieves user's body measurements data (dimensions like biceps, waist, chest, thighs, etc.) for the given date range. " +
+                        "Returns measurements in centimeters with changes vs previous measurements. " +
+                        "Use this for questions about: body dimensions, muscle growth, circumference changes, tape measurements. " +
+                        "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
+    public Object getBodyMeasurementsData(String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Fetching body measurements data for device {} from {} to {}", deviceId, startDate, endDate);
+
+        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+            var result = bodyMeasurementsFacade.getRangeSummary(deviceId, start, end);
+            log.info("Body measurements data fetched: {} measurements over {} days", result.measurementCount(), result.daysWithData());
+            return result;
+        });
+    }
+
+    @Tool(name = "getBodyPartHistory",
+          description = "Retrieves measurement history for a SPECIFIC body part for charting/trend analysis. " +
+                        "Returns time-series data points with min, max, change, and change percentage. " +
+                        "Use this for questions like: 'How have my biceps grown?', 'Show my waist trend', 'Has my chest size increased?'. " +
+                        "PARAMETERS: bodyPart must be one of: biceps-left, biceps-right, forearm-left, forearm-right, chest, waist, abdomen, hips, neck, shoulders, thigh-left, thigh-right, calf-left, calf-right. " +
+                        "startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
+    public Object getBodyPartHistory(String bodyPart, String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Fetching body part history for {} from {} to {}", bodyPart, startDate, endDate);
+
+        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+            BodyPart part;
+            try {
+                part = BodyPart.fromValue(bodyPart);
+            } catch (IllegalArgumentException e) {
+                return new ToolError("Invalid body part: '" + bodyPart + "'. Valid options: biceps-left, biceps-right, forearm-left, forearm-right, chest, waist, abdomen, hips, neck, shoulders, thigh-left, thigh-right, calf-left, calf-right");
+            }
+
+            var result = bodyMeasurementsFacade.getBodyPartHistory(deviceId, part, start, end);
+            log.info("Body part history fetched: {} data points", result.dataPoints().size());
+            return result;
+        });
+    }
+
     @Tool(name = "getEnergyRequirements",
           description = "Retrieves user's daily energy requirements and macro targets for a specific date. " +
                         "Returns target calories, protein/fat/carbs targets, already consumed amounts, and remaining to eat. " +
                         "Use this to answer questions about: recommended calories, macro goals, how much more to eat, nutrition targets. " +
                         "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
-    public Object getEnergyRequirements(String date) {
-        var deviceId = AssistantContext.getDeviceId();
+    public Object getEnergyRequirements(String date, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
         log.info("Fetching energy requirements for device {} for date {}", deviceId, date);
 
         return validateAndExecuteSingleDateQuery(date, localDate -> {
@@ -278,6 +324,17 @@ class HealthTools {
     @FunctionalInterface
     private interface SingleDateQuery<T> {
         T execute(LocalDate date);
+    }
+
+    private String getDeviceId(ToolContext toolContext) {
+        if (toolContext == null || toolContext.getContext() == null) {
+            throw new IllegalStateException("ToolContext or context map is null - deviceId not available");
+        }
+        var deviceId = toolContext.getContext().get(TOOL_CONTEXT_DEVICE_ID);
+        if (deviceId == null) {
+            throw new IllegalStateException("deviceId not found in ToolContext");
+        }
+        return (String) deviceId;
     }
 
     record ToolError(String message) {}

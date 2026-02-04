@@ -102,7 +102,7 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
         waitForProjections()
 
         when: "asking about weekly average"
-        def response = askAssistant("Jaka była moja średnia dzienna ilość kroków w tym tygodniu?")
+        def response = askAssistant("Jaka była moja średnia dzienna ilość kroków w ostatnich 7 dniach?")
         println "DEBUG: AI response: $response"
 
         then: "AI calculates approximately 8000 average"

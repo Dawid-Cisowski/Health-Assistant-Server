@@ -185,7 +185,7 @@ class AiHallucinationSpec extends BaseEvaluationSpec {
         println "DEBUG: Steps facade returned for ${weekStart} to ${today}: totalSteps=${stepsData.totalSteps()}"
 
         when: "asking about this week's steps"
-        def response = askAssistant("How many steps did I take this week?")
+        def response = askAssistant("How many steps did I take in the last 7 days?")
         println "DEBUG: AI response: $response"
 
         then: "AI returns approximately 19000 steps (5000+8000+6000)"

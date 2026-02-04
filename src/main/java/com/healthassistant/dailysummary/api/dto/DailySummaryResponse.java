@@ -103,7 +103,11 @@ public record DailySummaryResponse(
 
         @JsonProperty("note")
         @Schema(description = "Workout note/description", example = "Plecy i biceps", nullable = true)
-        String note
+        String note,
+
+        @JsonProperty("performedAt")
+        @Schema(description = "Time when workout was performed (ISO-8601 UTC)", example = "2025-11-19T10:30:00Z", nullable = true)
+        Instant performedAt
     ) {}
 
     @Schema(description = "Sleep session information")

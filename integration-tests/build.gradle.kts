@@ -142,7 +142,7 @@ tasks.register<Test>("evaluationTest") {
     // Longer timeout for LLM inference
     timeout.set(Duration.ofMinutes(10))
 
-    // Enable parallel test execution (limited to 2 to avoid Gemini API rate limiting)
+    // Enable parallel test execution (limited to avoid Gemini API rate limiting)
     maxParallelForks = 10
 
     // JVM args for parallel execution
@@ -186,7 +186,7 @@ tasks.register<Test>("benchmarkTest") {
     // Longer timeout for LLM inference
     timeout.set(Duration.ofMinutes(15))
 
-    // Run sequentially to get accurate timing measurements
+    // Enable parallel test execution
     maxParallelForks = 10
 
     // JVM args

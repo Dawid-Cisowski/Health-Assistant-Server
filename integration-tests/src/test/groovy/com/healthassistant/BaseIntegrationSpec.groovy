@@ -1,6 +1,7 @@
 package com.healthassistant
 
 import com.healthassistant.activity.api.ActivityFacade
+import com.healthassistant.bodymeasurements.api.BodyMeasurementsFacade
 import com.healthassistant.calories.api.CaloriesFacade
 import com.healthassistant.dailysummary.api.DailySummaryFacade
 import com.healthassistant.healthevents.api.HealthEventsFacade
@@ -88,6 +89,9 @@ abstract class BaseIntegrationSpec extends Specification {
     @Autowired
     HeartRateFacade heartRateFacade
 
+    @Autowired
+    BodyMeasurementsFacade bodyMeasurementsFacade
+
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("test_db")
@@ -136,6 +140,8 @@ abstract class BaseIntegrationSpec extends Specification {
             "test-pr",
             // Weight specs
             "test-weight", "test-weight-valid",
+            // Body measurements specs
+            "test-body-meas", "test-body-meas-valid",
             // Energy requirements specs
             "test-energy",
             // Guardrail specs
@@ -942,6 +948,7 @@ abstract class BaseIntegrationSpec extends Specification {
             dailySummaryFacade.deleteSummaryForDate(deviceId, date)
             weightFacade.deleteProjectionsForDate(deviceId, date)
             heartRateFacade.deleteProjectionsForDate(deviceId, date)
+            bodyMeasurementsFacade.deleteProjectionsForDate(deviceId, date)
         }
     }
 

@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -158,8 +159,6 @@ class AssistantService implements AssistantFacade {
         log.info("Processing streaming chat request for device {}: {} (conversationId: {})",
                 maskDeviceId(deviceId), sanitizeForLog(request.message()), request.conversationId());
 
-        AssistantContext.setDeviceId(deviceId);
-
         return Mono.fromCallable(() -> {
                     var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
                     var history = conversationService.loadConversationHistory(conversationId);
@@ -167,10 +166,9 @@ class AssistantService implements AssistantFacade {
                     var systemInstruction = buildSystemInstruction(currentDate);
                     var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
                     conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
-                    return new ConversationContext(conversationId, messages);
+                    return new ConversationContext(conversationId, messages, deviceId);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .contextCapture()
                 .flatMapMany(ctx -> {
                     // Use synchronous call() instead of stream() due to Spring AI 2.0.0-M2 bug
                     // where tool calling doesn't work properly with streaming.
@@ -179,6 +177,7 @@ class AssistantService implements AssistantFacade {
                     return Mono.fromCallable(() -> {
                                 var response = chatClient.prompt()
                                         .messages(ctx.messages())
+                                        .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
                                         .call()
                                         .chatResponse();
 
@@ -205,20 +204,11 @@ class AssistantService implements AssistantFacade {
                                     new DoneEvent(ctx.conversationId(), result.promptTokens(), result.completionTokens())
                             ))
                             .doOnError(error -> log.error("Error in chat call", error))
-                            .onErrorResume(error -> Flux.<AssistantEvent>just(createErrorEvent(error)))
-                            .doFinally(signal -> {
-                                AssistantContext.clear();
-                                log.debug("Cleared AssistantContext for device {}", maskDeviceId(deviceId));
-                            });
-                })
-                .contextCapture()
-                .doOnCancel(() -> {
-                    AssistantContext.clear();
-                    log.debug("Cleared AssistantContext on cancel for device {}", maskDeviceId(deviceId));
+                            .onErrorResume(error -> Flux.<AssistantEvent>just(createErrorEvent(error)));
                 });
     }
 
-    private record ConversationContext(UUID conversationId, List<Message> messages) {}
+    private record ConversationContext(UUID conversationId, List<Message> messages, String deviceId) {}
 
     private record ChatResult(String content, Long promptTokens, Long completionTokens) {}
 

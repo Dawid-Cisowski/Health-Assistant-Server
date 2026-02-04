@@ -18,6 +18,11 @@ import java.util.stream.IntStream;
 @Slf4j
 class EventValidator {
 
+    private static final String FIELD_BUCKET_START = "bucketStart";
+    private static final String FIELD_BUCKET_END = "bucketEnd";
+    private static final String FIELD_MEASURED_AT = "measuredAt";
+    private static final String ERROR_FUTURE_TIMESTAMP = "cannot be more than 5 minutes in the future";
+
     private final Validator validator;
     private final ObjectMapper objectMapper;
 
@@ -47,10 +52,10 @@ class EventValidator {
 
     private List<EventValidationError> validateDomainRules(EventPayload payload) {
         return switch (payload) {
-            case StepsPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), "bucketEnd", "bucketStart");
-            case DistanceBucketPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), "bucketEnd", "bucketStart");
-            case ActiveCaloriesPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), "bucketEnd", "bucketStart");
-            case ActiveMinutesPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), "bucketEnd", "bucketStart");
+            case StepsPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), FIELD_BUCKET_END, FIELD_BUCKET_START);
+            case DistanceBucketPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), FIELD_BUCKET_END, FIELD_BUCKET_START);
+            case ActiveCaloriesPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), FIELD_BUCKET_END, FIELD_BUCKET_START);
+            case ActiveMinutesPayload p -> validateTimeRange(p.bucketStart(), p.bucketEnd(), FIELD_BUCKET_END, FIELD_BUCKET_START);
             case HeartRatePayload p -> validateHeartRate(p);
             case RestingHeartRatePayload p -> validateRestingHeartRate(p);
             case SleepSessionPayload p -> validateTimeRange(p.sleepStart(), p.sleepEnd(), "sleepEnd", "sleepStart");
@@ -58,6 +63,7 @@ class EventValidator {
             case WorkoutPayload p -> validateWorkoutStructure(p);
             case MealRecordedPayload meal -> List.of();
             case WeightMeasurementPayload weight -> validateWeightMeasurement(weight);
+            case BodyMeasurementPayload body -> validateBodyMeasurement(body);
             case EventDeletedPayload p -> validateEventDeleted(p);
             case EventCorrectedPayload p -> validateEventCorrected(p);
         };
@@ -67,10 +73,60 @@ class EventValidator {
         List<EventValidationError> errors = new ArrayList<>();
 
         if (payload.measuredAt() != null && payload.measuredAt().isAfter(java.time.Instant.now().plusSeconds(300))) {
-            errors.add(EventValidationError.invalidValue("measuredAt", "cannot be more than 5 minutes in the future"));
+            errors.add(EventValidationError.invalidValue(FIELD_MEASURED_AT, ERROR_FUTURE_TIMESTAMP));
         }
 
         return errors;
+    }
+
+    private List<EventValidationError> validateBodyMeasurement(BodyMeasurementPayload payload) {
+        List<EventValidationError> errors = new ArrayList<>();
+
+        if (payload.measuredAt() != null && payload.measuredAt().isAfter(java.time.Instant.now().plusSeconds(300))) {
+            errors.add(EventValidationError.invalidValue(FIELD_MEASURED_AT, ERROR_FUTURE_TIMESTAMP));
+        }
+
+        // Validate notes field for dangerous content
+        if (payload.notes() != null) {
+            errors.addAll(validateNotesField(payload.notes()));
+        }
+
+        // At least one measurement must be provided
+        if (hasNoMeasurements(payload)) {
+            errors.add(EventValidationError.invalidValue("payload", "at least one body measurement must be provided"));
+        }
+
+        return errors;
+    }
+
+    private List<EventValidationError> validateNotesField(String notes) {
+        List<EventValidationError> errors = new ArrayList<>();
+
+        // Check for control characters (except space, tab is not allowed in notes)
+        if (notes.matches(".*[\\x00-\\x1F].*")) {
+            errors.add(EventValidationError.invalidValue("notes", "contains invalid control characters"));
+        }
+
+        return errors;
+    }
+
+    private boolean hasNoMeasurements(BodyMeasurementPayload payload) {
+        return java.util.stream.Stream.of(
+                payload.bicepsLeftCm(),
+                payload.bicepsRightCm(),
+                payload.forearmLeftCm(),
+                payload.forearmRightCm(),
+                payload.chestCm(),
+                payload.waistCm(),
+                payload.abdomenCm(),
+                payload.hipsCm(),
+                payload.neckCm(),
+                payload.shouldersCm(),
+                payload.thighLeftCm(),
+                payload.thighRightCm(),
+                payload.calfLeftCm(),
+                payload.calfRightCm()
+        ).allMatch(java.util.Objects::isNull);
     }
 
     @SuppressWarnings("PMD.UnusedFormalParameter")
@@ -129,7 +185,7 @@ class EventValidator {
 
     private List<EventValidationError> validateHeartRate(HeartRatePayload hr) {
         List<EventValidationError> errors = new ArrayList<>();
-        errors.addAll(validateTimeRange(hr.bucketStart(), hr.bucketEnd(), "bucketEnd", "bucketStart"));
+        errors.addAll(validateTimeRange(hr.bucketStart(), hr.bucketEnd(), FIELD_BUCKET_END, FIELD_BUCKET_START));
         errors.addAll(HeartRateStats.validate(hr.min(), hr.avg(), hr.max()));
         return errors;
     }
@@ -139,7 +195,7 @@ class EventValidator {
         List<EventValidationError> errors = new ArrayList<>();
 
         if (payload.measuredAt() != null && payload.measuredAt().isAfter(java.time.Instant.now().plusSeconds(300))) {
-            errors.add(EventValidationError.invalidValue("measuredAt", "cannot be more than 5 minutes in the future"));
+            errors.add(EventValidationError.invalidValue(FIELD_MEASURED_AT, ERROR_FUTURE_TIMESTAMP));
         }
 
         return errors;

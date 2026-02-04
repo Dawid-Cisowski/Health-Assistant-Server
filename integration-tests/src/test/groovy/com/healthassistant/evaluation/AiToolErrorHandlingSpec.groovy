@@ -118,7 +118,7 @@ class AiToolErrorHandlingSpec extends BaseEvaluationSpec {
         waitForProjections()
 
         when: "asking about weekly summary"
-        def response = askAssistant("Ile kroków zrobiłem w tym tygodniu?")
+        def response = askAssistant("Ile kroków zrobiłem w ostatnich 7 dniach?")
         println "DEBUG: Response: $response"
 
         then: "AI reports only the data that exists (~14000 steps from 2 days)"

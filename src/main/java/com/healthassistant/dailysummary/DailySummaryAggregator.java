@@ -192,7 +192,7 @@ class DailySummaryAggregator {
         }
 
         try {
-            return new Workout(workout.workoutId(), workout.note());
+            return new Workout(workout.workoutId(), workout.note(), workout.performedAt());
         } catch (Exception e) {
             log.warn("Failed to convert event to workout: {}", e.getMessage());
             return null;
