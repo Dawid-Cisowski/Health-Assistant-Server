@@ -142,8 +142,9 @@ tasks.register<Test>("evaluationTest") {
     // Longer timeout for LLM inference
     timeout.set(Duration.ofMinutes(10))
 
-    // Enable parallel test execution (limited to 2 to avoid Gemini API rate limiting)
-    maxParallelForks = 10
+    // Run sequentially to prevent AssistantContext device ID leaking between tests
+    // InheritableThreadLocal doesn't work well with thread pool reuse in parallel tests
+    maxParallelForks = 1
 
     // JVM args for parallel execution
     jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
@@ -186,8 +187,8 @@ tasks.register<Test>("benchmarkTest") {
     // Longer timeout for LLM inference
     timeout.set(Duration.ofMinutes(15))
 
-    // Run sequentially to get accurate timing measurements
-    maxParallelForks = 10
+    // Run sequentially for accurate timing and to prevent AssistantContext device ID leaking
+    maxParallelForks = 1
 
     // JVM args
     jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
