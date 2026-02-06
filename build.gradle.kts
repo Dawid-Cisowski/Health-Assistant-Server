@@ -1,5 +1,6 @@
 plugins {
     java
+    groovy
     jacoco
     id("org.springframework.boot") version "4.0.2"
     id("io.spring.dependency-management") version "1.1.7"
@@ -111,6 +112,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    testImplementation("org.spockframework:spock-core:2.4-groovy-5.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<Test> {
@@ -130,6 +133,15 @@ spotbugs {
 tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
     reports.create("html") { required = true }
     reports.create("xml") { required = false }
+}
+
+// Exclude Groovy test classes from SpotBugs and PMD (they don't analyze Groovy correctly)
+tasks.named<com.github.spotbugs.snom.SpotBugsTask>("spotbugsTest") {
+    classes = classes?.filter { !it.path.contains("/groovy/") }
+}
+
+tasks.named<Pmd>("pmdTest") {
+    source = source.matching { exclude("**/*.groovy") }
 }
 
 // PMD configuration
