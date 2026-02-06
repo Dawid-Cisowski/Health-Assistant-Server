@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -133,7 +132,7 @@ class AiHealthReportService {
 
         return dailySummaryFacade.getDailySummary(deviceId, date)
                 .map(summary -> {
-                    String dataContext = buildDailyDataContext(summary);
+                    String dataContext = summary.toAiDataContext(this::sanitizeForPrompt);
                     String report = callAi(DAILY_REPORT_SYSTEM_PROMPT,
                             "Generate a detailed health report for " + date + " based on this data:\n\n" + dataContext);
                     cacheReport(entity, report);
@@ -152,7 +151,7 @@ class AiHealthReportService {
             return AiHealthReportResponse.noData(startDate, endDate);
         }
 
-        String dataContext = buildRangeDataContext(rangeSummary, startDate, endDate);
+        String dataContext = rangeSummary.toAiDataContext(this::sanitizeForPrompt);
         String report = callAi(RANGE_REPORT_SYSTEM_PROMPT,
                 "Generate a detailed health report for the period " + startDate + " to " + endDate + " based on this data:\n\n" + dataContext);
 
@@ -204,130 +203,6 @@ class AiHealthReportService {
         } catch (Exception e) {
             log.error("Failed to generate AI report", e);
             throw new AiSummaryGenerationException("Failed to generate AI report", e);
-        }
-    }
-
-    private String buildDailyDataContext(DailySummary summary) {
-        StringBuilder sb = new StringBuilder();
-
-        var activity = summary.activity();
-        appendIfPositive(sb, "Steps", activity.steps());
-        appendIfPositive(sb, "Active minutes", activity.activeMinutes());
-        appendIfPositive(sb, "Active calories burned (kcal)", activity.activeCalories());
-        if (activity.distanceMeters() != null && activity.distanceMeters() > 0) {
-            sb.append("Distance: ").append(activity.distanceMeters()).append(" meters\n");
-        }
-
-        if (!summary.sleep().isEmpty()) {
-            int totalSleepMinutes = summary.sleep().stream()
-                    .mapToInt(s -> s.totalMinutes() != null ? s.totalMinutes() : 0)
-                    .sum();
-            sb.append("Sleep: ").append(totalSleepMinutes / 60).append("h ").append(totalSleepMinutes % 60).append("min\n");
-        }
-
-        if (!summary.workouts().isEmpty()) {
-            sb.append("Workouts: ").append(summary.workouts().size()).append("\n");
-            summary.workouts().stream()
-                    .filter(w -> w.note() != null && !w.note().isBlank())
-                    .map(w -> "  - " + sanitizeForPrompt(w.note()))
-                    .forEach(line -> sb.append(line).append("\n"));
-        }
-
-        var nutrition = summary.nutrition();
-        if (nutrition.mealCount() != null && nutrition.mealCount() > 0) {
-            sb.append("Meals: ").append(nutrition.mealCount()).append("\n");
-            appendIfPositive(sb, "  Calories (kcal)", nutrition.totalCalories());
-            appendIfPositive(sb, "  Protein (g)", nutrition.totalProtein());
-            appendIfPositive(sb, "  Fat (g)", nutrition.totalFat());
-            appendIfPositive(sb, "  Carbs (g)", nutrition.totalCarbs());
-        }
-
-        if (!summary.meals().isEmpty()) {
-            long healthyCount = summary.meals().stream()
-                    .filter(m -> "VERY_HEALTHY".equals(m.healthRating()) || "HEALTHY".equals(m.healthRating()))
-                    .count();
-            long unhealthyCount = summary.meals().stream()
-                    .filter(m -> "VERY_UNHEALTHY".equals(m.healthRating()) || "UNHEALTHY".equals(m.healthRating()))
-                    .count();
-            if (healthyCount > 0) sb.append("Healthy meals: ").append(healthyCount).append("\n");
-            if (unhealthyCount > 0) sb.append("Unhealthy meals: ").append(unhealthyCount).append("\n");
-        }
-
-        var heart = summary.heart();
-        appendIfPositive(sb, "Resting HR (bpm)", heart.restingBpm());
-        appendIfPositive(sb, "Average HR (bpm)", heart.avgBpm());
-        appendIfPositive(sb, "Max HR (bpm)", heart.maxBpm());
-
-        return sb.toString();
-    }
-
-    private String buildRangeDataContext(DailySummaryRangeSummaryResponse range, LocalDate startDate, LocalDate endDate) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Period: ").append(startDate).append(" to ").append(endDate).append("\n");
-        sb.append("Days with data: ").append(range.daysWithData()).append("\n\n");
-
-        var activity = range.activity();
-        if (activity != null) {
-            sb.append("--- ACTIVITY ---\n");
-            sb.append("Total steps: ").append(activity.totalSteps()).append("\n");
-            sb.append("Average steps/day: ").append(activity.averageSteps()).append("\n");
-            sb.append("Total active minutes: ").append(activity.totalActiveMinutes()).append("\n");
-            sb.append("Average active minutes/day: ").append(activity.averageActiveMinutes()).append("\n");
-            sb.append("Total calories burned: ").append(activity.totalActiveCalories()).append(" kcal\n");
-            sb.append("Average calories/day: ").append(activity.averageActiveCalories()).append(" kcal\n");
-            if (activity.totalDistanceMeters() != null && activity.totalDistanceMeters() > 0) {
-                sb.append("Total distance: ").append(activity.totalDistanceMeters()).append(" meters\n");
-                sb.append("Average distance/day: ").append(activity.averageDistanceMeters()).append(" meters\n");
-            }
-            sb.append("\n");
-        }
-
-        var sleep = range.sleep();
-        if (sleep != null && sleep.daysWithSleep() != null && sleep.daysWithSleep() > 0) {
-            sb.append("--- SLEEP ---\n");
-            sb.append("Average sleep: ").append(Optional.ofNullable(sleep.averageSleepMinutes()).map(m -> m / 60 + "h " + m % 60 + "min").orElse("N/A")).append("\n");
-            sb.append("Days with sleep data: ").append(sleep.daysWithSleep()).append("\n\n");
-        }
-
-        var nutrition = range.nutrition();
-        if (nutrition != null && nutrition.daysWithData() != null && nutrition.daysWithData() > 0) {
-            sb.append("--- NUTRITION ---\n");
-            sb.append("Average calories/day: ").append(nutrition.averageCalories()).append(" kcal\n");
-            sb.append("Average protein/day: ").append(nutrition.averageProtein()).append("g\n");
-            sb.append("Average fat/day: ").append(nutrition.averageFat()).append("g\n");
-            sb.append("Average carbs/day: ").append(nutrition.averageCarbs()).append("g\n");
-            sb.append("Average meals/day: ").append(nutrition.averageMealsPerDay()).append("\n");
-            sb.append("Days with nutrition data: ").append(nutrition.daysWithData()).append("\n\n");
-        }
-
-        var workouts = range.workouts();
-        if (workouts != null && workouts.totalWorkouts() != null && workouts.totalWorkouts() > 0) {
-            sb.append("--- WORKOUTS ---\n");
-            sb.append("Total workouts: ").append(workouts.totalWorkouts()).append("\n");
-            sb.append("Days with workouts: ").append(workouts.daysWithWorkouts()).append("\n");
-            if (workouts.workoutList() != null && !workouts.workoutList().isEmpty()) {
-                workouts.workoutList().stream()
-                        .map(w -> "  - " + w.date() + ": " + sanitizeForPrompt(Optional.ofNullable(w.note()).orElse("Workout")))
-                        .forEach(line -> sb.append(line).append("\n"));
-            }
-            sb.append("\n");
-        }
-
-        var heart = range.heart();
-        if (heart != null && heart.daysWithData() != null && heart.daysWithData() > 0) {
-            sb.append("--- HEART RATE ---\n");
-            if (heart.averageRestingBpm() != null) sb.append("Average resting HR: ").append(heart.averageRestingBpm()).append(" bpm\n");
-            if (heart.averageDailyBpm() != null) sb.append("Average daily HR: ").append(heart.averageDailyBpm()).append(" bpm\n");
-            if (heart.maxBpmOverall() != null) sb.append("Max HR: ").append(heart.maxBpmOverall()).append(" bpm\n");
-            sb.append("Days with HR data: ").append(heart.daysWithData()).append("\n");
-        }
-
-        return sb.toString();
-    }
-
-    private void appendIfPositive(StringBuilder sb, String label, Integer value) {
-        if (value != null && value > 0) {
-            sb.append(label).append(": ").append(value).append("\n");
         }
     }
 

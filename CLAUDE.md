@@ -497,10 +497,10 @@ return ResponseEntity.ok(sanitizedResponse);
 
 The codebase follows a modular architecture organized by feature/bounded context:
 
-**Package Structure** (21 modules verified by Spring Modulith):
+**Package Structure** (22 modules verified by Spring Modulith):
 - `appevents/` - App-facing health events submission API
 - `healthevents/` - Core event storage and management (event log, validation)
-- `dailysummary/` - Daily aggregated summaries from health events
+- `dailysummary/` - Daily aggregated summaries + AI health reports (daily/weekly/monthly)
 - `steps/` - Steps tracking projections and queries
 - `workout/` - Workout projections and queries
 - `workoutimport/` - Workout import from external sources
@@ -514,6 +514,7 @@ The codebase follows a modular architecture organized by feature/bounded context
 - `weightimport/` - Weight import from external sources
 - `heartrate/` - Heart rate projections (summary and resting HR)
 - `bodymeasurements/` - Body measurement projections (body fat, muscle mass, etc.)
+- `notifications/` - FCM push notifications (daily/weekly/monthly scheduled reports)
 - `guardrails/` - AI safety guardrails and content filtering
 - `googlefit/` - Google Fit synchronization and OAuth
 - `assistant/` - AI health assistant with Gemini integration (SSE streaming)
@@ -715,7 +716,8 @@ export NONCE_CACHE_TTL_SEC=600
 
 **Core Tables**:
 - `health_events` - Append-only event log (JSONB payload, GIN indexed)
-- `daily_summaries` - Aggregated daily metrics (JSONB summary, ai_summary_cache, device_id)
+- `daily_summaries` - Aggregated daily metrics (JSONB summary, ai_summary_cache, ai_report cache, device_id)
+- `fcm_tokens` - FCM push notification tokens (device_id → token mapping)
 - `conversations` - AI assistant conversation tracking
 - `conversation_messages` - Message history per conversation
 
@@ -732,7 +734,7 @@ export NONCE_CACHE_TTL_SEC=600
 - `meal_import_drafts` (AI-powered meal import)
 - `exercise_name_mappings` (maps exercise names to catalog IDs for statistics)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V44)
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V46)
 
 ---
 
@@ -821,9 +823,11 @@ open integration-tests/build/reports/tests/test/index.html
 - `GOOGLE_FIT_CLIENT_ID` - Google OAuth client ID (for historical sync)
 - `GOOGLE_FIT_CLIENT_SECRET` - Google OAuth client secret (for historical sync)
 - `GOOGLE_FIT_REFRESH_TOKEN` - Google OAuth refresh token (for historical sync)
+- `app.notifications.enabled` - Enable FCM push notifications (default: false)
+- `app.notifications.firebase-credentials` - Firebase credentials (file path, Base64 JSON, or omit for Application Default Credentials)
 
 ### Spring Features
-- `@EnableScheduling` - Google Fit sync scheduled tasks
+- `@EnableScheduling` - Google Fit sync + notification cron jobs
 - `@EnableCaching` - Caffeine cache for nonce replay protection
 - `@EnableFeignClients` - Google Fit API client
 - `@EnableJpaRepositories` - Spring Data JPA
@@ -834,7 +838,7 @@ open integration-tests/build/reports/tests/test/index.html
 - **SpotBugs**: Static analysis (`./gradlew spotbugsMain`, config: `config/spotbugs/exclude.xml`)
 - **PMD**: Code style checking (`./gradlew pmdMain`, config: `config/pmd/ruleset.xml`)
 - **JaCoCo**: Code coverage (`./gradlew jacocoTestReport`, reports in `build/reports/jacoco/`)
-- **Modularity Tests**: `ModularityTests.java` verifies module boundaries (20 modules)
+- **Modularity Tests**: `ModularityTests.java` verifies module boundaries (22 modules)
 
 ---
 
@@ -851,6 +855,12 @@ open integration-tests/build/reports/tests/test/index.html
 ### Daily Summaries
 - `GET /v1/daily-summaries/{date}` - Get daily summary (HMAC auth required)
 - `GET /v1/daily-summaries/range?from={date}&to={date}` - Get daily summary range (HMAC auth required)
+- `GET /v1/daily-summaries/{date}/ai-report` - AI-generated detailed daily health report (Markdown)
+- `GET /v1/daily-summaries/range/ai-report?startDate={date}&endDate={date}` - AI-generated range report (weekly/monthly)
+
+### Notifications
+- `POST /v1/notifications/fcm-token` - Register/update FCM push notification token
+- `DELETE /v1/notifications/fcm-token` - Deactivate FCM token for device
 
 ### Google Fit Sync (Historical/Legacy)
 - `POST /v1/google-fit/sync/day?date=YYYY-MM-DD` - Sync specific day (up to 5 years back)
@@ -942,13 +952,14 @@ SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 ## Tech Stack
 
 - **Java 21** with virtual threads (Project Loom)
-- **Spring Boot 3.3.5** (Web, Data JPA, Actuator, Validation)
-- **Spring AI 1.1.0** with Google Gemini 3 Flash integration
+- **Spring Boot 4.0.2** (Web, Data JPA, Actuator, Validation)
+- **Spring AI 2.0.0-M2** with Google Gemini integration
 - **Spring Modulith 2.0.1** for modular architecture
 - **PostgreSQL 16** with JSONB
 - **Gradle 8.5+** with Kotlin DSL
 - **Flyway** for database migrations
 - **Caffeine** for in-memory caching
+- **Firebase Admin SDK 9.4.3** for FCM push notifications
 - **Feign** for Google Fit API client
 - **MapStruct** for object mapping
 - **Testcontainers** for integration testing

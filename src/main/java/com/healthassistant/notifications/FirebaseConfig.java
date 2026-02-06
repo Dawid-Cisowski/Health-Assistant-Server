@@ -11,11 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Base64;
 
 @Configuration
@@ -23,8 +20,8 @@ import java.util.Base64;
 @Slf4j
 class FirebaseConfig {
 
-    @Value("${app.notifications.firebase-credentials:}")
-    private String firebaseCredentials;
+    @Value("${app.notifications.firebase-credentials}")
+    private String firebaseCredentialsJson;
 
     @Bean
     FirebaseApp firebaseApp() throws IOException {
@@ -32,7 +29,12 @@ class FirebaseConfig {
             return FirebaseApp.getInstance();
         }
 
-        GoogleCredentials credentials = resolveCredentials();
+        byte[] decoded = Base64.getDecoder().decode(firebaseCredentialsJson);
+        GoogleCredentials credentials;
+        try (InputStream is = new ByteArrayInputStream(decoded)) {
+            credentials = GoogleCredentials.fromStream(is);
+        }
+
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(credentials)
                 .build();
@@ -44,25 +46,5 @@ class FirebaseConfig {
     @Bean
     FirebaseMessaging firebaseMessaging(FirebaseApp firebaseApp) {
         return FirebaseMessaging.getInstance(firebaseApp);
-    }
-
-    private GoogleCredentials resolveCredentials() throws IOException {
-        if (firebaseCredentials == null || firebaseCredentials.isBlank()) {
-            log.info("Resolving Firebase credentials via application defaults");
-            return GoogleCredentials.getApplicationDefault();
-        }
-
-        if (Files.exists(Path.of(firebaseCredentials))) {
-            log.info("Resolving Firebase credentials from configured source");
-            try (InputStream is = new FileInputStream(firebaseCredentials)) {
-                return GoogleCredentials.fromStream(is);
-            }
-        }
-
-        log.info("Resolving Firebase credentials from configured source");
-        byte[] decoded = Base64.getDecoder().decode(firebaseCredentials);
-        try (InputStream is = new ByteArrayInputStream(decoded)) {
-            return GoogleCredentials.fromStream(is);
-        }
     }
 }
