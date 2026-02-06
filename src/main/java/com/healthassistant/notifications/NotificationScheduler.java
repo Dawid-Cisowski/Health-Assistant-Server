@@ -1,46 +1,44 @@
 package com.healthassistant.notifications;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.List;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(name = "app.notifications.enabled", havingValue = "true")
 class NotificationScheduler {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
-    private final FcmTokenRepository fcmTokenRepository;
     private final FcmService fcmService;
     private final NotificationContentService contentService;
+    private final String fcmToken;
+    private final String deviceId;
 
-    private record NotificationResult(boolean sent, boolean tokenInvalid, String deviceId) {}
+    NotificationScheduler(FcmService fcmService,
+                          NotificationContentService contentService,
+                          @Value("${app.notifications.fcm-token}") String fcmToken,
+                          @Value("${app.notifications.device-id}") String deviceId) {
+        this.fcmService = fcmService;
+        this.contentService = contentService;
+        this.fcmToken = fcmToken;
+        this.deviceId = deviceId;
+    }
 
     @Scheduled(cron = "0 0 8 * * *", zone = "Europe/Warsaw")
     void sendDailyNotifications() {
         LocalDate yesterday = LocalDate.now(POLAND_ZONE).minusDays(1);
-        log.info("Starting daily notifications for date: {}", yesterday);
+        log.info("Starting daily notification for date: {}", yesterday);
 
-        List<FcmTokenEntity> activeTokens = fcmTokenRepository.findAllActive();
-
-        List<NotificationResult> results = activeTokens.stream()
-                .map(token -> sendNotification(token, contentService.buildDailyNotification(token.getDeviceId(), yesterday)))
-                .toList();
-
-        logResults("Daily", results, activeTokens.size());
-        deactivateInvalidTokens(results);
+        sendNotification(contentService.buildDailyNotification(deviceId, yesterday), "Daily");
     }
 
     @Scheduled(cron = "0 0 8 * * MON", zone = "Europe/Warsaw")
@@ -48,16 +46,9 @@ class NotificationScheduler {
         LocalDate today = LocalDate.now(POLAND_ZONE);
         LocalDate weekStart = today.with(DayOfWeek.MONDAY).minusWeeks(1);
         LocalDate weekEnd = weekStart.plusDays(6);
-        log.info("Starting weekly notifications for period: {} to {}", weekStart, weekEnd);
+        log.info("Starting weekly notification for period: {} to {}", weekStart, weekEnd);
 
-        List<FcmTokenEntity> activeTokens = fcmTokenRepository.findAllActive();
-
-        List<NotificationResult> results = activeTokens.stream()
-                .map(token -> sendNotification(token, contentService.buildWeeklyNotification(token.getDeviceId(), weekStart, weekEnd)))
-                .toList();
-
-        logResults("Weekly", results, activeTokens.size());
-        deactivateInvalidTokens(results);
+        sendNotification(contentService.buildWeeklyNotification(deviceId, weekStart, weekEnd), "Weekly");
     }
 
     @Scheduled(cron = "0 5 8 1 * *", zone = "Europe/Warsaw")
@@ -65,61 +56,22 @@ class NotificationScheduler {
         LocalDate today = LocalDate.now(POLAND_ZONE);
         LocalDate monthStart = today.minusMonths(1).withDayOfMonth(1);
         LocalDate monthEnd = today.minusMonths(1).withDayOfMonth(today.minusMonths(1).lengthOfMonth());
-        log.info("Starting monthly notifications for period: {} to {}", monthStart, monthEnd);
+        log.info("Starting monthly notification for period: {} to {}", monthStart, monthEnd);
 
-        List<FcmTokenEntity> activeTokens = fcmTokenRepository.findAllActive();
-
-        List<NotificationResult> results = activeTokens.stream()
-                .map(token -> sendNotification(token, contentService.buildMonthlyNotification(token.getDeviceId(), monthStart, monthEnd)))
-                .toList();
-
-        logResults("Monthly", results, activeTokens.size());
-        deactivateInvalidTokens(results);
+        sendNotification(contentService.buildMonthlyNotification(deviceId, monthStart, monthEnd), "Monthly");
     }
 
-    private NotificationResult sendNotification(FcmTokenEntity token,
-                                                 Optional<NotificationContentService.NotificationContent> contentOpt) {
-        return contentOpt
-                .map(content -> {
-                    FcmService.SendResult result = fcmService.sendNotification(
-                            token.getToken(), content.title(), content.body(), content.data());
-                    return new NotificationResult(result.success(), result.tokenInvalid(), token.getDeviceId());
-                })
-                .orElse(new NotificationResult(false, false, token.getDeviceId()));
-    }
-
-    private void deactivateInvalidTokens(List<NotificationResult> results) {
-        results.stream()
-                .filter(r -> r.tokenInvalid())
-                .map(NotificationResult::deviceId)
-                .forEach(this::deactivateTokenSafely);
-    }
-
-    @Transactional
-    void deactivateTokenSafely(String deviceId) {
-        try {
-            fcmTokenRepository.findByDeviceId(deviceId)
-                    .ifPresent(entity -> {
-                        log.info("Deactivating invalid token for device {}", maskDeviceId(deviceId));
-                        entity.deactivate();
-                        fcmTokenRepository.save(entity);
-                    });
-        } catch (ObjectOptimisticLockingFailureException e) {
-            log.warn("Token already modified for device {}, skipping deactivation", maskDeviceId(deviceId));
-        }
-    }
-
-    private void logResults(String type, List<NotificationResult> results, int totalTokens) {
-        long sent = results.stream().filter(NotificationResult::sent).count();
-        long failed = results.size() - sent;
-        log.info("{} notifications completed: {} sent, {} failed out of {} active tokens",
-                type, sent, failed, totalTokens);
-    }
-
-    private static String maskDeviceId(String deviceId) {
-        if (deviceId == null || deviceId.length() <= 8) {
-            return "***";
-        }
-        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
+    private void sendNotification(Optional<NotificationContentService.NotificationContent> contentOpt, String type) {
+        contentOpt.ifPresentOrElse(
+                content -> {
+                    FcmService.SendResult result = fcmService.sendNotification(fcmToken, content.title(), content.body(), content.data());
+                    if (result.success()) {
+                        log.info("{} notification sent successfully", type);
+                    } else {
+                        log.warn("{} notification failed to send (tokenInvalid: {})", type, result.tokenInvalid());
+                    }
+                },
+                () -> log.info("{} notification skipped — no data available", type)
+        );
     }
 }

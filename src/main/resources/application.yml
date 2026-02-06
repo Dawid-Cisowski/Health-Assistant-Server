@@ -129,6 +129,8 @@ app:
   notifications:
     enabled: ${NOTIFICATIONS_ENABLED:false}
     firebase-credentials: ${FIREBASE_CREDENTIALS_JSON:}
+    fcm-token: ${FCM_TOKEN:}
+    device-id: ${NOTIFICATION_DEVICE_ID:}
   energy-requirements:
     surplus-kcal: 300
     base-multiplier: 1.35

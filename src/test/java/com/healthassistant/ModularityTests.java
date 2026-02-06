@@ -98,7 +98,6 @@ class ModularityTests {
                 Map.entry("weight", "WeightFacade"),
                 Map.entry("weightimport", "WeightImportFacade"),
                 Map.entry("heartrate", "HeartRateFacade"),
-                Map.entry("notifications", "NotificationFacade"),
                 Map.entry("bodymeasurements", "BodyMeasurementsFacade")
         );
 
