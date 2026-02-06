@@ -53,6 +53,12 @@ class DailySummaryJpaEntity {
     @Column(name = "last_event_at")
     private Instant lastEventAt;
 
+    @Column(name = "ai_report", columnDefinition = "TEXT")
+    private String aiReport;
+
+    @Column(name = "ai_report_generated_at")
+    private Instant aiReportGeneratedAt;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
@@ -75,5 +81,10 @@ class DailySummaryJpaEntity {
     void cacheAiSummary(String aiSummary) {
         this.aiSummary = aiSummary;
         this.aiSummaryGeneratedAt = Instant.now();
+    }
+
+    void cacheAiReport(String aiReport) {
+        this.aiReport = aiReport;
+        this.aiReportGeneratedAt = Instant.now();
     }
 }

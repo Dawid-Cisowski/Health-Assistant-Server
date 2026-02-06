@@ -77,7 +77,9 @@ class ArchitectureRulesTest {
                             "com.healthassistant.config..",
                             "com.healthassistant.weight..",
                             "com.healthassistant.weightimport..",
-                            "com.healthassistant.heartrate.."
+                            "com.healthassistant.heartrate..",
+                            "com.healthassistant.bodymeasurements..",
+                            "com.healthassistant.notifications.."
                     )
                     .because("Controllers should only exist in API-facing modules");
 

@@ -62,6 +62,9 @@ dependencies {
     // Feign client (version managed by Spring Cloud BOM)
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 
+    // Firebase Cloud Messaging
+    implementation("com.google.firebase:firebase-admin:9.4.3")
+
     // Database
     implementation("org.postgresql:postgresql:42.7.4")
     // Spring Boot 4.0 requires starter for Flyway autoconfiguration

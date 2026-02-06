@@ -126,6 +126,9 @@ app:
     device-id: ${GOOGLE_FIT_DEVICE_ID:google-fit}
   assistant:
     max-iterations: ${ASSISTANT_MAX_ITERATIONS:5}
+  notifications:
+    enabled: ${NOTIFICATIONS_ENABLED:false}
+    firebase-credentials: ${FIREBASE_CREDENTIALS_JSON:}
   energy-requirements:
     surplus-kcal: 300
     base-multiplier: 1.35
