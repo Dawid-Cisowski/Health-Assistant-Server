@@ -147,7 +147,11 @@ abstract class BaseIntegrationSpec extends Specification {
             // Guardrail specs
             "test-guardrail",
             // Reprojection specs
-            "test-reproject"
+            "test-reproject",
+            // Heart rate projection specs
+            "test-hr-proj",
+            // Conversation cleanup specs
+            "test-cleanup"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
