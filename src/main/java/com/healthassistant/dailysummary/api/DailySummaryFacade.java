@@ -1,6 +1,5 @@
 package com.healthassistant.dailysummary.api;
 
-import com.healthassistant.dailysummary.api.dto.AiHealthReportResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.dailysummary.api.dto.DailySummaryRangeSummaryResponse;
 
@@ -16,8 +15,4 @@ public interface DailySummaryFacade {
     DailySummaryRangeSummaryResponse getRangeSummary(String deviceId, LocalDate startDate, LocalDate endDate);
 
     void deleteSummaryForDate(String deviceId, LocalDate date);
-
-    AiHealthReportResponse generateDailyReport(String deviceId, LocalDate date);
-
-    AiHealthReportResponse generateRangeReport(String deviceId, LocalDate startDate, LocalDate endDate);
 }

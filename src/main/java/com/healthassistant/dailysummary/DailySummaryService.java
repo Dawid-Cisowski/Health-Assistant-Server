@@ -2,7 +2,6 @@ package com.healthassistant.dailysummary;
 
 import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
-import com.healthassistant.dailysummary.api.dto.AiHealthReportResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.dailysummary.api.dto.DailySummaryRangeSummaryResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummaryResponse;
@@ -25,7 +24,6 @@ class DailySummaryService implements DailySummaryFacade {
     private final GenerateDailySummaryCommandHandler commandHandler;
     private final DailySummaryJpaRepository jpaRepository;
     private final ObjectMapper objectMapper;
-    private final Optional<AiHealthReportService> aiHealthReportService;
 
     @Override
     public void generateDailySummary(String deviceId, LocalDate date) {
@@ -237,24 +235,6 @@ class DailySummaryService implements DailySummaryFacade {
         private static long orZeroLong(Long value) {
             return value != null ? value : 0L;
         }
-    }
-
-    @Override
-    public AiHealthReportResponse generateDailyReport(String deviceId, LocalDate date) {
-        if (aiHealthReportService.isEmpty()) {
-            log.warn("AI report service not available - feature disabled");
-            return AiHealthReportResponse.noData(date, date);
-        }
-        return aiHealthReportService.get().generateDailyReport(deviceId, date);
-    }
-
-    @Override
-    public AiHealthReportResponse generateRangeReport(String deviceId, LocalDate startDate, LocalDate endDate) {
-        if (aiHealthReportService.isEmpty()) {
-            log.warn("AI report service not available - feature disabled");
-            return AiHealthReportResponse.noData(startDate, endDate);
-        }
-        return aiHealthReportService.get().generateRangeReport(deviceId, startDate, endDate);
     }
 
     @Override

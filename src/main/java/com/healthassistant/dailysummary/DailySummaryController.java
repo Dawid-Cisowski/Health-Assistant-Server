@@ -32,6 +32,7 @@ class DailySummaryController {
 
     private final DailySummaryFacade dailySummaryFacade;
     private final Optional<AiDailySummaryService> aiDailySummaryService;
+    private final Optional<AiHealthReportService> aiHealthReportService;
 
     @GetMapping("/{date}")
     @Operation(
@@ -142,8 +143,13 @@ class DailySummaryController {
 
         LocalDate effectiveDate = date.isAfter(LocalDate.now()) ? LocalDate.now() : date;
 
+        if (aiHealthReportService.isEmpty()) {
+            log.warn("AI report service is not available");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+
         try {
-            AiHealthReportResponse response = dailySummaryFacade.generateDailyReport(deviceId, effectiveDate);
+            AiHealthReportResponse response = aiHealthReportService.get().generateDailyReport(deviceId, effectiveDate);
             return ResponseEntity.ok(response);
         } catch (AiSummaryGenerationException e) {
             log.error("AI report generation failed for device {} date: {}", maskDeviceId(deviceId), effectiveDate, e);
@@ -184,8 +190,13 @@ class DailySummaryController {
 
         log.info("Generating AI range report for device {} from {} to {}", maskDeviceId(deviceId), startDate, effectiveEndDate);
 
+        if (aiHealthReportService.isEmpty()) {
+            log.warn("AI report service is not available");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+
         try {
-            AiHealthReportResponse response = dailySummaryFacade.generateRangeReport(deviceId, startDate, effectiveEndDate);
+            AiHealthReportResponse response = aiHealthReportService.get().generateRangeReport(deviceId, startDate, effectiveEndDate);
             return ResponseEntity.ok(response);
         } catch (AiSummaryGenerationException e) {
             log.error("AI range report generation failed for device {} range {} to {}", maskDeviceId(deviceId), startDate, effectiveEndDate, e);

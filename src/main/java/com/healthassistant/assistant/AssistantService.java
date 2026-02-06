@@ -177,7 +177,7 @@ class AssistantService implements AssistantFacade {
                                     .call()
                                     .chatResponse();
 
-                            var content = response.getResult() != null
+                            var content = response.getResult() != null && response.getResult().getOutput() != null
                                     ? response.getResult().getOutput().getText()
                                     : null;
 
@@ -188,7 +188,7 @@ class AssistantService implements AssistantFacade {
                                 log.warn("Empty response from AI for conversation {}", ctx.conversationId());
                             }
 
-                            var usage = response.getMetadata().getUsage();
+                            var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
                             Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
                             Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
 
