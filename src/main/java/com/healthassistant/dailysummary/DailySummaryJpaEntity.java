@@ -38,6 +38,9 @@ class DailySummaryJpaEntity {
     @Column(name = "summary", nullable = false, columnDefinition = "jsonb")
     private Map<String, Object> summary;
 
+    @Version
+    private Long version;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

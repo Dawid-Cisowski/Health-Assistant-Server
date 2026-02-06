@@ -15,13 +15,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
 class AiHealthReportService {
+
+    private static final int MAX_AI_INPUT_LENGTH = 50_000;
+    private static final int MAX_WORKOUT_NOTE_LENGTH = 500;
+    private static final Set<String> PROMPT_INJECTION_PATTERNS = Set.of(
+            "ignore previous", "ignore all previous", "system prompt",
+            "you are now", "new instructions", "disregard",
+            "forget your instructions", "override"
+    );
 
     private final DailySummaryFacade dailySummaryFacade;
     private final DailySummaryJpaRepository repository;
@@ -166,10 +176,16 @@ class AiHealthReportService {
     }
 
     private String callAi(String systemPrompt, String userMessage) {
+        String effectiveMessage = userMessage;
+        if (effectiveMessage.length() > MAX_AI_INPUT_LENGTH) {
+            log.warn("AI input truncated from {} to {} chars", effectiveMessage.length(), MAX_AI_INPUT_LENGTH);
+            effectiveMessage = effectiveMessage.substring(0, MAX_AI_INPUT_LENGTH) + "\n\n[Data truncated]";
+        }
+
         try {
             ChatResponse chatResponse = chatClient.prompt()
                     .system(systemPrompt)
-                    .user(userMessage)
+                    .user(effectiveMessage)
                     .call()
                     .chatResponse();
 
@@ -319,7 +335,17 @@ class AiHealthReportService {
         if (input == null) {
             return "";
         }
-        return guardrailFacade.sanitizeOnly(input, GuardrailProfile.DATA_EXTRACTION);
+        String truncated = input.length() > MAX_WORKOUT_NOTE_LENGTH
+                ? input.substring(0, MAX_WORKOUT_NOTE_LENGTH)
+                : input;
+        String lower = truncated.toLowerCase(Locale.ROOT);
+        boolean hasInjection = PROMPT_INJECTION_PATTERNS.stream()
+                .anyMatch(lower::contains);
+        if (hasInjection) {
+            log.warn("Prompt injection pattern detected in workout note, stripping");
+            return "[filtered]";
+        }
+        return guardrailFacade.sanitizeOnly(truncated, GuardrailProfile.DATA_EXTRACTION);
     }
 
     private static String maskDeviceId(String deviceId) {

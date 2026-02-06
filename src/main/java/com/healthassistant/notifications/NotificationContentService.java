@@ -23,51 +23,73 @@ class NotificationContentService {
     record NotificationContent(String title, String body, Map<String, String> data) {}
 
     Optional<NotificationContent> buildDailyNotification(String deviceId, LocalDate date) {
-        return dailySummaryFacade.getDailySummary(deviceId, date)
-                .map(summary -> {
-                    String body = buildDailySummaryBody(summary);
-                    Map<String, String> data = Map.of(
-                            "type", "DAILY_REPORT",
-                            "date", date.toString(),
-                            "reportAvailable", "true"
-                    );
-                    return new NotificationContent("Podsumowanie dnia", body, data);
-                });
+        try {
+            return dailySummaryFacade.getDailySummary(deviceId, date)
+                    .map(summary -> {
+                        String body = buildDailySummaryBody(summary);
+                        Map<String, String> data = Map.of(
+                                "type", "DAILY_REPORT",
+                                "date", date.toString(),
+                                "reportAvailable", "true"
+                        );
+                        return new NotificationContent("Podsumowanie dnia", body, data);
+                    });
+        } catch (Exception e) {
+            log.error("Failed to build daily notification for device {} date {}",
+                    maskDeviceId(deviceId), date, e);
+            return Optional.empty();
+        }
     }
 
     Optional<NotificationContent> buildWeeklyNotification(String deviceId, LocalDate weekStart, LocalDate weekEnd) {
-        DailySummaryRangeSummaryResponse range = dailySummaryFacade.getRangeSummary(deviceId, weekStart, weekEnd);
-        if (range.daysWithData() == null || range.daysWithData() == 0) {
+        try {
+            DailySummaryRangeSummaryResponse range = dailySummaryFacade.getRangeSummary(deviceId, weekStart, weekEnd);
+            if (range.daysWithData() == null || range.daysWithData() == 0) {
+                return Optional.empty();
+            }
+
+            String body = buildRangeSummaryBody(range, "tygodnia");
+            Map<String, String> data = Map.of(
+                    "type", "WEEKLY_REPORT",
+                    "startDate", weekStart.toString(),
+                    "endDate", weekEnd.toString(),
+                    "reportAvailable", "true"
+            );
+            return Optional.of(new NotificationContent("Podsumowanie tygodnia", body, data));
+        } catch (Exception e) {
+            log.error("Failed to build weekly notification for device {} period {} to {}",
+                    maskDeviceId(deviceId), weekStart, weekEnd, e);
             return Optional.empty();
         }
-
-        String body = buildRangeSummaryBody(range, "tygodnia");
-        Map<String, String> data = Map.of(
-                "type", "WEEKLY_REPORT",
-                "startDate", weekStart.toString(),
-                "endDate", weekEnd.toString(),
-                "reportAvailable", "true"
-        );
-        return Optional.of(new NotificationContent("Podsumowanie tygodnia", body, data));
     }
 
     Optional<NotificationContent> buildMonthlyNotification(String deviceId, LocalDate monthStart, LocalDate monthEnd) {
-        DailySummaryRangeSummaryResponse range = dailySummaryFacade.getRangeSummary(deviceId, monthStart, monthEnd);
-        if (range.daysWithData() == null || range.daysWithData() == 0) {
+        try {
+            DailySummaryRangeSummaryResponse range = dailySummaryFacade.getRangeSummary(deviceId, monthStart, monthEnd);
+            if (range.daysWithData() == null || range.daysWithData() == 0) {
+                return Optional.empty();
+            }
+
+            String body = buildRangeSummaryBody(range, "miesiaca");
+            Map<String, String> data = Map.of(
+                    "type", "MONTHLY_REPORT",
+                    "startDate", monthStart.toString(),
+                    "endDate", monthEnd.toString(),
+                    "reportAvailable", "true"
+            );
+            return Optional.of(new NotificationContent("Podsumowanie miesiaca", body, data));
+        } catch (Exception e) {
+            log.error("Failed to build monthly notification for device {} period {} to {}",
+                    maskDeviceId(deviceId), monthStart, monthEnd, e);
             return Optional.empty();
         }
-
-        String body = buildRangeSummaryBody(range, "miesiaca");
-        Map<String, String> data = Map.of(
-                "type", "MONTHLY_REPORT",
-                "startDate", monthStart.toString(),
-                "endDate", monthEnd.toString(),
-                "reportAvailable", "true"
-        );
-        return Optional.of(new NotificationContent("Podsumowanie miesiaca", body, data));
     }
 
     private String buildDailySummaryBody(DailySummary summary) {
+        if (summary == null) {
+            return "Sprawdz swoje dane zdrowotne";
+        }
+
         StringBuilder sb = new StringBuilder();
         Integer steps = summary.getTotalSteps();
         if (steps != null && steps > 0) {
@@ -109,8 +131,15 @@ class NotificationContentService {
 
     private String formatNumber(int number) {
         if (number >= 1000) {
-            return String.valueOf(number);
+            return String.format("%,d", number);
         }
         return String.valueOf(number);
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) {
+            return "***";
+        }
+        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
     }
 }

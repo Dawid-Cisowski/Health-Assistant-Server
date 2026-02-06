@@ -242,7 +242,8 @@ class DailySummaryService implements DailySummaryFacade {
     @Override
     public AiHealthReportResponse generateDailyReport(String deviceId, LocalDate date) {
         if (aiHealthReportService.isEmpty()) {
-            throw new AiSummaryGenerationException("AI service is not available");
+            log.warn("AI report service not available - feature disabled");
+            return AiHealthReportResponse.noData(date, date);
         }
         return aiHealthReportService.get().generateDailyReport(deviceId, date);
     }
@@ -250,7 +251,8 @@ class DailySummaryService implements DailySummaryFacade {
     @Override
     public AiHealthReportResponse generateRangeReport(String deviceId, LocalDate startDate, LocalDate endDate) {
         if (aiHealthReportService.isEmpty()) {
-            throw new AiSummaryGenerationException("AI service is not available");
+            log.warn("AI report service not available - feature disabled");
+            return AiHealthReportResponse.noData(startDate, endDate);
         }
         return aiHealthReportService.get().generateRangeReport(deviceId, startDate, endDate);
     }

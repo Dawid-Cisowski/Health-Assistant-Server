@@ -48,18 +48,18 @@ class FirebaseConfig {
 
     private GoogleCredentials resolveCredentials() throws IOException {
         if (firebaseCredentials == null || firebaseCredentials.isBlank()) {
-            log.info("Using Application Default Credentials for Firebase");
+            log.info("Resolving Firebase credentials via application defaults");
             return GoogleCredentials.getApplicationDefault();
         }
 
         if (Files.exists(Path.of(firebaseCredentials))) {
-            log.info("Loading Firebase credentials from file");
+            log.info("Resolving Firebase credentials from configured source");
             try (InputStream is = new FileInputStream(firebaseCredentials)) {
                 return GoogleCredentials.fromStream(is);
             }
         }
 
-        log.info("Loading Firebase credentials from Base64 encoded value");
+        log.info("Resolving Firebase credentials from configured source");
         byte[] decoded = Base64.getDecoder().decode(firebaseCredentials);
         try (InputStream is = new ByteArrayInputStream(decoded)) {
             return GoogleCredentials.fromStream(is);
