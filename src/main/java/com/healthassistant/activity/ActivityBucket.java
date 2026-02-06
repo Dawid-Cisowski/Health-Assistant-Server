@@ -42,7 +42,4 @@ record ActivityBucket(
         return minutes.value();
     }
 
-    boolean hasActivity() {
-        return minutes.isPositive();
-    }
 }

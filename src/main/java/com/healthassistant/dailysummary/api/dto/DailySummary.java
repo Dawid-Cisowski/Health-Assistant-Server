@@ -3,6 +3,7 @@ package com.healthassistant.dailysummary.api.dto;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.UnaryOperator;
 
 public record DailySummary(
     LocalDate date,
@@ -89,6 +90,63 @@ public record DailySummary(
         String healthRating,
         java.time.Instant occurredAt
     ) {
+    }
+
+    public String toAiDataContext(UnaryOperator<String> sanitizer) {
+        StringBuilder sb = new StringBuilder();
+
+        appendIfPositive(sb, "Steps", activity.steps());
+        appendIfPositive(sb, "Active minutes", activity.activeMinutes());
+        appendIfPositive(sb, "Active calories burned (kcal)", activity.activeCalories());
+        if (activity.distanceMeters() != null && activity.distanceMeters() > 0) {
+            sb.append("Distance: ").append(activity.distanceMeters()).append(" meters\n");
+        }
+
+        if (!sleep.isEmpty()) {
+            int totalSleepMins = sleep.stream()
+                    .mapToInt(s -> s.totalMinutes() != null ? s.totalMinutes() : 0)
+                    .sum();
+            sb.append("Sleep: ").append(totalSleepMins / 60).append("h ").append(totalSleepMins % 60).append("min\n");
+        }
+
+        if (!workouts.isEmpty()) {
+            sb.append("Workouts: ").append(workouts.size()).append("\n");
+            workouts.stream()
+                    .filter(w -> w.note() != null && !w.note().isBlank())
+                    .map(w -> "  - " + sanitizer.apply(w.note()))
+                    .forEach(line -> sb.append(line).append("\n"));
+        }
+
+        if (nutrition.mealCount() != null && nutrition.mealCount() > 0) {
+            sb.append("Meals: ").append(nutrition.mealCount()).append("\n");
+            appendIfPositive(sb, "  Calories (kcal)", nutrition.totalCalories());
+            appendIfPositive(sb, "  Protein (g)", nutrition.totalProtein());
+            appendIfPositive(sb, "  Fat (g)", nutrition.totalFat());
+            appendIfPositive(sb, "  Carbs (g)", nutrition.totalCarbs());
+        }
+
+        if (!meals.isEmpty()) {
+            long healthyCount = meals.stream()
+                    .filter(m -> "VERY_HEALTHY".equals(m.healthRating()) || "HEALTHY".equals(m.healthRating()))
+                    .count();
+            long unhealthyCount = meals.stream()
+                    .filter(m -> "VERY_UNHEALTHY".equals(m.healthRating()) || "UNHEALTHY".equals(m.healthRating()))
+                    .count();
+            if (healthyCount > 0) sb.append("Healthy meals: ").append(healthyCount).append("\n");
+            if (unhealthyCount > 0) sb.append("Unhealthy meals: ").append(unhealthyCount).append("\n");
+        }
+
+        appendIfPositive(sb, "Resting HR (bpm)", heart.restingBpm());
+        appendIfPositive(sb, "Average HR (bpm)", heart.avgBpm());
+        appendIfPositive(sb, "Max HR (bpm)", heart.maxBpm());
+
+        return sb.toString();
+    }
+
+    private static void appendIfPositive(StringBuilder sb, String label, Integer value) {
+        if (value != null && value > 0) {
+            sb.append(label).append(": ").append(value).append("\n");
+        }
     }
 
     // Helper methods for easier AI tool access

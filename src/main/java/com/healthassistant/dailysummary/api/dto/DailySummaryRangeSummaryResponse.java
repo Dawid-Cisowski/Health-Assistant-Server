@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 @Schema(description = "Daily summary for a date range (week, month, or year)")
 public record DailySummaryRangeSummaryResponse(
@@ -44,6 +46,65 @@ public record DailySummaryRangeSummaryResponse(
     @Schema(description = "Daily statistics for each day in the range")
     List<DailySummaryResponse> dailyStats
 ) {
+    public String toAiDataContext(UnaryOperator<String> sanitizer) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Period: ").append(startDate).append(" to ").append(endDate).append("\n");
+        sb.append("Days with data: ").append(daysWithData).append("\n\n");
+
+        if (activity != null) {
+            sb.append("--- ACTIVITY ---\n");
+            sb.append("Total steps: ").append(activity.totalSteps()).append("\n");
+            sb.append("Average steps/day: ").append(activity.averageSteps()).append("\n");
+            sb.append("Total active minutes: ").append(activity.totalActiveMinutes()).append("\n");
+            sb.append("Average active minutes/day: ").append(activity.averageActiveMinutes()).append("\n");
+            sb.append("Total calories burned: ").append(activity.totalActiveCalories()).append(" kcal\n");
+            sb.append("Average calories/day: ").append(activity.averageActiveCalories()).append(" kcal\n");
+            if (activity.totalDistanceMeters() != null && activity.totalDistanceMeters() > 0) {
+                sb.append("Total distance: ").append(activity.totalDistanceMeters()).append(" meters\n");
+                sb.append("Average distance/day: ").append(activity.averageDistanceMeters()).append(" meters\n");
+            }
+            sb.append("\n");
+        }
+
+        if (sleep != null && sleep.daysWithSleep() != null && sleep.daysWithSleep() > 0) {
+            sb.append("--- SLEEP ---\n");
+            sb.append("Average sleep: ").append(Optional.ofNullable(sleep.averageSleepMinutes()).map(m -> m / 60 + "h " + m % 60 + "min").orElse("N/A")).append("\n");
+            sb.append("Days with sleep data: ").append(sleep.daysWithSleep()).append("\n\n");
+        }
+
+        if (nutrition != null && nutrition.daysWithData() != null && nutrition.daysWithData() > 0) {
+            sb.append("--- NUTRITION ---\n");
+            sb.append("Average calories/day: ").append(nutrition.averageCalories()).append(" kcal\n");
+            sb.append("Average protein/day: ").append(nutrition.averageProtein()).append("g\n");
+            sb.append("Average fat/day: ").append(nutrition.averageFat()).append("g\n");
+            sb.append("Average carbs/day: ").append(nutrition.averageCarbs()).append("g\n");
+            sb.append("Average meals/day: ").append(nutrition.averageMealsPerDay()).append("\n");
+            sb.append("Days with nutrition data: ").append(nutrition.daysWithData()).append("\n\n");
+        }
+
+        if (workouts != null && workouts.totalWorkouts() != null && workouts.totalWorkouts() > 0) {
+            sb.append("--- WORKOUTS ---\n");
+            sb.append("Total workouts: ").append(workouts.totalWorkouts()).append("\n");
+            sb.append("Days with workouts: ").append(workouts.daysWithWorkouts()).append("\n");
+            if (workouts.workoutList() != null && !workouts.workoutList().isEmpty()) {
+                workouts.workoutList().stream()
+                        .map(w -> "  - " + w.date() + ": " + sanitizer.apply(Optional.ofNullable(w.note()).orElse("Workout")))
+                        .forEach(line -> sb.append(line).append("\n"));
+            }
+            sb.append("\n");
+        }
+
+        if (heart != null && heart.daysWithData() != null && heart.daysWithData() > 0) {
+            sb.append("--- HEART RATE ---\n");
+            if (heart.averageRestingBpm() != null) sb.append("Average resting HR: ").append(heart.averageRestingBpm()).append(" bpm\n");
+            if (heart.averageDailyBpm() != null) sb.append("Average daily HR: ").append(heart.averageDailyBpm()).append(" bpm\n");
+            if (heart.maxBpmOverall() != null) sb.append("Max HR: ").append(heart.maxBpmOverall()).append(" bpm\n");
+            sb.append("Days with HR data: ").append(heart.daysWithData()).append("\n");
+        }
+
+        return sb.toString();
+    }
+
     public record ActivitySummary(
         @JsonProperty("totalSteps")
         @Schema(description = "Total steps for the entire range", example = "324500")

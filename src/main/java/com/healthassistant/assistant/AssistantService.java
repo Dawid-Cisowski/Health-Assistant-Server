@@ -2,6 +2,7 @@ package com.healthassistant.assistant;
 
 import com.healthassistant.assistant.api.AssistantFacade;
 import com.healthassistant.assistant.api.dto.*;
+import com.healthassistant.config.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -169,43 +170,37 @@ class AssistantService implements AssistantFacade {
                     return new ConversationContext(conversationId, messages, deviceId);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(ctx -> {
-                    // Use synchronous call() instead of stream() due to Spring AI 2.0.0-M2 bug
-                    // where tool calling doesn't work properly with streaming.
-                    // See: https://github.com/spring-projects/spring-ai/issues/3366
-                    // Tool calling is imperative and works reliably only with call().
-                    return Mono.fromCallable(() -> {
-                                var response = chatClient.prompt()
-                                        .messages(ctx.messages())
-                                        .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
-                                        .call()
-                                        .chatResponse();
+                .flatMapMany(ctx -> Mono.fromCallable(() -> {
+                            var response = chatClient.prompt()
+                                    .messages(ctx.messages())
+                                    .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
+                                    .call()
+                                    .chatResponse();
 
-                                var content = response.getResult() != null && response.getResult().getOutput() != null
-                                        ? response.getResult().getOutput().getText()
-                                        : null;
+                            var content = response.getResult() != null && response.getResult().getOutput() != null
+                                    ? response.getResult().getOutput().getText()
+                                    : null;
 
-                                if (content != null && !content.isBlank()) {
-                                    conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
-                                    log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
-                                } else {
-                                    log.warn("Empty response from AI for conversation {}", ctx.conversationId());
-                                }
+                            if (content != null && !content.isBlank()) {
+                                conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
+                                log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
+                            } else {
+                                log.warn("Empty response from AI for conversation {}", ctx.conversationId());
+                            }
 
-                                var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
-                                Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
-                                Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+                            var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
+                            Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+                            Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
 
-                                return new ChatResult(content != null ? content : "", promptTokens, completionTokens);
-                            })
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .flatMapMany(result -> Flux.<AssistantEvent>just(
-                                    new ContentEvent(result.content()),
-                                    new DoneEvent(ctx.conversationId(), result.promptTokens(), result.completionTokens())
-                            ))
-                            .doOnError(error -> log.error("Error in chat call", error))
-                            .onErrorResume(error -> Flux.<AssistantEvent>just(createErrorEvent(error)));
-                });
+                            return new ChatResult(content != null ? content : "", promptTokens, completionTokens);
+                        })
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .flatMapMany(result -> Flux.<AssistantEvent>just(
+                                new ContentEvent(result.content()),
+                                new DoneEvent(ctx.conversationId(), result.promptTokens(), result.completionTokens())
+                        ))
+                        .doOnError(error -> log.error("Error in chat call", error))
+                        .onErrorResume(error -> Flux.just(createErrorEvent(error))));
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages, String deviceId) {}
@@ -226,10 +221,7 @@ class AssistantService implements AssistantFacade {
     }
 
     private static String maskDeviceId(String deviceId) {
-        if (deviceId == null || deviceId.length() < 8) {
-            return "***";
-        }
-        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+        return SecurityUtils.maskDeviceId(deviceId);
     }
 
     @Override

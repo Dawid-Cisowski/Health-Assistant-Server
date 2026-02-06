@@ -14,15 +14,8 @@ record ActiveMinutes(int value) {
         return new ActiveMinutes(value);
     }
 
-    ActiveMinutes add(ActiveMinutes other) {
-        return new ActiveMinutes(value + other.value);
-    }
-
     boolean isPositive() {
         return value > 0;
     }
 
-    boolean isGreaterThan(ActiveMinutes other) {
-        return value > other.value;
-    }
 }

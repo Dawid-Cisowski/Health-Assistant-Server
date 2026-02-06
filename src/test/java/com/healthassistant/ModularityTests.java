@@ -29,7 +29,8 @@ class ModularityTests {
                 "appevents", "healthevents", "dailysummary", "steps", "workout",
                 "workoutimport", "sleep", "sleepimport", "calories", "activity",
                 "meals", "mealimport", "googlefit", "assistant", "security", "config",
-                "weight", "weightimport", "heartrate", "guardrails"
+                "weight", "weightimport", "heartrate", "guardrails",
+                "bodymeasurements", "notifications"
         );
 
         var actualModules = modules.stream()
@@ -53,16 +54,15 @@ class ModularityTests {
         var projectionModules = List.of("steps", "workout", "sleep", "calories", "activity", "meals", "weight");
         var importModules = Set.of("mealimport", "sleepimport", "workoutimport", "weightimport", "googlefit");
 
-        for (String projName : projectionModules) {
+        projectionModules.forEach(projName -> {
             var module = modules.getModuleByName(projName).orElseThrow();
             var dependencies = module.getBootstrapDependencies(modules)
                     .map(ApplicationModule::getName)
                     .collect(Collectors.toSet());
-
             assertThat(dependencies)
                     .as("Module %s should not depend on import modules", projName)
                     .doesNotContainAnyElementsOf(importModules);
-        }
+        });
     }
 
     @Test
@@ -97,7 +97,8 @@ class ModularityTests {
                 Map.entry("workoutimport", "WorkoutImportFacade"),
                 Map.entry("weight", "WeightFacade"),
                 Map.entry("weightimport", "WeightImportFacade"),
-                Map.entry("heartrate", "HeartRateFacade")
+                Map.entry("heartrate", "HeartRateFacade"),
+                Map.entry("bodymeasurements", "BodyMeasurementsFacade")
         );
 
         for (var entry : modulesWithFacades.entrySet()) {
@@ -116,6 +117,7 @@ class ModularityTests {
         var documenter = new Documenter(modules)
                 .writeModuleCanvases()
                 .writeModulesAsPlantUml()
+                .writeAggregatingDocument()
                 .writeIndividualModulesAsPlantUml();
         // PMD requires explicit assertion
         assertThat(documenter).isNotNull();
