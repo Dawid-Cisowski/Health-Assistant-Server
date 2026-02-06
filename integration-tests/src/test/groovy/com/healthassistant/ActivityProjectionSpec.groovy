@@ -474,4 +474,56 @@ class ActivityProjectionSpec extends BaseIntegrationSpec {
         def response2 = waitForApiResponse("/v1/activity/daily/${date}", "different-device-id", DIFFERENT_DEVICE_SECRET_BASE64)
         response2.getInt("totalActiveMinutes") == 25
     }
+
+    def "Scenario 11: Range query exceeding 365 days returns 400"() {
+        when: "I query a range spanning more than 365 days"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/activity/range?startDate=2024-01-01&endDate=2025-01-02")
+                .get("/v1/activity/range?startDate=2024-01-01&endDate=2025-01-02")
+                .then()
+                .extract()
+
+        then: "400 Bad Request is returned"
+        response.statusCode() == 400
+    }
+
+    def "Scenario 12: Future endDate is capped to today and returns 200"() {
+        given: "activity data for today"
+        def today = java.time.LocalDate.now()
+        def todayStr = today.toString()
+        def bucketStart = today.atStartOfDay(java.time.ZoneId.of("UTC")).toInstant().toString()
+        def bucketEnd = today.atStartOfDay(java.time.ZoneId.of("UTC")).toInstant().plusSeconds(60).toString()
+        def request = """
+        {
+            "events": [{
+                "idempotencyKey": "${DEVICE_ID}|activity|future-cap-${todayStr}",
+                "type": "ActiveMinutesRecorded.v1",
+                "occurredAt": "${bucketEnd}",
+                "payload": {
+                    "bucketStart": "${bucketStart}",
+                    "bucketEnd": "${bucketEnd}",
+                    "activeMinutes": 10,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+
+        and: "events are submitted"
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        when: "I query with future endDate"
+        def futureDate = today.plusDays(30).toString()
+        def path = "/v1/activity/range?startDate=${todayStr}&endDate=${futureDate}"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, path)
+                .get(path)
+                .then()
+                .extract()
+
+        then: "200 is returned (endDate capped to today)"
+        response.statusCode() == 200
+    }
 }

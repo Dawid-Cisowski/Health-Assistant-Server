@@ -480,4 +480,45 @@ class CaloriesProjectionSpec extends BaseIntegrationSpec {
         def response2 = waitForApiResponse("/v1/calories/daily/${date}", "different-device-id", DIFFERENT_DEVICE_SECRET_BASE64)
         response2.getDouble("totalCalories") == 200.0
     }
+
+    def "Scenario 11: Future endDate is capped to today and returns 200"() {
+        given: "calorie data for today"
+        def today = java.time.LocalDate.now()
+        def todayStr = today.toString()
+        def bucketStart = today.atStartOfDay(java.time.ZoneId.of("UTC")).toInstant().toString()
+        def bucketEnd = today.atStartOfDay(java.time.ZoneId.of("UTC")).toInstant().plusSeconds(60).toString()
+        def request = """
+        {
+            "events": [{
+                "idempotencyKey": "${DEVICE_ID}|calories|future-cap-${todayStr}",
+                "type": "ActiveCaloriesBurnedRecorded.v1",
+                "occurredAt": "${bucketEnd}",
+                "payload": {
+                    "bucketStart": "${bucketStart}",
+                    "bucketEnd": "${bucketEnd}",
+                    "energyKcal": 50.0,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+
+        and: "events are submitted"
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        when: "I query with future endDate"
+        def futureDate = today.plusDays(30).toString()
+        def path = "/v1/calories/range?startDate=${todayStr}&endDate=${futureDate}"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, path)
+                .get(path)
+                .then()
+                .extract()
+
+        then: "200 is returned (endDate capped to today)"
+        response.statusCode() == 200
+    }
 }
