@@ -497,7 +497,7 @@ return ResponseEntity.ok(sanitizedResponse);
 
 The codebase follows a modular architecture organized by feature/bounded context:
 
-**Package Structure** (20 modules verified by Spring Modulith):
+**Package Structure** (21 modules verified by Spring Modulith):
 - `appevents/` - App-facing health events submission API
 - `healthevents/` - Core event storage and management (event log, validation)
 - `dailysummary/` - Daily aggregated summaries from health events
@@ -513,6 +513,7 @@ The codebase follows a modular architecture organized by feature/bounded context
 - `weight/` - Weight measurement projections and queries
 - `weightimport/` - Weight import from external sources
 - `heartrate/` - Heart rate projections (summary and resting HR)
+- `bodymeasurements/` - Body measurement projections (body fat, muscle mass, etc.)
 - `guardrails/` - AI safety guardrails and content filtering
 - `googlefit/` - Google Fit synchronization and OAuth
 - `assistant/` - AI health assistant with Gemini integration (SSE streaming)
@@ -534,9 +535,13 @@ The codebase follows a modular architecture organized by feature/bounded context
 3. → `StoreHealthEventsCommandHandler.handle()`
 4. → Validate events (`EventValidator`)
 5. → Store/update events via `EventRepository` (idempotency via `idempotency_key`)
-6. → Project to materialized views (`StepsProjector`, `WorkoutProjector`)
-7. → Aggregate daily summaries (`DailySummaryAggregator`)
-8. → Return per-event status (stored/duplicate/invalid)
+6. → **After transaction commits** (via `TransactionSynchronizationManager.afterCommit()`):
+   - Publish domain events to Spring Modulith
+   - Project to materialized views (`StepsProjector`, `WorkoutProjector`, etc.)
+   - Aggregate daily summaries (`DailySummaryAggregator`)
+7. → Return per-event status (stored/duplicate/invalid)
+
+**Important**: Events are published AFTER transaction commits to ensure async listeners see committed data. See `HealthEventsService.storeHealthEvents()` for the `TransactionSynchronization` pattern.
 
 **Key Files**:
 - `StoreHealthEventsCommandHandler.java` - Main orchestrator for event ingestion
@@ -723,10 +728,11 @@ export NONCE_CACHE_TTL_SEC=600
 - `meal_projections`, `meal_daily_projections`
 - `weight_measurement_projections`
 - `heart_rate_projections`, `resting_heart_rate_projections`
+- `body_measurement_projections`
 - `meal_import_drafts` (AI-powered meal import)
 - `exercise_name_mappings` (maps exercise names to catalog IDs for statistics)
 
-**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V39)
+**Migrations**: Flyway versioned in `src/main/resources/db/migration/` (V1-V44)
 
 ---
 
@@ -753,6 +759,7 @@ All events have:
 | `MealRecorded.v1` | `title`, `mealType`, `caloriesKcal`, `proteinGrams`, `fatGrams`, `carbohydratesGrams`, `healthRating` | macros ≥ 0, valid enums |
 | `WeightMeasured.v1` | `weightKg`, `measuredAt` | weightKg > 0 |
 | `RestingHeartRateRecorded.v1` | `measuredAt`, `beatsPerMinute` | bpm > 0 |
+| `BodyMeasurementRecorded.v1` | `measuredAt`, `bodyFatPercent`, `muscleMassKg`, etc. | values > 0 |
 
 **Meal Types**: `BREAKFAST`, `BRUNCH`, `LUNCH`, `DINNER`, `SNACK`, `DESSERT`, `DRINK`
 
@@ -937,7 +944,7 @@ SELECT * FROM daily_summaries WHERE date = '2025-01-15';
 - **Java 21** with virtual threads (Project Loom)
 - **Spring Boot 3.3.5** (Web, Data JPA, Actuator, Validation)
 - **Spring AI 1.1.0** with Google Gemini 3 Flash integration
-- **Spring Modulith 1.3.1** for modular architecture
+- **Spring Modulith 2.0.1** for modular architecture
 - **PostgreSQL 16** with JSONB
 - **Gradle 8.5+** with Kotlin DSL
 - **Flyway** for database migrations

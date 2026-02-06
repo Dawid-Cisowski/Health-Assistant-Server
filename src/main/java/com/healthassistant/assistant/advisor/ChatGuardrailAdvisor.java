@@ -76,12 +76,12 @@ public class ChatGuardrailAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     private String extractUserMessage(ChatClientRequest request) {
-        if (request == null || request.prompt() == null) {
+        if (request == null) {
             return null;
         }
 
         List<Message> messages = request.prompt().getInstructions();
-        if (messages == null || messages.isEmpty()) {
+        if (messages.isEmpty()) {
             return null;
         }
 

@@ -32,8 +32,8 @@ Backend server for managing health data with Health Connect integration, AI assi
 </p>
 
 - **Append-only Event Log**: All data as immutable events in PostgreSQL
-- **11 Event Types**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories, Weight, RestingHeartRate
-- **8 Projections**: Steps, Sleep, Workout, Calories, Activity, Meals, Weight, HeartRate
+- **12 Event Types**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories, Weight, RestingHeartRate, BodyMeasurement
+- **9 Projections**: Steps, Sleep, Workout, Calories, Activity, Meals, Weight, HeartRate, BodyMeasurements
 - **Optimistic Locking**: `@Version` on all entities with automatic retry
 - **Idempotency**: Deduplication via `idempotency_key`
 
@@ -69,7 +69,7 @@ Backend server for managing health data with Health Connect integration, AI assi
 
 ## Architecture
 
-### 20 Modules (Spring Modulith)
+### 21 Modules (Spring Modulith)
 
 ```
 com.healthassistant/
@@ -88,6 +88,7 @@ com.healthassistant/
 ├── weight/          # Weight measurement projections
 ├── weightimport/    # AI weight import from screenshots
 ├── heartrate/       # Heart rate projections (summary + resting)
+├── bodymeasurements/ # Body measurements (body fat, muscle mass)
 ├── guardrails/      # AI safety guardrails and content filtering
 ├── assistant/       # AI chat with Gemini
 ├── googlefit/       # Historical sync with Google Fit
@@ -113,7 +114,8 @@ StoreHealthEventsCommandHandler
     │   ├── ActivityProjector
     │   ├── MealsProjector
     │   ├── WeightProjector
-    │   └── HeartRateProjector
+    │   ├── HeartRateProjector
+    │   └── BodyMeasurementsProjector
     └── DailySummaryAggregator
 ```
 
@@ -235,6 +237,7 @@ StoreHealthEventsCommandHandler
 | `MealRecorded.v1` | title, mealType, macros, healthRating | macros ≥ 0 |
 | `WeightMeasured.v1` | weightKg, measuredAt | weightKg > 0 |
 | `RestingHeartRateRecorded.v1` | measuredAt, beatsPerMinute | bpm > 0 |
+| `BodyMeasurementRecorded.v1` | measuredAt, bodyFatPercent, muscleMassKg | values > 0 |
 
 **Meal Types**: BREAKFAST, BRUNCH, LUNCH, DINNER, SNACK, DESSERT, DRINK
 
@@ -242,7 +245,7 @@ StoreHealthEventsCommandHandler
 
 ## Database Schema
 
-### 39 Flyway Migrations (V1-V39)
+### 44 Flyway Migrations (V1-V44)
 
 **Core Tables**:
 - `health_events` - Event log (JSONB payload, GIN index, version)
@@ -259,6 +262,7 @@ StoreHealthEventsCommandHandler
 - `meal_projections`, `meal_daily_projections`
 - `weight_measurement_projections`
 - `heart_rate_projections`, `resting_heart_rate_projections`
+- `body_measurement_projections`
 
 **Domain Tables**:
 - `exercises` - Catalog of 59 exercises
@@ -349,7 +353,7 @@ open integration-tests/build/reports/tests/test/index.html
 | Language | Java 21 (Virtual Threads) |
 | Framework | Spring Boot 3.3.5 |
 | AI | Spring AI 1.1.0 + Gemini 3 Flash |
-| Architecture | Spring Modulith 1.3.1 |
+| Architecture | Spring Modulith 2.0.1 |
 | Database | PostgreSQL 16 (JSONB) |
 | Migrations | Flyway |
 | Build | Gradle 8.5+ (Kotlin DSL) |
