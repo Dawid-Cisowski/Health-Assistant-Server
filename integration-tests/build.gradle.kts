@@ -119,7 +119,7 @@ tasks.test {
     jvmArgs("-Xmx1g", "-XX:+UseParallelGC")
 
     // Ensure tests have enough time
-    timeout.set(Duration.ofMinutes(10))
+    timeout.set(Duration.ofMinutes(15))
 }
 
 // Separate task for AI evaluation tests using real Gemini API
@@ -140,7 +140,7 @@ tasks.register<Test>("evaluationTest") {
     environment("GEMINI_API_KEY", System.getenv("GEMINI_API_KEY") ?: "")
 
     // Longer timeout for LLM inference
-    timeout.set(Duration.ofMinutes(10))
+    timeout.set(Duration.ofMinutes(15))
 
     // Enable parallel test execution (limited to avoid Gemini API rate limiting)
     maxParallelForks = 10
