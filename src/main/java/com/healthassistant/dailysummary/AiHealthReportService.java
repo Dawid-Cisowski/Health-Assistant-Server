@@ -225,8 +225,8 @@ class AiHealthReportService {
             Long completionTokens = null;
             if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
                 var usage = chatResponse.getMetadata().getUsage();
-                promptTokens = usage.getPromptTokens();
-                completionTokens = usage.getGenerationTokens();
+                promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
+                completionTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
             }
 
             log.info("AI report generated: {} chars", content.length());
