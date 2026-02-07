@@ -8,6 +8,7 @@ import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.steps.api.StepsFacade;
 import com.healthassistant.weight.api.WeightFacade;
 import com.healthassistant.workout.api.WorkoutFacade;
+import com.healthassistant.config.AiMetricsRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
@@ -37,6 +38,7 @@ class HealthTools {
     private final MealsFacade mealsFacade;
     private final WeightFacade weightFacade;
     private final BodyMeasurementsFacade bodyMeasurementsFacade;
+    private final AiMetricsRecorder aiMetrics;
 
     @Tool(name = "getStepsData",
           description = "Retrieves user's step data for the given date range. Returns step count, distance, active hours and minutes. " +
@@ -45,7 +47,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching steps data for device {} from {} to {}", deviceId, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getStepsData", startDate, endDate, (start, end) -> {
             var result = stepsFacade.getRangeSummary(deviceId, start, end);
             log.info("Steps data fetched: {} total steps over {} days", result.totalSteps(), result.daysWithData());
             return result;
@@ -59,7 +61,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching sleep data for device {} from {} to {}", deviceId, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getSleepData", startDate, endDate, (start, end) -> {
             var result = sleepFacade.getRangeSummary(deviceId, start, end);
             log.info("Sleep data fetched: {} total minutes over {} days", result.totalSleepMinutes(), result.daysWithData());
             return result;
@@ -73,7 +75,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching workout data for device {} from {} to {}", deviceId, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getWorkoutData", startDate, endDate, (start, end) -> {
             var result = workoutFacade.getWorkoutsByDateRange(deviceId, start, end);
             log.info("Workout data fetched: {} workouts", result.size());
             return result;
@@ -88,7 +90,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching daily summary for device {} for date {}", deviceId, date);
 
-        return validateAndExecuteSingleDateQuery(date, localDate -> {
+        return validateAndExecuteSingleDateQuery("getDailySummary", date, localDate -> {
             var result = dailySummaryFacade.getDailySummary(deviceId, localDate);
             if (result.isPresent()) {
                 var summary = result.get();
@@ -116,7 +118,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching daily summary range for device {} from {} to {}", deviceId, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getDailySummaryRange", startDate, endDate, (start, end) -> {
             var result = dailySummaryFacade.getRangeSummary(deviceId, start, end);
             log.info("Daily summary range fetched: {} days with data", result.daysWithData());
             return result;
@@ -130,7 +132,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching meals data for device {} from {} to {}", deviceId, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getMealsData", startDate, endDate, (start, end) -> {
             var result = mealsFacade.getRangeSummary(deviceId, start, end);
             log.info("Meals data fetched: {} total meals over {} days", result.totalMealCount(), result.daysWithData());
             return result;
@@ -145,7 +147,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching weight data for device {} from {} to {}", deviceId, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getWeightData", startDate, endDate, (start, end) -> {
             var result = weightFacade.getRangeSummary(deviceId, start, end);
             log.info("Weight data fetched: {} measurements over {} days", result.measurementCount(), result.daysWithData());
             return result;
@@ -161,7 +163,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching body measurements data for device {} from {} to {}", deviceId, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getBodyMeasurementsData", startDate, endDate, (start, end) -> {
             var result = bodyMeasurementsFacade.getRangeSummary(deviceId, start, end);
             log.info("Body measurements data fetched: {} measurements over {} days", result.measurementCount(), result.daysWithData());
             return result;
@@ -178,7 +180,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching body part history for {} from {} to {}", bodyPart, startDate, endDate);
 
-        return validateAndExecuteRangeQuery(startDate, endDate, (start, end) -> {
+        return validateAndExecuteRangeQuery("getBodyPartHistory", startDate, endDate, (start, end) -> {
             BodyPart part;
             try {
                 part = BodyPart.fromValue(bodyPart);
@@ -201,7 +203,7 @@ class HealthTools {
         var deviceId = getDeviceId(toolContext);
         log.info("Fetching energy requirements for device {} for date {}", deviceId, date);
 
-        return validateAndExecuteSingleDateQuery(date, localDate -> {
+        return validateAndExecuteSingleDateQuery("getEnergyRequirements", date, localDate -> {
             var result = mealsFacade.getEnergyRequirements(deviceId, localDate);
             log.info("Energy requirements fetched: {}", result.isPresent() ? "found" : "not available");
             return result.<Object>map(r -> r)
@@ -209,14 +211,18 @@ class HealthTools {
         });
     }
 
-    private <T> Object validateAndExecuteRangeQuery(String startDateStr, String endDateStr, DateRangeQuery<T> query) {
+    private <T> Object validateAndExecuteRangeQuery(String toolName, String startDateStr, String endDateStr, DateRangeQuery<T> query) {
+        var sample = aiMetrics.startTimer();
+
         var startDateResult = parseDate(startDateStr);
         if (startDateResult instanceof ToolError error) {
+            aiMetrics.recordToolCall(toolName, sample, "validation_error");
             return error;
         }
 
         var endDateResult = parseDate(endDateStr);
         if (endDateResult instanceof ToolError error) {
+            aiMetrics.recordToolCall(toolName, sample, "validation_error");
             return error;
         }
 
@@ -225,20 +231,27 @@ class HealthTools {
 
         var validationError = validateDateRange(start, end);
         if (validationError != null) {
+            aiMetrics.recordToolCall(toolName, sample, "validation_error");
             return validationError;
         }
 
         try {
-            return query.execute(start, end);
+            var result = query.execute(start, end);
+            aiMetrics.recordToolCall(toolName, sample, "success");
+            return result;
         } catch (Exception e) {
             log.error("Error executing range query from {} to {}", start, end, e);
+            aiMetrics.recordToolCall(toolName, sample, "error");
             return new ToolError("Unable to retrieve data. Please try again later.");
         }
     }
 
-    private <T> Object validateAndExecuteSingleDateQuery(String dateStr, SingleDateQuery<T> query) {
+    private <T> Object validateAndExecuteSingleDateQuery(String toolName, String dateStr, SingleDateQuery<T> query) {
+        var sample = aiMetrics.startTimer();
+
         var dateResult = parseDate(dateStr);
         if (dateResult instanceof ToolError error) {
+            aiMetrics.recordToolCall(toolName, sample, "validation_error");
             return error;
         }
 
@@ -246,13 +259,17 @@ class HealthTools {
 
         var validationError = validateSingleDate(date);
         if (validationError != null) {
+            aiMetrics.recordToolCall(toolName, sample, "validation_error");
             return validationError;
         }
 
         try {
-            return query.execute(date);
+            var result = query.execute(date);
+            aiMetrics.recordToolCall(toolName, sample, "success");
+            return result;
         } catch (Exception e) {
             log.error("Error executing single date query for {}", date, e);
+            aiMetrics.recordToolCall(toolName, sample, "error");
             return new ToolError("Unable to retrieve data. Please try again later.");
         }
     }

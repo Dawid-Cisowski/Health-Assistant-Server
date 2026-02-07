@@ -2,7 +2,9 @@ package com.healthassistant.assistant;
 
 import com.healthassistant.assistant.api.AssistantFacade;
 import com.healthassistant.assistant.api.dto.*;
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.SecurityUtils;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -29,6 +31,7 @@ class AssistantService implements AssistantFacade {
 
     private final ChatClient chatClient;
     private final ConversationService conversationService;
+    private final AiMetricsRecorder aiMetrics;
 
     private String buildSystemInstruction(LocalDate currentDate) {
         return """
@@ -159,6 +162,7 @@ class AssistantService implements AssistantFacade {
     public Flux<AssistantEvent> streamChat(ChatRequest request, String deviceId) {
         log.info("Processing streaming chat request for device {}: {} (conversationId: {})",
                 maskDeviceId(deviceId), sanitizeForLog(request.message()), request.conversationId());
+        Timer.Sample timerSample = aiMetrics.startTimer();
 
         return Mono.fromCallable(() -> {
                     var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
@@ -192,6 +196,9 @@ class AssistantService implements AssistantFacade {
                             Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
                             Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
 
+                            aiMetrics.recordChatTokens(promptTokens, completionTokens);
+                            aiMetrics.recordChatRequest(timerSample, "success");
+
                             return new ChatResult(content != null ? content : "", promptTokens, completionTokens);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -199,7 +206,11 @@ class AssistantService implements AssistantFacade {
                                 new ContentEvent(result.content()),
                                 new DoneEvent(ctx.conversationId(), result.promptTokens(), result.completionTokens())
                         ))
-                        .doOnError(error -> log.error("Error in chat call", error))
+                        .doOnError(error -> {
+                            log.error("Error in chat call", error);
+                            aiMetrics.recordChatRequest(timerSample, "error");
+                            aiMetrics.recordAiError("chat", "api_error");
+                        })
                         .onErrorResume(error -> Flux.just(createErrorEvent(error))));
     }
 

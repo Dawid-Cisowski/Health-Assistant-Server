@@ -1,8 +1,10 @@
 package com.healthassistant.mealimport;
 
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.ImageValidationUtils;
 import com.healthassistant.config.ImportConstants;
 import com.healthassistant.config.SecurityUtils;
+import io.micrometer.core.instrument.Timer;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
@@ -41,11 +43,16 @@ class MealImportService implements MealImportFacade {
     private final HealthEventsFacade healthEventsFacade;
     private final MealImportDraftRepository draftRepository;
     private final MealsFacade mealsFacade;
+    private final AiMetricsRecorder aiMetrics;
 
     @Override
     @Transactional
     public MealImportResponse importMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
         validateInput(description, images);
+        var sample = aiMetrics.startTimer();
+        if (images != null) {
+            aiMetrics.recordImportImageCount("meal", images.size());
+        }
 
         if (images != null && !images.isEmpty()) {
             images.forEach(ImageValidationUtils::validateImage);
@@ -57,6 +64,7 @@ class MealImportService implements MealImportFacade {
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
                     SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
+                aiMetrics.recordImportRequest("meal", sample, "error", "direct");
                 return MealImportResponse.failure(
                     "Could not extract valid meal data: " + extractedData.validationError()
                 );
@@ -95,6 +103,9 @@ class MealImportService implements MealImportFacade {
                 extractedData.caloriesKcal(), eventResult.status(),
                 extractedData.promptTokens(), extractedData.completionTokens());
 
+            aiMetrics.recordImportConfidence("meal", extractedData.confidence());
+            aiMetrics.recordImportTokens("meal", extractedData.promptTokens(), extractedData.completionTokens());
+            aiMetrics.recordImportRequest("meal", sample, "success", "direct");
             return MealImportResponse.successWithTokens(
                 mealId,
                 eventId,
@@ -113,6 +124,7 @@ class MealImportService implements MealImportFacade {
 
         } catch (MealExtractionException e) {
             log.warn("Meal extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
+            aiMetrics.recordImportRequest("meal", sample, "error", "direct");
             return MealImportResponse.failure(e.getMessage());
         }
     }
@@ -145,6 +157,7 @@ class MealImportService implements MealImportFacade {
     @Transactional
     public MealDraftResponse analyzeMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
         validateInput(description, images);
+        var sample = aiMetrics.startTimer();
 
         if (images != null && !images.isEmpty()) {
             images.forEach(ImageValidationUtils::validateImage);
@@ -156,6 +169,7 @@ class MealImportService implements MealImportFacade {
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
                     SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
+                aiMetrics.recordImportRequest("meal", sample, "error", "draft");
                 return MealDraftResponse.failure(
                     "Could not extract valid meal data: " + extractedData.validationError()
                 );
@@ -188,10 +202,13 @@ class MealImportService implements MealImportFacade {
                 draft.getId(), SecurityUtils.maskDeviceId(deviceId.value()), draft.getTitle(),
                 draft.getCaloriesKcal(), draft.getConfidence());
 
+            aiMetrics.recordImportConfidence("meal", extractedData.confidence());
+            aiMetrics.recordImportRequest("meal", sample, "success", "draft");
             return mapToResponse(draft);
 
         } catch (MealExtractionException e) {
             log.warn("Meal extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
+            aiMetrics.recordImportRequest("meal", sample, "error", "draft");
             return MealDraftResponse.failure(e.getMessage());
         }
     }
@@ -229,16 +246,19 @@ class MealImportService implements MealImportFacade {
                 if (reAnalyzed.isValid()) {
                     draft.updateFromExtraction(reAnalyzed);
                     draft.recordUserContext(request.answers(), request.userFeedback());
+                    aiMetrics.recordReanalysis("success");
 
                     log.info("Re-analysis successful for draft {}: {} kcal -> {} kcal",
                         draftId, currentExtraction.caloriesKcal(), reAnalyzed.caloriesKcal());
                 } else {
                     log.warn("Re-analysis returned invalid result for draft {}: {}",
                         draftId, reAnalyzed.validationError());
+                    aiMetrics.recordReanalysis("invalid");
                 }
             } catch (MealExtractionException e) {
                 log.warn("Re-analysis failed for draft {}, keeping original values. User should verify data is current. Error: {}",
                     draftId, e.getMessage());
+                aiMetrics.recordReanalysis("error");
                 draft.recordUserContext(request.answers(), request.userFeedback());
             }
         }
@@ -316,6 +336,7 @@ class MealImportService implements MealImportFacade {
         }
 
         draft.markConfirmed();
+        aiMetrics.recordDraftAction("confirmed");
         draftRepository.save(draft);
 
         String eventId = eventResult.eventId() != null

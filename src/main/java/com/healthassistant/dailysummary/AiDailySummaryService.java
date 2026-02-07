@@ -3,8 +3,10 @@ package com.healthassistant.dailysummary;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.dailysummary.api.dto.AiDailySummaryResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import com.healthassistant.guardrails.api.GuardrailProfile;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -34,6 +36,7 @@ class AiDailySummaryService {
     private final DailySummaryJpaRepository repository;
     private final ChatClient chatClient;
     private final GuardrailFacade guardrailFacade;
+    private final AiMetricsRecorder aiMetrics;
 
     private static final String SYSTEM_PROMPT = """
         You are a health assistant that writes very short daily summaries.
@@ -73,10 +76,12 @@ class AiDailySummaryService {
     @Transactional
     public AiDailySummaryResponse generateSummary(String deviceId, LocalDate date) {
         log.info("Generating AI daily summary for device {} date: {}", maskDeviceId(deviceId), date);
+        var sample = aiMetrics.startTimer();
 
         var entityOpt = repository.findByDeviceIdAndDate(deviceId, date);
         if (entityOpt.isEmpty()) {
             log.info("No daily summary entity found for device {} date: {}", maskDeviceId(deviceId), date);
+            aiMetrics.recordSummaryRequest("daily_summary", sample, "success", false);
             return AiDailySummaryResponse.noData(date);
         }
 
@@ -85,6 +90,7 @@ class AiDailySummaryService {
         if (isCacheValid(entity)) {
             log.info("Returning cached AI summary for device {} date: {} (generated at: {})",
                     maskDeviceId(deviceId), date, entity.getAiSummaryGeneratedAt());
+            aiMetrics.recordSummaryRequest("daily_summary", sample, "success", true);
             return new AiDailySummaryResponse(date, entity.getAiSummary(), true);
         }
 
@@ -93,6 +99,8 @@ class AiDailySummaryService {
                 .map(summary -> {
                     AiGenerationResult result = generateFromData(summary, timeOfDay);
                     cacheAiSummary(entity, result.content());
+                    aiMetrics.recordSummaryTokens("daily_summary", result.promptTokens(), result.completionTokens());
+                    aiMetrics.recordSummaryRequest("daily_summary", sample, "success", false);
                     return AiDailySummaryResponse.withTokens(date, result.content(), true,
                             result.promptTokens(), result.completionTokens());
                 })
@@ -154,6 +162,7 @@ class AiDailySummaryService {
             return new AiGenerationResult(content, promptTokens, completionTokens);
         } catch (Exception e) {
             log.error("Failed to generate AI summary", e);
+            aiMetrics.recordAiError("daily_summary", "api_error");
             throw new AiSummaryGenerationException("Failed to generate AI summary", e);
         }
     }
