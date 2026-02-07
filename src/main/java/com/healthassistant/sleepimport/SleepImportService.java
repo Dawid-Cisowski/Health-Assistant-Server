@@ -1,5 +1,6 @@
 package com.healthassistant.sleepimport;
 
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.ImageValidationUtils;
 import com.healthassistant.config.ImportConstants;
 import com.healthassistant.config.SecurityUtils;
@@ -12,6 +13,7 @@ import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.sleepimport.api.SleepImportFacade;
 import com.healthassistant.sleepimport.api.dto.SleepImportResponse;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,10 +38,12 @@ class SleepImportService implements SleepImportFacade {
     private final SleepImageExtractor imageExtractor;
     private final SleepEventMapper eventMapper;
     private final HealthEventsFacade healthEventsFacade;
+    private final AiMetricsRecorder aiMetrics;
 
     @Override
     public SleepImportResponse importFromImage(MultipartFile image, DeviceId deviceId, Integer year) {
         ImageValidationUtils.validateImage(image);
+        var sample = aiMetrics.startTimer();
 
         int effectiveYear = year != null ? year : LocalDate.now(ImportConstants.POLAND_ZONE).getYear();
 
@@ -49,6 +53,7 @@ class SleepImportService implements SleepImportFacade {
             if (!extractedData.isValid()) {
                 log.warn("Sleep extraction invalid for device {}: {}",
                         SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
+                aiMetrics.recordImportRequest("sleep", sample, "error", "direct");
                 return SleepImportResponse.failure(
                         "Could not extract valid sleep data: " + extractedData.validationError()
                 );
@@ -107,6 +112,7 @@ class SleepImportService implements SleepImportFacade {
                         .map(StoreHealthEventsResult.EventError::message)
                         .orElse("Validation failed");
                 log.warn("Sleep event validation failed: {}", errorMessage);
+                aiMetrics.recordImportRequest("sleep", sample, "error", "direct");
                 return SleepImportResponse.failure("Validation error: " + errorMessage);
             }
 
@@ -118,6 +124,10 @@ class SleepImportService implements SleepImportFacade {
                     sleepId, SecurityUtils.maskDeviceId(deviceId.value()), extractedData.totalSleepMinutes(),
                     extractedData.sleepScore(), sleepEventResult.status(), overwrote,
                     extractedData.promptTokens(), extractedData.completionTokens());
+
+            aiMetrics.recordImportConfidence("sleep", extractedData.confidence());
+            aiMetrics.recordImportTokens("sleep", extractedData.promptTokens(), extractedData.completionTokens());
+            aiMetrics.recordImportRequest("sleep", sample, "success", "direct");
 
             return SleepImportResponse.successWithTokens(
                     sleepId,
@@ -138,6 +148,7 @@ class SleepImportService implements SleepImportFacade {
 
         } catch (SleepExtractionException e) {
             log.warn("Sleep extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
+            aiMetrics.recordImportRequest("sleep", sample, "error", "direct");
             return SleepImportResponse.failure(e.getMessage());
         }
     }

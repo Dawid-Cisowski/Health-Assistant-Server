@@ -1,5 +1,6 @@
 package com.healthassistant.weightimport;
 
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.ImageValidationUtils;
 import com.healthassistant.config.ImportConstants;
 import com.healthassistant.config.SecurityUtils;
@@ -10,6 +11,7 @@ import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.weightimport.api.WeightImportFacade;
 import com.healthassistant.weightimport.api.dto.WeightImportResponse;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,10 +34,13 @@ class WeightImportService implements WeightImportFacade {
     private final WeightImageExtractor imageExtractor;
     private final WeightEventMapper eventMapper;
     private final HealthEventsFacade healthEventsFacade;
+    private final AiMetricsRecorder aiMetrics;
 
     @Override
     public WeightImportResponse importFromImages(List<MultipartFile> images, DeviceId deviceId) {
         validateImages(images);
+        var sample = aiMetrics.startTimer();
+        aiMetrics.recordImportImageCount("weight", images.size());
 
         try {
             ExtractedWeightData extractedData = imageExtractor.extract(images);
@@ -43,6 +48,7 @@ class WeightImportService implements WeightImportFacade {
             if (!extractedData.isValid()) {
                 log.warn("Weight extraction invalid for device {}: {}",
                         SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
+                aiMetrics.recordImportRequest("weight", sample, "error", "direct");
                 return WeightImportResponse.failure(mapToSafeErrorMessage(extractedData.validationError()));
             }
 
@@ -59,6 +65,7 @@ class WeightImportService implements WeightImportFacade {
 
             if (result.results().isEmpty()) {
                 log.error("No event results returned from health events facade");
+                aiMetrics.recordImportRequest("weight", sample, "error", "direct");
                 return WeightImportResponse.failure("Internal error: no results returned");
             }
 
@@ -68,6 +75,7 @@ class WeightImportService implements WeightImportFacade {
                         .map(StoreHealthEventsResult.EventError::message)
                         .orElse("Validation failed");
                 log.warn("Weight event validation failed: {}", errorMessage);
+                aiMetrics.recordImportRequest("weight", sample, "error", "direct");
                 return WeightImportResponse.failure("Validation error: " + errorMessage);
             }
 
@@ -80,6 +88,9 @@ class WeightImportService implements WeightImportFacade {
             log.info("Successfully imported weight {} for device {}: {}kg, score={}, BMI={}, status={}, overwrote={}",
                     measurementId, SecurityUtils.maskDeviceId(deviceId.value()), extractedData.weightKg(),
                     extractedData.score(), extractedData.bmi(), eventResult.status(), overwrote);
+
+            aiMetrics.recordImportConfidence("weight", extractedData.confidence());
+            aiMetrics.recordImportRequest("weight", sample, "success", "direct");
 
             return WeightImportResponse.success(
                     measurementId,
@@ -103,6 +114,7 @@ class WeightImportService implements WeightImportFacade {
         } catch (WeightExtractionException e) {
             log.warn("Weight extraction failed for device {}: {}",
                     SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
+            aiMetrics.recordImportRequest("weight", sample, "error", "direct");
             return WeightImportResponse.failure(mapToSafeErrorMessage(e.getMessage()));
         }
     }

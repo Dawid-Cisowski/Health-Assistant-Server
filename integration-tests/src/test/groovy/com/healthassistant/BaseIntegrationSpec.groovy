@@ -146,6 +146,8 @@ abstract class BaseIntegrationSpec extends Specification {
             "test-energy",
             // Guardrail specs
             "test-guardrail",
+            // AI Metrics specs
+            "test-ai-metrics",
             // Reprojection specs
             "test-reproject",
             // Heart rate projection specs

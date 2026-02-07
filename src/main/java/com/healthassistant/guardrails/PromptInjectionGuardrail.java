@@ -1,7 +1,9 @@
 package com.healthassistant.guardrails;
 
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.guardrails.api.GuardrailProfile;
 import com.healthassistant.guardrails.api.GuardrailResult;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -12,9 +14,11 @@ import static com.healthassistant.guardrails.PromptInjectionPatterns.*;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 class PromptInjectionGuardrail implements Guardrail {
 
     private static final int ORDER = 10;
+    private final AiMetricsRecorder aiMetrics;
 
     @Override
     public GuardrailResult evaluate(String input, GuardrailProfile profile) {
@@ -27,6 +31,7 @@ class PromptInjectionGuardrail implements Guardrail {
             if (detected.isPresent()) {
                 log.warn("Prompt injection detected: pattern='{}', input_preview='{}'",
                         detected.get(), sanitizeForLog(input));
+                aiMetrics.recordInjectionDetected(profile.name(), "text");
 
                 if (profile.blockOnDetection()) {
                     return GuardrailResult.blocked(
@@ -42,6 +47,7 @@ class PromptInjectionGuardrail implements Guardrail {
             if (detected.isPresent()) {
                 log.warn("JSON injection detected: pattern='{}', input_preview='{}'",
                         detected.get(), sanitizeForLog(input));
+                aiMetrics.recordInjectionDetected(profile.name(), "json");
 
                 if (profile.blockOnDetection()) {
                     return GuardrailResult.blocked(

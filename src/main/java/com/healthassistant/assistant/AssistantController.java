@@ -5,6 +5,7 @@ import com.healthassistant.assistant.api.AssistantFacade;
 import com.healthassistant.assistant.api.dto.AssistantEvent;
 import com.healthassistant.assistant.api.dto.ChatRequest;
 import com.healthassistant.assistant.api.dto.ErrorEvent;
+import com.healthassistant.config.AiMetricsRecorder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -35,16 +36,19 @@ class AssistantController {
 
     private final AssistantFacade assistantFacade;
     private final ObjectMapper objectMapper;
+    private final AiMetricsRecorder aiMetrics;
     private final int maxRequestsPerMinute;
     private final ConcurrentMap<String, RateLimitBucket> rateLimitBuckets = new ConcurrentHashMap<>();
 
     AssistantController(
             AssistantFacade assistantFacade,
             ObjectMapper objectMapper,
+            AiMetricsRecorder aiMetrics,
             @Value("${app.assistant.rate-limit.max-requests-per-minute:10}") int maxRequestsPerMinute
     ) {
         this.assistantFacade = assistantFacade;
         this.objectMapper = objectMapper;
+        this.aiMetrics = aiMetrics;
         this.maxRequestsPerMinute = maxRequestsPerMinute;
     }
 
@@ -69,6 +73,7 @@ class AssistantController {
 
         if (!tryAcquireRateLimit(deviceId)) {
             log.warn("Rate limit exceeded for device {}", maskDeviceId(deviceId));
+            aiMetrics.recordRateLimitRejected();
             return createRateLimitExceededResponse();
         }
 

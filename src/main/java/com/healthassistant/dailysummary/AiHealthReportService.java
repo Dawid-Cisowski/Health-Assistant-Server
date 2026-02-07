@@ -4,8 +4,10 @@ import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.dailysummary.api.dto.AiHealthReportResponse;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import com.healthassistant.dailysummary.api.dto.DailySummaryRangeSummaryResponse;
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import com.healthassistant.guardrails.api.GuardrailProfile;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -36,6 +38,7 @@ class AiHealthReportService {
     private final DailySummaryJpaRepository repository;
     private final ChatClient chatClient;
     private final GuardrailFacade guardrailFacade;
+    private final AiMetricsRecorder aiMetrics;
 
     private static final String DAILY_REPORT_SYSTEM_PROMPT = """
         You are a health assistant that generates detailed daily health reports.
@@ -116,6 +119,7 @@ class AiHealthReportService {
     @Transactional
     AiHealthReportResponse generateDailyReport(String deviceId, LocalDate date) {
         log.info("Generating AI daily report for device {} date: {}", maskDeviceId(deviceId), date);
+        var sample = aiMetrics.startTimer();
 
         var entityOpt = repository.findByDeviceIdAndDate(deviceId, date);
         if (entityOpt.isEmpty()) {
@@ -127,22 +131,32 @@ class AiHealthReportService {
 
         if (isReportCacheValid(entity)) {
             log.info("Returning cached AI report for device {} date: {}", maskDeviceId(deviceId), date);
+            aiMetrics.recordSummaryRequest("daily_report", sample, "success", true);
             return AiHealthReportResponse.daily(date, entity.getAiReport(), true);
         }
 
-        return dailySummaryFacade.getDailySummary(deviceId, date)
-                .map(summary -> {
-                    String dataContext = summary.toAiDataContext(this::sanitizeForPrompt);
-                    String report = callAi(DAILY_REPORT_SYSTEM_PROMPT,
-                            "Generate a detailed health report for " + date + " based on this data:\n\n" + dataContext);
-                    cacheReport(entity, report);
-                    return AiHealthReportResponse.daily(date, report, true);
-                })
-                .orElse(AiHealthReportResponse.noData(date, date));
+        try {
+            return dailySummaryFacade.getDailySummary(deviceId, date)
+                    .map(summary -> {
+                        String dataContext = summary.toAiDataContext(this::sanitizeForPrompt);
+                        AiResult result = callAi(DAILY_REPORT_SYSTEM_PROMPT,
+                                "Generate a detailed health report for " + date + " based on this data:\n\n" + dataContext);
+                        cacheReport(entity, result.content());
+                        aiMetrics.recordSummaryTokens("daily_report", result.promptTokens(), result.completionTokens());
+                        aiMetrics.recordSummaryRequest("daily_report", sample, "success", false);
+                        return AiHealthReportResponse.daily(date, result.content(), true);
+                    })
+                    .orElse(AiHealthReportResponse.noData(date, date));
+        } catch (Exception e) {
+            aiMetrics.recordSummaryRequest("daily_report", sample, "error", false);
+            aiMetrics.recordAiError("daily_report", "api_error");
+            throw e;
+        }
     }
 
     AiHealthReportResponse generateRangeReport(String deviceId, LocalDate startDate, LocalDate endDate) {
         log.info("Generating AI range report for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
+        var sample = aiMetrics.startTimer();
 
         DailySummaryRangeSummaryResponse rangeSummary = dailySummaryFacade.getRangeSummary(deviceId, startDate, endDate);
 
@@ -151,11 +165,19 @@ class AiHealthReportService {
             return AiHealthReportResponse.noData(startDate, endDate);
         }
 
-        String dataContext = rangeSummary.toAiDataContext(this::sanitizeForPrompt);
-        String report = callAi(RANGE_REPORT_SYSTEM_PROMPT,
-                "Generate a detailed health report for the period " + startDate + " to " + endDate + " based on this data:\n\n" + dataContext);
+        try {
+            String dataContext = rangeSummary.toAiDataContext(this::sanitizeForPrompt);
+            AiResult result = callAi(RANGE_REPORT_SYSTEM_PROMPT,
+                    "Generate a detailed health report for the period " + startDate + " to " + endDate + " based on this data:\n\n" + dataContext);
 
-        return AiHealthReportResponse.range(startDate, endDate, report, true);
+            aiMetrics.recordSummaryTokens("range_report", result.promptTokens(), result.completionTokens());
+            aiMetrics.recordSummaryRequest("range_report", sample, "success", false);
+            return AiHealthReportResponse.range(startDate, endDate, result.content(), true);
+        } catch (Exception e) {
+            aiMetrics.recordSummaryRequest("range_report", sample, "error", false);
+            aiMetrics.recordAiError("range_report", "api_error");
+            throw e;
+        }
     }
 
     private boolean isReportCacheValid(DailySummaryJpaEntity entity) {
@@ -174,10 +196,13 @@ class AiHealthReportService {
         log.info("Cached AI report for date: {}", entity.getDate());
     }
 
-    private String callAi(String systemPrompt, String userMessage) {
+    private record AiResult(String content, Long promptTokens, Long completionTokens) { }
+
+    private AiResult callAi(String systemPrompt, String userMessage) {
         String effectiveMessage = userMessage;
         if (effectiveMessage.length() > MAX_AI_INPUT_LENGTH) {
             log.warn("AI input truncated from {} to {} chars", effectiveMessage.length(), MAX_AI_INPUT_LENGTH);
+            aiMetrics.recordSummaryInputTruncated();
             effectiveMessage = effectiveMessage.substring(0, MAX_AI_INPUT_LENGTH) + "\n\n[Data truncated]";
         }
 
@@ -196,8 +221,16 @@ class AiHealthReportService {
                 throw new AiSummaryGenerationException("AI returned empty report");
             }
 
+            Long promptTokens = null;
+            Long completionTokens = null;
+            if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                promptTokens = usage.getPromptTokens();
+                completionTokens = usage.getGenerationTokens();
+            }
+
             log.info("AI report generated: {} chars", content.length());
-            return content;
+            return new AiResult(content, promptTokens, completionTokens);
         } catch (AiSummaryGenerationException e) {
             throw e;
         } catch (Exception e) {

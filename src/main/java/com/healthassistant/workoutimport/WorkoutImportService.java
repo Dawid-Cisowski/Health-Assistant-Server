@@ -1,5 +1,6 @@
 package com.healthassistant.workoutimport;
 
+import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.ImageValidationUtils;
 import com.healthassistant.config.ImportConstants;
 import com.healthassistant.config.SecurityUtils;
@@ -11,6 +12,7 @@ import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import com.healthassistant.workoutimport.api.WorkoutImportFacade;
 import com.healthassistant.workoutimport.api.dto.WorkoutImportResponse;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,11 +34,13 @@ class WorkoutImportService implements WorkoutImportFacade {
     private final WorkoutEventMapper eventMapper;
     private final HealthEventsFacade healthEventsFacade;
     private final WorkoutFacade workoutFacade;
+    private final AiMetricsRecorder aiMetrics;
 
     @Override
     @Transactional
     public WorkoutImportResponse importFromImage(MultipartFile image, DeviceId deviceId) {
         ImageValidationUtils.validateImage(image);
+        var sample = aiMetrics.startTimer();
 
         try {
             ExtractedWorkoutData extractedData = imageExtractor.extract(image);
@@ -44,6 +48,7 @@ class WorkoutImportService implements WorkoutImportFacade {
             if (!extractedData.isValid()) {
                 log.warn("Workout extraction invalid for device {}: {}",
                     SecurityUtils.maskDeviceId(deviceId.value()), SecurityUtils.sanitizeForLog(extractedData.validationError()));
+                aiMetrics.recordImportRequest("workout", sample, "error", "direct");
                 return WorkoutImportResponse.failure(
                     "Could not extract valid workout data: " + extractedData.validationError()
                 );
@@ -66,6 +71,7 @@ class WorkoutImportService implements WorkoutImportFacade {
                     ? eventResult.error().message()
                     : "Validation failed";
                 log.warn("Workout event validation failed: {}", SecurityUtils.sanitizeForLog(errorMessage));
+                aiMetrics.recordImportRequest("workout", sample, "error", "direct");
                 return WorkoutImportResponse.failure("Validation error: " + errorMessage);
             }
 
@@ -84,6 +90,9 @@ class WorkoutImportService implements WorkoutImportFacade {
             log.info("Successfully imported workout {} for device {}: {} exercises, {} sets, status={}",
                 SecurityUtils.sanitizeForLog(workoutId), SecurityUtils.maskDeviceId(deviceId.value()), exerciseCount, totalSets, eventResult.status());
 
+            aiMetrics.recordImportConfidence("workout", extractedData.confidence());
+            aiMetrics.recordImportRequest("workout", sample, "success", "direct");
+
             return WorkoutImportResponse.success(
                 workoutId,
                 eventId,
@@ -97,6 +106,7 @@ class WorkoutImportService implements WorkoutImportFacade {
 
         } catch (WorkoutExtractionException e) {
             log.warn("Workout extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), SecurityUtils.sanitizeForLog(e.getMessage()));
+            aiMetrics.recordImportRequest("workout", sample, "error", "direct");
             return WorkoutImportResponse.failure(e.getMessage());
         }
     }
