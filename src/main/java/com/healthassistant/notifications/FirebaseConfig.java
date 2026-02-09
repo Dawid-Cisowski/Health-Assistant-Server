@@ -29,7 +29,7 @@ class FirebaseConfig {
             return FirebaseApp.getInstance();
         }
 
-        byte[] decoded = Base64.getDecoder().decode(firebaseCredentialsJson);
+        byte[] decoded = Base64.getMimeDecoder().decode(firebaseCredentialsJson.trim());
         GoogleCredentials credentials;
         try (InputStream is = new ByteArrayInputStream(decoded)) {
             credentials = GoogleCredentials.fromStream(is);
