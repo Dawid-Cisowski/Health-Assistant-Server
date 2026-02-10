@@ -31,6 +31,7 @@ class HealthEventJpaEntity {
     private Long id;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @Column(name = "event_id", nullable = false, unique = true, length = 32)

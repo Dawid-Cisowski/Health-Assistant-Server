@@ -31,6 +31,7 @@ class ConversationMessage {
     private Instant createdAt;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @PrePersist

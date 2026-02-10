@@ -36,6 +36,7 @@ class RoutineExerciseEntity {
     private String notes;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     void setRoutine(RoutineEntity routine) {

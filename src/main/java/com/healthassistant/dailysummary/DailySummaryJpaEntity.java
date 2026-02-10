@@ -39,6 +39,7 @@ class DailySummaryJpaEntity {
     private Map<String, Object> summary;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)

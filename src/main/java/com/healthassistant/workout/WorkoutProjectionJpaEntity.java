@@ -61,6 +61,7 @@ class WorkoutProjectionJpaEntity {
     private Instant updatedAt;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @OneToMany(mappedBy = "workout", cascade = CascadeType.ALL, orphanRemoval = true)

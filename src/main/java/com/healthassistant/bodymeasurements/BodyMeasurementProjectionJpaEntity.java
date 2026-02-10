@@ -89,6 +89,7 @@ class BodyMeasurementProjectionJpaEntity {
     private Instant updatedAt;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @PrePersist

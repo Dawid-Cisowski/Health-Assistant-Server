@@ -35,6 +35,7 @@ class MealImportDraft {
     private UUID id;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @Column(name = "device_id", nullable = false)

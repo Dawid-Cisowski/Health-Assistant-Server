@@ -47,6 +47,7 @@ class WorkoutExerciseProjectionJpaEntity {
     private Instant createdAt;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @PrePersist

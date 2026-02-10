@@ -37,6 +37,7 @@ class RestingHeartRateProjectionJpaEntity {
     private Instant createdAt;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     static RestingHeartRateProjectionJpaEntity create(

@@ -39,6 +39,7 @@ class ExerciseDefinitionEntity {
     private Boolean isAutoCreated;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     private ExerciseDefinitionEntity(

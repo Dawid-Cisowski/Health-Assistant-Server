@@ -41,6 +41,7 @@ class RoutineEntity {
     private Instant updatedAt;
 
     @Version
+    @Column(nullable = false)
     private Integer version;
 
     @OneToMany(mappedBy = "routine", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
