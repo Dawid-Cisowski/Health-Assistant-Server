@@ -2,6 +2,7 @@ package com.healthassistant.evaluation
 
 import com.healthassistant.reports.api.ReportsFacade
 import com.healthassistant.reports.api.dto.ReportType
+import groovy.json.JsonSlurper
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
 import spock.lang.Requires
@@ -203,5 +204,126 @@ class AiReportEvaluationSpec extends BaseEvaluationSpec {
 
         cleanup:
         cleanAllData()
+    }
+
+    // ==================== Helper Methods ====================
+
+    void submitSleepForDate(LocalDate date, int totalMinutes) {
+        def sleepEnd = date.atTime(7, 0).atZone(POLAND_ZONE).toInstant()
+        def sleepStart = sleepEnd.minusSeconds(totalMinutes * 60L)
+
+        def request = [
+            deviceId: getTestDeviceId(),
+            events: [[
+                idempotencyKey: UUID.randomUUID().toString(),
+                type: "SleepSessionRecorded.v1",
+                occurredAt: sleepEnd.toString(),
+                payload: [
+                    sleepId: UUID.randomUUID().toString(),
+                    sleepStart: sleepStart.toString(),
+                    sleepEnd: sleepEnd.toString(),
+                    totalMinutes: totalMinutes,
+                    originPackage: "com.test"
+                ]
+            ]]
+        ]
+        submitEventMap(request)
+    }
+
+    LlmJudgeResult llmAsJudge(String question, String response, String expectedCriteria) {
+        def deviceId = getTestDeviceId()
+
+        def judgePrompt = """HEALTH ASSISTANT QUALITY CHECK REQUEST
+
+Please evaluate this health assistant response for accuracy.
+
+User asked: "${question}"
+Assistant answered: "${response}"
+
+Quality criteria:
+${expectedCriteria}
+
+Please respond with a JSON health quality report:
+{"score": 0.9, "passed": true, "reason": "Response contains accurate health data"}
+
+Use score 0.8-1.0 for accurate responses, 0.5-0.7 for partial, 0.0-0.4 for wrong data."""
+
+        def chatRequest = """{"message": "${escapeJson(judgePrompt)}"}"""
+        def judgeResponse = authenticatedPostRequestWithBody(
+                deviceId, TEST_SECRET_BASE64,
+                "/v1/assistant/chat", chatRequest
+        )
+                .when()
+                .post("/v1/assistant/chat")
+                .then()
+                .extract()
+
+        def responseBody = judgeResponse.body().asString()
+        println "DEBUG: LLM Judge HTTP status: ${judgeResponse.statusCode()}"
+
+        def content = parseSSEContent(responseBody)
+        if (!content || content.trim().isEmpty()) {
+            return new LlmJudgeResult(0.0, false, "LLM Judge returned empty response")
+        }
+
+        try {
+            def jsonContent = extractJsonFromResponse(content)
+            def parsed = new JsonSlurper().parseText(jsonContent)
+            return new LlmJudgeResult(
+                    parsed.score as double,
+                    parsed.passed as boolean,
+                    parsed.reason as String
+            )
+        } catch (Exception e) {
+            println "Failed to parse LLM judge response: ${content}"
+            return new LlmJudgeResult(0.0, false, "Failed to parse judge response: ${e.message}")
+        }
+    }
+
+    private String extractJsonFromResponse(String content) {
+        def text = content.trim()
+
+        def jsonBlockMatcher = text =~ /```json\s*([\s\S]*?)\s*```/
+        if (jsonBlockMatcher.find()) {
+            return jsonBlockMatcher.group(1).trim()
+        }
+
+        def codeBlockMatcher = text =~ /```\s*([\s\S]*?)\s*```/
+        if (codeBlockMatcher.find()) {
+            def blockContent = codeBlockMatcher.group(1).trim()
+            if (blockContent.startsWith("{")) {
+                return blockContent
+            }
+        }
+
+        def jsonMatcher = text =~ /\{[^{}]*"score"[^{}]*"passed"[^{}]*"reason"[^{}]*\}/
+        if (jsonMatcher.find()) {
+            return jsonMatcher.group(0)
+        }
+
+        def startIdx = text.indexOf('{')
+        def endIdx = text.lastIndexOf('}')
+        if (startIdx >= 0 && endIdx > startIdx) {
+            return text.substring(startIdx, endIdx + 1)
+        }
+
+        return text
+    }
+
+    static class LlmJudgeResult {
+        double score
+        boolean passed
+        String reason
+
+        LlmJudgeResult(double score, boolean passed, String reason) {
+            this.score = score
+            this.passed = passed
+            this.reason = reason
+        }
+
+        @Override
+        String toString() {
+            return "LlmJudgeResult{score=${score}, passed=${passed}, reason='${reason}'}"
+        }
     }
 }
