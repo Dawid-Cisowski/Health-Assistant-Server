@@ -1,6 +1,6 @@
 package com.healthassistant.reports;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.reports.api.ReportsFacade;
 import com.healthassistant.reports.api.dto.*;
 import lombok.RequiredArgsConstructor;
