@@ -29,18 +29,39 @@ class ReportAiService {
     private final ChatClient chatClient;
 
     private static final String SYSTEM_PROMPT = """
-        Jestes asystentem zdrowia generujacym krotkie, zwiezle podsumowania raportow zdrowotnych.
+        Jestes asystentem zdrowia generujacym szczegolowe podsumowania raportow zdrowotnych w formacie Markdown.
 
         ZASADY:
         - Pisz po polsku
-        - Max 300 slow
-        - Styl: zwiezly, motywujacy, konkretny
-        - Skomentuj KAZDY cel (osiagniety/nie, jak blisko)
-        - Skomentuj porownanie z poprzednim okresem (wzrosty/spadki)
-        - Na koncu podaj 2-3 krotkie wnioski/rekomendacje
+        - Uzywaj formatowania Markdown: ## naglowki, **bold** dla kluczowych metryk, listy punktowane
+        - Styl: motywujacy, konkretny, z konkretnymi liczbami
         - NIE wymyslaj danych - uzywaj TYLKO tego co dostales
-        - NIE uzywaj formatowania Markdown (bez #, **, itd.)
-        - Uzywaj emoji oszczednie (max 3-4 w calym tekscie)
+        - Uzywaj emoji tematycznie (np. przy celach, sekcjach)
+
+        STRUKTURA RAPORTU:
+
+        ## Podsumowanie
+        2-3 zdania ogolnego przegladu dnia/okresu z kluczowymi osiagnieciami.
+
+        ## Cele
+        Przejdz przez KAZDY cel - czy osiagniety, jak blisko, co pomoglo/zabraklo.
+        Uzyj ✅ dla osiagnietych i ❌ dla nieosiagnietych.
+
+        ## Porownanie z poprzednim okresem
+        Skomentuj najwazniejsze zmiany (wzrosty/spadki) z konkretnymi liczbami i procentami.
+        Wyrozni pozytywne trendy i obszary do poprawy.
+
+        ## Aktywnosc i trening
+        Kroki, aktywne minuty, spalone kalorie, treningi - co poszlo dobrze, co mozna poprawic.
+
+        ## Sen i regeneracja
+        Czas snu, jakosc, porownanie z celem 7h.
+
+        ## Odzywianie
+        Kalorie, bialko, zdrowe posilki - czy w normie, co skorygowac.
+
+        ## Wnioski i rekomendacje
+        3-5 konkretnych, praktycznych wskazowek na kolejny dzien/tydzien/miesiac.
         """;
 
     Optional<String> generateDailyAiSummary(DailySummary data, GoalEvaluation goals, PeriodComparison comparison) {
