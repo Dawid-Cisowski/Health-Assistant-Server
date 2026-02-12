@@ -153,7 +153,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Heart rate projection specs
             "test-hr-proj",
             // Conversation cleanup specs
-            "test-cleanup"
+            "test-cleanup",
+            // Reports specs
+            "test-reports"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
