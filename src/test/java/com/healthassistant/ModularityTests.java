@@ -30,7 +30,7 @@ class ModularityTests {
                 "workoutimport", "sleep", "sleepimport", "calories", "activity",
                 "meals", "mealimport", "googlefit", "assistant", "security", "config",
                 "weight", "weightimport", "heartrate", "guardrails",
-                "bodymeasurements", "notifications"
+                "bodymeasurements", "notifications", "reports"
         );
 
         var actualModules = modules.stream()
@@ -50,6 +50,7 @@ class ModularityTests {
     }
 
     @Test
+    @SuppressWarnings("PMD.UnitTestShouldIncludeAssert") // assertThat is inside forEach lambda
     void projectionModulesShouldNotDependOnImportModules() {
         var projectionModules = List.of("steps", "workout", "sleep", "calories", "activity", "meals", "weight");
         var importModules = Set.of("mealimport", "sleepimport", "workoutimport", "weightimport", "googlefit");
@@ -98,7 +99,8 @@ class ModularityTests {
                 Map.entry("weight", "WeightFacade"),
                 Map.entry("weightimport", "WeightImportFacade"),
                 Map.entry("heartrate", "HeartRateFacade"),
-                Map.entry("bodymeasurements", "BodyMeasurementsFacade")
+                Map.entry("bodymeasurements", "BodyMeasurementsFacade"),
+                Map.entry("reports", "ReportsFacade")
         );
 
         for (var entry : modulesWithFacades.entrySet()) {
