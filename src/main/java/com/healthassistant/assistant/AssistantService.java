@@ -175,59 +175,62 @@ class AssistantService implements AssistantFacade {
                 maskDeviceId(deviceId), sanitizeForLog(request.message()), request.conversationId());
         Timer.Sample timerSample = aiMetrics.startTimer();
 
+        return prepareConversation(request, deviceId)
+                .flatMapMany(ctx -> callAndEmit(ctx, timerSample));
+    }
+
+    private Mono<ConversationContext> prepareConversation(ChatRequest request, String deviceId) {
         return Mono.fromCallable(() -> {
-                    var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
-                    var history = conversationService.loadConversationHistory(conversationId);
-                    var currentDate = LocalDate.now(POLAND_ZONE);
-                    var systemInstruction = buildSystemInstruction(currentDate);
-                    var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
-                    conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
-                    return new ConversationContext(conversationId, messages, deviceId);
+            var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
+            var history = conversationService.loadConversationHistory(conversationId);
+            var currentDate = LocalDate.now(POLAND_ZONE);
+            var systemInstruction = buildSystemInstruction(currentDate);
+            var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
+            conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
+            return new ConversationContext(conversationId, messages, deviceId);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    // NOTE: Using .call() instead of .stream() because Spring AI 2.0.0-M2 has a bug
+    // where streaming with Gemini 3 + tool calling fails due to missing thought_signature.
+    // See: https://github.com/spring-projects/spring-ai/issues/5167
+    // Switch to .stream().content() when this is fixed.
+    private Flux<AssistantEvent> callAndEmit(ConversationContext ctx, Timer.Sample timerSample) {
+        return Mono.fromCallable(() -> {
+                    var response = chatClient.prompt()
+                            .messages(ctx.messages())
+                            .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
+                            .call()
+                            .chatResponse();
+
+                    var content = Optional.ofNullable(response.getResult())
+                            .map(r -> r.getOutput().getText())
+                            .orElse("");
+
+                    if (!content.isBlank()) {
+                        conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
+                        log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
+                    } else {
+                        log.warn("Empty response from AI for conversation {}", ctx.conversationId());
+                    }
+
+                    aiMetrics.recordChatRequest(timerSample, "success");
+                    return content;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(ctx -> Mono.fromCallable(() -> {
-                            var response = chatClient.prompt()
-                                    .messages(ctx.messages())
-                                    .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
-                                    .call()
-                                    .chatResponse();
-
-                            var content = response.getResult() != null && response.getResult().getOutput() != null
-                                    ? response.getResult().getOutput().getText()
-                                    : null;
-
-                            if (content != null && !content.isBlank()) {
-                                conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
-                                log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
-                            } else {
-                                log.warn("Empty response from AI for conversation {}", ctx.conversationId());
-                            }
-
-                            var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
-                            Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
-                            Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
-
-                            aiMetrics.recordChatTokens(promptTokens, completionTokens);
-                            aiMetrics.recordChatRequest(timerSample, "success");
-
-                            return new ChatResult(content != null ? content : "", promptTokens, completionTokens);
-                        })
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .flatMapMany(result -> Flux.<AssistantEvent>just(
-                                new ContentEvent(result.content()),
-                                new DoneEvent(ctx.conversationId(), result.promptTokens(), result.completionTokens())
-                        ))
-                        .doOnError(error -> {
-                            log.error("Error in chat call", error);
-                            aiMetrics.recordChatRequest(timerSample, "error");
-                            aiMetrics.recordAiError("chat", "api_error");
-                        })
-                        .onErrorResume(error -> Flux.just(createErrorEvent(error))));
+                .<AssistantEvent>flatMapMany(content -> Flux.just(
+                        new ContentEvent(content),
+                        new DoneEvent(ctx.conversationId())
+                ))
+                .doOnError(error -> {
+                    log.error("Error in chat call", error);
+                    aiMetrics.recordChatRequest(timerSample, "error");
+                    aiMetrics.recordAiError("chat", "api_error");
+                })
+                .onErrorResume(error -> Flux.just(createErrorEvent(error)));
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages, String deviceId) {}
-
-    private record ChatResult(String content, Long promptTokens, Long completionTokens) {}
 
     private AssistantEvent createErrorEvent(Throwable error) {
         log.error("Chat processing error", error);

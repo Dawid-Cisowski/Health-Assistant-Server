@@ -52,9 +52,14 @@ class TestChatModelConfiguration {
             Flux<ChatResponse> stream(Prompt prompt) {
                 CALL_COUNT.incrementAndGet()
                 String response = CONFIGURED_RESPONSE.get()
-                return Flux.just(
-                        new ChatResponse([new Generation(new AssistantMessage(response))])
-                )
+                String[] words = response.split("(?<=\\s)")
+                if (words.length <= 1) {
+                    return Flux.just(
+                            new ChatResponse([new Generation(new AssistantMessage(response))])
+                    )
+                }
+                return Flux.fromArray(words)
+                        .map { word -> new ChatResponse([new Generation(new AssistantMessage(word))]) }
             }
         }
     }
