@@ -51,6 +51,7 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         def response = waitForApiResponse("/v1/meals/daily/${date}", DEVICE_ID, SECRET_BASE64)
         def meals = response.getList("meals")
         meals.size() == 1
+        meals[0].eventId != null
         meals[0].mealNumber == 1
         meals[0].title == "Grilled chicken salad"
         meals[0].mealType == "LUNCH"
@@ -411,8 +412,15 @@ class MealProjectionSpec extends BaseIntegrationSpec {
         then: "response contains both meals"
         response.getList("meals").size() == 2
 
-        and: "meal details are correct"
+        and: "meal details include eventId for edit/delete operations"
         def meals = response.getList("meals")
+        meals[0].eventId != null
+        meals[0].eventId instanceof String
+        meals[1].eventId != null
+        meals[1].eventId instanceof String
+        meals[0].eventId != meals[1].eventId
+
+        and: "meal details are correct"
         meals[0].mealNumber == 1
         meals[0].title == "Pancakes"
         meals[0].mealType == "BREAKFAST"
