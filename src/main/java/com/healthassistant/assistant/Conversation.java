@@ -1,6 +1,7 @@
 package com.healthassistant.assistant;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -10,7 +11,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "conversations")
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class Conversation {
 
     @Id

@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -19,6 +21,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -241,6 +244,16 @@ class AssistantService implements AssistantFacade {
 
     private static String maskDeviceId(String deviceId) {
         return SecurityUtils.maskDeviceId(deviceId);
+    }
+
+    @Override
+    public Page<ConversationSummaryResponse> listConversations(String deviceId, Pageable pageable) {
+        return conversationService.listConversations(deviceId, pageable);
+    }
+
+    @Override
+    public Optional<ConversationDetailResponse> getConversationDetail(UUID conversationId, String deviceId) {
+        return conversationService.getConversationDetail(conversationId, deviceId);
     }
 
     @Override

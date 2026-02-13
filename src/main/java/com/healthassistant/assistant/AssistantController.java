@@ -4,6 +4,8 @@ import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.assistant.api.AssistantFacade;
 import com.healthassistant.assistant.api.dto.AssistantEvent;
 import com.healthassistant.assistant.api.dto.ChatRequest;
+import com.healthassistant.assistant.api.dto.ConversationDetailResponse;
+import com.healthassistant.assistant.api.dto.ConversationSummaryResponse;
 import com.healthassistant.assistant.api.dto.ErrorEvent;
 import com.healthassistant.config.AiMetricsRecorder;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,12 +16,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.time.Instant;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,6 +39,7 @@ class AssistantController {
 
     private static final long RATE_LIMIT_WINDOW_MS = 60_000L;
     private static final int MAX_RATE_LIMIT_BUCKETS = 10_000;
+    private static final int MAX_PAGE_SIZE = 50;
 
     private final AssistantFacade assistantFacade;
     private final ObjectMapper objectMapper;
@@ -81,6 +88,49 @@ class AssistantController {
                 .map(this::serializeToSseEvent)
                 .doOnComplete(() -> log.info("SSE stream completed for device {}", maskDeviceId(deviceId)))
                 .doOnError(error -> log.error("SSE stream failed for device {}", maskDeviceId(deviceId), error));
+    }
+
+    @GetMapping("/conversations")
+    @Operation(
+            summary = "List conversations",
+            description = "Returns paginated list of conversations for the authenticated device, sorted by most recently updated.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Conversations retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<Page<ConversationSummaryResponse>> listConversations(
+            @RequestAttribute("deviceId") String deviceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        log.info("List conversations request from device {}, page={}, size={}", maskDeviceId(deviceId), page, size);
+        int effectivePage = Math.max(page, 0);
+        int effectiveSize = Math.clamp(size, 1, MAX_PAGE_SIZE);
+        var conversations = assistantFacade.listConversations(deviceId, PageRequest.of(effectivePage, effectiveSize));
+        return ResponseEntity.ok(conversations);
+    }
+
+    @GetMapping("/conversations/{conversationId}")
+    @Operation(
+            summary = "Get conversation detail with messages",
+            description = "Returns conversation metadata and all messages in chronological order.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Conversation retrieved successfully"),
+            @ApiResponse(responseCode = "404", description = "Conversation not found or belongs to another device"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<ConversationDetailResponse> getConversationDetail(
+            @PathVariable UUID conversationId,
+            @RequestAttribute("deviceId") String deviceId
+    ) {
+        log.info("Get conversation detail {} for device {}", conversationId, maskDeviceId(deviceId));
+        return assistantFacade.getConversationDetail(conversationId, deviceId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     private ServerSentEvent<String> serializeToSseEvent(AssistantEvent event) {
