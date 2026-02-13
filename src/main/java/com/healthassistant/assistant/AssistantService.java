@@ -175,83 +175,58 @@ class AssistantService implements AssistantFacade {
                 maskDeviceId(deviceId), sanitizeForLog(request.message()), request.conversationId());
         Timer.Sample timerSample = aiMetrics.startTimer();
 
+        return prepareConversation(request, deviceId)
+                .flatMapMany(ctx -> streamAndFinalize(ctx, timerSample));
+    }
+
+    private Mono<ConversationContext> prepareConversation(ChatRequest request, String deviceId) {
         return Mono.fromCallable(() -> {
-                    var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
-                    var history = conversationService.loadConversationHistory(conversationId);
-                    var currentDate = LocalDate.now(POLAND_ZONE);
-                    var systemInstruction = buildSystemInstruction(currentDate);
-                    var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
-                    conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
-                    return new ConversationContext(conversationId, messages, deviceId);
+            var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
+            var history = conversationService.loadConversationHistory(conversationId);
+            var currentDate = LocalDate.now(POLAND_ZONE);
+            var systemInstruction = buildSystemInstruction(currentDate);
+            var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
+            conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
+            return new ConversationContext(conversationId, messages, deviceId);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Flux<AssistantEvent> streamAndFinalize(ConversationContext ctx, Timer.Sample timerSample) {
+        var contentBuilder = new StringBuilder();
+
+        return chatClient.prompt()
+                .messages(ctx.messages())
+                .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
+                .stream()
+                .content()
+                .map(chunk -> {
+                    contentBuilder.append(chunk);
+                    return (AssistantEvent) new ContentEvent(chunk);
                 })
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(ctx -> {
-                    var contentBuilder = new StringBuilder();
-                    var lastUsage = new UsageHolder();
+                .concatWith(finalizeStream(ctx, contentBuilder, timerSample))
+                .doOnError(error -> {
+                    log.error("Error in chat stream", error);
+                    aiMetrics.recordChatRequest(timerSample, "error");
+                    aiMetrics.recordAiError("chat", "api_error");
+                })
+                .onErrorResume(error -> Flux.just(createErrorEvent(error)));
+    }
 
-                    return chatClient.prompt()
-                            .messages(ctx.messages())
-                            .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
-                            .stream()
-                            .chatResponse()
-                            .filter(response -> response.getResult() != null
-                                    && response.getResult().getOutput() != null
-                                    && response.getResult().getOutput().getText() != null
-                                    && !response.getResult().getOutput().getText().isEmpty())
-                            .<AssistantEvent>map(response -> {
-                                var chunk = response.getResult().getOutput().getText();
-                                contentBuilder.append(chunk);
-
-                                var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
-                                if (usage != null) {
-                                    lastUsage.update(usage);
-                                }
-
-                                return new ContentEvent(chunk);
-                            })
-                            .concatWith(Mono.defer(() -> {
-                                var fullContent = contentBuilder.toString();
-                                return Mono.fromCallable(() -> {
-                                    if (!fullContent.isBlank()) {
-                                        conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, fullContent);
-                                        log.info("Saved assistant response ({} chars) to conversation {}", fullContent.length(), ctx.conversationId());
-                                    } else {
-                                        log.warn("Empty response from AI for conversation {}", ctx.conversationId());
-                                    }
-
-                                    aiMetrics.recordChatTokens(lastUsage.promptTokens(), lastUsage.completionTokens());
-                                    aiMetrics.recordChatRequest(timerSample, "success");
-
-                                    return (AssistantEvent) new DoneEvent(ctx.conversationId(), lastUsage.promptTokens(), lastUsage.completionTokens());
-                                }).subscribeOn(Schedulers.boundedElastic());
-                            }))
-                            .doOnError(error -> {
-                                log.error("Error in chat stream", error);
-                                aiMetrics.recordChatRequest(timerSample, "error");
-                                aiMetrics.recordAiError("chat", "api_error");
-                            })
-                            .onErrorResume(error -> Flux.just(createErrorEvent(error)));
-                });
+    private Mono<AssistantEvent> finalizeStream(ConversationContext ctx, StringBuilder contentBuilder, Timer.Sample timerSample) {
+        return Mono.fromCallable(() -> {
+            var fullContent = contentBuilder.toString();
+            if (!fullContent.isBlank()) {
+                conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, fullContent);
+                log.info("Saved assistant response ({} chars) to conversation {}", fullContent.length(), ctx.conversationId());
+            } else {
+                log.warn("Empty response from AI for conversation {}", ctx.conversationId());
+            }
+            aiMetrics.recordChatRequest(timerSample, "success");
+            return (AssistantEvent) new DoneEvent(ctx.conversationId());
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages, String deviceId) {}
-
-    private static class UsageHolder {
-        private Long promptTokens;
-        private Long completionTokens;
-
-        void update(org.springframework.ai.chat.metadata.Usage usage) {
-            if (usage.getPromptTokens() != null) {
-                this.promptTokens = usage.getPromptTokens().longValue();
-            }
-            if (usage.getCompletionTokens() != null) {
-                this.completionTokens = usage.getCompletionTokens().longValue();
-            }
-        }
-
-        Long promptTokens() { return promptTokens; }
-        Long completionTokens() { return completionTokens; }
-    }
 
     private AssistantEvent createErrorEvent(Throwable error) {
         log.error("Chat processing error", error);
