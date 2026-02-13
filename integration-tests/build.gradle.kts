@@ -39,7 +39,7 @@ dependencyManagement {
         mavenBom("org.springframework.ai:spring-ai-bom:2.0.0-M2")
         mavenBom("org.springframework.modulith:spring-modulith-bom:2.0.1")
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.0")
-        mavenBom("org.testcontainers:testcontainers-bom:1.20.4")
+        mavenBom("org.testcontainers:testcontainers-bom:1.21.4")
     }
 }
 

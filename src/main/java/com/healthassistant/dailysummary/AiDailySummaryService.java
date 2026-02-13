@@ -50,6 +50,11 @@ class AiDailySummaryService {
         - DO NOT use words: "podsumowanie", "dzisiaj", "twoje dane"
         - DO NOT start with "Hej" or "Czesc"
 
+        FORMATTING:
+        - Use **bold** (Markdown) for key numbers and metrics, e.g. **8500 kroków**, **6h 30min snu**
+        - Do NOT use ## headers, bullet lists, or other heavy Markdown - this is a short text
+        - Bold helps the user scan the most important data points at a glance
+
         GOAL EVALUATION (IMPORTANT):
         - Default goals: Steps=10000, Sleep=7h, Calories=2500kcal, Activity=5h
         - TOLERANCE: +/-10% from goal is "achieved" (e.g., 6h50m sleep vs 7h goal = OK, don't criticize!)
@@ -68,9 +73,9 @@ class AiDailySummaryService {
         - Sleep 5h -> "za malo snu, jutro sie odśpisz?"
 
         STYLE EXAMPLES:
-        - "super dzien! wyspales sie, zdrowe jedzenie i duzo krokow - szacun"
-        - "no slabo to wyglada... malo snu i sniadanie moglo byc lepsze"
-        - "solidnie sie narobiles na silce, tylko ten sen moglby byc dluzszy"
+        - "**super dzien**! wyspales sie, zdrowe jedzenie i **duzo krokow** - szacun"
+        - "solidnie sie narobiles na silce 💪 **10200 krokow** i **7h snu** - tak trzymaj!"
+        - "no slabo to wyglada... **malo snu** i sniadanie moglo byc lepsze"
         """;
 
     @Transactional
