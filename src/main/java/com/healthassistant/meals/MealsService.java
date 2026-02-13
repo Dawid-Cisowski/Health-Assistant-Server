@@ -83,7 +83,7 @@ class MealsService implements MealsFacade {
 
                     List<MealDailyDetailResponse.MealDetail> mealDetails = meals.stream()
                             .map(m -> new MealDailyDetailResponse.MealDetail(
-                                    m.getMealNumber(), m.getOccurredAt(), m.getTitle(), m.getMealType(),
+                                    m.getEventId(), m.getMealNumber(), m.getOccurredAt(), m.getTitle(), m.getMealType(),
                                     m.getCaloriesKcal(), m.getProteinGrams(), m.getFatGrams(),
                                     m.getCarbohydratesGrams(), m.getHealthRating()))
                             .toList();

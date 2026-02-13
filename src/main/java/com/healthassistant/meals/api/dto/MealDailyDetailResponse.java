@@ -58,6 +58,10 @@ public record MealDailyDetailResponse(
     List<MealDetail> meals
 ) {
     public record MealDetail(
+        @JsonProperty("eventId")
+        @Schema(description = "Event ID for edit/delete operations", example = "550e8400-e29b-41d4-a716-446655440000")
+        String eventId,
+
         @JsonProperty("mealNumber")
         @Schema(description = "Sequential meal number for the day", example = "1")
         Integer mealNumber,
