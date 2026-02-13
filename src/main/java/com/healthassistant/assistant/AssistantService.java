@@ -176,7 +176,7 @@ class AssistantService implements AssistantFacade {
         Timer.Sample timerSample = aiMetrics.startTimer();
 
         return prepareConversation(request, deviceId)
-                .flatMapMany(ctx -> streamAndFinalize(ctx, timerSample));
+                .flatMapMany(ctx -> callAndEmit(ctx, timerSample));
     }
 
     private Mono<ConversationContext> prepareConversation(ChatRequest request, String deviceId) {
@@ -191,39 +191,43 @@ class AssistantService implements AssistantFacade {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    private Flux<AssistantEvent> streamAndFinalize(ConversationContext ctx, Timer.Sample timerSample) {
-        var contentBuilder = new StringBuilder();
+    // NOTE: Using .call() instead of .stream() because Spring AI 2.0.0-M2 has a bug
+    // where streaming with Gemini 3 + tool calling fails due to missing thought_signature.
+    // See: https://github.com/spring-projects/spring-ai/issues/5167
+    // Switch to .stream().content() when this is fixed.
+    private Flux<AssistantEvent> callAndEmit(ConversationContext ctx, Timer.Sample timerSample) {
+        return Mono.fromCallable(() -> {
+                    var response = chatClient.prompt()
+                            .messages(ctx.messages())
+                            .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
+                            .call()
+                            .chatResponse();
 
-        return chatClient.prompt()
-                .messages(ctx.messages())
-                .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
-                .stream()
-                .content()
-                .map(chunk -> {
-                    contentBuilder.append(chunk);
-                    return (AssistantEvent) new ContentEvent(chunk);
+                    var content = Optional.ofNullable(response.getResult())
+                            .map(r -> r.getOutput().getText())
+                            .orElse("");
+
+                    if (!content.isBlank()) {
+                        conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
+                        log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
+                    } else {
+                        log.warn("Empty response from AI for conversation {}", ctx.conversationId());
+                    }
+
+                    aiMetrics.recordChatRequest(timerSample, "success");
+                    return content;
                 })
-                .concatWith(finalizeStream(ctx, contentBuilder, timerSample))
+                .subscribeOn(Schedulers.boundedElastic())
+                .<AssistantEvent>flatMapMany(content -> Flux.just(
+                        new ContentEvent(content),
+                        new DoneEvent(ctx.conversationId())
+                ))
                 .doOnError(error -> {
-                    log.error("Error in chat stream", error);
+                    log.error("Error in chat call", error);
                     aiMetrics.recordChatRequest(timerSample, "error");
                     aiMetrics.recordAiError("chat", "api_error");
                 })
                 .onErrorResume(error -> Flux.just(createErrorEvent(error)));
-    }
-
-    private Mono<AssistantEvent> finalizeStream(ConversationContext ctx, StringBuilder contentBuilder, Timer.Sample timerSample) {
-        return Mono.fromCallable(() -> {
-            var fullContent = contentBuilder.toString();
-            if (!fullContent.isBlank()) {
-                conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, fullContent);
-                log.info("Saved assistant response ({} chars) to conversation {}", fullContent.length(), ctx.conversationId());
-            } else {
-                log.warn("Empty response from AI for conversation {}", ctx.conversationId());
-            }
-            aiMetrics.recordChatRequest(timerSample, "success");
-            return (AssistantEvent) new DoneEvent(ctx.conversationId());
-        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages, String deviceId) {}
