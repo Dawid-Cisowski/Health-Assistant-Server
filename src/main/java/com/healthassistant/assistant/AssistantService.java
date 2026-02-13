@@ -185,49 +185,73 @@ class AssistantService implements AssistantFacade {
                     return new ConversationContext(conversationId, messages, deviceId);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(ctx -> Mono.fromCallable(() -> {
-                            var response = chatClient.prompt()
-                                    .messages(ctx.messages())
-                                    .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
-                                    .call()
-                                    .chatResponse();
+                .flatMapMany(ctx -> {
+                    var contentBuilder = new StringBuilder();
+                    var lastUsage = new UsageHolder();
 
-                            var content = response.getResult() != null && response.getResult().getOutput() != null
-                                    ? response.getResult().getOutput().getText()
-                                    : null;
+                    return chatClient.prompt()
+                            .messages(ctx.messages())
+                            .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
+                            .stream()
+                            .chatResponse()
+                            .filter(response -> response.getResult() != null
+                                    && response.getResult().getOutput() != null
+                                    && response.getResult().getOutput().getText() != null
+                                    && !response.getResult().getOutput().getText().isEmpty())
+                            .<AssistantEvent>map(response -> {
+                                var chunk = response.getResult().getOutput().getText();
+                                contentBuilder.append(chunk);
 
-                            if (content != null && !content.isBlank()) {
-                                conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
-                                log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
-                            } else {
-                                log.warn("Empty response from AI for conversation {}", ctx.conversationId());
-                            }
+                                var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
+                                if (usage != null) {
+                                    lastUsage.update(usage);
+                                }
 
-                            var usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
-                            Long promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : null;
-                            Long completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+                                return new ContentEvent(chunk);
+                            })
+                            .concatWith(Mono.defer(() -> {
+                                var fullContent = contentBuilder.toString();
+                                return Mono.fromCallable(() -> {
+                                    if (!fullContent.isBlank()) {
+                                        conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, fullContent);
+                                        log.info("Saved assistant response ({} chars) to conversation {}", fullContent.length(), ctx.conversationId());
+                                    } else {
+                                        log.warn("Empty response from AI for conversation {}", ctx.conversationId());
+                                    }
 
-                            aiMetrics.recordChatTokens(promptTokens, completionTokens);
-                            aiMetrics.recordChatRequest(timerSample, "success");
+                                    aiMetrics.recordChatTokens(lastUsage.promptTokens(), lastUsage.completionTokens());
+                                    aiMetrics.recordChatRequest(timerSample, "success");
 
-                            return new ChatResult(content != null ? content : "", promptTokens, completionTokens);
-                        })
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .flatMapMany(result -> Flux.<AssistantEvent>just(
-                                new ContentEvent(result.content()),
-                                new DoneEvent(ctx.conversationId(), result.promptTokens(), result.completionTokens())
-                        ))
-                        .doOnError(error -> {
-                            log.error("Error in chat call", error);
-                            aiMetrics.recordChatRequest(timerSample, "error");
-                            aiMetrics.recordAiError("chat", "api_error");
-                        })
-                        .onErrorResume(error -> Flux.just(createErrorEvent(error))));
+                                    return (AssistantEvent) new DoneEvent(ctx.conversationId(), lastUsage.promptTokens(), lastUsage.completionTokens());
+                                }).subscribeOn(Schedulers.boundedElastic());
+                            }))
+                            .doOnError(error -> {
+                                log.error("Error in chat stream", error);
+                                aiMetrics.recordChatRequest(timerSample, "error");
+                                aiMetrics.recordAiError("chat", "api_error");
+                            })
+                            .onErrorResume(error -> Flux.just(createErrorEvent(error)));
+                });
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages, String deviceId) {}
 
-    private record ChatResult(String content, Long promptTokens, Long completionTokens) {}
+    private static class UsageHolder {
+        private Long promptTokens;
+        private Long completionTokens;
+
+        void update(org.springframework.ai.chat.metadata.Usage usage) {
+            if (usage.getPromptTokens() != null) {
+                this.promptTokens = usage.getPromptTokens().longValue();
+            }
+            if (usage.getCompletionTokens() != null) {
+                this.completionTokens = usage.getCompletionTokens().longValue();
+            }
+        }
+
+        Long promptTokens() { return promptTokens; }
+        Long completionTokens() { return completionTokens; }
+    }
 
     private AssistantEvent createErrorEvent(Throwable error) {
         log.error("Chat processing error", error);
