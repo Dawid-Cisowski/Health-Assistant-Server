@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## TDD Workflow (MANDATORY)
+
+**ALWAYS write integration tests FIRST, before writing any production code.**
+
+1. Write Spock integration tests that define expected behavior
+2. Run tests — they should FAIL (red)
+3. Write minimal production code to make tests pass (green)
+4. Refactor if needed
+5. Every feature, endpoint, or behavior change MUST have corresponding integration tests
+
+**No production code without tests. No exceptions.**
+
+---
+
 ## Build & Development Commands
 
 ### Build & Test
