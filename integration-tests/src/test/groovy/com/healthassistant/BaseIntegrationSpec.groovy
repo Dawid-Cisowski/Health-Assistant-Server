@@ -154,6 +154,8 @@ abstract class BaseIntegrationSpec extends Specification {
             "test-hr-proj",
             // Conversation cleanup specs
             "test-cleanup",
+            // Conversation API specs
+            "test-convo-api",
             // Reports specs
             "test-reports"
         ]

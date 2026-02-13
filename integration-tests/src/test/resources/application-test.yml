@@ -35,5 +35,5 @@ logging:
     com.healthassistant: INFO
     org.springframework: WARN
     org.testcontainers: WARN
-    org.flywaydb: DEBUG
-    org.springframework.boot.flyway: DEBUG
+    org.flywaydb: INFO
+    org.springframework.boot.flyway: INFO
