@@ -1,0 +1,109 @@
+{
+    "timestamp": "2026-02-16T06:53:51.435459455Z",
+    "summary": {
+        "totalTests": 6,
+        "passedTests": 5,
+        "failedTests": 1,
+        "totalTokens": 0,
+        "totalCostUsd": 0.0,
+        "avgResponseMs": 6234
+    },
+    "byModel": {
+        "gemini-3-pro-preview": {
+            "passed": 3,
+            "failed": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalCostUsd": 0.0,
+            "avgResponseMs": 5979.3333333333
+        },
+        "gemini-3-flash-preview": {
+            "passed": 2,
+            "failed": 1,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalCostUsd": 0.0,
+            "avgResponseMs": 6488.6666666667
+        }
+    },
+    "tests": [
+        {
+            "testId": "BM-R01",
+            "testName": "Daily report AI summary",
+            "model": "gemini-3-pro-preview",
+            "passed": true,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 6676,
+            "ttftMs": null,
+            "timestamp": "2026-02-16T06:52:47.618537273Z",
+            "errorMessage": null
+        },
+        {
+            "testId": "BM-R01",
+            "testName": "Daily report AI summary",
+            "model": "gemini-3-flash-preview",
+            "passed": true,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 5966,
+            "ttftMs": null,
+            "timestamp": "2026-02-16T06:53:02.224046272Z",
+            "errorMessage": null
+        },
+        {
+            "testId": "BM-R02",
+            "testName": "Weekly report AI summary",
+            "model": "gemini-3-pro-preview",
+            "passed": true,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 5299,
+            "ttftMs": null,
+            "timestamp": "2026-02-16T06:53:13.636568369Z",
+            "errorMessage": null
+        },
+        {
+            "testId": "BM-R02",
+            "testName": "Weekly report AI summary",
+            "model": "gemini-3-flash-preview",
+            "passed": false,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 7999,
+            "ttftMs": null,
+            "timestamp": "2026-02-16T06:53:27.329039204Z",
+            "errorMessage": "Judge score: 0.0, reason: LLM Judge returned empty response"
+        },
+        {
+            "testId": "BM-R03",
+            "testName": "Report with mixed goals",
+            "model": "gemini-3-pro-preview",
+            "passed": true,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 5963,
+            "ttftMs": null,
+            "timestamp": "2026-02-16T06:53:38.353961014Z",
+            "errorMessage": null
+        },
+        {
+            "testId": "BM-R03",
+            "testName": "Report with mixed goals",
+            "model": "gemini-3-flash-preview",
+            "passed": true,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 5501,
+            "ttftMs": null,
+            "timestamp": "2026-02-16T06:53:48.707230082Z",
+            "errorMessage": null
+        }
+    ]
+}
