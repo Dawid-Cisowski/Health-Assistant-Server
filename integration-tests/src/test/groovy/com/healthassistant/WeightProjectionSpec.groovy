@@ -14,7 +14,7 @@ class WeightProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     def setup() {
-        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31))
+        cleanupAllProjectionsForDevice(DEVICE_ID)
     }
 
     def "Scenario 1: Weight measurement event creates projection"() {
@@ -175,14 +175,7 @@ class WeightProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query range summary"
-        Thread.sleep(500) // Wait for async projection
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/weight/range?startDate=2025-01-05&endDate=2025-01-12")
-                .get("/v1/weight/range?startDate=2025-01-05&endDate=2025-01-12")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/weight/range?startDate=2025-01-05&endDate=2025-01-12", DEVICE_ID, SECRET_BASE64)
 
         then: "response contains measurements from this test (at least 3)"
         response.getInt("measurementCount") >= 3
@@ -286,16 +279,8 @@ class WeightProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        Thread.sleep(500) // Wait for async projection
-
         and: "projection is created with original weight"
-        def firstResponse = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/weight/${measurementId}")
-                .get("/v1/weight/${measurementId}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def firstResponse = waitForApiResponse("/v1/weight/${measurementId}", DEVICE_ID, SECRET_BASE64)
         firstResponse.get("weightKg") == 72.6f
 
         when: "I submit same idempotency key again"

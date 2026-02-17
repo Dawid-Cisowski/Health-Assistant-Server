@@ -112,8 +112,8 @@ tasks.test {
     exclude("**/evaluation/**")
     exclude("**/benchmark/**")
 
-    // Enable parallel test execution
-    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(10)
+    // Enable parallel test execution (use half of available cores, minimum 1)
+    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
 
     // JVM args for parallel execution
     jvmArgs("-Xmx1g", "-XX:+UseParallelGC")

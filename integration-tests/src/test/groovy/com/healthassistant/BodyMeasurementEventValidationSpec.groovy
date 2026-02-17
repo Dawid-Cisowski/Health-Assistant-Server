@@ -11,7 +11,7 @@ class BodyMeasurementEventValidationSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     def setup() {
-        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31))
+        cleanupAllProjectionsForDevice(DEVICE_ID)
     }
 
     def "Scenario 1: Valid body measurement event is accepted"() {

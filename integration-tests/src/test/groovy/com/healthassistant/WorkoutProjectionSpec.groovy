@@ -287,7 +287,7 @@ class WorkoutProjectionSpec extends BaseIntegrationSpec {
         workout.totalExercises == null
         workout.totalSets == null
         workout.totalVolume == null
-        workout.performedAt == null
+        workout.performedAt != null
         workout.source == null
     }
 

@@ -11,7 +11,7 @@ class BodyMeasurementProjectionSpec extends BaseIntegrationSpec {
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
 
     def setup() {
-        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31))
+        cleanupAllProjectionsForDevice(DEVICE_ID)
     }
 
     def "Scenario 1: Body measurement event creates projection"() {
@@ -151,14 +151,7 @@ class BodyMeasurementProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query range summary"
-        Thread.sleep(500)
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/body-measurements/range?startDate=2025-01-05&endDate=2025-01-12")
-                .get("/v1/body-measurements/range?startDate=2025-01-05&endDate=2025-01-12")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/body-measurements/range?startDate=2025-01-05&endDate=2025-01-12", DEVICE_ID, SECRET_BASE64)
 
         then: "response contains measurements from this test (at least 3)"
         response.getInt("measurementCount") >= 3
@@ -249,16 +242,8 @@ class BodyMeasurementProjectionSpec extends BaseIntegrationSpec {
                 .then()
                 .statusCode(200)
 
-        Thread.sleep(500)
-
         and: "projection is created with original measurements"
-        def firstResponse = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/body-measurements/${measurementId}")
-                .get("/v1/body-measurements/${measurementId}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def firstResponse = waitForApiResponse("/v1/body-measurements/${measurementId}", DEVICE_ID, SECRET_BASE64)
         firstResponse.get("bicepsLeftCm") == 38.5f
 
         when: "I submit same idempotency key again"
@@ -375,14 +360,7 @@ class BodyMeasurementProjectionSpec extends BaseIntegrationSpec {
                 .statusCode(200)
 
         when: "I query biceps-left history"
-        Thread.sleep(500)
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/body-measurements/history/biceps-left?from=2025-01-01&to=2025-01-31")
-                .get("/v1/body-measurements/history/biceps-left?from=2025-01-01&to=2025-01-31")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/body-measurements/history/biceps-left?from=2025-01-01&to=2025-01-31", DEVICE_ID, SECRET_BASE64)
 
         then: "history contains data points"
         response.get("bodyPart") == "biceps-left"
