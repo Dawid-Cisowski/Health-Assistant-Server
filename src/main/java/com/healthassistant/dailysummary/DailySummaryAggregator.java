@@ -202,6 +202,14 @@ class DailySummaryAggregator {
     private List<Sleep> aggregateSleep(List<EventData> events) {
         return events.stream()
                 .filter(e -> e.payload() instanceof SleepSessionPayload)
+                .collect(java.util.stream.Collectors.toMap(
+                        e -> ((SleepSessionPayload) e.payload()).sleepStart(),
+                        e -> e,
+                        (older, newer) -> newer,
+                        java.util.LinkedHashMap::new
+                ))
+                .values()
+                .stream()
                 .map(this::toSleep)
                 .filter(Objects::nonNull)
                 .toList();

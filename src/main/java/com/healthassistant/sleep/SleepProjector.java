@@ -37,22 +37,39 @@ class SleepProjector {
     }
 
     private void doSaveProjection(SleepSession session) {
-        Optional<SleepSessionProjectionJpaEntity> existingOpt = sessionRepository.findByEventId(session.eventId());
+        Optional<SleepSessionProjectionJpaEntity> existingByEventId = sessionRepository.findByEventId(session.eventId());
 
         SleepSessionProjectionJpaEntity entity;
+        LocalDate previousDate = null;
 
-        if (existingOpt.isPresent()) {
-            entity = existingOpt.get();
+        if (existingByEventId.isPresent()) {
+            entity = existingByEventId.get();
+            previousDate = entity.getDate();
             entity.updateFrom(session);
             log.debug("Updating existing sleep session for event {}", session.eventId());
         } else {
-            int sessionNumber = calculateNextSessionNumber(session.deviceId(), session.date());
-            entity = SleepSessionProjectionJpaEntity.from(session, sessionNumber);
-            log.debug("Creating new sleep session #{} for date {} from event {}",
-                    sessionNumber, session.date(), session.eventId());
+            Optional<SleepSessionProjectionJpaEntity> existingBySleepStart =
+                    sessionRepository.findByDeviceIdAndSleepStart(session.deviceId(), session.sleepStart());
+
+            if (existingBySleepStart.isPresent()) {
+                entity = existingBySleepStart.get();
+                previousDate = entity.getDate();
+                entity.updateFrom(session);
+                log.info("Replacing sleep session by sleepStart match for device {}, date {}",
+                        maskDeviceId(session.deviceId()), session.date());
+            } else {
+                int sessionNumber = calculateNextSessionNumber(session.deviceId(), session.date());
+                entity = SleepSessionProjectionJpaEntity.from(session, sessionNumber);
+                log.debug("Creating new sleep session #{} for date {} from event {}",
+                        sessionNumber, session.date(), session.eventId());
+            }
         }
 
         sessionRepository.save(entity);
+
+        if (previousDate != null && !previousDate.equals(session.date())) {
+            updateDailyProjection(session.deviceId(), previousDate);
+        }
         updateDailyProjection(session.deviceId(), session.date());
     }
 

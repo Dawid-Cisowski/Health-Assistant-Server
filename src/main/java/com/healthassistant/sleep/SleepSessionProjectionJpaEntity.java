@@ -101,6 +101,8 @@ class SleepSessionProjectionJpaEntity {
     }
 
     void updateFrom(SleepSession session) {
+        this.eventId = session.eventId();
+        this.date = session.date();
         this.sleepStart = session.sleepStart();
         this.sleepEnd = session.sleepEnd();
         this.durationMinutes = session.durationMinutes();
