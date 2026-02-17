@@ -650,6 +650,143 @@ class SleepProjectionSpec extends BaseIntegrationSpec {
         response.getString("lastSleepEnd") == sleepEnd
     }
 
+    def "Scenario 15: Corrected sleep session replaces the original by sleepStart"() {
+        given: "a sleep session from 23:00 to 05:00 (6 hours)"
+        def date = "2025-12-05"
+        def sleepStart = "2025-12-04T22:00:00Z"  // 23:00 Warsaw time (CET = UTC+1)
+        def request1 = """
+        {
+            "events": [{
+                "idempotencyKey": "${DEVICE_ID}|sleep|original-v1",
+                "type": "SleepSessionRecorded.v1",
+                "occurredAt": "2025-12-05T04:00:00Z",
+                "payload": {
+                    "sleepId": "sleep-original-v1",
+                    "sleepStart": "${sleepStart}",
+                    "sleepEnd": "2025-12-05T04:00:00Z",
+                    "totalMinutes": 360,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+
+        and: "a corrected session with same sleepStart but different sleepId (23:00 to 07:00, 8 hours)"
+        def request2 = """
+        {
+            "events": [{
+                "idempotencyKey": "${DEVICE_ID}|sleep|corrected-v2",
+                "type": "SleepSessionRecorded.v1",
+                "occurredAt": "2025-12-05T06:00:00Z",
+                "payload": {
+                    "sleepId": "sleep-corrected-v2",
+                    "sleepStart": "${sleepStart}",
+                    "sleepEnd": "2025-12-05T06:00:00Z",
+                    "totalMinutes": 480,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+
+        when: "I submit the original and then the corrected session"
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request1)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
+
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request2)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "only the corrected session is visible (replaced by sleepStart match)"
+        def response = waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
+        response.getList("sessions").size() == 1
+        response.getList("sessions")[0].durationMinutes == 480
+        response.getInt("totalSleepMinutes") == 480
+        response.getInt("sleepCount") == 1
+    }
+
+    def "Scenario 16: Corrected sleep with nap keeps both when sleepStart differs"() {
+        given: "a main sleep session from 23:00 to 07:00"
+        def date = "2025-12-06"
+        def mainSleepStart = "2025-12-05T22:00:00Z"  // 23:00 Warsaw time
+        def request1 = """
+        {
+            "events": [
+                {
+                    "idempotencyKey": "${DEVICE_ID}|sleep|main-sleep-s16",
+                    "type": "SleepSessionRecorded.v1",
+                    "occurredAt": "2025-12-06T06:00:00Z",
+                    "payload": {
+                        "sleepId": "main-sleep-s16",
+                        "sleepStart": "${mainSleepStart}",
+                        "sleepEnd": "2025-12-06T06:00:00Z",
+                        "totalMinutes": 480,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                },
+                {
+                    "idempotencyKey": "${DEVICE_ID}|sleep|nap-s16",
+                    "type": "SleepSessionRecorded.v1",
+                    "occurredAt": "2025-12-06T14:00:00Z",
+                    "payload": {
+                        "sleepId": "nap-s16",
+                        "sleepStart": "2025-12-06T13:00:00Z",
+                        "sleepEnd": "2025-12-06T14:00:00Z",
+                        "totalMinutes": 60,
+                        "originPackage": "com.google.android.apps.fitness"
+                    }
+                }
+            ],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+
+        and: "a corrected main sleep session with same sleepStart (23:00 to 08:00)"
+        def request2 = """
+        {
+            "events": [{
+                "idempotencyKey": "${DEVICE_ID}|sleep|main-corrected-s16",
+                "type": "SleepSessionRecorded.v1",
+                "occurredAt": "2025-12-06T07:00:00Z",
+                "payload": {
+                    "sleepId": "main-corrected-s16",
+                    "sleepStart": "${mainSleepStart}",
+                    "sleepEnd": "2025-12-06T07:00:00Z",
+                    "totalMinutes": 540,
+                    "originPackage": "com.google.android.apps.fitness"
+                }
+            }],
+            "deviceId": "${DEVICE_ID}"
+        }
+        """
+
+        when: "I submit main + nap, then corrected main"
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request1)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
+
+        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request2)
+                .post("/v1/health-events")
+                .then()
+                .statusCode(200)
+
+        then: "2 sessions visible: corrected main (540 min) + nap (60 min), not 3"
+        def response = waitForApiResponse("/v1/sleep/daily/${date}", DEVICE_ID, SECRET_BASE64)
+        response.getList("sessions").size() == 2
+        response.getInt("totalSleepMinutes") == 600  // 540 + 60
+        response.getInt("sleepCount") == 2
+    }
+
     def "Scenario 14: Device isolation - different devices have separate projections"() {
         given: "sleep from two different devices"
         def date = "2025-12-04"
