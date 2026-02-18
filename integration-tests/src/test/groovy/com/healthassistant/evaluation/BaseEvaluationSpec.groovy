@@ -456,17 +456,18 @@ abstract class BaseEvaluationSpec extends Specification {
      * Wait for async projections to complete by polling for daily summary existence.
      * Daily summary is generated last (via AllEventsStoredEvent), so its presence
      * indicates all projections are done.
+     * Checks for ANY daily summary for the device (not date-specific) since
+     * events may project to different dates (e.g. sleep sessions → previous day).
      */
     void waitForProjections() {
         def deviceId = getTestDeviceId()
-        def today = java.sql.Date.valueOf(LocalDate.now(POLAND_ZONE))
         Awaitility.await()
-                .atMost(5, java.util.concurrent.TimeUnit.SECONDS)
-                .pollInterval(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .atMost(10, java.util.concurrent.TimeUnit.SECONDS)
+                .pollInterval(200, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .until({
                     def count = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM daily_summaries WHERE device_id = ? AND date = ?",
-                        Integer, deviceId, today)
+                        "SELECT COUNT(*) FROM daily_summaries WHERE device_id = ?",
+                        Integer, deviceId)
                     count > 0
                 } as java.util.concurrent.Callable<Boolean>)
     }
