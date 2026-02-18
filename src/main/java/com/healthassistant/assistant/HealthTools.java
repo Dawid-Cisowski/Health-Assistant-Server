@@ -50,6 +50,10 @@ class HealthTools {
 
     private static final int MAX_DATE_RANGE_DAYS = 365;
     private static final int MAX_HISTORICAL_YEARS = 5;
+    private static final String METRIC_SUCCESS = "success";
+    private static final String METRIC_ERROR = "error";
+    private static final String METRIC_VALIDATION_ERROR = "validation_error";
+    private static final String SOURCE_ASSISTANT = "ASSISTANT";
 
     private final StepsFacade stepsFacade;
     private final SleepFacade sleepFacade;
@@ -367,7 +371,7 @@ class HealthTools {
                     measurementId, timestamp, null, parsedWeight,
                     null, null, null, null, null,
                     null, null, null, null, null,
-                    null, null, null, null, null, null, null, "ASSISTANT"
+                    null, null, null, null, null, null, null, SOURCE_ASSISTANT
             );
 
             var idempotencyKey = deviceId + "|weight|" + measurementId;
@@ -419,7 +423,7 @@ class HealthTools {
             }
 
             var workoutId = "assistant-workout-" + UUID.randomUUID();
-            var payload = new WorkoutPayload(workoutId, timestamp, "ASSISTANT", note, exercises);
+            var payload = new WorkoutPayload(workoutId, timestamp, SOURCE_ASSISTANT, note, exercises);
 
             var idempotencyKey = deviceId + "|workout|" + workoutId;
             var command = new StoreHealthEventsCommand(
@@ -481,7 +485,7 @@ class HealthTools {
             }
             var sleepId = "assistant-sleep-" + UUID.randomUUID();
 
-            var payload = new SleepSessionPayload(sleepId, parsedStart, parsedEnd, totalMinutes, "ASSISTANT");
+            var payload = new SleepSessionPayload(sleepId, parsedStart, parsedEnd, totalMinutes, SOURCE_ASSISTANT);
 
             var idempotencyKey = deviceId + "|sleep|" + sleepId;
             var command = new StoreHealthEventsCommand(
@@ -509,15 +513,15 @@ class HealthTools {
         var sample = aiMetrics.startTimer();
         try {
             var result = command.execute();
-            aiMetrics.recordToolCall(toolName, sample, "success");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_SUCCESS);
             return result;
         } catch (IllegalArgumentException e) {
             log.warn("Validation error in mutation {}: {}", toolName, e.getMessage());
-            aiMetrics.recordToolCall(toolName, sample, "validation_error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_VALIDATION_ERROR);
             return new ToolError(e.getMessage());
         } catch (Exception e) {
             log.error("Error executing mutation {}", toolName, e);
-            aiMetrics.recordToolCall(toolName, sample, "error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_ERROR);
             return new ToolError(mapMutationErrorMessage(e));
         }
     }
@@ -527,13 +531,13 @@ class HealthTools {
 
         var startDateResult = parseDate(startDateStr);
         if (startDateResult instanceof ToolError error) {
-            aiMetrics.recordToolCall(toolName, sample, "validation_error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_VALIDATION_ERROR);
             return error;
         }
 
         var endDateResult = parseDate(endDateStr);
         if (endDateResult instanceof ToolError error) {
-            aiMetrics.recordToolCall(toolName, sample, "validation_error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_VALIDATION_ERROR);
             return error;
         }
 
@@ -542,17 +546,17 @@ class HealthTools {
 
         var validationError = validateDateRange(start, end);
         if (validationError != null) {
-            aiMetrics.recordToolCall(toolName, sample, "validation_error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_VALIDATION_ERROR);
             return validationError;
         }
 
         try {
             var result = query.execute(start, end);
-            aiMetrics.recordToolCall(toolName, sample, "success");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_SUCCESS);
             return result;
         } catch (Exception e) {
             log.error("Error executing range query from {} to {}", start, end, e);
-            aiMetrics.recordToolCall(toolName, sample, "error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_ERROR);
             return new ToolError("Unable to retrieve data. Please try again later.");
         }
     }
@@ -562,7 +566,7 @@ class HealthTools {
 
         var dateResult = parseDate(dateStr);
         if (dateResult instanceof ToolError error) {
-            aiMetrics.recordToolCall(toolName, sample, "validation_error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_VALIDATION_ERROR);
             return error;
         }
 
@@ -570,17 +574,17 @@ class HealthTools {
 
         var validationError = validateSingleDate(date);
         if (validationError != null) {
-            aiMetrics.recordToolCall(toolName, sample, "validation_error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_VALIDATION_ERROR);
             return validationError;
         }
 
         try {
             var result = query.execute(date);
-            aiMetrics.recordToolCall(toolName, sample, "success");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_SUCCESS);
             return result;
         } catch (Exception e) {
             log.error("Error executing single date query for {}", date, e);
-            aiMetrics.recordToolCall(toolName, sample, "error");
+            aiMetrics.recordToolCall(toolName, sample, METRIC_ERROR);
             return new ToolError("Unable to retrieve data. Please try again later.");
         }
     }

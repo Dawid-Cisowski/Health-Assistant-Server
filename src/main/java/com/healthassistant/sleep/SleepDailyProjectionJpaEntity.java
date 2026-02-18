@@ -91,29 +91,33 @@ class SleepDailyProjectionJpaEntity {
         updatedAt = Instant.now();
     }
 
-    void updateDailyStats(int totalSleepMinutes,
-                          int sleepCount,
-                          Instant firstSleepStart,
-                          Instant lastSleepEnd,
-                          Integer longestSessionMinutes,
-                          Integer shortestSessionMinutes,
-                          int averageSessionMinutes,
-                          int totalLightSleepMinutes,
-                          int totalDeepSleepMinutes,
-                          int totalRemSleepMinutes,
-                          int totalAwakeMinutes,
-                          Integer averageSleepScore) {
-        this.totalSleepMinutes = totalSleepMinutes;
-        this.sleepCount = sleepCount;
-        this.firstSleepStart = firstSleepStart;
-        this.lastSleepEnd = lastSleepEnd;
-        this.longestSessionMinutes = longestSessionMinutes;
-        this.shortestSessionMinutes = shortestSessionMinutes;
-        this.averageSessionMinutes = averageSessionMinutes;
-        this.totalLightSleepMinutes = totalLightSleepMinutes;
-        this.totalDeepSleepMinutes = totalDeepSleepMinutes;
-        this.totalRemSleepMinutes = totalRemSleepMinutes;
-        this.totalAwakeMinutes = totalAwakeMinutes;
-        this.averageSleepScore = averageSleepScore;
+    void updateDailyStats(SleepDailyStats stats) {
+        this.totalSleepMinutes = stats.totalSleepMinutes();
+        this.sleepCount = stats.sleepCount();
+        this.firstSleepStart = stats.firstSleepStart();
+        this.lastSleepEnd = stats.lastSleepEnd();
+        this.longestSessionMinutes = stats.longestSessionMinutes();
+        this.shortestSessionMinutes = stats.shortestSessionMinutes();
+        this.averageSessionMinutes = stats.averageSessionMinutes();
+        this.totalLightSleepMinutes = stats.totalLightSleepMinutes();
+        this.totalDeepSleepMinutes = stats.totalDeepSleepMinutes();
+        this.totalRemSleepMinutes = stats.totalRemSleepMinutes();
+        this.totalAwakeMinutes = stats.totalAwakeMinutes();
+        this.averageSleepScore = stats.averageSleepScore();
     }
+
+    record SleepDailyStats(
+            int totalSleepMinutes,
+            int sleepCount,
+            Instant firstSleepStart,
+            Instant lastSleepEnd,
+            Integer longestSessionMinutes,
+            Integer shortestSessionMinutes,
+            int averageSessionMinutes,
+            int totalLightSleepMinutes,
+            int totalDeepSleepMinutes,
+            int totalRemSleepMinutes,
+            int totalAwakeMinutes,
+            Integer averageSleepScore
+    ) {}
 }

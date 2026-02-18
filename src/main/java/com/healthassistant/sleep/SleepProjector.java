@@ -169,7 +169,7 @@ class SleepProjector {
                         .date(date)
                         .build());
 
-        daily.updateDailyStats(
+        daily.updateDailyStats(new SleepDailyProjectionJpaEntity.SleepDailyStats(
                 totalSleepMinutes,
                 sleepCount,
                 firstSleepStart,
@@ -182,7 +182,7 @@ class SleepProjector {
                 totalRemSleep,
                 totalAwake,
                 averageSleepScore
-        );
+        ));
 
         dailyRepository.save(daily);
     }
