@@ -161,7 +161,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Conversation API specs
             "test-convo-api",
             // Reports specs
-            "test-reports"
+            "test-reports",
+            // Assistant mutation specs
+            "test-assistant-mutation"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
