@@ -8,7 +8,7 @@
 
 Backend server for managing health data with Health Connect integration, AI assistant, and meal/workout tracking.
 
-**Tech Stack**: Java 21 + Spring Boot 3.3 + PostgreSQL 16 + Spring AI (Gemini) + Spring Modulith
+**Tech Stack**: Java 21 + Spring Boot 4.0.2 + PostgreSQL 16 + Spring AI 2.0 (Gemini) + Spring Modulith
 
 ## Features
 
@@ -22,7 +22,8 @@ Backend server for managing health data with Health Connect integration, AI assi
 - **Conversation History**: Multi-turn with context (last 20 messages)
 - **Date Recognition**: "today", "yesterday", "last week", "last month"
 - **SSE Streaming**: Real-time word-by-word responses
-- **5 AI Tools**: Steps, sleep, workouts, meals, daily summaries
+- **18 AI Tools** (11 read + 7 mutation): Steps, sleep, workouts, meals, daily summaries, weight, body measurements, energy requirements + record/update/delete via chat
+- **Mutation via Chat**: "Ate chicken with rice for lunch, 500 kcal", "Record my weight 82.5 kg", "Delete today's breakfast"
 - **Gemini 3 Flash**: Google's latest model with function calling
 
 ### Event Sourcing & Projections
@@ -69,7 +70,7 @@ Backend server for managing health data with Health Connect integration, AI assi
 
 ## Architecture
 
-### 21 Modules (Spring Modulith)
+### 23 Modules (Spring Modulith)
 
 ```
 com.healthassistant/
@@ -90,7 +91,9 @@ com.healthassistant/
 ├── heartrate/       # Heart rate projections (summary + resting)
 ├── bodymeasurements/ # Body measurements (body fat, muscle mass)
 ├── guardrails/      # AI safety guardrails and content filtering
-├── assistant/       # AI chat with Gemini
+├── assistant/       # AI chat with Gemini (18 tools: read + mutation)
+├── notifications/   # FCM push notifications (daily/weekly/monthly)
+├── reports/         # Health reports generation
 ├── googlefit/       # Historical sync with Google Fit
 ├── security/        # HMAC filter, nonce cache
 └── config/          # Configuration, exception handling
@@ -245,7 +248,7 @@ StoreHealthEventsCommandHandler
 
 ## Database Schema
 
-### 44 Flyway Migrations (V1-V44)
+### 48 Flyway Migrations (V1-V48)
 
 **Core Tables**:
 - `health_events` - Event log (JSONB payload, GIN index, version)
@@ -333,26 +336,26 @@ docker run --name postgres-dev \
 open integration-tests/build/reports/tests/test/index.html
 ```
 
-### Integration Tests (64 Spec Files)
+### Integration Tests (77 Spec Files)
 - **Event Validation**: Steps, Sleep, Workout, Meal, HeartRate, Distance, WalkingSession, ActiveMinutes, ActiveCalories, Weight
 - **Projections**: Steps, Sleep, Workout, Calories, Activity, Meals, Weight, ExerciseStatistics, PersonalRecords
-- **Features**: DailySummary, Assistant, ConversationHistory, GoogleFitSync, HmacAuthentication, BatchEventIngestion, Routines, MealCrud, WorkoutCrud
+- **Features**: DailySummary, Assistant, AssistantMutationTools, ConversationHistory, GoogleFitSync, HmacAuthentication, BatchEventIngestion, Routines, MealCrud, WorkoutCrud
 - **Import**: WorkoutImport, MealImport, SleepImport, MealImportDraft, MealImportEdgeCases
-- **AI Evaluation**: Hallucination, ToolErrorHandling, ConversationAccuracy, ContentFiltering, PromptInjection, StreamErrorRecovery, ConcurrentRequests, MultiToolQuery
+- **AI Evaluation**: Hallucination, ToolErrorHandling, ConversationAccuracy, ContentFiltering, PromptInjection, StreamErrorRecovery, ConcurrentRequests, MultiToolQuery, MutationTools, DailySummaryEvaluation
 - **AI Import**: WorkoutImportAI, SleepImportAI, MealImportAI, WeightImportAI
 - **Security**: HmacAuthentication, EventSecurity, GlobalExceptionHandler, RateLimiting, Guardrails
 - **Concurrency**: OptimisticLocking
 - **AI Features**: AiDailySummary, AiDailySummaryCache
 - **Cross-cutting**: TimezoneBoundary, CrossModuleConsistency, EventCorrection, EventDeletion
-- **Benchmarks**: AiBenchmark
+- **Benchmarks**: AiBenchmark, AiMutationBenchmark
 
 ## Tech Stack
 
 | Category | Technology |
 |----------|------------|
 | Language | Java 21 (Virtual Threads) |
-| Framework | Spring Boot 3.3.5 |
-| AI | Spring AI 1.1.0 + Gemini 3 Flash |
+| Framework | Spring Boot 4.0.2 |
+| AI | Spring AI 2.0.0-M2 + Gemini 3 Flash |
 | Architecture | Spring Modulith 2.0.1 |
 | Database | PostgreSQL 16 (JSONB) |
 | Migrations | Flyway |
@@ -410,6 +413,6 @@ curl http://localhost:8080/actuator/prometheus
 
 ---
 
-**Built with Java 21 + Spring Boot 3.3 + Spring AI**
+**Built with Java 21 + Spring Boot 4.0.2 + Spring AI 2.0**
 
 Copyright 2026. All rights reserved.

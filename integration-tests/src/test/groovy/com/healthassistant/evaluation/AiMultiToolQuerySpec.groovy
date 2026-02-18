@@ -56,7 +56,6 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
         evaluation.isPass()
     }
 
-    @spock.lang.Ignore("Flaky: Gemini non-deterministically omits some data sources in synthesis")
     def "AI synthesizes data from multiple sources"() {
         given: "steps, calories, sleep, and meal data"
         submitStepsForToday(10000)
