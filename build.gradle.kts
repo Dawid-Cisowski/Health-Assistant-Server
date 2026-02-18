@@ -173,7 +173,8 @@ tasks.jacocoTestReport {
 // SonarQube configuration
 sonar {
     properties {
-        property("sonar.projectKey", "health-assistant-server")
+        property("sonar.projectKey", "Dawid-Cisowski_Health-Assistant-Server")
+        property("sonar.organization", "dawid-cisowski")
         property("sonar.host.url", "https://sonarcloud.io")
 
         // JaCoCo coverage from integration-tests module

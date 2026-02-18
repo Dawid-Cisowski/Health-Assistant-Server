@@ -13,10 +13,12 @@ import com.healthassistant.weight.api.WeightFacade
 import com.healthassistant.heartrate.api.HeartRateFacade
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
+import org.awaitility.Awaitility
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.ContextConfiguration
 import org.testcontainers.containers.PostgreSQLContainer
@@ -92,6 +94,9 @@ abstract class BaseEvaluationSpec extends Specification {
 
     @Autowired
     HeartRateFacade heartRateFacade
+
+    @Autowired
+    JdbcTemplate jdbcTemplate
 
     @Autowired(required = false)
     com.healthassistant.assistant.api.AssistantFacade assistantFacade
@@ -169,41 +174,28 @@ abstract class BaseEvaluationSpec extends Specification {
         if (assistantFacade != null) {
             assistantFacade.deleteConversationsByDeviceId(deviceId)
         }
-        // Delete all projections for device within a reasonable date range
-        def today = LocalDate.now(POLAND_ZONE)
-        def startDate = today.minusMonths(6)
-        def endDate = today.plusDays(7)
-
-        startDate.datesUntil(endDate.plusDays(1)).toList().each { date ->
-            cleanupProjectionsForDate(deviceId, date)
-        }
+        // Bulk delete all projections for device using SQL (replaces 214 days × 8 facades = 1712 operations)
+        cleanupAllProjectionsForDevice(deviceId)
     }
 
-    void cleanupProjectionsForDate(String deviceId, LocalDate date) {
-        if (stepsFacade != null) {
-            stepsFacade.deleteProjectionsForDate(deviceId, date)
-        }
-        if (sleepFacade != null) {
-            sleepFacade.deleteProjectionsForDate(deviceId, date)
-        }
-        if (workoutFacade != null) {
-            workoutFacade.deleteProjectionsForDate(deviceId, date)
-        }
-        if (mealsFacade != null) {
-            mealsFacade.deleteProjectionsForDate(deviceId, date)
-        }
-        if (caloriesFacade != null) {
-            caloriesFacade.deleteProjectionsForDate(deviceId, date)
-        }
-        if (dailySummaryFacade != null) {
-            dailySummaryFacade.deleteSummaryForDate(deviceId, date)
-        }
-        if (weightFacade != null) {
-            weightFacade.deleteProjectionsForDate(deviceId, date)
-        }
-        if (heartRateFacade != null) {
-            heartRateFacade.deleteProjectionsForDate(deviceId, date)
-        }
+    void cleanupAllProjectionsForDevice(String deviceId) {
+        jdbcTemplate.update("DELETE FROM workout_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM steps_hourly_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM steps_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM sleep_sessions_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM sleep_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM calories_hourly_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM calories_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM activity_hourly_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM activity_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM daily_summaries WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM weight_measurement_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM heart_rate_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM resting_heart_rate_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM body_measurement_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM health_reports WHERE device_id = ?", deviceId)
     }
 
     // ==================== Assistant Helpers ====================
@@ -245,32 +237,46 @@ abstract class BaseEvaluationSpec extends Specification {
     /**
      * Send a chat message with optional conversation context.
      * Returns both content and conversationId for multi-turn conversations.
+     * Retries once if Gemini returns an empty response (transient API failure).
      */
     Map askAssistantWithContext(String message, String conversationId) {
         def deviceId = getTestDeviceId()
-        println "DEBUG: Asking assistant for device ${deviceId}: ${message} (conversationId: ${conversationId ?: 'new'})"
+        def maxAttempts = 2
 
-        def chatRequest = conversationId ?
-            """{"message": "${escapeJson(message)}", "conversationId": "${conversationId}"}""" :
-            """{"message": "${escapeJson(message)}"}"""
+        Map result = null
+        (1..maxAttempts).find { attempt ->
+            if (attempt > 1) {
+                println "DEBUG: Retry #${attempt} for device ${deviceId} (previous response was empty)"
+                Thread.sleep(2000)
+            }
+            println "DEBUG: Asking assistant for device ${deviceId}: ${message} (conversationId: ${conversationId ?: 'new'}, attempt: ${attempt})"
 
-        def response = authenticatedPostRequestWithBody(
-                deviceId, TEST_SECRET_BASE64,
-                "/v1/assistant/chat", chatRequest
-        )
-                .when()
-                .post("/v1/assistant/chat")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .asString()
+            def chatRequest = conversationId ?
+                """{"message": "${escapeJson(message)}", "conversationId": "${conversationId}"}""" :
+                """{"message": "${escapeJson(message)}"}"""
 
-        def content = parseSSEContent(response)
-        def newConversationId = parseSSEConversationId(response)
-        println "DEBUG: Assistant response for device ${deviceId}: ${content?.take(100)}... (conversationId: ${newConversationId})"
+            def response = authenticatedPostRequestWithBody(
+                    deviceId, TEST_SECRET_BASE64,
+                    "/v1/assistant/chat", chatRequest
+            )
+                    .when()
+                    .post("/v1/assistant/chat")
+                    .then()
+                    .statusCode(200)
+                    .extract()
+                    .body()
+                    .asString()
 
-        return [content: content, conversationId: newConversationId]
+            def content = parseSSEContent(response)
+            def newConversationId = parseSSEConversationId(response)
+            println "DEBUG: Assistant response for device ${deviceId}: ${content?.take(100)}... (conversationId: ${newConversationId})"
+
+            result = [content: content, conversationId: newConversationId]
+            // Stop retrying if we got a non-empty response
+            content && !content.isBlank()
+        }
+
+        return result
     }
 
     /**
@@ -461,11 +467,23 @@ abstract class BaseEvaluationSpec extends Specification {
     }
 
     /**
-     * Wait for async projections to complete.
-     * Increased timeout to ensure all projections and daily summaries are fully updated.
+     * Wait for async projections to complete by polling for daily summary existence.
+     * Daily summary is generated last (via AllEventsStoredEvent), so its presence
+     * indicates all projections are done.
+     * Checks for ANY daily summary for the device (not date-specific) since
+     * events may project to different dates (e.g. sleep sessions → previous day).
      */
     void waitForProjections() {
-        Thread.sleep(1000) // Increased from 500ms to 2000ms for AI evaluation tests
+        def deviceId = getTestDeviceId()
+        Awaitility.await()
+                .atMost(10, java.util.concurrent.TimeUnit.SECONDS)
+                .pollInterval(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .until({
+                    def count = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM daily_summaries WHERE device_id = ?",
+                        Integer, deviceId)
+                    count > 0
+                } as java.util.concurrent.Callable<Boolean>)
     }
 
     // ==================== HMAC Authentication Helpers ====================
