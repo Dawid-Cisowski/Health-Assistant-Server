@@ -225,7 +225,7 @@ class WorkoutService implements WorkoutFacade {
         log.info("Deleting workout {} for device {}", sanitizeForLog(eventId), sanitizeForLog(deviceId));
         StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.INVALID) {
             String errorDetail = result.results().isEmpty() ? "No result" :
                     result.results().getFirst().error() != null ?
                             result.results().getFirst().error().message() : "Unknown error";
@@ -284,7 +284,7 @@ class WorkoutService implements WorkoutFacade {
         log.info("Updating workout {} for device {}", sanitizeForLog(eventId), sanitizeForLog(deviceId));
         StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.INVALID) {
             String errorDetail = result.results().isEmpty() ? "No result" :
                     result.results().getFirst().error() != null ?
                             result.results().getFirst().error().message() : "Unknown error";

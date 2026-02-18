@@ -733,7 +733,7 @@ class HealthTools {
 
     private void validateStoreResult(StoreHealthEventsResult result, String entityName) {
         if (result.results().isEmpty() ||
-                result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+                result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.INVALID) {
             var errorDetail = result.results().isEmpty() ? "No result" :
                     result.results().getFirst().error() != null ?
                             result.results().getFirst().error().message() : "Unknown error";

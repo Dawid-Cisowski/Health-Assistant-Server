@@ -2,7 +2,6 @@ package com.healthassistant.weightimport;
 
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.payload.WeightMeasurementPayload;
-import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import org.springframework.stereotype.Component;
 
@@ -15,8 +14,7 @@ class WeightEventMapper {
     StoreHealthEventsCommand.EventEnvelope mapToEventEnvelope(
             ExtractedWeightData data,
             String measurementId,
-            IdempotencyKey idempotencyKey,
-            DeviceId deviceId
+            IdempotencyKey idempotencyKey
     ) {
         WeightMeasurementPayload payload = new WeightMeasurementPayload(
                 measurementId,

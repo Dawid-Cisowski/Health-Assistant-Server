@@ -58,9 +58,9 @@ class HealthEventsResponseMapper {
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
         return new Summary(
-                statusCounts.getOrDefault(EventStatus.stored, 0L),
-                statusCounts.getOrDefault(EventStatus.duplicate, 0L),
-                statusCounts.getOrDefault(EventStatus.invalid, 0L)
+                statusCounts.getOrDefault(EventStatus.STORED, 0L),
+                statusCounts.getOrDefault(EventStatus.DUPLICATE, 0L),
+                statusCounts.getOrDefault(EventStatus.INVALID, 0L)
         );
     }
 

@@ -47,7 +47,7 @@ class AppEventsService implements AppEventsFacade {
         List<EventResult> deserializationErrors = partitionedEvents.get(true).stream()
                 .map(ie -> new EventResult(
                         ie.index(),
-                        EventStatus.invalid,
+                        EventStatus.INVALID,
                         null,
                         new EventError("payload", ie.event().deserializationError())
                 ))

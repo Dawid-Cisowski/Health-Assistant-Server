@@ -18,8 +18,8 @@ class HealthEventsResponseMapperSpec extends Specification {
     def "all events invalid -> status 'all_invalid'"() {
         given:
         def results = [
-                new EventResult(0, EventStatus.invalid, null, new EventError("payload", "bad")),
-                new EventResult(1, EventStatus.invalid, null, new EventError("payload", "bad"))
+                new EventResult(0, EventStatus.INVALID, null, new EventError("payload", "bad")),
+                new EventResult(1, EventStatus.INVALID, null, new EventError("payload", "bad"))
         ]
         def storeResult = new StoreHealthEventsResult(results, Set.of(), Set.of(), List.of())
 
@@ -33,8 +33,8 @@ class HealthEventsResponseMapperSpec extends Specification {
     def "some events invalid -> status 'partial_success'"() {
         given:
         def results = [
-                new EventResult(0, EventStatus.stored, EventId.of("evt_abc"), null),
-                new EventResult(1, EventStatus.invalid, null, new EventError("payload", "bad"))
+                new EventResult(0, EventStatus.STORED, EventId.of("evt_abc"), null),
+                new EventResult(1, EventStatus.INVALID, null, new EventError("payload", "bad"))
         ]
         def storeResult = new StoreHealthEventsResult(results, Set.of(), Set.of(), List.of())
 
@@ -48,8 +48,8 @@ class HealthEventsResponseMapperSpec extends Specification {
     def "no invalid events -> status 'success'"() {
         given:
         def results = [
-                new EventResult(0, EventStatus.stored, EventId.of("evt_abc"), null),
-                new EventResult(1, EventStatus.duplicate, EventId.of("evt_def"), null)
+                new EventResult(0, EventStatus.STORED, EventId.of("evt_abc"), null),
+                new EventResult(1, EventStatus.DUPLICATE, EventId.of("evt_def"), null)
         ]
         def storeResult = new StoreHealthEventsResult(results, Set.of(), Set.of(), List.of())
 
@@ -63,7 +63,7 @@ class HealthEventsResponseMapperSpec extends Specification {
     def "all stored events -> status 'success'"() {
         given:
         def results = [
-                new EventResult(0, EventStatus.stored, EventId.of("evt_abc"), null)
+                new EventResult(0, EventStatus.STORED, EventId.of("evt_abc"), null)
         ]
         def storeResult = new StoreHealthEventsResult(results, Set.of(), Set.of(), List.of())
 
@@ -79,11 +79,11 @@ class HealthEventsResponseMapperSpec extends Specification {
     def "summary counts stored, duplicate, and invalid correctly"() {
         given:
         def results = [
-                new EventResult(0, EventStatus.stored, EventId.of("evt_a01"), null),
-                new EventResult(1, EventStatus.stored, EventId.of("evt_a02"), null),
-                new EventResult(2, EventStatus.duplicate, EventId.of("evt_a03"), null),
-                new EventResult(3, EventStatus.invalid, null, new EventError("field", "msg")),
-                new EventResult(4, EventStatus.invalid, null, new EventError("field", "msg"))
+                new EventResult(0, EventStatus.STORED, EventId.of("evt_a01"), null),
+                new EventResult(1, EventStatus.STORED, EventId.of("evt_a02"), null),
+                new EventResult(2, EventStatus.DUPLICATE, EventId.of("evt_a03"), null),
+                new EventResult(3, EventStatus.INVALID, null, new EventError("field", "msg")),
+                new EventResult(4, EventStatus.INVALID, null, new EventError("field", "msg"))
         ]
         def storeResult = new StoreHealthEventsResult(results, Set.of(), Set.of(), List.of())
 
@@ -115,8 +115,8 @@ class HealthEventsResponseMapperSpec extends Specification {
     def "event results preserve index, status, eventId, and error details"() {
         given:
         def results = [
-                new EventResult(0, EventStatus.stored, EventId.of("evt_abc"), null),
-                new EventResult(1, EventStatus.invalid, null, new EventError("payload", "Missing required field"))
+                new EventResult(0, EventStatus.STORED, EventId.of("evt_abc"), null),
+                new EventResult(1, EventStatus.INVALID, null, new EventError("payload", "Missing required field"))
         ]
         def storeResult = new StoreHealthEventsResult(results, Set.of(), Set.of(), List.of())
 
@@ -143,7 +143,7 @@ class HealthEventsResponseMapperSpec extends Specification {
     def "duplicate event result maps correctly"() {
         given:
         def results = [
-                new EventResult(0, EventStatus.duplicate, EventId.of("evt_dup"), null)
+                new EventResult(0, EventStatus.DUPLICATE, EventId.of("evt_dup"), null)
         ]
         def storeResult = new StoreHealthEventsResult(results, Set.of(), Set.of(), List.of())
 

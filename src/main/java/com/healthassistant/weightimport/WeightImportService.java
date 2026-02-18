@@ -57,7 +57,7 @@ class WeightImportService implements WeightImportFacade {
             log.info("Creating weight event with key: {}", idempotencyKey.value());
 
             StoreHealthEventsCommand.EventEnvelope envelope = eventMapper.mapToEventEnvelope(
-                    extractedData, measurementId, idempotencyKey, deviceId
+                    extractedData, measurementId, idempotencyKey
             );
 
             StoreHealthEventsCommand command = new StoreHealthEventsCommand(List.of(envelope), deviceId);

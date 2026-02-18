@@ -125,7 +125,7 @@ class StoreHealthEventsCommandHandler {
 
                         return new StoreHealthEventsResult.EventResult(
                                 index,
-                                StoreHealthEventsResult.EventStatus.stored,
+                                StoreHealthEventsResult.EventStatus.STORED,
                                 savedEvent.eventId(),
                                 null
                         );
@@ -147,7 +147,7 @@ class StoreHealthEventsCommandHandler {
             Map<Integer, Event> savedEventsByIndex
     ) {
         return IntStream.range(0, results.size())
-                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
+                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.STORED)
                 .mapToObj(savedEventsByIndex::get)
                 .filter(Objects::nonNull)
                 .map(event -> new com.healthassistant.healthevents.api.dto.StoredEventData(
@@ -163,7 +163,7 @@ class StoreHealthEventsCommandHandler {
 
     private Set<LocalDate> extractAffectedDates(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
         return IntStream.range(0, results.size())
-                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
+                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.STORED)
                 .mapToObj(command.events()::get)
                 .map(StoreHealthEventsCommand.EventEnvelope::occurredAt)
                 .filter(Objects::nonNull)
@@ -173,7 +173,7 @@ class StoreHealthEventsCommandHandler {
 
     private Set<EventType> extractEventTypes(StoreHealthEventsCommand command, List<StoreHealthEventsResult.EventResult> results) {
         return IntStream.range(0, results.size())
-                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.stored)
+                .filter(index -> results.get(index).status() == StoreHealthEventsResult.EventStatus.STORED)
                 .mapToObj(command.events()::get)
                 .map(StoreHealthEventsCommand.EventEnvelope::eventType)
                 .map(this::parseEventTypeSafely)
@@ -222,7 +222,7 @@ class StoreHealthEventsCommandHandler {
     private StoreHealthEventsResult.EventResult createInvalidResult(int index, String field, String message) {
         return new StoreHealthEventsResult.EventResult(
                 index,
-                StoreHealthEventsResult.EventStatus.invalid,
+                StoreHealthEventsResult.EventStatus.INVALID,
                 null,
                 new StoreHealthEventsResult.EventError(field, message)
         );
@@ -231,7 +231,7 @@ class StoreHealthEventsCommandHandler {
     private StoreHealthEventsResult.EventResult createErrorResult(int index, String message) {
         return new StoreHealthEventsResult.EventResult(
                 index,
-                StoreHealthEventsResult.EventStatus.invalid,
+                StoreHealthEventsResult.EventStatus.INVALID,
                 null,
                 new StoreHealthEventsResult.EventError("general", "Internal error: " + message)
         );
@@ -248,7 +248,7 @@ class StoreHealthEventsCommandHandler {
 
         return new StoreHealthEventsResult.EventResult(
                 index,
-                StoreHealthEventsResult.EventStatus.invalid,
+                StoreHealthEventsResult.EventStatus.INVALID,
                 null,
                 new StoreHealthEventsResult.EventError("payload", errorMessage)
         );
@@ -257,7 +257,7 @@ class StoreHealthEventsCommandHandler {
     private StoreHealthEventsResult.EventResult createDuplicateError(int index, String message) {
         return new StoreHealthEventsResult.EventResult(
                 index,
-                StoreHealthEventsResult.EventStatus.duplicate,
+                StoreHealthEventsResult.EventStatus.DUPLICATE,
                 null,
                 new StoreHealthEventsResult.EventError("idempotencyKey", message)
         );

@@ -211,7 +211,7 @@ class MealsService implements MealsFacade {
         log.info("Recording meal for device {} at {}", sanitizeForLog(deviceId), occurredAt);
         StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.INVALID) {
             String error = result.results().isEmpty() ? "No result" :
                     result.results().getFirst().error() != null ?
                             result.results().getFirst().error().message() : "Unknown error";
@@ -272,7 +272,7 @@ class MealsService implements MealsFacade {
         log.info("Deleting meal {} for device {}", sanitizeForLog(eventId), sanitizeForLog(deviceId));
         StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.INVALID) {
             String error = result.results().isEmpty() ? "No result" :
                     result.results().getFirst().error() != null ?
                             result.results().getFirst().error().message() : "Unknown error";
@@ -339,7 +339,7 @@ class MealsService implements MealsFacade {
         log.info("Updating meal {} for device {}", sanitizeForLog(eventId), sanitizeForLog(deviceId));
         StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
-        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.INVALID) {
             String error = result.results().isEmpty() ? "No result" :
                     result.results().getFirst().error() != null ?
                             result.results().getFirst().error().message() : "Unknown error";

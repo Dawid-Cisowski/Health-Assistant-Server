@@ -2,7 +2,6 @@ package com.healthassistant.sleepimport;
 
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.payload.SleepSessionPayload;
-import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import org.springframework.stereotype.Component;
 
@@ -15,8 +14,7 @@ class SleepEventMapper {
     StoreHealthEventsCommand.EventEnvelope mapToEventEnvelope(
             ExtractedSleepData data,
             String sleepId,
-            IdempotencyKey idempotencyKey,
-            DeviceId deviceId
+            IdempotencyKey idempotencyKey
     ) {
         SleepSessionPayload payload = new SleepSessionPayload(
                 sleepId,

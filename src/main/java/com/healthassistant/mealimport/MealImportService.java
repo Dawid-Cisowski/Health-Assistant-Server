@@ -86,7 +86,7 @@ class MealImportService implements MealImportFacade {
             StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
             var eventResult = result.results().get(0);
-            if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
+            if (eventResult.status() == StoreHealthEventsResult.EventStatus.INVALID) {
                 String errorMessage = eventResult.error() != null
                     ? eventResult.error().message()
                     : "Validation failed";
@@ -327,7 +327,7 @@ class MealImportService implements MealImportFacade {
         StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
         var eventResult = result.results().get(0);
-        if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
+        if (eventResult.status() == StoreHealthEventsResult.EventStatus.INVALID) {
             String errorMessage = eventResult.error() != null
                 ? eventResult.error().message()
                 : "Validation failed";

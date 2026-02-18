@@ -66,7 +66,7 @@ class WorkoutImportService implements WorkoutImportFacade {
             StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
 
             var eventResult = result.results().getFirst();
-            if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
+            if (eventResult.status() == StoreHealthEventsResult.EventStatus.INVALID) {
                 String errorMessage = eventResult.error() != null
                     ? eventResult.error().message()
                     : "Validation failed";

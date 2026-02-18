@@ -45,12 +45,12 @@ class SleepImportService implements SleepImportFacade {
         ImageValidationUtils.validateImage(image);
         var sample = aiMetrics.startTimer();
 
-        int effectiveYear = year \!= null ? year : LocalDate.now(ImportConstants.POLAND_ZONE).getYear();
+        int effectiveYear = year != null ? year : LocalDate.now(ImportConstants.POLAND_ZONE).getYear();
 
         try {
             ExtractedSleepData extractedData = imageExtractor.extract(image, effectiveYear);
 
-            if (\!extractedData.isValid()) {
+            if (!extractedData.isValid()) {
                 log.warn("Sleep extraction invalid for device {}: {}",
                         SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
                 aiMetrics.recordImportRequest("sleep", sample, "error", "direct");
@@ -116,7 +116,7 @@ class SleepImportService implements SleepImportFacade {
                 return SleepImportResponse.failure("Validation error: " + errorMessage);
             }
 
-            String eventId = sleepEventResult.eventId() \!= null
+            String eventId = sleepEventResult.eventId() != null
                     ? sleepEventResult.eventId().value()
                     : null;
 
