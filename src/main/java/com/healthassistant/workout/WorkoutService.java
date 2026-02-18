@@ -95,7 +95,7 @@ class WorkoutService implements WorkoutFacade {
                 .toList();
 
         return Optional.of(new WorkoutDetailResponse(
-                workout.getWorkoutId(), workout.getPerformedAt(), workout.getPerformedDate(),
+                workout.getEventId(), workout.getWorkoutId(), workout.getPerformedAt(), workout.getPerformedDate(),
                 workout.getSource(), workout.getNote(), workout.getTotalExercises(),
                 workout.getTotalSets(), workout.getTotalVolumeKg(), workout.getTotalWorkingVolumeKg(),
                 exerciseDetails));
@@ -121,7 +121,7 @@ class WorkoutService implements WorkoutFacade {
                             .toList();
 
                     return new WorkoutDetailResponse(
-                            workout.getWorkoutId(), workout.getPerformedAt(), workout.getPerformedDate(),
+                            workout.getEventId(), workout.getWorkoutId(), workout.getPerformedAt(), workout.getPerformedDate(),
                             workout.getSource(), workout.getNote(), workout.getTotalExercises(),
                             workout.getTotalSets(), workout.getTotalVolumeKg(), workout.getTotalWorkingVolumeKg(),
                             exerciseDetails);

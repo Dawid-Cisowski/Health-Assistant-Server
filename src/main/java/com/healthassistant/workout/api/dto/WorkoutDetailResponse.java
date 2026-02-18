@@ -10,6 +10,10 @@ import java.util.List;
 
 @Schema(description = "Detailed workout information")
 public record WorkoutDetailResponse(
+    @JsonProperty("eventId")
+    @Schema(description = "Event ID for edit/delete operations", example = "550e8400-e29b-41d4-a716-446655440000")
+    String eventId,
+
     @JsonProperty("workoutId")
     @Schema(description = "Unique workout identifier", example = "gymrun-2025-11-19-1")
     String workoutId,

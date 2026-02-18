@@ -3,7 +3,19 @@ package com.healthassistant.assistant;
 import com.healthassistant.bodymeasurements.api.BodyMeasurementsFacade;
 import com.healthassistant.bodymeasurements.api.dto.BodyPart;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
+import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
+import com.healthassistant.healthevents.api.dto.payload.HealthRating;
+import com.healthassistant.healthevents.api.dto.payload.MealType;
+import com.healthassistant.healthevents.api.dto.payload.SleepSessionPayload;
+import com.healthassistant.healthevents.api.dto.payload.WeightMeasurementPayload;
+import com.healthassistant.healthevents.api.dto.payload.WorkoutPayload;
+import com.healthassistant.healthevents.api.model.DeviceId;
+import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.meals.api.MealsFacade;
+import com.healthassistant.meals.api.dto.RecordMealRequest;
+import com.healthassistant.meals.api.dto.UpdateMealRequest;
 import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.steps.api.StepsFacade;
 import com.healthassistant.weight.api.WeightFacade;
@@ -15,10 +27,18 @@ import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.UUID;
+
 
 @Component
 @RequiredArgsConstructor
@@ -38,14 +58,18 @@ class HealthTools {
     private final MealsFacade mealsFacade;
     private final WeightFacade weightFacade;
     private final BodyMeasurementsFacade bodyMeasurementsFacade;
+    private final HealthEventsFacade healthEventsFacade;
+    private final ObjectMapper objectMapper;
     private final AiMetricsRecorder aiMetrics;
+
+    // ==================== READ TOOLS ====================
 
     @Tool(name = "getStepsData",
           description = "Retrieves user's step data for the given date range. Returns step count, distance, active hours and minutes. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getStepsData(String startDate, String endDate, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching steps data for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Fetching steps data for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
 
         return validateAndExecuteRangeQuery("getStepsData", startDate, endDate, (start, end) -> {
             var result = stepsFacade.getRangeSummary(deviceId, start, end);
@@ -59,7 +83,7 @@ class HealthTools {
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getSleepData(String startDate, String endDate, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching sleep data for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Fetching sleep data for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
 
         return validateAndExecuteRangeQuery("getSleepData", startDate, endDate, (start, end) -> {
             var result = sleepFacade.getRangeSummary(deviceId, start, end);
@@ -70,10 +94,11 @@ class HealthTools {
 
     @Tool(name = "getWorkoutData",
           description = "Retrieves user's strength training data for the given date range. Returns a list of workouts with exercises, sets and volume. " +
+                        "Each workout includes an eventId field that can be used with deleteWorkout. " +
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getWorkoutData(String startDate, String endDate, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching workout data for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Fetching workout data for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
 
         return validateAndExecuteRangeQuery("getWorkoutData", startDate, endDate, (start, end) -> {
             var result = workoutFacade.getWorkoutsByDateRange(deviceId, start, end);
@@ -88,7 +113,7 @@ class HealthTools {
                         "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getDailySummary(String date, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching daily summary for device {} for date {}", deviceId, date);
+        log.info("Fetching daily summary for device {} for date {}", maskDeviceId(deviceId), date);
 
         return validateAndExecuteSingleDateQuery("getDailySummary", date, localDate -> {
             var result = dailySummaryFacade.getDailySummary(deviceId, localDate);
@@ -116,7 +141,7 @@ class HealthTools {
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getDailySummaryRange(String startDate, String endDate, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching daily summary range for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Fetching daily summary range for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
 
         return validateAndExecuteRangeQuery("getDailySummaryRange", startDate, endDate, (start, end) -> {
             var result = dailySummaryFacade.getRangeSummary(deviceId, start, end);
@@ -130,7 +155,7 @@ class HealthTools {
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getMealsData(String startDate, String endDate, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching meals data for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Fetching meals data for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
 
         return validateAndExecuteRangeQuery("getMealsData", startDate, endDate, (start, end) -> {
             var result = mealsFacade.getRangeSummary(deviceId, start, end);
@@ -145,7 +170,7 @@ class HealthTools {
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getWeightData(String startDate, String endDate, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching weight data for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Fetching weight data for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
 
         return validateAndExecuteRangeQuery("getWeightData", startDate, endDate, (start, end) -> {
             var result = weightFacade.getRangeSummary(deviceId, start, end);
@@ -161,7 +186,7 @@ class HealthTools {
                         "PARAMETERS: startDate and endDate must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getBodyMeasurementsData(String startDate, String endDate, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching body measurements data for device {} from {} to {}", deviceId, startDate, endDate);
+        log.info("Fetching body measurements data for device {} from {} to {}", maskDeviceId(deviceId), startDate, endDate);
 
         return validateAndExecuteRangeQuery("getBodyMeasurementsData", startDate, endDate, (start, end) -> {
             var result = bodyMeasurementsFacade.getRangeSummary(deviceId, start, end);
@@ -201,7 +226,7 @@ class HealthTools {
                         "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
     public Object getEnergyRequirements(String date, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
-        log.info("Fetching energy requirements for device {} for date {}", deviceId, date);
+        log.info("Fetching energy requirements for device {} for date {}", maskDeviceId(deviceId), date);
 
         return validateAndExecuteSingleDateQuery("getEnergyRequirements", date, localDate -> {
             var result = mealsFacade.getEnergyRequirements(deviceId, localDate);
@@ -209,6 +234,292 @@ class HealthTools {
             return result.<Object>map(r -> r)
                     .orElseGet(() -> new ToolError("Energy requirements not available. Weight data may be missing."));
         });
+    }
+
+    @Tool(name = "getMealsDailyDetail",
+          description = "Retrieves detailed list of individual meals for a specific day, including eventId for each meal. " +
+                        "Use this BEFORE updateMeal or deleteMeal to get the eventId of the meal to modify. " +
+                        "Returns each meal with: eventId, title, mealType, calories, protein, fat, carbs, healthRating. " +
+                        "PARAMETER: date must be in ISO-8601 format (YYYY-MM-DD), e.g. '2025-11-24'.")
+    public Object getMealsDailyDetail(String date, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Fetching meals daily detail for device {} for date {}", maskDeviceId(deviceId), date);
+
+        return validateAndExecuteSingleDateQuery("getMealsDailyDetail", date, localDate -> {
+            var result = mealsFacade.getDailyDetail(deviceId, localDate);
+            log.info("Meals daily detail fetched: {} meals for {}", result.totalMealCount(), localDate);
+            return result;
+        });
+    }
+
+    // ==================== MUTATION TOOLS ====================
+
+    @Tool(name = "recordMeal",
+          description = "Records a new meal for the user. Use when user tells you what they ate. " +
+                        "You can estimate macronutrients if user doesn't provide exact values (but tell the user you estimated). " +
+                        "PARAMETERS: " +
+                        "title (String, required) - name/description of the meal, e.g. 'Chicken with rice'. " +
+                        "mealType (String, required) - one of: BREAKFAST, BRUNCH, LUNCH, DINNER, SNACK, DESSERT, DRINK. " +
+                        "caloriesKcal (String, required) - calories in kcal, e.g. '500'. " +
+                        "proteinGrams (String, required) - protein in grams, e.g. '40'. " +
+                        "fatGrams (String, required) - fat in grams, e.g. '15'. " +
+                        "carbohydratesGrams (String, required) - carbohydrates in grams, e.g. '55'. " +
+                        "healthRating (String, required) - one of: VERY_HEALTHY, HEALTHY, NEUTRAL, UNHEALTHY, VERY_UNHEALTHY. " +
+                        "occurredAt (String, optional) - ISO-8601 UTC timestamp, e.g. '2025-11-24T12:30:00Z'. If not provided, defaults to now.")
+    public Object recordMeal(String title, String mealType, String caloriesKcal, String proteinGrams,
+                             String fatGrams, String carbohydratesGrams, String healthRating,
+                             String occurredAt, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Recording meal for device {}: {}", maskDeviceId(deviceId), sanitizeForLog(title));
+
+        return validateAndExecuteMutation("recordMeal", () -> {
+            validateTitle(title);
+            var parsedMealType = parseEnum(MealType.class, mealType, "mealType");
+            var parsedHealthRating = parseEnum(HealthRating.class, healthRating, "healthRating");
+            var parsedCalories = parseNonNegativeInt(caloriesKcal, "caloriesKcal");
+            var parsedProtein = parseNonNegativeInt(proteinGrams, "proteinGrams");
+            var parsedFat = parseNonNegativeInt(fatGrams, "fatGrams");
+            var parsedCarbs = parseNonNegativeInt(carbohydratesGrams, "carbohydratesGrams");
+            var parsedOccurredAt = occurredAt != null && !occurredAt.isBlank() ? parseInstant(occurredAt, "occurredAt") : null;
+
+            var request = new RecordMealRequest(title, parsedMealType, parsedCalories,
+                    parsedProtein, parsedFat, parsedCarbs, parsedHealthRating, parsedOccurredAt);
+
+            var result = mealsFacade.recordMeal(deviceId, request);
+            log.info("Meal recorded: eventId={}, title={}", result.eventId(), sanitizeForLog(title));
+            return new MutationSuccess("Meal recorded successfully", result);
+        });
+    }
+
+    @Tool(name = "updateMeal",
+          description = "Updates an existing meal. Use getMealsDailyDetail first to get the eventId. " +
+                        "PARAMETERS: " +
+                        "eventId (String, required) - the eventId of the meal to update (from getMealsDailyDetail). " +
+                        "title (String, required) - new name/description of the meal. " +
+                        "mealType (String, required) - one of: BREAKFAST, BRUNCH, LUNCH, DINNER, SNACK, DESSERT, DRINK. " +
+                        "caloriesKcal (String, required) - new calories in kcal. " +
+                        "proteinGrams (String, required) - new protein in grams. " +
+                        "fatGrams (String, required) - new fat in grams. " +
+                        "carbohydratesGrams (String, required) - new carbohydrates in grams. " +
+                        "healthRating (String, required) - one of: VERY_HEALTHY, HEALTHY, NEUTRAL, UNHEALTHY, VERY_UNHEALTHY.")
+    public Object updateMeal(String eventId, String title, String mealType, String caloriesKcal,
+                             String proteinGrams, String fatGrams, String carbohydratesGrams,
+                             String healthRating, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Updating meal {} for device {}", sanitizeForLog(eventId), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("updateMeal", () -> {
+            validateEventId(eventId);
+            validateTitle(title);
+            var parsedMealType = parseEnum(MealType.class, mealType, "mealType");
+            var parsedHealthRating = parseEnum(HealthRating.class, healthRating, "healthRating");
+            var parsedCalories = parseNonNegativeInt(caloriesKcal, "caloriesKcal");
+            var parsedProtein = parseNonNegativeInt(proteinGrams, "proteinGrams");
+            var parsedFat = parseNonNegativeInt(fatGrams, "fatGrams");
+            var parsedCarbs = parseNonNegativeInt(carbohydratesGrams, "carbohydratesGrams");
+
+            var request = new UpdateMealRequest(title, parsedMealType, parsedCalories,
+                    parsedProtein, parsedFat, parsedCarbs, parsedHealthRating, null);
+
+            var result = mealsFacade.updateMeal(deviceId, eventId, request);
+            log.info("Meal updated: eventId={}", result.eventId());
+            return new MutationSuccess("Meal updated successfully", result);
+        });
+    }
+
+    @Tool(name = "deleteMeal",
+          description = "Deletes a meal. Use getMealsDailyDetail first to get the eventId. " +
+                        "IMPORTANT: Always confirm with the user before deleting. " +
+                        "PARAMETER: eventId (String, required) - the eventId of the meal to delete.")
+    public Object deleteMeal(String eventId, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Deleting meal {} for device {}", sanitizeForLog(eventId), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("deleteMeal", () -> {
+            validateEventId(eventId);
+            mealsFacade.deleteMeal(deviceId, eventId);
+            log.info("Meal deleted: eventId={}", sanitizeForLog(eventId));
+            return new MutationSuccess("Meal deleted successfully", null);
+        });
+    }
+
+    @Tool(name = "recordWeight",
+          description = "Records a weight measurement for the user. " +
+                        "PARAMETERS: " +
+                        "weightKg (String, required) - weight in kilograms, e.g. '82.5'. Must be between 1 and 500. " +
+                        "measuredAt (String, optional) - ISO-8601 UTC timestamp, e.g. '2025-11-24T07:00:00Z'. If not provided, defaults to now.")
+    public Object recordWeight(String weightKg, String measuredAt, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Recording weight for device {}", maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("recordWeight", () -> {
+            var parsedWeight = parsePositiveBigDecimal(weightKg, "weightKg");
+            if (parsedWeight.compareTo(BigDecimal.ONE) < 0 || parsedWeight.compareTo(new BigDecimal("500")) > 0) {
+                throw new IllegalArgumentException("weightKg must be between 1 and 500");
+            }
+
+            var timestamp = measuredAt != null && !measuredAt.isBlank()
+                    ? parseInstant(measuredAt, "measuredAt")
+                    : Instant.now();
+
+            var measurementId = "assistant-weight-" + UUID.randomUUID();
+            var payload = new WeightMeasurementPayload(
+                    measurementId, timestamp, null, parsedWeight,
+                    null, null, null, null, null,
+                    null, null, null, null, null,
+                    null, null, null, null, null, null, null, "ASSISTANT"
+            );
+
+            var idempotencyKey = deviceId + "|weight|" + measurementId;
+            var command = new StoreHealthEventsCommand(
+                    List.of(new StoreHealthEventsCommand.EventEnvelope(
+                            new IdempotencyKey(idempotencyKey),
+                            "WeightMeasurementRecorded.v1",
+                            timestamp,
+                            payload
+                    )),
+                    new DeviceId(deviceId)
+            );
+
+            var result = healthEventsFacade.storeHealthEvents(command);
+            validateStoreResult(result, "weight measurement");
+
+            log.info("Weight recorded: {} kg", parsedWeight);
+            return new MutationSuccess("Weight measurement recorded: " + parsedWeight + " kg",
+                    new WeightRecordResult(result.results().getFirst().eventId().value(), parsedWeight, timestamp));
+        });
+    }
+
+    @Tool(name = "recordWorkout",
+          description = "Records a strength training workout. " +
+                        "PARAMETERS: " +
+                        "performedAt (String, required) - ISO-8601 UTC timestamp when workout was performed, e.g. '2025-11-24T18:00:00Z'. " +
+                        "note (String, optional) - workout note/description, e.g. 'Chest and triceps'. " +
+                        "exercisesJson (String, required) - JSON array of exercises. Each exercise must have: " +
+                        "name (String), orderInWorkout (int), sets (array of {setNumber, weightKg, reps, isWarmup}). " +
+                        "Example: '[{\"name\":\"Bench Press\",\"orderInWorkout\":1,\"sets\":[{\"setNumber\":1,\"weightKg\":80.0,\"reps\":10,\"isWarmup\":false}]}]'")
+    public Object recordWorkout(String performedAt, String note, String exercisesJson, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Recording workout for device {} at {}", maskDeviceId(deviceId), sanitizeForLog(performedAt));
+
+        return validateAndExecuteMutation("recordWorkout", () -> {
+            var timestamp = parseInstant(performedAt, "performedAt");
+            validateWorkoutTimestamp(timestamp);
+
+            List<WorkoutPayload.Exercise> exercises;
+            try {
+                exercises = objectMapper.readValue(exercisesJson,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, WorkoutPayload.Exercise.class));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid exercisesJson format. Please provide a valid JSON array of exercises.", e);
+            }
+
+            if (exercises.isEmpty()) {
+                throw new IllegalArgumentException("exercises cannot be empty");
+            }
+
+            var workoutId = "assistant-workout-" + UUID.randomUUID();
+            var payload = new WorkoutPayload(workoutId, timestamp, "ASSISTANT", note, exercises);
+
+            var idempotencyKey = deviceId + "|workout|" + workoutId;
+            var command = new StoreHealthEventsCommand(
+                    List.of(new StoreHealthEventsCommand.EventEnvelope(
+                            new IdempotencyKey(idempotencyKey),
+                            "WorkoutRecorded.v1",
+                            timestamp,
+                            payload
+                    )),
+                    new DeviceId(deviceId)
+            );
+
+            var result = healthEventsFacade.storeHealthEvents(command);
+            validateStoreResult(result, "workout");
+
+            int totalSets = exercises.stream().mapToInt(e -> e.sets().size()).sum();
+            log.info("Workout recorded: {} exercises, {} sets", exercises.size(), totalSets);
+            return new MutationSuccess("Workout recorded successfully with " + exercises.size() + " exercises and " + totalSets + " sets",
+                    new WorkoutRecordResult(result.results().getFirst().eventId().value(), workoutId, timestamp, exercises.size(), totalSets));
+        });
+    }
+
+    @Tool(name = "deleteWorkout",
+          description = "Deletes a workout. Use getWorkoutData first to find the workout and its eventId. " +
+                        "IMPORTANT: Always confirm with the user before deleting. " +
+                        "PARAMETER: eventId (String, required) - the eventId of the workout to delete (from getWorkoutData response).")
+    public Object deleteWorkout(String eventId, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Deleting workout {} for device {}", sanitizeForLog(eventId), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("deleteWorkout", () -> {
+            validateEventId(eventId);
+            workoutFacade.deleteWorkout(deviceId, eventId);
+            log.info("Workout deleted: eventId={}", sanitizeForLog(eventId));
+            return new MutationSuccess("Workout deleted successfully", null);
+        });
+    }
+
+    @Tool(name = "recordSleep",
+          description = "Records a sleep session for the user. " +
+                        "PARAMETERS: " +
+                        "sleepStart (String, required) - ISO-8601 UTC timestamp when sleep started, e.g. '2025-11-23T23:00:00Z'. " +
+                        "sleepEnd (String, required) - ISO-8601 UTC timestamp when sleep ended, e.g. '2025-11-24T07:00:00Z'. Must be after sleepStart.")
+    public Object recordSleep(String sleepStart, String sleepEnd, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Recording sleep for device {}", maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("recordSleep", () -> {
+            var parsedStart = parseInstant(sleepStart, "sleepStart");
+            var parsedEnd = parseInstant(sleepEnd, "sleepEnd");
+
+            if (!parsedEnd.isAfter(parsedStart)) {
+                throw new IllegalArgumentException("sleepEnd must be after sleepStart");
+            }
+
+            var totalMinutes = (int) Duration.between(parsedStart, parsedEnd).toMinutes();
+            if (totalMinutes > 1440) {
+                throw new IllegalArgumentException("Sleep session cannot exceed 24 hours (1440 minutes)");
+            }
+            var sleepId = "assistant-sleep-" + UUID.randomUUID();
+
+            var payload = new SleepSessionPayload(sleepId, parsedStart, parsedEnd, totalMinutes, "ASSISTANT");
+
+            var idempotencyKey = deviceId + "|sleep|" + sleepId;
+            var command = new StoreHealthEventsCommand(
+                    List.of(new StoreHealthEventsCommand.EventEnvelope(
+                            new IdempotencyKey(idempotencyKey),
+                            "SleepSessionRecorded.v1",
+                            parsedEnd,
+                            payload
+                    )),
+                    new DeviceId(deviceId)
+            );
+
+            var result = healthEventsFacade.storeHealthEvents(command);
+            validateStoreResult(result, "sleep session");
+
+            log.info("Sleep recorded: {} minutes", totalMinutes);
+            return new MutationSuccess("Sleep session recorded: " + totalMinutes + " minutes (" + totalMinutes / 60 + "h " + totalMinutes % 60 + "min)",
+                    new SleepRecordResult(result.results().getFirst().eventId().value(), parsedStart, parsedEnd, totalMinutes));
+        });
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    private <T> Object validateAndExecuteMutation(String toolName, MutationCommand<T> command) {
+        var sample = aiMetrics.startTimer();
+        try {
+            var result = command.execute();
+            aiMetrics.recordToolCall(toolName, sample, "success");
+            return result;
+        } catch (IllegalArgumentException e) {
+            log.warn("Validation error in mutation {}: {}", toolName, e.getMessage());
+            aiMetrics.recordToolCall(toolName, sample, "validation_error");
+            return new ToolError(e.getMessage());
+        } catch (Exception e) {
+            log.error("Error executing mutation {}", toolName, e);
+            aiMetrics.recordToolCall(toolName, sample, "error");
+            return new ToolError(mapMutationErrorMessage(e));
+        }
     }
 
     private <T> Object validateAndExecuteRangeQuery(String toolName, String startDateStr, String endDateStr, DateRangeQuery<T> query) {
@@ -333,6 +644,123 @@ class HealthTools {
         return null;
     }
 
+    // ==================== PARSING HELPERS ====================
+
+    private <E extends Enum<E>> E parseEnum(Class<E> enumClass, String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " cannot be empty");
+        }
+        try {
+            return Enum.valueOf(enumClass, value.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid " + fieldName + ": '" + value + "'. Valid values: " +
+                    String.join(", ", java.util.Arrays.stream(enumClass.getEnumConstants()).map(Enum::name).toList()), e);
+        }
+    }
+
+    private int parseNonNegativeInt(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " cannot be empty");
+        }
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            if (parsed < 0) {
+                throw new IllegalArgumentException(fieldName + " must be non-negative");
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid " + fieldName + ": '" + value + "'. Must be a non-negative integer.", e);
+        }
+    }
+
+    private BigDecimal parsePositiveBigDecimal(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " cannot be empty");
+        }
+        try {
+            var parsed = new BigDecimal(value.trim());
+            if (parsed.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException(fieldName + " must be positive");
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid " + fieldName + ": '" + value + "'. Must be a positive number.", e);
+        }
+    }
+
+    private Instant parseInstant(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " cannot be empty");
+        }
+        try {
+            return Instant.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid " + fieldName + ": '" + value + "'. Must be ISO-8601 UTC format, e.g. '2025-11-24T12:00:00Z'.", e);
+        }
+    }
+
+    private static final int MAX_TITLE_LENGTH = 200;
+    private static final int MAX_WORKOUT_BACKDATE_DAYS = 30;
+
+    private void validateTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title cannot be empty");
+        }
+        if (title.length() > MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("title cannot exceed " + MAX_TITLE_LENGTH + " characters");
+        }
+    }
+
+    private void validateWorkoutTimestamp(Instant timestamp) {
+        var now = Instant.now();
+        if (timestamp.isAfter(now)) {
+            throw new IllegalArgumentException("Workout date cannot be in the future");
+        }
+        long daysBetween = ChronoUnit.DAYS.between(timestamp, now);
+        if (daysBetween > MAX_WORKOUT_BACKDATE_DAYS) {
+            throw new IllegalArgumentException("Workout date cannot be more than " + MAX_WORKOUT_BACKDATE_DAYS + " days in the past");
+        }
+    }
+
+    private void validateEventId(String eventId) {
+        if (eventId == null || eventId.isBlank()) {
+            throw new IllegalArgumentException("eventId cannot be empty");
+        }
+        if (eventId.length() > 64) {
+            throw new IllegalArgumentException("eventId is too long");
+        }
+    }
+
+    private void validateStoreResult(StoreHealthEventsResult result, String entityName) {
+        if (result.results().isEmpty() ||
+                result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+            var errorDetail = result.results().isEmpty() ? "No result" :
+                    result.results().getFirst().error() != null ?
+                            result.results().getFirst().error().message() : "Unknown error";
+            throw new IllegalStateException("Failed to store " + entityName + ": " + errorDetail);
+        }
+    }
+
+    private String mapMutationErrorMessage(Exception e) {
+        var message = e.getMessage();
+        if (message == null) return "An unexpected error occurred. Please try again.";
+        if (message.contains("not found") || message.contains("NotFoundException")) return "The requested item was not found.";
+        if (message.contains("not a workout") || message.contains("not a meal")) return "The specified event is not the correct type.";
+        return "An error occurred while processing your request. Please try again.";
+    }
+
+    private static String sanitizeForLog(String input) {
+        if (input == null) return "null";
+        return input.replaceAll("[\\r\\n\\t]", "_").substring(0, Math.min(input.length(), 100));
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) return "***";
+        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
+
+    // ==================== FUNCTIONAL INTERFACES & RECORDS ====================
+
     @FunctionalInterface
     private interface DateRangeQuery<T> {
         T execute(LocalDate start, LocalDate end);
@@ -341,6 +769,11 @@ class HealthTools {
     @FunctionalInterface
     private interface SingleDateQuery<T> {
         T execute(LocalDate date);
+    }
+
+    @FunctionalInterface
+    private interface MutationCommand<T> {
+        T execute();
     }
 
     private String getDeviceId(ToolContext toolContext) {
@@ -355,4 +788,12 @@ class HealthTools {
     }
 
     record ToolError(String message) {}
+
+    record MutationSuccess(String message, Object data) {}
+
+    record WeightRecordResult(String eventId, BigDecimal weightKg, Instant measuredAt) {}
+
+    record WorkoutRecordResult(String eventId, String workoutId, Instant performedAt, int exerciseCount, int totalSets) {}
+
+    record SleepRecordResult(String eventId, Instant sleepStart, Instant sleepEnd, int totalMinutes) {}
 }
