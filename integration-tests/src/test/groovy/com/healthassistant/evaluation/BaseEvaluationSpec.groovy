@@ -237,32 +237,46 @@ abstract class BaseEvaluationSpec extends Specification {
     /**
      * Send a chat message with optional conversation context.
      * Returns both content and conversationId for multi-turn conversations.
+     * Retries once if Gemini returns an empty response (transient API failure).
      */
     Map askAssistantWithContext(String message, String conversationId) {
         def deviceId = getTestDeviceId()
-        println "DEBUG: Asking assistant for device ${deviceId}: ${message} (conversationId: ${conversationId ?: 'new'})"
+        def maxAttempts = 2
 
-        def chatRequest = conversationId ?
-            """{"message": "${escapeJson(message)}", "conversationId": "${conversationId}"}""" :
-            """{"message": "${escapeJson(message)}"}"""
+        Map result = null
+        (1..maxAttempts).find { attempt ->
+            if (attempt > 1) {
+                println "DEBUG: Retry #${attempt} for device ${deviceId} (previous response was empty)"
+                Thread.sleep(2000)
+            }
+            println "DEBUG: Asking assistant for device ${deviceId}: ${message} (conversationId: ${conversationId ?: 'new'}, attempt: ${attempt})"
 
-        def response = authenticatedPostRequestWithBody(
-                deviceId, TEST_SECRET_BASE64,
-                "/v1/assistant/chat", chatRequest
-        )
-                .when()
-                .post("/v1/assistant/chat")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .asString()
+            def chatRequest = conversationId ?
+                """{"message": "${escapeJson(message)}", "conversationId": "${conversationId}"}""" :
+                """{"message": "${escapeJson(message)}"}"""
 
-        def content = parseSSEContent(response)
-        def newConversationId = parseSSEConversationId(response)
-        println "DEBUG: Assistant response for device ${deviceId}: ${content?.take(100)}... (conversationId: ${newConversationId})"
+            def response = authenticatedPostRequestWithBody(
+                    deviceId, TEST_SECRET_BASE64,
+                    "/v1/assistant/chat", chatRequest
+            )
+                    .when()
+                    .post("/v1/assistant/chat")
+                    .then()
+                    .statusCode(200)
+                    .extract()
+                    .body()
+                    .asString()
 
-        return [content: content, conversationId: newConversationId]
+            def content = parseSSEContent(response)
+            def newConversationId = parseSSEConversationId(response)
+            println "DEBUG: Assistant response for device ${deviceId}: ${content?.take(100)}... (conversationId: ${newConversationId})"
+
+            result = [content: content, conversationId: newConversationId]
+            // Stop retrying if we got a non-empty response
+            content && !content.isBlank()
+        }
+
+        return result
     }
 
     /**
