@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.context.annotation.Import
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.ContextConfiguration
 import org.testcontainers.containers.PostgreSQLContainer
@@ -91,6 +92,9 @@ abstract class BaseIntegrationSpec extends Specification {
 
     @Autowired
     BodyMeasurementsFacade bodyMeasurementsFacade
+
+    @Autowired
+    JdbcTemplate jdbcTemplate
 
     @Shared
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -970,6 +974,31 @@ abstract class BaseIntegrationSpec extends Specification {
         startDate.datesUntil(endDate.plusDays(1)).toList().each { date ->
             cleanupProjectionsForDevice(deviceId, date)
         }
+    }
+
+    /**
+     * Bulk-delete ALL projections for a device using direct SQL.
+     * Much faster than cleanupProjectionsForDateRange() which iterates day-by-day through facades.
+     * Use this when you need to clean all data for a device regardless of date.
+     */
+    void cleanupAllProjectionsForDevice(String deviceId) {
+        // Workout cascade: workout_projections ON DELETE CASCADE removes exercises and sets
+        jdbcTemplate.update("DELETE FROM workout_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM steps_hourly_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM steps_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM sleep_sessions_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM sleep_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM calories_hourly_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM calories_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM activity_hourly_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM activity_daily_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM daily_summaries WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM weight_measurement_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM heart_rate_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM resting_heart_rate_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM body_measurement_projections WHERE device_id = ?", deviceId)
     }
 }
 

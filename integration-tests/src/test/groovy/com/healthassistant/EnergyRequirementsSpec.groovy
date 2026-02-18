@@ -12,7 +12,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
     private static final LocalDate TEST_DATE = LocalDate.of(2025, 1, 15)
 
     def setup() {
-        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31))
+        cleanupAllProjectionsForDevice(DEVICE_ID)
     }
 
     def "Scenario 1: Calculate energy requirements with 3 LBM measurements (averaging)"() {
@@ -20,21 +20,14 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         def uuid = UUID.randomUUID().toString().substring(0, 8)
         def request = createWeightEventsWithLbm([57.0, 57.4, 57.8], uuid)
 
-        when: "I submit weight events and wait for projections"
+        when: "I submit weight events"
         authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-        Thread.sleep(1000)
 
         and: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "effective LBM is averaged from 3 measurements"
         response.getInt("lbmMeasurementsUsed") == 3
@@ -55,21 +48,14 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         def uuid = UUID.randomUUID().toString().substring(0, 8)
         def request = createSingleWeightEvent(57.4, uuid)
 
-        when: "I submit weight event and wait"
+        when: "I submit weight event"
         authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", request)
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-        Thread.sleep(1000)
 
         and: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "only 1 measurement is used"
         response.getInt("lbmMeasurementsUsed") == 1
@@ -82,13 +68,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitWeightEvents([57.4], uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "it's not a training day"
         response.getBoolean("isTrainingDay") == false
@@ -107,13 +87,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitWorkoutEvent(uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "it's a training day"
         response.getBoolean("isTrainingDay") == true
@@ -132,13 +106,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitStepsEvent(3000, uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "step intervals is 0"
         response.getInt("stepIntervals") == 0
@@ -154,13 +122,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitStepsEvent(8000, uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "floor((8000-4000)/2000) = 2 intervals"
         response.getInt("steps") == 8000
@@ -177,13 +139,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitStepsEvent(22000, uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "intervals are capped at 8"
         response.getInt("stepIntervals") == 8
@@ -202,13 +158,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitWorkoutEvent(uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "all values are calculated correctly"
         response.getInt("bmrKcal") == 1610
@@ -233,13 +183,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitMealEvent(uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "consumed nutrition is returned"
         response.getInt("consumed.caloriesKcal") == 800
@@ -258,13 +202,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitWeightEvents([57.4], uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "consumed and remaining are null"
         response.get("consumed") == null
@@ -288,13 +226,7 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
         submitWeightEvents([60.0], uuid)
 
         when: "I request energy requirements"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/meals/energy-requirements/${TEST_DATE}")
-                .get("/v1/meals/energy-requirements/${TEST_DATE}")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
+        def response = waitForApiResponse("/v1/meals/energy-requirements/${TEST_DATE}", DEVICE_ID, SECRET_BASE64)
 
         then: "protein = 2.8 × 60 = 168"
         response.getInt("macroTargets.proteinGrams") == 168
@@ -306,7 +238,6 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-        Thread.sleep(1000)
     }
 
     private void submitStepsEvent(int steps, String uuid) {
@@ -330,7 +261,6 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-        Thread.sleep(1000)
     }
 
     private void submitWorkoutEvent(String uuid) {
@@ -364,7 +294,6 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-        Thread.sleep(2000)
     }
 
     private void submitMealEvent(String uuid) {
@@ -391,7 +320,6 @@ class EnergyRequirementsSpec extends BaseIntegrationSpec {
                 .post("/v1/health-events")
                 .then()
                 .statusCode(200)
-        Thread.sleep(1000)
     }
 
     private String createWeightEventsWithLbm(List<BigDecimal> lbmValues, String uuid) {

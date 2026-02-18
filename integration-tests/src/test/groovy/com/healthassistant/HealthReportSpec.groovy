@@ -1,5 +1,6 @@
 package com.healthassistant
 
+import com.healthassistant.dailysummary.api.DailySummaryFacade
 import com.healthassistant.reports.api.ReportsFacade
 import com.healthassistant.reports.api.dto.ReportType
 import groovy.json.JsonOutput
@@ -31,6 +32,9 @@ class HealthReportSpec extends BaseIntegrationSpec {
     ReportsFacade reportsFacade
 
     @Autowired
+    DailySummaryFacade dailySummaryFacade
+
+    @Autowired
     JdbcTemplate jdbcTemplate
 
     def setup() {
@@ -57,6 +61,17 @@ class HealthReportSpec extends BaseIntegrationSpec {
             ],
             restingHr: 65
         ])
+
+        and: "wait for resting HR projection to be created by async listener"
+        waitForEventProcessing(10) {
+            def count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM resting_heart_rate_projections WHERE device_id = ? AND date = ?",
+                Integer, DEVICE_ID, java.sql.Date.valueOf(DAY_1))
+            count > 0
+        }
+
+        and: "regenerate daily summary so it includes the resting HR data"
+        dailySummaryFacade.generateDailySummary(DEVICE_ID, DAY_1)
 
         when: "generating daily report"
         def reportIdOpt = reportsFacade.generateReport(DEVICE_ID, ReportType.DAILY, DAY_1, DAY_1)
@@ -168,15 +183,21 @@ class HealthReportSpec extends BaseIntegrationSpec {
         given: "multiple reports for different dates"
         submitHealthEventsForDate(DAY_1, [steps: 5000])
         submitHealthEventsForDate(DAY_2, [steps: 6000])
+
+        and: "wait for async daily summaries to be created"
+        waitForEventProcessing(10) {
+            def count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM daily_summaries WHERE device_id = ? AND date IN (?, ?)",
+                Integer, DEVICE_ID, java.sql.Date.valueOf(DAY_1), java.sql.Date.valueOf(DAY_2))
+            count >= 2
+        }
         reportsFacade.generateReport(DEVICE_ID, ReportType.DAILY, DAY_1, DAY_1)
         reportsFacade.generateReport(DEVICE_ID, ReportType.DAILY, DAY_2, DAY_2)
 
         when: "listing reports via REST API"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/reports")
-                .queryParam("type", "DAILY")
-                .queryParam("page", "0")
-                .queryParam("size", "10")
-                .get("/v1/reports")
+        def path = "/v1/reports?type=DAILY&page=0&size=10"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, path)
+                .get(path)
                 .then()
                 .extract()
 
@@ -427,7 +448,7 @@ class HealthReportSpec extends BaseIntegrationSpec {
                 occurredAt: measuredAt.toString(),
                 payload: [
                     measuredAt: measuredAt.toString(),
-                    beatsPerMinute: data.restingHr,
+                    restingBpm: data.restingHr,
                     originPackage: "com.test"
                 ]
             ]

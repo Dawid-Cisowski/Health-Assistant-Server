@@ -27,7 +27,6 @@ class ConversationCleanupSpec extends BaseIntegrationSpec {
         try {
             conn.prepareStatement("DELETE FROM conversation_messages WHERE conversation_id IN (SELECT id FROM conversations WHERE device_id = '${DEVICE_ID}')").executeUpdate()
             conn.prepareStatement("DELETE FROM conversations WHERE device_id = '${DEVICE_ID}'").executeUpdate()
-            conn.commit()
         } finally {
             conn.close()
         }
@@ -139,7 +138,6 @@ class ConversationCleanupSpec extends BaseIntegrationSpec {
             stmt.setTimestamp(3, updatedAt)
             stmt.setTimestamp(4, updatedAt)
             stmt.executeUpdate()
-            conn.commit()
         } finally {
             conn.close()
         }
@@ -155,7 +153,6 @@ class ConversationCleanupSpec extends BaseIntegrationSpec {
             stmt.setString(3, content)
             stmt.setTimestamp(4, createdAt)
             stmt.executeUpdate()
-            conn.commit()
         } finally {
             conn.close()
         }
@@ -169,7 +166,6 @@ class ConversationCleanupSpec extends BaseIntegrationSpec {
             stmt.setTimestamp(1, cutoff)
             stmt.setString(2, DEVICE_ID)
             def count = stmt.executeUpdate()
-            conn.commit()
             return count
         } finally {
             conn.close()
@@ -184,7 +180,6 @@ class ConversationCleanupSpec extends BaseIntegrationSpec {
             stmt.setTimestamp(1, cutoff)
             stmt.setString(2, DEVICE_ID)
             def count = stmt.executeUpdate()
-            conn.commit()
             return count
         } finally {
             conn.close()

@@ -17,7 +17,7 @@ class ExerciseStatisticsSpec extends BaseIntegrationSpec {
 
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
-        cleanupProjectionsForDateRange(DEVICE_ID, LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31))
+        cleanupAllProjectionsForDevice(DEVICE_ID)
     }
 
     def "Scenario 1: Get statistics for exercise with multiple workouts returns complete data"() {

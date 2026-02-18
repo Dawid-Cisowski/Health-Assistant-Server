@@ -6,11 +6,9 @@ class ConversationApiSpec extends BaseIntegrationSpec {
     private static final String SECRET = TEST_SECRET_BASE64
 
     def setup() {
+        jdbcTemplate.update("DELETE FROM conversation_messages WHERE conversation_id IN (SELECT id FROM conversations WHERE device_id = ?)", DEVICE_ID)
+        jdbcTemplate.update("DELETE FROM conversations WHERE device_id = ?", DEVICE_ID)
         setupGeminiApiMock("Oto odpowiedź asystenta zdrowotnego.")
-    }
-
-    def cleanup() {
-        authenticatedDeleteRequest(DEVICE_ID, SECRET, "/v1/assistant/conversations")
     }
 
     // --- GET /v1/assistant/conversations ---
