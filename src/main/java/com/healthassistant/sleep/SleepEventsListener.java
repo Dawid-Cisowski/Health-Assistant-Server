@@ -65,8 +65,7 @@ class SleepEventsListener {
                 if (SLEEP_SESSION_V1.equals(correction.correctedEventType()) && correction.correctedPayload() != null) {
                     sleepProjector.projectCorrectedSleep(
                             event.deviceId(),
-                            correction.correctedPayload(),
-                            correction.correctedOccurredAt()
+                            correction.correctedPayload()
                     );
                 }
             } catch (Exception e) {

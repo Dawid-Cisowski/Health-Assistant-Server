@@ -70,7 +70,7 @@ class WeightImportService implements WeightImportFacade {
             }
 
             var eventResult = result.results().getFirst();
-            if (eventResult.status() == StoreHealthEventsResult.EventStatus.invalid) {
+            if (eventResult.status() == StoreHealthEventsResult.EventStatus.INVALID) {
                 String errorMessage = Optional.ofNullable(eventResult.error())
                         .map(StoreHealthEventsResult.EventError::message)
                         .orElse("Validation failed");
@@ -83,7 +83,7 @@ class WeightImportService implements WeightImportFacade {
                     ? eventResult.eventId().value()
                     : null;
 
-            boolean overwrote = eventResult.status() == StoreHealthEventsResult.EventStatus.duplicate;
+            boolean overwrote = eventResult.status() == StoreHealthEventsResult.EventStatus.DUPLICATE;
 
             log.info("Successfully imported weight {} for device {}: {}kg, score={}, BMI={}, status={}, overwrote={}",
                     measurementId, SecurityUtils.maskDeviceId(deviceId.value()), extractedData.weightKg(),

@@ -11,7 +11,7 @@ class SleepScoreCalculator {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
-    int calculateScore(Instant sleepStart, Instant sleepEnd, int totalMinutes) {
+    int calculateScore(Instant sleepStart, int totalMinutes) {
         int durationScore = calculateDurationScore(totalMinutes);
         int bedtimeScore = calculateBedtimeScore(sleepStart);
         return durationScore + bedtimeScore;

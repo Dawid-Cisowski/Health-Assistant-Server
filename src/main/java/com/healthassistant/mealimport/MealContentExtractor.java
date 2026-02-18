@@ -468,7 +468,7 @@ class MealContentExtractor {
 
         try {
             ChatResponse chatResponse = chatClient.prompt()
-                .system(buildReAnalysisSystemPrompt())
+                .system(RE_ANALYSIS_SYSTEM_PROMPT)
                 .user(reAnalysisPrompt)
                 .call()
                 .chatResponse();
@@ -501,8 +501,7 @@ class MealContentExtractor {
         }
     }
 
-    private String buildReAnalysisSystemPrompt() {
-        return """
+    private static final String RE_ANALYSIS_SYSTEM_PROMPT = """
             You are a nutrition expert correcting a previous meal analysis based on user feedback.
 
             Your task is to adjust the nutritional estimates based on the new information provided.
@@ -540,7 +539,6 @@ class MealContentExtractor {
             - With sauce vs without: sauce adds ~50-100 kcal
             - If user says "it was X not Y", replace the ingredient completely
             """;
-    }
 
     private String buildReAnalysisPrompt(
             String originalDescription,

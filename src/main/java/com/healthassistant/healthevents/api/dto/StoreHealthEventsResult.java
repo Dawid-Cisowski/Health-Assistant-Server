@@ -61,9 +61,20 @@ public record StoreHealthEventsResult(
     }
 
     public enum EventStatus {
-        stored,
-        duplicate,
-        invalid
+        STORED("stored"),
+        DUPLICATE("duplicate"),
+        INVALID("invalid");
+
+        private final String displayName;
+
+        EventStatus(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
     }
 
     public record EventError(String field, String message) {

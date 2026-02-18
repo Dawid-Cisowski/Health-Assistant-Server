@@ -46,7 +46,6 @@ class SleepSessionFactory {
         if (sleepScore == null) {
             sleepScore = sleepScoreCalculator.calculateScore(
                     payload.sleepStart(),
-                    payload.sleepEnd(),
                     payload.totalMinutes()
             );
             log.debug("Auto-calculated sleep score {} for session {}", sleepScore, payload.sleepId());
@@ -65,7 +64,7 @@ class SleepSessionFactory {
         ));
     }
 
-    Optional<SleepSession> createFromCorrectionPayload(String deviceId, Map<String, Object> payload, Instant occurredAt) {
+    Optional<SleepSession> createFromCorrectionPayload(String deviceId, Map<String, Object> payload) {
         Instant sleepStart = parseInstant(payload.get("sleepStart"));
         Instant sleepEnd = parseInstant(payload.get("sleepEnd"));
         Integer totalMinutes = parseInteger(payload.get("totalMinutes"));
@@ -89,7 +88,7 @@ class SleepSessionFactory {
 
         Integer sleepScore = parseInteger(payload.get("sleepScore"));
         if (sleepScore == null) {
-            sleepScore = sleepScoreCalculator.calculateScore(sleepStart, sleepEnd, totalMinutes);
+            sleepScore = sleepScoreCalculator.calculateScore(sleepStart, totalMinutes);
         }
 
         String sleepId = payload.get("sleepId") != null ? payload.get("sleepId").toString() : UUID.randomUUID().toString();

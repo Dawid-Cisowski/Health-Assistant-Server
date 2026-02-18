@@ -14,6 +14,8 @@ import java.time.Instant;
 
 public class StoredEventDataDeserializer extends ValueDeserializer<StoredEventData> {
 
+    private static final String VALUE_FIELD = "value";
+
     @Override
     public StoredEventData deserialize(JsonParser p, DeserializationContext ctxt) {
         JsonNode node = ctxt.readTree(p);
@@ -53,8 +55,8 @@ public class StoredEventDataDeserializer extends ValueDeserializer<StoredEventDa
         if (node.isTextual()) {
             return IdempotencyKey.of(node.asText());
         }
-        if (node.has("value")) {
-            return IdempotencyKey.of(node.get("value").asText());
+        if (node.has(VALUE_FIELD)) {
+            return IdempotencyKey.of(node.get(VALUE_FIELD).asText());
         }
         return ctxt.readTreeAsValue(node, IdempotencyKey.class);
     }
@@ -79,8 +81,8 @@ public class StoredEventDataDeserializer extends ValueDeserializer<StoredEventDa
         if (node.isTextual()) {
             return DeviceId.of(node.asText());
         }
-        if (node.has("value")) {
-            return DeviceId.of(node.get("value").asText());
+        if (node.has(VALUE_FIELD)) {
+            return DeviceId.of(node.get(VALUE_FIELD).asText());
         }
         return ctxt.readTreeAsValue(node, DeviceId.class);
     }
@@ -92,8 +94,8 @@ public class StoredEventDataDeserializer extends ValueDeserializer<StoredEventDa
         if (node.isTextual()) {
             return EventId.of(node.asText());
         }
-        if (node.has("value")) {
-            return EventId.of(node.get("value").asText());
+        if (node.has(VALUE_FIELD)) {
+            return EventId.of(node.get(VALUE_FIELD).asText());
         }
         return ctxt.readTreeAsValue(node, EventId.class);
     }

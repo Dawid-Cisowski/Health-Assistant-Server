@@ -26,6 +26,13 @@ import static java.util.Locale.*;
 class WorkoutImageExtractor {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+    private static final String IMAGE_JPEG = "image/jpeg";
+    private static final String USER_PROMPT = """
+            Analyze this workout app screenshot.
+            Extract all workout data and return as JSON according to the response format.
+
+            If this is not a workout summary screenshot, set isWorkoutScreenshot to false and include the reason in validationError.
+            """;
 
     private final ChatClient chatClient;
     private final ExerciseMatcher exerciseMatcher;
@@ -42,7 +49,7 @@ class WorkoutImageExtractor {
             AiWorkoutExtractionResponse response = chatClient.prompt()
                 .system(buildSystemPrompt())
                 .user(userSpec -> userSpec
-                    .text(buildUserPrompt())
+                    .text(USER_PROMPT)
                     .media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes))
                 )
                 .call()
@@ -131,20 +138,11 @@ class WorkoutImageExtractor {
             """.formatted(catalogSection);
     }
 
-    private String buildUserPrompt() {
-        return """
-            Analyze this workout app screenshot.
-            Extract all workout data and return as JSON according to the response format.
-
-            If this is not a workout summary screenshot, set isWorkoutScreenshot to false and include the reason in validationError.
-            """;
-    }
-
     private ExtractedWorkoutData transformToExtractedWorkoutData(AiWorkoutExtractionResponse response) {
         double confidence = response.confidence();
         if (confidence < 0.0 || confidence > 1.0) {
             log.warn("AI returned invalid confidence: {}, clamping to [0.0, 1.0]", confidence);
-            confidence = Math.max(0.0, Math.min(1.0, confidence));
+            confidence = Math.clamp(confidence, 0.0, 1.0);
         }
 
         if (!response.isWorkoutScreenshot()) {
@@ -253,21 +251,21 @@ class WorkoutImageExtractor {
 
     private String resolveImageMimeType(String contentType) {
         if (contentType == null || contentType.isBlank()) {
-            return "image/jpeg";
+            return IMAGE_JPEG;
         }
         if (contentType.contains("*")) {
-            return "image/jpeg";
+            return IMAGE_JPEG;
         }
         if (contentType.equals("application/octet-stream")) {
-            return "image/jpeg";
+            return IMAGE_JPEG;
         }
         return switch (contentType.toLowerCase(ROOT)) {
-            case "image/jpeg", "image/jpg" -> "image/jpeg";
+            case "image/jpeg", "image/jpg" -> IMAGE_JPEG;
             case "image/png" -> "image/png";
             case "image/gif" -> "image/gif";
             case "image/webp" -> "image/webp";
             case "image/heic", "image/heif" -> "image/heic";
-            default -> "image/jpeg";
+            default -> IMAGE_JPEG;
         };
     }
 }

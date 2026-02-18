@@ -17,7 +17,10 @@ import java.util.UUID;
 class MealFactory {
 
     Optional<Meal> createFromEvent(StoredEventData eventData) {
-        if (!(eventData.payload() instanceof MealRecordedPayload payload)) {
+        if (!(eventData.payload() instanceof MealRecordedPayload(
+                var title, var mealType, var caloriesKcal, var proteinGrams,
+                var fatGrams, var carbohydratesGrams, var healthRating
+        ))) {
             String payloadType = eventData.payload() != null
                     ? eventData.payload().getClass().getSimpleName()
                     : "null";
@@ -25,7 +28,7 @@ class MealFactory {
             return Optional.empty();
         }
 
-        if (payload.title() == null || payload.mealType() == null || payload.healthRating() == null) {
+        if (title == null || mealType == null || healthRating == null) {
             log.warn("MealRecorded event missing required fields, skipping");
             return Optional.empty();
         }
@@ -34,13 +37,13 @@ class MealFactory {
                 eventData.deviceId().value(),
                 eventData.eventId().value(),
                 eventData.occurredAt(),
-                payload.title(),
-                payload.mealType(),
-                payload.caloriesKcal(),
-                payload.proteinGrams(),
-                payload.fatGrams(),
-                payload.carbohydratesGrams(),
-                payload.healthRating()
+                title,
+                mealType,
+                caloriesKcal,
+                proteinGrams,
+                fatGrams,
+                carbohydratesGrams,
+                healthRating
         ));
     }
 

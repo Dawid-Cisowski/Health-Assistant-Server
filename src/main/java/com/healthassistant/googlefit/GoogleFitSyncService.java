@@ -78,9 +78,9 @@ class GoogleFitSyncService implements GoogleFitFacade {
         var result = healthEventsFacade.storeHealthEvents(command);
 
         int storedCount = (int) result.results().stream()
-                .filter(r -> r.status() == StoreHealthEventsResult.EventStatus.stored).count();
+                .filter(r -> r.status() == StoreHealthEventsResult.EventStatus.STORED).count();
         int duplicateCount = (int) result.results().stream()
-                .filter(r -> r.status() == StoreHealthEventsResult.EventStatus.duplicate).count();
+                .filter(r -> r.status() == StoreHealthEventsResult.EventStatus.DUPLICATE).count();
 
         log.info("Sync complete for date {}: stored={}, duplicates={}", date, storedCount, duplicateCount);
         return new SyncDayResult(storedCount, duplicateCount);

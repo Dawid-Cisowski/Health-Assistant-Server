@@ -30,54 +30,10 @@ class WeightImageExtractor {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final double MIN_CONFIDENCE_THRESHOLD = 0.7;
+    private static final String IMAGE_JPEG = "image/jpeg";
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MAX_LOG_LENGTH = 100;
-
-    private final ChatClient chatClient;
-    private final GuardrailFacade guardrailFacade;
-
-    ExtractedWeightData extract(List<MultipartFile> images) throws WeightExtractionException {
-        try {
-            log.info("Extracting weight data from {} images, total size: {} bytes",
-                    images.size(),
-                    images.stream().mapToLong(MultipartFile::getSize).sum());
-
-            AiWeightExtractionResponse response = chatClient.prompt()
-                    .system(buildSystemPrompt())
-                    .user(userSpec -> {
-                        userSpec.text(buildUserPrompt());
-                        images.forEach(image -> {
-                            try {
-                                byte[] imageBytes = image.getBytes();
-                                String mimeType = resolveImageMimeType(image.getContentType());
-                                userSpec.media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes));
-                            } catch (IOException e) {
-                                throw new RuntimeException("Failed to read image bytes", e);
-                            }
-                        });
-                    })
-                    .call()
-                    .entity(AiWeightExtractionResponse.class);
-
-            if (response == null) {
-                throw new WeightExtractionException("AI returned null response");
-            }
-
-            // Security check on text fields that could contain injection attempts
-            validateResponseSecurity(response);
-
-            return transformToExtractedWeightData(response);
-
-        } catch (WeightExtractionException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("AI extraction failed", e);
-            throw new WeightExtractionException("Failed to extract weight data from image", e);
-        }
-    }
-
-    private String buildSystemPrompt() {
-        return """
+    private static final String SYSTEM_PROMPT = """
             You are an expert at analyzing smart scale app screenshots, particularly from Chinese/Polish body composition apps.
 
             Your task is to extract body composition data from the screenshot and return it as JSON.
@@ -148,10 +104,7 @@ class WeightImageExtractor {
             - For percentage values, extract without % sign (e.g., "21.0%" -> 21.0)
             - For negative values (like weightControlKg), preserve the sign (e.g., "-5.4kg" -> -5.4)
             """;
-    }
-
-    private String buildUserPrompt() {
-        return """
+    private static final String USER_PROMPT = """
             Analyze the provided smart scale/body composition app screenshot(s).
             If multiple images are provided, they show the same measurement (scrolled view).
             Combine data from ALL images to extract the complete set of metrics.
@@ -159,6 +112,47 @@ class WeightImageExtractor {
 
             If this is not a weight/body composition screenshot, set isWeightScreenshot to false and include the reason in validationError.
             """;
+
+    private final ChatClient chatClient;
+    private final GuardrailFacade guardrailFacade;
+
+    ExtractedWeightData extract(List<MultipartFile> images) throws WeightExtractionException {
+        try {
+            log.info("Extracting weight data from {} images, total size: {} bytes",
+                    images.size(),
+                    images.stream().mapToLong(MultipartFile::getSize).sum());
+
+            AiWeightExtractionResponse response = chatClient.prompt()
+                    .system(SYSTEM_PROMPT)
+                    .user(userSpec -> {
+                        userSpec.text(USER_PROMPT);
+                        images.forEach(image -> {
+                            try {
+                                byte[] imageBytes = image.getBytes();
+                                String mimeType = resolveImageMimeType(image.getContentType());
+                                userSpec.media(MimeType.valueOf(mimeType), new ByteArrayResource(imageBytes));
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to read image bytes", e);
+                            }
+                        });
+                    })
+                    .call()
+                    .entity(AiWeightExtractionResponse.class);
+
+            if (response == null) {
+                throw new WeightExtractionException("AI returned null response");
+            }
+
+            validateResponseSecurity(response);
+
+            return transformToExtractedWeightData(response);
+
+        } catch (WeightExtractionException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("AI extraction failed", e);
+            throw new WeightExtractionException("Failed to extract weight data from image", e);
+        }
     }
 
     private void validateResponseSecurity(AiWeightExtractionResponse response) throws WeightExtractionException {
@@ -173,7 +167,7 @@ class WeightImageExtractor {
 
         if (confidence < 0.0 || confidence > 1.0) {
             log.warn("AI returned invalid confidence: {}", confidence);
-            confidence = Math.max(0.0, Math.min(1.0, confidence));
+            confidence = Math.clamp(confidence, 0.0, 1.0);
         }
 
         if (!response.isWeightScreenshot()) {
@@ -253,7 +247,6 @@ class WeightImageExtractor {
         if (bodyType == null) {
             return null;
         }
-        // Validate body type for suspicious patterns
         if (containsSuspiciousPatterns(bodyType)) {
             log.warn("Suspicious bodyType detected, nullifying: {}", sanitizeForLog(bodyType));
             return null;
@@ -263,21 +256,21 @@ class WeightImageExtractor {
 
     private String resolveImageMimeType(String contentType) {
         if (contentType == null || contentType.isBlank()) {
-            return "image/jpeg";
+            return IMAGE_JPEG;
         }
         if (contentType.contains("*")) {
-            return "image/jpeg";
+            return IMAGE_JPEG;
         }
         if (contentType.equals("application/octet-stream")) {
-            return "image/jpeg";
+            return IMAGE_JPEG;
         }
         return switch (contentType.toLowerCase(ROOT)) {
-            case "image/jpeg", "image/jpg" -> "image/jpeg";
+            case "image/jpeg", "image/jpg" -> IMAGE_JPEG;
             case "image/png" -> "image/png";
             case "image/gif" -> "image/gif";
             case "image/webp" -> "image/webp";
             case "image/heic", "image/heif" -> "image/heic";
-            default -> "image/jpeg";
+            default -> IMAGE_JPEG;
         };
     }
 }

@@ -90,8 +90,8 @@ class SleepProjector {
         });
     }
 
-    public void projectCorrectedSleep(String deviceId, java.util.Map<String, Object> payload, java.time.Instant occurredAt) {
-        sleepSessionFactory.createFromCorrectionPayload(deviceId, payload, occurredAt)
+    public void projectCorrectedSleep(String deviceId, java.util.Map<String, Object> payload) {
+        sleepSessionFactory.createFromCorrectionPayload(deviceId, payload)
                 .ifPresent(this::saveProjection);
     }
 
