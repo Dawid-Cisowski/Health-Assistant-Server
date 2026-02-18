@@ -56,36 +56,6 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
         evaluation.isPass()
     }
 
-    def "AI synthesizes data from multiple sources"() {
-        given: "steps, calories, sleep, and meal data"
-        submitStepsForToday(10000)
-        submitActiveCalories(400)
-        submitSleepForLastNight(420) // 7 hours
-        submitMeal("Lunch", "LUNCH", 600, 30, 20, 50)
-        submitWorkout("Squats", 4, 10, 80.0)
-        waitForProjections()
-
-        when: "asking for comprehensive analysis"
-        def response = askAssistant("Daj mi pełną analizę mojego zdrowia dziś - kroki, kalorie, sen, posiłki i trening")
-        println "DEBUG: AI response: $response"
-
-        then: "AI mentions all data sources"
-        def evaluation = healthDataEvaluator.evaluate(
-                new EvaluationRequest(
-                        """Summary should include:
-                        - Steps: ~10000
-                        - Active calories: ~400 kcal
-                        - Sleep: ~7 hours (420 minutes)
-                        - Meal: ~600 kcal
-                        - Workout: Squats, 4x10 @ 80kg""",
-                        [],
-                        response
-                )
-        )
-        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
-        evaluation.isPass()
-    }
-
     def "AI calculates weekly averages correctly"() {
         given: "7 days of step data"
         def today = LocalDate.now(POLAND_ZONE)

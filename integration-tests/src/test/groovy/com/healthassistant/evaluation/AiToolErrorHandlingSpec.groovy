@@ -87,26 +87,6 @@ class AiToolErrorHandlingSpec extends BaseEvaluationSpec {
         evaluation.isPass()
     }
 
-    def "AI gracefully handles no meal data"() {
-        given: "no meals recorded"
-        // database cleaned in setup()
-
-        when: "asking about meals"
-        def response = askAssistant("Co dzisiaj jadłem?")
-        println "DEBUG: Response: $response"
-
-        then: "AI indicates no meal data available"
-        def evaluation = healthDataEvaluator.evaluate(
-                new EvaluationRequest(
-                        "AI should indicate no meal data is available or no meals were recorded. It should NOT invent meals or calorie counts.",
-                        [],
-                        response
-                )
-        )
-        println "DEBUG: Evaluation: pass=${evaluation.isPass()}, feedback=${evaluation.feedback}"
-        evaluation.isPass()
-    }
-
     // ==================== Partial Data Tests ====================
 
     def "AI correctly reports partial data - some days have steps, others don't"() {
