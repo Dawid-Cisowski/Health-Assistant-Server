@@ -105,7 +105,7 @@ class MealImportAISpec extends BaseEvaluationSpec {
 
     def "AI correctly estimates grilled chicken with broccoli and rice"() {
         given: "a detailed healthy meal description"
-        def description = "200g grillowanego kurczaka, 200g brokuła i 100g ryżu"
+        def description = "200g grillowanego kurczaka, 200g brokuła i 100g ugotowanego ryżu"
 
         when: "importing via Gemini API"
         def response = authenticatedMultipartRequestWithDescription(getTestDeviceId(), SECRET_BASE64, IMPORT_ENDPOINT, description)
