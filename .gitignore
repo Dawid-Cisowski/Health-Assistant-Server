@@ -46,3 +46,6 @@ out/
 .env
 .env.local
 /target/
+
+### Claude Code ###
+.claude/settings.local.json
