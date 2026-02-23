@@ -15,7 +15,7 @@ interface CatalogProductRepository extends JpaRepository<CatalogProduct, Long> {
     @Query("""
             SELECT p FROM CatalogProduct p
             WHERE p.deviceId = :deviceId
-            AND LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\\\'
+            AND LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%'))
             ORDER BY p.usageCount DESC
             """)
     List<CatalogProduct> searchByDeviceIdAndQuery(@Param("deviceId") String deviceId,
