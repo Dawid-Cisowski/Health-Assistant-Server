@@ -391,7 +391,7 @@ class WorkoutService implements WorkoutFacade {
                 workoutProjector.projectWorkout(event);
                 counter[0]++;
             } catch (Exception e) {
-                log.error("Failed to reproject event {}: {}", event.eventId().value(), e.getMessage());
+                log.error("Failed to reproject event {}", event.eventId().value(), e);
                 counter[1]++;
             }
         });

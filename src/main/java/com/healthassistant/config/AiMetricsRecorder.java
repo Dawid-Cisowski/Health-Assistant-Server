@@ -2,28 +2,35 @@ package com.healthassistant.config;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
  * Central service for recording custom AI metrics.
  * All AI services inject this instead of MeterRegistry directly.
+ * Disabled by default to avoid high-cardinality metric costs in Google Cloud Monitoring.
+ * Enable with app.metrics.ai.enabled=true.
  */
 @Component
 public class AiMetricsRecorder {
 
     private final MeterRegistry registry;
+    private final boolean enabled;
 
-    public AiMetricsRecorder(MeterRegistry registry) {
+    public AiMetricsRecorder(MeterRegistry registry,
+                             @Value("${app.metrics.ai.enabled:false}") boolean enabled) {
         this.registry = registry;
+        this.enabled = enabled;
     }
 
     public Timer.Sample startTimer() {
-        return Timer.start(registry);
+        return enabled ? Timer.start(registry) : null;
     }
 
     // --- Chat ---
 
     public void recordChatRequest(Timer.Sample sample, String status) {
+        if (!enabled) return;
         sample.stop(Timer.builder("ai.chat.duration")
                 .tag("status", status)
                 .register(registry));
@@ -31,6 +38,7 @@ public class AiMetricsRecorder {
     }
 
     public void recordChatTokens(Long promptTokens, Long completionTokens) {
+        if (!enabled) return;
         if (promptTokens != null) {
             registry.summary("ai.chat.tokens.prompt").record(promptTokens);
             registry.counter("ai.tokens.cost.total", "feature", "chat",
@@ -44,6 +52,7 @@ public class AiMetricsRecorder {
     }
 
     public void recordToolCall(String toolName, Timer.Sample sample, String status) {
+        if (!enabled) return;
         sample.stop(Timer.builder("ai.chat.tool_calls.duration")
                 .tag("tool", toolName)
                 .tag("status", status)
@@ -52,12 +61,14 @@ public class AiMetricsRecorder {
     }
 
     public void recordRateLimitRejected() {
+        if (!enabled) return;
         registry.counter("ai.chat.rate_limit.rejected").increment();
     }
 
     // --- Summary / Report ---
 
     public void recordSummaryRequest(String type, Timer.Sample sample, String status, boolean cacheHit) {
+        if (!enabled) return;
         sample.stop(Timer.builder("ai.summary.duration")
                 .tag("type", type)
                 .register(registry));
@@ -67,6 +78,7 @@ public class AiMetricsRecorder {
     }
 
     public void recordSummaryTokens(String type, Long promptTokens, Long completionTokens) {
+        if (!enabled) return;
         if (promptTokens != null) {
             registry.summary("ai.summary.tokens.prompt", "type", type).record(promptTokens);
             registry.counter("ai.tokens.cost.total", "feature", type,
@@ -80,12 +92,14 @@ public class AiMetricsRecorder {
     }
 
     public void recordSummaryInputTruncated() {
+        if (!enabled) return;
         registry.counter("ai.summary.input.truncated").increment();
     }
 
     // --- Import ---
 
     public void recordImportRequest(String importType, Timer.Sample sample, String status, String mode) {
+        if (!enabled) return;
         sample.stop(Timer.builder("ai.import.duration")
                 .tag("import_type", importType)
                 .register(registry));
@@ -95,6 +109,7 @@ public class AiMetricsRecorder {
     }
 
     public void recordImportTokens(String importType, Long promptTokens, Long completionTokens) {
+        if (!enabled) return;
         if (promptTokens != null) {
             registry.summary("ai.import.tokens.prompt", "import_type", importType).record(promptTokens);
             registry.counter("ai.tokens.cost.total", "feature", "import_" + importType,
@@ -108,33 +123,40 @@ public class AiMetricsRecorder {
     }
 
     public void recordImportConfidence(String importType, double confidence) {
+        if (!enabled) return;
         registry.summary("ai.import.confidence", "import_type", importType).record(confidence);
     }
 
     public void recordImportImageCount(String importType, int imageCount) {
+        if (!enabled) return;
         registry.summary("ai.import.images_per_request", "import_type", importType).record(imageCount);
     }
 
     public void recordDraftAction(String action) {
+        if (!enabled) return;
         registry.counter("ai.import.draft.confirmed", "action", action).increment();
     }
 
     public void recordReanalysis(String status) {
+        if (!enabled) return;
         registry.counter("ai.import.reanalysis", "status", status).increment();
     }
 
     // --- Guardrails ---
 
     public void recordGuardrailCheck(String profile, String result) {
+        if (!enabled) return;
         registry.counter("ai.guardrail.checks", "profile", profile, "result", result).increment();
     }
 
     public void recordInjectionDetected(String profile, String patternType) {
+        if (!enabled) return;
         registry.counter("ai.guardrail.injection.detected",
                 "profile", profile, "pattern_type", patternType).increment();
     }
 
     public void recordGuardrailValidationFailed(String profile, String reason) {
+        if (!enabled) return;
         registry.counter("ai.guardrail.validation.failed",
                 "profile", profile, "reason", reason).increment();
     }
@@ -142,6 +164,7 @@ public class AiMetricsRecorder {
     // --- Errors ---
 
     public void recordAiError(String feature, String errorType) {
+        if (!enabled) return;
         registry.counter("ai.errors", "feature", feature, "error_type", errorType).increment();
     }
 }
