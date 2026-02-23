@@ -67,7 +67,7 @@ public final class ImageValidationUtils {
         }
 
         if (image.getSize() > ImportConstants.MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("Image file exceeds maximum size of 10MB");
+            throw new IllegalArgumentException("Image file exceeds maximum size of 15MB");
         }
 
         String contentType = image.getContentType();

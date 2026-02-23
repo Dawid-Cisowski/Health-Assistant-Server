@@ -161,7 +161,7 @@ class ModulithEventSerializerConfig {
                 log.debug("Serialized event of type {}", event.getClass().getSimpleName());
                 return serialized;
             } catch (JacksonException e) {
-                log.error("Failed to serialize event of type {}: {}", event.getClass().getName(), e.getMessage());
+                log.error("Failed to serialize event of type {}", event.getClass().getName(), e);
                 throw new IllegalArgumentException("Failed to serialize event: " + event, e);
             }
         }
@@ -173,7 +173,7 @@ class ModulithEventSerializerConfig {
                 log.debug("Deserialized event to type {}", type.getSimpleName());
                 return deserialized;
             } catch (JacksonException e) {
-                log.error("Failed to deserialize event to {}: {}", type.getName(), e.getMessage());
+                log.error("Failed to deserialize event to {}", type.getName(), e);
                 throw new IllegalArgumentException("Failed to deserialize event to " + type.getName(), e);
             }
         }

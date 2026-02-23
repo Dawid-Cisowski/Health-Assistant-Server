@@ -27,9 +27,9 @@ public final class ImportConstants {
     );
 
     /**
-     * Maximum file size for image imports (10MB).
+     * Maximum file size for image imports (15MB).
      */
-    public static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
+    public static final long MAX_FILE_SIZE = 15L * 1024 * 1024;
 
     /**
      * Poland timezone for date calculations.

@@ -35,7 +35,7 @@ import java.util.UUID;
 @Slf4j
 class MealImportService implements MealImportFacade {
 
-    private static final long MAX_TOTAL_SIZE = 30L * 1024 * 1024;
+    private static final long MAX_TOTAL_SIZE = 50L * 1024 * 1024;
     private static final int MAX_FILES_COUNT = 5;
 
     private final MealContentExtractor contentExtractor;
@@ -144,7 +144,7 @@ class MealImportService implements MealImportFacade {
         if (images != null) {
             long totalSize = images.stream().mapToLong(MultipartFile::getSize).sum();
             if (totalSize > MAX_TOTAL_SIZE) {
-                throw new IllegalArgumentException("Total images size exceeds 30MB limit");
+                throw new IllegalArgumentException("Total images size exceeds 50MB limit");
             }
         }
     }
