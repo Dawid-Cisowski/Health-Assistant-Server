@@ -11,6 +11,8 @@ import com.healthassistant.meals.api.MealsFacade
 import com.healthassistant.steps.api.StepsFacade
 import com.healthassistant.weight.api.WeightFacade
 import com.healthassistant.heartrate.api.HeartRateFacade
+import com.healthassistant.mealcatalog.api.MealCatalogFacade
+import com.healthassistant.mealcatalog.api.dto.SaveProductRequest
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.awaitility.Awaitility
@@ -96,6 +98,9 @@ abstract class BaseEvaluationSpec extends Specification {
     HeartRateFacade heartRateFacade
 
     @Autowired
+    MealCatalogFacade mealCatalogFacade
+
+    @Autowired
     JdbcTemplate jdbcTemplate
 
     @Autowired(required = false)
@@ -131,7 +136,9 @@ abstract class BaseEvaluationSpec extends Specification {
             "AiReportEvaluationSpec",
             "ReportBenchmarkSpec",
             "AiMutationToolSpec",
-            "AiMutationBenchmarkSpec"
+            "AiMutationBenchmarkSpec",
+            "AiMealCatalogEvalSpec",
+            "AiMealCatalogBenchmarkSpec"
         ]
 
         def devicesMap = new StringBuilder('{')
@@ -198,6 +205,34 @@ abstract class BaseEvaluationSpec extends Specification {
         jdbcTemplate.update("DELETE FROM resting_heart_rate_projections WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM body_measurement_projections WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM health_reports WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_catalog_products WHERE device_id = ?", deviceId)
+    }
+
+    void seedCatalogProduct(String title, String mealType, int calories, int protein, int fat, int carbs, String healthRating) {
+        mealCatalogFacade.saveProduct(getTestDeviceId(), new SaveProductRequest(title, mealType, calories, protein, fat, carbs, healthRating))
+    }
+
+    // ==================== Meal Import Helpers ====================
+
+    byte[] loadTestImage(String resourcePath) {
+        def stream = getClass().getResourceAsStream(resourcePath)
+        if (stream == null) {
+            throw new IllegalArgumentException("Test image not found: ${resourcePath}")
+        }
+        return stream.bytes
+    }
+
+    def authenticatedMultipartRequestWithImage(String deviceId, String secretBase64, String path, byte[] imageBytes, String fileName) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, "", secretBase64)
+
+        return RestAssured.given()
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+                .multiPart("images", fileName, imageBytes, "image/png")
     }
 
     // ==================== Assistant Helpers ====================
