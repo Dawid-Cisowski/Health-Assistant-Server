@@ -20,8 +20,19 @@ record ExtractedMealData(
         double confidence,
         List<ClarifyingQuestion> questions,
         Long promptTokens,
-        Long completionTokens
+        Long completionTokens,
+        List<ExtractedItem> items
 ) {
+    record ExtractedItem(
+            String title,
+            String source,
+            Integer caloriesKcal,
+            Integer proteinGrams,
+            Integer fatGrams,
+            Integer carbohydratesGrams,
+            String healthRating
+    ) {}
+
     static ExtractedMealData valid(
             Instant occurredAt,
             String title,
@@ -37,7 +48,7 @@ record ExtractedMealData(
         return new ExtractedMealData(
                 true, null, occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-                healthRating, confidence, List.of(), null, null
+                healthRating, confidence, List.of(), null, null, List.of()
         );
     }
 
@@ -57,7 +68,8 @@ record ExtractedMealData(
         return new ExtractedMealData(
                 true, null, occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-                healthRating, confidence, questions != null ? questions : List.of(), null, null
+                healthRating, confidence, questions != null ? questions : List.of(),
+                null, null, List.of()
         );
     }
 
@@ -80,7 +92,31 @@ record ExtractedMealData(
                 true, null, occurredAt, title, description, mealType,
                 caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
                 healthRating, confidence, questions != null ? questions : List.of(),
-                promptTokens, completionTokens
+                promptTokens, completionTokens, List.of()
+        );
+    }
+
+    static ExtractedMealData validWithTokensAndItems(
+            Instant occurredAt,
+            String title,
+            String description,
+            String mealType,
+            Integer caloriesKcal,
+            Integer proteinGrams,
+            Integer fatGrams,
+            Integer carbohydratesGrams,
+            String healthRating,
+            double confidence,
+            List<ClarifyingQuestion> questions,
+            Long promptTokens,
+            Long completionTokens,
+            List<ExtractedItem> items
+    ) {
+        return new ExtractedMealData(
+                true, null, occurredAt, title, description, mealType,
+                caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
+                healthRating, confidence, questions != null ? questions : List.of(),
+                promptTokens, completionTokens, items != null ? items : List.of()
         );
     }
 
@@ -88,7 +124,7 @@ record ExtractedMealData(
         return new ExtractedMealData(
                 false, error, null, null, null, null,
                 null, null, null, null,
-                null, confidence, List.of(), null, null
+                null, confidence, List.of(), null, null, List.of()
         );
     }
 }

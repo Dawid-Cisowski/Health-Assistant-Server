@@ -28,7 +28,7 @@ class ModularityTests {
         var expectedModules = Set.of(
                 "appevents", "healthevents", "dailysummary", "steps", "workout",
                 "workoutimport", "sleep", "sleepimport", "calories", "activity",
-                "meals", "mealimport", "googlefit", "assistant", "security", "config",
+                "meals", "mealimport", "mealcatalog", "googlefit", "assistant", "security", "config",
                 "weight", "weightimport", "heartrate", "guardrails",
                 "bodymeasurements", "notifications", "reports"
         );
@@ -100,7 +100,8 @@ class ModularityTests {
                 Map.entry("weightimport", "WeightImportFacade"),
                 Map.entry("heartrate", "HeartRateFacade"),
                 Map.entry("bodymeasurements", "BodyMeasurementsFacade"),
-                Map.entry("reports", "ReportsFacade")
+                Map.entry("reports", "ReportsFacade"),
+                Map.entry("mealcatalog", "MealCatalogFacade")
         );
 
         for (var entry : modulesWithFacades.entrySet()) {

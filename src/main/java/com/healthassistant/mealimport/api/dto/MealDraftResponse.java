@@ -15,7 +15,8 @@ public record MealDraftResponse(
     Double confidence,
     List<ClarifyingQuestion> questions,
     Instant expiresAt,
-    String errorMessage
+    String errorMessage,
+    List<DraftItem> items
 ) {
     public record MealData(
         String title,
@@ -28,6 +29,16 @@ public record MealDraftResponse(
     ) {
     }
 
+    public record DraftItem(
+            String title,
+            String source,
+            Integer caloriesKcal,
+            Integer proteinGrams,
+            Integer fatGrams,
+            Integer carbohydratesGrams,
+            String healthRating
+    ) {}
+
     public static MealDraftResponse success(
         String draftId,
         Instant suggestedOccurredAt,
@@ -39,14 +50,30 @@ public record MealDraftResponse(
     ) {
         return new MealDraftResponse(
             draftId, "draft", suggestedOccurredAt, description, meal,
-            confidence, questions, expiresAt, null
+            confidence, questions, expiresAt, null, null
+        );
+    }
+
+    public static MealDraftResponse success(
+        String draftId,
+        Instant suggestedOccurredAt,
+        String description,
+        MealData meal,
+        double confidence,
+        List<ClarifyingQuestion> questions,
+        Instant expiresAt,
+        List<DraftItem> items
+    ) {
+        return new MealDraftResponse(
+            draftId, "draft", suggestedOccurredAt, description, meal,
+            confidence, questions, expiresAt, null, items
         );
     }
 
     public static MealDraftResponse failure(String errorMessage) {
         return new MealDraftResponse(
             null, "failed", null, null, null,
-            null, null, null, errorMessage
+            null, null, null, errorMessage, null
         );
     }
 }

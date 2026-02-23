@@ -4,6 +4,7 @@ import com.healthassistant.bodymeasurements.api.BodyMeasurementsFacade;
 import com.healthassistant.bodymeasurements.api.dto.BodyPart;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.mealcatalog.api.MealCatalogFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.dto.payload.HealthRating;
@@ -59,6 +60,7 @@ class HealthTools {
     private final WeightFacade weightFacade;
     private final BodyMeasurementsFacade bodyMeasurementsFacade;
     private final HealthEventsFacade healthEventsFacade;
+    private final MealCatalogFacade mealCatalogFacade;
     private final ObjectMapper objectMapper;
     private final AiMetricsRecorder aiMetrics;
 
@@ -252,6 +254,42 @@ class HealthTools {
         });
     }
 
+    @Tool(name = "searchMealCatalog",
+          description = "Searches the user's personal meal catalog for products by name. " +
+                        "The catalog auto-learns from meal imports and recordings. " +
+                        "Use this BEFORE recording a meal when user mentions a product by name - if found, use exact nutritional values from catalog. " +
+                        "Returns matching products with nutritional values (calories, protein, fat, carbs) and usage count. " +
+                        "PARAMETER: query (String, required) - product name to search for, e.g. 'Skyr', 'baton proteinowy'.")
+    public Object searchMealCatalog(String query, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Searching meal catalog for device {}: query='{}'", maskDeviceId(deviceId), sanitizeForLog(query));
+
+        var sample = aiMetrics.startTimer();
+        try {
+            if (query == null || query.isBlank()) {
+                aiMetrics.recordToolCall("searchMealCatalog", sample, "validation_error");
+                return new ToolError("Query cannot be empty. Please provide a product name to search for.");
+            }
+            if (query.length() > 200) {
+                aiMetrics.recordToolCall("searchMealCatalog", sample, "validation_error");
+                return new ToolError("Query is too long (max 200 characters).");
+            }
+
+            var results = mealCatalogFacade.searchProducts(deviceId, query, 10);
+            log.info("Meal catalog search returned {} results for query '{}'", results.size(), sanitizeForLog(query));
+            aiMetrics.recordToolCall("searchMealCatalog", sample, "success");
+
+            if (results.isEmpty()) {
+                return new ToolError("No products found matching '" + sanitizeForLog(query) + "' in your catalog. You can estimate the values yourself.");
+            }
+            return results;
+        } catch (Exception e) {
+            log.error("Error searching meal catalog", e);
+            aiMetrics.recordToolCall("searchMealCatalog", sample, "error");
+            return new ToolError("Unable to search meal catalog. Please estimate the values yourself.");
+        }
+    }
+
     // ==================== MUTATION TOOLS ====================
 
     @Tool(name = "recordMeal",
@@ -287,6 +325,8 @@ class HealthTools {
 
             var result = mealsFacade.recordMeal(deviceId, request);
             log.info("Meal recorded: eventId={}, title={}", result.eventId(), sanitizeForLog(title));
+            saveToCatalogQuietly(deviceId, title, parsedMealType.name(), parsedCalories,
+                    parsedProtein, parsedFat, parsedCarbs, parsedHealthRating.name());
             return new MutationSuccess("Meal recorded successfully", result);
         });
     }
@@ -747,6 +787,20 @@ class HealthTools {
         if (message.contains("not found") || message.contains("NotFoundException")) return "The requested item was not found.";
         if (message.contains("not a workout") || message.contains("not a meal")) return "The specified event is not the correct type.";
         return "An error occurred while processing your request. Please try again.";
+    }
+
+    private void saveToCatalogQuietly(String deviceId, String title, String mealType,
+                                      int caloriesKcal, int proteinGrams, int fatGrams,
+                                      int carbohydratesGrams, String healthRating) {
+        try {
+            mealCatalogFacade.saveProduct(deviceId,
+                    new com.healthassistant.mealcatalog.api.dto.SaveProductRequest(
+                            title, mealType, caloriesKcal, proteinGrams, fatGrams,
+                            carbohydratesGrams, healthRating
+                    ));
+        } catch (Exception e) {
+            log.warn("Failed to save meal to catalog: {}", e.getMessage());
+        }
     }
 
     private static String sanitizeForLog(String input) {

@@ -40,7 +40,8 @@ class ArchitectureRulesTest {
                             "com.healthassistant.dailysummary..",
                             "com.healthassistant.weight..",
                             "com.healthassistant.heartrate..",
-                            "com.healthassistant.reports.."
+                            "com.healthassistant.reports..",
+                            "com.healthassistant.mealcatalog.."
                     )
                     .and().resideOutsideOfPackage("..api..")
                     .should().notBePublic()

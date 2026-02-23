@@ -3,6 +3,7 @@ package com.healthassistant.mealimport;
 import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import com.healthassistant.guardrails.api.GuardrailProfile;
+import com.healthassistant.mealcatalog.api.dto.CatalogProductResponse;
 import com.healthassistant.mealimport.api.dto.ClarifyingQuestion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
+
 
 @Component
 @RequiredArgsConstructor
@@ -38,14 +41,16 @@ class MealContentExtractor {
 
     private record AiCallResult(AiMealExtractionResponse response, Long promptTokens, Long completionTokens) {}
 
-    ExtractedMealData extract(String description, List<MultipartFile> images, MealTimeContext timeContext) {
-        log.info("Extracting meal data from description: {}, images: {}, time: {}",
+    ExtractedMealData extract(String description, List<MultipartFile> images, MealTimeContext timeContext,
+                              List<CatalogProductResponse> catalogProducts) {
+        log.info("Extracting meal data from description: {}, images: {}, time: {}, catalog products: {}",
             description != null ? description.length() + " chars" : "none",
             images != null ? images.size() : 0,
-            timeContext != null ? timeContext.formatCurrentTime() : "none");
+            timeContext != null ? timeContext.formatCurrentTime() : "none",
+            catalogProducts != null ? catalogProducts.size() : 0);
 
         try {
-            AiCallResult result = callAI(description, images, timeContext);
+            AiCallResult result = callAI(description, images, timeContext, catalogProducts);
             return transformToExtractedMealData(result.response(), result.promptTokens(), result.completionTokens());
         } catch (IOException e) {
             throw new MealExtractionException("Failed to read image data: " + e.getMessage(), e);
@@ -55,9 +60,10 @@ class MealContentExtractor {
         }
     }
 
-    private AiCallResult callAI(String description, List<MultipartFile> images, MealTimeContext timeContext) throws IOException {
+    private AiCallResult callAI(String description, List<MultipartFile> images, MealTimeContext timeContext,
+                                List<CatalogProductResponse> catalogProducts) throws IOException {
         var promptBuilder = chatClient.prompt()
-            .system(buildSystemPrompt(timeContext));
+            .system(buildSystemPrompt(timeContext, catalogProducts));
 
         ChatResponse chatResponse = promptBuilder.user(userSpec -> {
             userSpec.text(buildUserPrompt(description, images, timeContext));
@@ -133,13 +139,15 @@ class MealContentExtractor {
         return contentType;
     }
 
-    private String buildSystemPrompt(MealTimeContext timeContext) {
+    private String buildSystemPrompt(MealTimeContext timeContext, List<CatalogProductResponse> catalogProducts) {
         String timeInfo = buildTimeContextInfo(timeContext);
+        String catalogInfo = buildCatalogInfo(catalogProducts);
 
         return timeInfo + """
             You are a nutrition expert analyzing meals from photos and/or descriptions.
 
             Your task is to estimate nutritional values and return them as JSON.
+            """ + catalogInfo + """
 
             IMPORTANT RULES:
             1. Return ONLY valid JSON without any additional text
@@ -228,6 +236,12 @@ class MealContentExtractor {
             - UNHEALTHY: Fast food, fried foods
             - VERY_UNHEALTHY: High sugar, high fat junk food
 
+            ITEMS BREAKDOWN:
+            - ALWAYS provide an "items" array listing each individual food item separately.
+            - Each item has: title, source ("catalog" or "estimated"), caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams, healthRating.
+            - The top-level nutritional values (caloriesKcal, proteinGrams, etc.) MUST equal the SUM of all items.
+            - The top-level "title" should be a combined name for the whole meal.
+
             RESPONSE FORMAT:
             {
               "isMeal": boolean,
@@ -237,10 +251,10 @@ class MealContentExtractor {
               "description": "detailed component breakdown in Polish" or null,
               "mealType": "BREAKFAST" | "BRUNCH" | "LUNCH" | "DINNER" | "SNACK" | "DESSERT" | "DRINK" (REQUIRED when isMeal=true),
               "occurredAt": "ISO-8601 datetime" or null,
-              "caloriesKcal": number,
-              "proteinGrams": number,
-              "fatGrams": number,
-              "carbohydratesGrams": number,
+              "caloriesKcal": number (total = sum of items),
+              "proteinGrams": number (total = sum of items),
+              "fatGrams": number (total = sum of items),
+              "carbohydratesGrams": number (total = sum of items),
               "healthRating": "HEALTHY" | "NEUTRAL" | etc.,
               "validationError": "error description" or null,
               "questions": [
@@ -250,6 +264,17 @@ class MealContentExtractor {
                   "questionType": "SINGLE_CHOICE",
                   "options": ["SMALL", "MEDIUM", "LARGE"],
                   "affectedFields": ["caloriesKcal", "proteinGrams", "fatGrams", "carbohydratesGrams"]
+                }
+              ],
+              "items": [
+                {
+                  "title": "item name",
+                  "source": "catalog" or "estimated",
+                  "caloriesKcal": number,
+                  "proteinGrams": number,
+                  "fatGrams": number,
+                  "carbohydratesGrams": number,
+                  "healthRating": "HEALTHY" | "NEUTRAL" | etc.
                 }
               ]
             }
@@ -273,6 +298,42 @@ class MealContentExtractor {
         sb.append("CURRENT DATE: ").append(timeContext.currentDate()).append("\n\n");
         sb.append("TODAY'S MEALS:\n");
         sb.append(timeContext.formatMealsForPrompt()).append("\n\n");
+
+        return sb.toString();
+    }
+
+    private String buildCatalogInfo(List<CatalogProductResponse> catalogProducts) {
+        if (catalogProducts == null || catalogProducts.isEmpty()) {
+            return "";
+        }
+
+        var sb = new StringBuilder();
+        sb.append("\nPERSONAL PRODUCT CATALOG (use EXACT nutritional values when you identify a matching product):\n");
+
+        var products = catalogProducts.stream().limit(30).toList();
+        IntStream.range(0, products.size())
+                .forEach(i -> {
+                    var p = products.get(i);
+                    sb.append(i + 1)
+                            .append(". \"").append(p.title()).append("\" - ")
+                            .append(p.caloriesKcal()).append(" kcal, ")
+                            .append("P:").append(p.proteinGrams()).append("g, ")
+                            .append("F:").append(p.fatGrams()).append("g, ")
+                            .append("C:").append(p.carbohydratesGrams()).append("g")
+                            .append(p.healthRating() != null ? ", " + p.healthRating() : "")
+                            .append("\n");
+                });
+
+        sb.append("""
+
+                CATALOG MATCHING RULES:
+                - When you identify a food item that MATCHES a catalog product, use the catalog's EXACT values.
+                - Mark matched items with "source": "catalog".
+                - Mark non-matched items with "source": "estimated".
+                - Matching should be by product identity (same product, same brand).
+                - A photo of "Skyr pitny Piątnica" matches catalog entry "Skyr pitny z Piątnicy".
+                - If unsure about a match, use "estimated" and provide your own values.
+                """);
 
         return sb.toString();
     }
@@ -366,11 +427,32 @@ class MealContentExtractor {
             log.debug("Added meal type clarifying question due to low confidence: {}", mealTypeConfidence);
         }
 
-        return ExtractedMealData.validWithTokens(
+        List<ExtractedMealData.ExtractedItem> items = transformItems(response.items());
+
+        return ExtractedMealData.validWithTokensAndItems(
             occurredAt, title, description, mealType,
             caloriesKcal, proteinGrams, fatGrams, carbohydratesGrams,
-            healthRating, confidence, questions, promptTokens, completionTokens
+            healthRating, confidence, questions, promptTokens, completionTokens, items
         );
+    }
+
+    private List<ExtractedMealData.ExtractedItem> transformItems(List<AiMealExtractionResponse.AiItem> aiItems) {
+        if (aiItems == null || aiItems.isEmpty()) {
+            return List.of();
+        }
+
+        return aiItems.stream()
+                .filter(item -> item != null && item.title() != null)
+                .map(item -> new ExtractedMealData.ExtractedItem(
+                        item.title(),
+                        item.source() != null ? item.source() : "estimated",
+                        item.caloriesKcal(),
+                        item.proteinGrams(),
+                        item.fatGrams(),
+                        item.carbohydratesGrams(),
+                        item.healthRating()
+                ))
+                .toList();
     }
 
     private List<ClarifyingQuestion> transformQuestions(List<AiMealExtractionResponse.AiQuestion> aiQuestions) {
