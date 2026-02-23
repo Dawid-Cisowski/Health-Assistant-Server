@@ -1,29 +1,29 @@
 {
-    "timestamp": "2026-02-16T06:53:51.435459455Z",
+    "timestamp": "2026-02-23T06:55:23.939225610Z",
     "summary": {
         "totalTests": 6,
         "passedTests": 5,
         "failedTests": 1,
         "totalTokens": 0,
         "totalCostUsd": 0.0,
-        "avgResponseMs": 6234
+        "avgResponseMs": 6573.5
     },
     "byModel": {
         "gemini-3-pro-preview": {
-            "passed": 3,
-            "failed": 0,
-            "inputTokens": 0,
-            "outputTokens": 0,
-            "totalCostUsd": 0.0,
-            "avgResponseMs": 5979.3333333333
-        },
-        "gemini-3-flash-preview": {
             "passed": 2,
             "failed": 1,
             "inputTokens": 0,
             "outputTokens": 0,
             "totalCostUsd": 0.0,
-            "avgResponseMs": 6488.6666666667
+            "avgResponseMs": 6541.3333333333
+        },
+        "gemini-3-flash-preview": {
+            "passed": 3,
+            "failed": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "totalCostUsd": 0.0,
+            "avgResponseMs": 6605.6666666667
         }
     },
     "tests": [
@@ -35,9 +35,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 6676,
+            "responseTimeMs": 7084,
             "ttftMs": null,
-            "timestamp": "2026-02-16T06:52:47.618537273Z",
+            "timestamp": "2026-02-23T06:54:45.167157060Z",
             "errorMessage": null
         },
         {
@@ -48,36 +48,36 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 5966,
+            "responseTimeMs": 7531,
             "ttftMs": null,
-            "timestamp": "2026-02-16T06:53:02.224046272Z",
+            "timestamp": "2026-02-23T06:54:53.970874961Z",
             "errorMessage": null
         },
         {
             "testId": "BM-R02",
             "testName": "Weekly report AI summary",
             "model": "gemini-3-pro-preview",
-            "passed": true,
-            "inputTokens": 0,
-            "outputTokens": 0,
-            "estimatedCostUsd": 0.0,
-            "responseTimeMs": 5299,
-            "ttftMs": null,
-            "timestamp": "2026-02-16T06:53:13.636568369Z",
-            "errorMessage": null
-        },
-        {
-            "testId": "BM-R02",
-            "testName": "Weekly report AI summary",
-            "model": "gemini-3-flash-preview",
             "passed": false,
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 7999,
+            "responseTimeMs": 8111,
             "ttftMs": null,
-            "timestamp": "2026-02-16T06:53:27.329039204Z",
+            "timestamp": "2026-02-23T06:55:03.471835180Z",
             "errorMessage": "Judge score: 0.0, reason: LLM Judge returned empty response"
+        },
+        {
+            "testId": "BM-R02",
+            "testName": "Weekly report AI summary",
+            "model": "gemini-3-flash-preview",
+            "passed": true,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 6941,
+            "ttftMs": null,
+            "timestamp": "2026-02-23T06:55:11.191823283Z",
+            "errorMessage": null
         },
         {
             "testId": "BM-R03",
@@ -87,9 +87,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 5963,
+            "responseTimeMs": 4429,
             "ttftMs": null,
-            "timestamp": "2026-02-16T06:53:38.353961014Z",
+            "timestamp": "2026-02-23T06:55:16.810695121Z",
             "errorMessage": null
         },
         {
@@ -100,9 +100,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 5501,
+            "responseTimeMs": 5345,
             "ttftMs": null,
-            "timestamp": "2026-02-16T06:53:48.707230082Z",
+            "timestamp": "2026-02-23T06:55:23.325612443Z",
             "errorMessage": null
         }
     ]
