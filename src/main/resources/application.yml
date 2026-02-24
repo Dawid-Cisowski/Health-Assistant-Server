@@ -136,6 +136,7 @@ app:
     gcs:
       enabled: ${MEDICAL_EXAMS_GCS_ENABLED:false}
       bucket-name: ${MEDICAL_EXAMS_GCS_BUCKET:}
+      credentials-json: ${MEDICAL_EXAMS_GCS_CREDENTIALS_JSON:}
       credentials-file: ${MEDICAL_EXAMS_GCS_CREDENTIALS_FILE:}
       signed-url-hours: ${MEDICAL_EXAMS_GCS_SIGNED_URL_HOURS:168}
     storage:

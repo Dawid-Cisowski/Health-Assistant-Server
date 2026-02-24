@@ -13,9 +13,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Year;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +29,9 @@ class GcsStorageService implements FileStorageService {
 
     @Value("${app.medicalexams.gcs.bucket-name}")
     private String bucketName;
+
+    @Value("${app.medicalexams.gcs.credentials-json:}")
+    private String credentialsJson;
 
     @Value("${app.medicalexams.gcs.credentials-file:}")
     private String credentialsFile;
@@ -40,7 +45,10 @@ class GcsStorageService implements FileStorageService {
     void init() {
         try {
             var builder = StorageOptions.newBuilder();
-            if (credentialsFile != null && !credentialsFile.isBlank()) {
+            if (credentialsJson != null && !credentialsJson.isBlank()) {
+                var stream = new ByteArrayInputStream(credentialsJson.getBytes(StandardCharsets.UTF_8));
+                builder.setCredentials(GoogleCredentials.fromStream(stream));
+            } else if (credentialsFile != null && !credentialsFile.isBlank()) {
                 try (var stream = new FileInputStream(credentialsFile)) {
                     builder.setCredentials(GoogleCredentials.fromStream(stream));
                 }
