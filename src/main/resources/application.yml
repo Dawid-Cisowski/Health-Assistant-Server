@@ -133,9 +133,11 @@ app:
     fcm-token: ${FCM_TOKEN:}
     device-id: ${NOTIFICATION_DEVICE_ID:}
   medicalexams:
-    google-drive:
-      enabled: ${MEDICAL_EXAMS_DRIVE_ENABLED:false}
-      root-folder-id: ${MEDICAL_EXAMS_DRIVE_FOLDER_ID:}
+    gcs:
+      enabled: ${MEDICAL_EXAMS_GCS_ENABLED:false}
+      bucket-name: ${MEDICAL_EXAMS_GCS_BUCKET:}
+      credentials-file: ${MEDICAL_EXAMS_GCS_CREDENTIALS_FILE:}
+      signed-url-hours: ${MEDICAL_EXAMS_GCS_SIGNED_URL_HOURS:168}
     storage:
       local-path: ${MEDICAL_EXAMS_LOCAL_PATH:${java.io.tmpdir}/healthassistant/medical-exams}
   energy-requirements:

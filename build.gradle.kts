@@ -75,6 +75,9 @@ dependencies {
     // Google Cloud SQL support (for production)
     implementation("com.google.cloud.sql:postgres-socket-factory:1.13.1")
 
+    // Google Cloud Storage (for medical exam attachments)
+    implementation("com.google.cloud:google-cloud-storage:2.43.2")
+
     // Cache
     implementation("com.github.ben-manes.caffeine:caffeine")
 

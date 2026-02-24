@@ -17,7 +17,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(prefix = "app.medicalexams.google-drive", name = "enabled", havingValue = "false", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "app.medicalexams.gcs", name = "enabled", havingValue = "false", matchIfMissing = true)
 class LocalFileStorageService implements FileStorageService {
 
     @Value("${app.medicalexams.storage.local-path:${java.io.tmpdir}/healthassistant/medical-exams}")
