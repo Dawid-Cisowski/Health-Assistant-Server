@@ -132,6 +132,12 @@ app:
     firebase-credentials: ${FIREBASE_CREDENTIALS_JSON:}
     fcm-token: ${FCM_TOKEN:}
     device-id: ${NOTIFICATION_DEVICE_ID:}
+  medicalexams:
+    google-drive:
+      enabled: ${MEDICAL_EXAMS_DRIVE_ENABLED:false}
+      root-folder-id: ${MEDICAL_EXAMS_DRIVE_FOLDER_ID:}
+    storage:
+      local-path: ${MEDICAL_EXAMS_LOCAL_PATH:${java.io.tmpdir}/healthassistant/medical-exams}
   energy-requirements:
     surplus-kcal: 300
     base-multiplier: 1.35

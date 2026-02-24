@@ -78,6 +78,12 @@
         <Bug pattern="REC_CATCH_EXCEPTION"/>
     </Match>
 
+    <!-- Immutable JPA seed-data entities: fields are populated by Hibernate, not application code -->
+    <Match>
+        <Class name="com.healthassistant.medicalexams.MarkerDefinition"/>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+    </Match>
+
     <!-- Local records with combine() for Stream.reduce() - needed for parallel stream contract -->
     <Match>
         <Class name="~com\.healthassistant\.workout\.ExerciseStatisticsCalculator\$\d+.*"/>

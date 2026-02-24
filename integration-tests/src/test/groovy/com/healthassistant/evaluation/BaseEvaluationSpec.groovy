@@ -129,7 +129,6 @@ abstract class BaseEvaluationSpec extends Specification {
             "AiPromptInjectionSpec",
             "AiDailySummaryEvaluationSpec",
             "MealImportAISpec",
-            "WorkoutImportAISpec",
             "SleepImportAISpec",
             "WeightImportAISpec",
             "AiBenchmarkSpec",
@@ -138,7 +137,9 @@ abstract class BaseEvaluationSpec extends Specification {
             "AiMutationToolSpec",
             "AiMutationBenchmarkSpec",
             "AiMealCatalogEvalSpec",
-            "AiMealCatalogBenchmarkSpec"
+            "AiMealCatalogBenchmarkSpec",
+            "AiMedicalExamImportEvalSpec",
+            "AiMedicalExamBenchmarkSpec"
         ]
 
         def devicesMap = new StringBuilder('{')
@@ -206,6 +207,8 @@ abstract class BaseEvaluationSpec extends Specification {
         jdbcTemplate.update("DELETE FROM body_measurement_projections WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM health_reports WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM meal_catalog_products WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM examinations WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM medical_exam_import_drafts WHERE device_id = ?", deviceId)
     }
 
     void seedCatalogProduct(String title, String mealType, int calories, int protein, int fat, int carbs, String healthRating) {
