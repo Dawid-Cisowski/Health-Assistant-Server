@@ -206,8 +206,9 @@ class MedicalExamsCrudSpec extends BaseIntegrationSpec {
         """
 
         when: "I update the examination"
-        def response = authenticatedPutRequestWithBody(DEVICE_ID, SECRET, "${BASE_PATH}/${examId}", updateRequest)
-                .put("${BASE_PATH}/${examId}")
+        def examPath = BASE_PATH + "/" + examId
+        def response = authenticatedPutRequestWithBody(DEVICE_ID, SECRET, examPath, updateRequest)
+                .put(examPath)
                 .then()
                 .extract()
 
@@ -413,8 +414,9 @@ class MedicalExamsCrudSpec extends BaseIntegrationSpec {
         """
 
         when: "I update the result"
-        def response = authenticatedPutRequestWithBody(DEVICE_ID, SECRET, "${BASE_PATH}/${examId}/results/${resultId}", updateRequest)
-                .put("${BASE_PATH}/${examId}/results/${resultId}")
+        def resultPath = BASE_PATH + "/" + examId + "/results/" + resultId
+        def response = authenticatedPutRequestWithBody(DEVICE_ID, SECRET, resultPath, updateRequest)
+                .put(resultPath)
                 .then()
                 .extract()
 
@@ -643,8 +645,9 @@ class MedicalExamsCrudSpec extends BaseIntegrationSpec {
             "conclusions": "Hipercholesterolemia"
         }
         """
-        def updateResponse = authenticatedPutRequestWithBody(DEVICE_ID, SECRET, "${BASE_PATH}/${examId}", updateRequest)
-                .put("${BASE_PATH}/${examId}")
+        def updatePath = BASE_PATH + "/" + examId
+        def updateResponse = authenticatedPutRequestWithBody(DEVICE_ID, SECRET, updatePath, updateRequest)
+                .put(updatePath)
                 .then()
                 .extract()
 
