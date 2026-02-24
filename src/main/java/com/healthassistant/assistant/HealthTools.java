@@ -702,14 +702,23 @@ class HealthTools {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " cannot be empty");
         }
+        String trimmed = value.trim();
         try {
-            int parsed = Integer.parseInt(value.trim());
+            int parsed = Integer.parseInt(trimmed);
             if (parsed < 0) {
                 throw new IllegalArgumentException(fieldName + " must be non-negative");
             }
             return parsed;
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid " + fieldName + ": '" + value + "'. Must be a non-negative integer.", e);
+            try {
+                double parsedDouble = Double.parseDouble(trimmed);
+                if (parsedDouble < 0) {
+                    throw new IllegalArgumentException(fieldName + " must be non-negative", e);
+                }
+                return (int) Math.round(parsedDouble);
+            } catch (NumberFormatException ignored) {
+                throw new IllegalArgumentException("Invalid " + fieldName + ": '" + value + "'. Must be a non-negative integer.", e);
+            }
         }
     }
 

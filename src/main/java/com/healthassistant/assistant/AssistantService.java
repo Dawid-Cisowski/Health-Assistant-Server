@@ -33,6 +33,7 @@ class AssistantService implements AssistantFacade {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final ChatClient chatClient;
+    private final HealthTools healthTools;
     private final ConversationService conversationService;
     private final AiMetricsRecorder aiMetrics;
 
@@ -250,6 +251,7 @@ class AssistantService implements AssistantFacade {
         return Mono.fromCallable(() -> {
                     var response = chatClient.prompt()
                             .messages(ctx.messages())
+                            .tools(healthTools)
                             .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
                             .call()
                             .chatResponse();

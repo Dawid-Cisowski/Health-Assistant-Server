@@ -12,13 +12,11 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 class AssistantConfiguration {
 
-    private final HealthTools healthTools;
     private final ChatGuardrailAdvisor chatGuardrailAdvisor;
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {
         return builder
-                .defaultTools(healthTools)
                 .defaultAdvisors(chatGuardrailAdvisor)
                 .build();
     }

@@ -4,7 +4,9 @@ import org.springframework.ai.evaluation.EvaluationRequest
 import spock.lang.Requires
 import spock.lang.Timeout
 
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.TimeUnit
 
 /**
@@ -150,10 +152,18 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
     def "AI handles comparison when one period has no data"() {
         given: "steps only for this week, not last week"
         def today = LocalDate.now(POLAND_ZONE)
+        def monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        def stepAmounts = [8000, 7000, 9000]
 
-        submitStepsForDate(today, 8000)
-        submitStepsForDate(today.minusDays(1), 7000)
-        submitStepsForDate(today.minusDays(2), 9000)
+        // Submit steps only for unique dates within the current week (Mon up to today, at most 3)
+        def datesThisWeek = (0..6)
+                .collect { offset -> monday.plusDays(offset as long) }
+                .findAll { date -> !date.isAfter(today) }
+                .take(3)
+
+        def totalSteps = (0..<datesThisWeek.size())
+                .collect { i -> submitStepsForDate(datesThisWeek[i], stepAmounts[i]); stepAmounts[i] }
+                .sum()
         // Last week has no data
 
         waitForProjections()
@@ -165,7 +175,7 @@ class AiMultiToolQuerySpec extends BaseEvaluationSpec {
         then: "AI acknowledges missing data for comparison"
         def evaluation = healthDataEvaluator.evaluate(
                 new EvaluationRequest(
-                        "This week has data (~24000 steps total), but last week has no data or very little data available for comparison",
+                        "This week has data (~${totalSteps} steps total), but last week has no data or very little data available for comparison",
                         [],
                         response
                 )
