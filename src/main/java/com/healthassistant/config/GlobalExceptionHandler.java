@@ -12,6 +12,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.List;
 import java.util.UUID;
@@ -99,6 +100,21 @@ class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = new ErrorResponse("INVALID_ARGUMENT",
                 ex.getMessage(), List.of());
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipartException(
+            MultipartException ex,
+            WebRequest request
+    ) {
+        log.warn("Multipart request parsing failed: {}", ex.getMessage());
+
+        ErrorResponse errorResponse = new ErrorResponse("INVALID_REQUEST",
+                "Invalid or empty multipart request", List.of());
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)

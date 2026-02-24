@@ -169,7 +169,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Assistant mutation specs
             "test-assistant-mutation",
             // Meal catalog specs
-            "test-meal-catalog"
+            "test-meal-catalog",
+            // Medical exams specs
+            "test-medical-exams", "test-medical-exam-import", "test-medical-attach"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
@@ -1008,6 +1010,9 @@ abstract class BaseIntegrationSpec extends Specification {
         jdbcTemplate.update("DELETE FROM resting_heart_rate_projections WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM body_measurement_projections WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM meal_catalog_products WHERE device_id = ?", deviceId)
+        // Medical exams cleanup (cascade: lab_results + attachments deleted automatically)
+        jdbcTemplate.update("DELETE FROM examinations WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM medical_exam_import_drafts WHERE device_id = ?", deviceId)
     }
 
     void cleanupMealCatalogForDevice(String deviceId) {

@@ -30,7 +30,8 @@ class ModularityTests {
                 "workoutimport", "sleep", "sleepimport", "calories", "activity",
                 "meals", "mealimport", "mealcatalog", "googlefit", "assistant", "security", "config",
                 "weight", "weightimport", "heartrate", "guardrails",
-                "bodymeasurements", "notifications", "reports"
+                "bodymeasurements", "notifications", "reports",
+                "medicalexams", "medicalexamimport"
         );
 
         var actualModules = modules.stream()
@@ -101,7 +102,9 @@ class ModularityTests {
                 Map.entry("heartrate", "HeartRateFacade"),
                 Map.entry("bodymeasurements", "BodyMeasurementsFacade"),
                 Map.entry("reports", "ReportsFacade"),
-                Map.entry("mealcatalog", "MealCatalogFacade")
+                Map.entry("mealcatalog", "MealCatalogFacade"),
+                Map.entry("medicalexams", "MedicalExamsFacade"),
+                Map.entry("medicalexamimport", "MedicalExamImportFacade")
         );
 
         for (var entry : modulesWithFacades.entrySet()) {

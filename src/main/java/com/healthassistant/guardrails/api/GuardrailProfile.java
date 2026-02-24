@@ -6,7 +6,9 @@ public enum GuardrailProfile {
 
     IMAGE_IMPORT(2000, true, true, false),
 
-    DATA_EXTRACTION(100, true, false, true);
+    DATA_EXTRACTION(100, true, false, true),
+
+    MEDICAL_EXAM_IMPORT(5000, true, true, false);
 
     private final int maxTextLength;
     private final boolean checkPromptInjection;
