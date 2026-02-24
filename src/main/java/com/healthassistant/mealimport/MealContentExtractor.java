@@ -326,12 +326,14 @@ class MealContentExtractor {
 
         sb.append("""
 
-                CATALOG MATCHING RULES:
-                - When you identify a food item that MATCHES a catalog product, use the catalog's EXACT values.
+                CATALOG MATCHING RULES (MANDATORY - follow strictly):
+                - When you identify a food item that MATCHES a catalog product, you MUST use the catalog's EXACT nutritional values.
                 - Mark matched items with "source": "catalog".
                 - Mark non-matched items with "source": "estimated".
-                - Matching should be by product identity (same product, same brand).
+                - Match by product identity (same product, same brand) - ignore minor name variations.
                 - A photo of "Skyr pitny Piątnica" matches catalog entry "Skyr pitny z Piątnicy".
+                - IMPORTANT: Catalog values represent the user's personalized portion sizes and ALWAYS take priority over label values, generic estimates, or nutritional facts visible on packaging.
+                - Even if label shows different values than catalog, USE THE CATALOG VALUES - the user trusts their catalog data.
                 - If unsure about a match, use "estimated" and provide your own values.
                 """);
 

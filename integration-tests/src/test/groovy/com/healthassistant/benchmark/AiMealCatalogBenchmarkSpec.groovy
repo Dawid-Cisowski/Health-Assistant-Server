@@ -66,7 +66,7 @@ class AiMealCatalogBenchmarkSpec extends BaseBenchmarkSpec {
     def "BM-CAT-02: Import skyr from image with catalog [#modelName]"() {
         given: "model is set and skyr is in catalog"
         currentModel = modelName
-        seedCatalogProduct("Skyr pitny z Piatnicy", "SNACK", 120, 20, 2, 6, "HEALTHY")
+        seedCatalogProduct("Skyr jogurt pitny Piątnica", "SNACK", 120, 20, 2, 6, "HEALTHY")
         def imageBytes = loadTestImage("/screenshots/meal/skyr.png")
 
         when: "importing skyr from image"

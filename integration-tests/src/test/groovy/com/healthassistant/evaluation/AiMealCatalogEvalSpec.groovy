@@ -72,7 +72,7 @@ class AiMealCatalogEvalSpec extends BaseEvaluationSpec {
 
     def "E-CAT-02: AI uses exact catalog values when importing skyr from image"() {
         given: "Skyr pitny z Piatnicy is in the catalog with known values"
-        seedCatalogProduct("Skyr pitny z Piatnicy", "SNACK", 120, 20, 2, 6, "HEALTHY")
+        seedCatalogProduct("Skyr jogurt pitny Piątnica", "SNACK", 120, 20, 2, 6, "HEALTHY")
 
         and: "skyr image is loaded"
         def imageBytes = loadTestImage("/screenshots/meal/skyr.png")
@@ -172,7 +172,7 @@ class AiMealCatalogEvalSpec extends BaseEvaluationSpec {
 
     def "E-CAT-05: imported item from catalog has source 'catalog' in response"() {
         given: "Skyr pitny z Piatnicy is in the catalog"
-        seedCatalogProduct("Skyr pitny z Piatnicy", "SNACK", 120, 20, 2, 6, "HEALTHY")
+        seedCatalogProduct("Skyr jogurt pitny Piątnica", "SNACK", 120, 20, 2, 6, "HEALTHY")
 
         and: "skyr image is loaded"
         def imageBytes = loadTestImage("/screenshots/meal/skyr.png")
