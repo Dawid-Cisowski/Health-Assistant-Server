@@ -319,6 +319,9 @@ class HealthTools {
             var parsedFat = parseNonNegativeInt(fatGrams, "fatGrams");
             var parsedCarbs = parseNonNegativeInt(carbohydratesGrams, "carbohydratesGrams");
             var parsedOccurredAt = occurredAt != null && !occurredAt.isBlank() ? parseInstant(occurredAt, "occurredAt") : null;
+            if (parsedOccurredAt != null && parsedOccurredAt.isAfter(Instant.now())) {
+                parsedOccurredAt = Instant.now();
+            }
 
             var request = new RecordMealRequest(title, parsedMealType, parsedCalories,
                     parsedProtein, parsedFat, parsedCarbs, parsedHealthRating, parsedOccurredAt);
