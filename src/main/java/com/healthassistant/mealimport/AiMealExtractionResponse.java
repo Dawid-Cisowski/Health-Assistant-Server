@@ -16,7 +16,8 @@ record AiMealExtractionResponse(
         Integer carbohydratesGrams,
         String healthRating,
         String validationError,
-        List<AiQuestion> questions
+        List<AiQuestion> questions,
+        List<AiItem> items
 ) {
     record AiQuestion(
             String questionId,
@@ -24,5 +25,15 @@ record AiMealExtractionResponse(
             String questionType,
             List<String> options,
             List<String> affectedFields
+    ) {}
+
+    record AiItem(
+            String title,
+            String source,
+            Integer caloriesKcal,
+            Integer proteinGrams,
+            Integer fatGrams,
+            Integer carbohydratesGrams,
+            String healthRating
     ) {}
 }

@@ -33,6 +33,7 @@ class AssistantService implements AssistantFacade {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final ChatClient chatClient;
+    private final HealthTools healthTools;
     private final ConversationService conversationService;
     private final AiMetricsRecorder aiMetrics;
 
@@ -182,6 +183,13 @@ class AssistantService implements AssistantFacade {
             - Present current values to the user, then apply their requested changes.
             - ALL fields are required in updateMeal - keep unchanged values from the original meal.
 
+            MEAL CATALOG (searchMealCatalog):
+            - User has a personal meal catalog that auto-learns from imports and records.
+            - When user mentions a product by name to record, FIRST search catalog with searchMealCatalog.
+            - If found, present product with nutritional values and confirm before recording.
+            - If multiple results, present numbered list for user to choose.
+            - If not found, estimate values yourself or ask user.
+
             CRITICAL MUTATION SAFETY RULES:
             - NEVER create data speculatively - only when user explicitly asks you to record something.
             - NEVER modify or delete data without clear user intent.
@@ -243,6 +251,7 @@ class AssistantService implements AssistantFacade {
         return Mono.fromCallable(() -> {
                     var response = chatClient.prompt()
                             .messages(ctx.messages())
+                            .tools(healthTools)
                             .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
                             .call()
                             .chatResponse();

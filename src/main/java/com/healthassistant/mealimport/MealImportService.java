@@ -11,6 +11,9 @@ import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.dto.payload.HealthRating;
 import com.healthassistant.healthevents.api.dto.payload.MealType;
+import com.healthassistant.mealcatalog.api.MealCatalogFacade;
+import com.healthassistant.mealcatalog.api.dto.CatalogProductResponse;
+import com.healthassistant.mealcatalog.api.dto.SaveProductRequest;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.mealimport.api.MealImportFacade;
@@ -43,6 +46,7 @@ class MealImportService implements MealImportFacade {
     private final HealthEventsFacade healthEventsFacade;
     private final MealImportDraftRepository draftRepository;
     private final MealsFacade mealsFacade;
+    private final MealCatalogFacade mealCatalogFacade;
     private final AiMetricsRecorder aiMetrics;
 
     @Override
@@ -60,7 +64,8 @@ class MealImportService implements MealImportFacade {
 
         try {
             MealTimeContext timeContext = buildMealTimeContext(deviceId.value());
-            ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
+            var catalogProducts = fetchCatalogProducts(deviceId.value());
+            ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext, catalogProducts);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
                     SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
@@ -103,6 +108,8 @@ class MealImportService implements MealImportFacade {
                 extractedData.caloriesKcal(), eventResult.status(),
                 extractedData.promptTokens(), extractedData.completionTokens());
 
+            saveItemsToCatalog(deviceId.value(), extractedData);
+
             aiMetrics.recordImportConfidence("meal", extractedData.confidence());
             aiMetrics.recordImportTokens("meal", extractedData.promptTokens(), extractedData.completionTokens());
             aiMetrics.recordImportRequest("meal", sample, "success", "direct");
@@ -119,7 +126,8 @@ class MealImportService implements MealImportFacade {
                 extractedData.healthRating(),
                 extractedData.confidence(),
                 extractedData.promptTokens(),
-                extractedData.completionTokens()
+                extractedData.completionTokens(),
+                mapItems(extractedData.items())
             );
 
         } catch (MealExtractionException e) {
@@ -165,7 +173,8 @@ class MealImportService implements MealImportFacade {
 
         try {
             MealTimeContext timeContext = buildMealTimeContext(deviceId.value());
-            ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext);
+            var catalogProducts = fetchCatalogProducts(deviceId.value());
+            ExtractedMealData extractedData = contentExtractor.extract(description, images, timeContext, catalogProducts);
             if (!extractedData.isValid()) {
                 log.warn("Meal extraction invalid for device {}: {}",
                     SecurityUtils.maskDeviceId(deviceId.value()), extractedData.validationError());
@@ -204,7 +213,7 @@ class MealImportService implements MealImportFacade {
 
             aiMetrics.recordImportConfidence("meal", extractedData.confidence());
             aiMetrics.recordImportRequest("meal", sample, "success", "draft");
-            return mapToResponse(draft);
+            return mapToResponseWithItems(draft, extractedData.items());
 
         } catch (MealExtractionException e) {
             log.warn("Meal extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId.value()), e.getMessage());
@@ -346,6 +355,10 @@ class MealImportService implements MealImportFacade {
         log.info("Confirmed meal draft {} as meal {} for device {}: {} ({} kcal)",
             draftId, mealId, SecurityUtils.maskDeviceId(deviceId.value()), draft.getTitle(), draft.getCaloriesKcal());
 
+        saveSingleProductToCatalog(deviceId.value(), draft.getTitle(), draft.getMealType().name(),
+                draft.getCaloriesKcal(), draft.getProteinGrams(), draft.getFatGrams(),
+                draft.getCarbohydratesGrams(), draft.getHealthRating().name());
+
         return MealImportResponse.success(
             mealId,
             eventId,
@@ -381,6 +394,37 @@ class MealImportService implements MealImportFacade {
         );
     }
 
+    private MealDraftResponse mapToResponseWithItems(MealImportDraft draft, List<ExtractedMealData.ExtractedItem> items) {
+        List<MealDraftResponse.DraftItem> draftItems = List.of();
+        if (items != null && !items.isEmpty()) {
+            draftItems = items.stream()
+                    .map(item -> new MealDraftResponse.DraftItem(
+                            item.title(), item.source(), item.caloriesKcal(),
+                            item.proteinGrams(), item.fatGrams(), item.carbohydratesGrams(),
+                            item.healthRating()
+                    ))
+                    .toList();
+        }
+        return MealDraftResponse.success(
+            draft.getId().toString(),
+            draft.getSuggestedOccurredAt(),
+            draft.getDescription(),
+            new MealDraftResponse.MealData(
+                draft.getTitle(),
+                draft.getMealType().name(),
+                draft.getCaloriesKcal(),
+                draft.getProteinGrams(),
+                draft.getFatGrams(),
+                draft.getCarbohydratesGrams(),
+                draft.getHealthRating().name()
+            ),
+            draft.getConfidence().doubleValue(),
+            draft.getQuestions(),
+            draft.getExpiresAt(),
+            draftItems
+        );
+    }
+
     private MealTimeContext buildMealTimeContext(String deviceId) {
         LocalDate today = LocalDate.now(MealTimeContext.POLAND_ZONE);
         LocalTime now = LocalTime.now(MealTimeContext.POLAND_ZONE);
@@ -396,5 +440,67 @@ class MealImportService implements MealImportFacade {
             .toList();
 
         return new MealTimeContext(now, today, meals);
+    }
+
+    private List<CatalogProductResponse> fetchCatalogProducts(String deviceId) {
+        try {
+            return mealCatalogFacade.getTopProducts(deviceId, 30);
+        } catch (Exception e) {
+            log.warn("Failed to fetch catalog products for device {}: {}",
+                    SecurityUtils.maskDeviceId(deviceId), e.getMessage());
+            return List.of();
+        }
+    }
+
+    private void saveItemsToCatalog(String deviceId, ExtractedMealData data) {
+        if (data.items() == null || data.items().isEmpty()) {
+            saveSingleProductToCatalog(deviceId, data.title(), data.mealType(),
+                    data.caloriesKcal(), data.proteinGrams(), data.fatGrams(),
+                    data.carbohydratesGrams(), data.healthRating());
+            return;
+        }
+
+        data.items().forEach(item -> {
+            try {
+                mealCatalogFacade.saveProduct(deviceId, new SaveProductRequest(
+                        item.title(), data.mealType(), item.caloriesKcal(),
+                        item.proteinGrams(), item.fatGrams(), item.carbohydratesGrams(),
+                        item.healthRating()
+                ));
+            } catch (Exception e) {
+                log.warn("Failed to save catalog item '{}' for device {}: {}",
+                        SecurityUtils.sanitizeForLog(item.title()),
+                        SecurityUtils.maskDeviceId(deviceId),
+                        e.getMessage());
+            }
+        });
+    }
+
+    private void saveSingleProductToCatalog(String deviceId, String title, String mealType,
+                                            Integer caloriesKcal, Integer proteinGrams,
+                                            Integer fatGrams, Integer carbohydratesGrams,
+                                            String healthRating) {
+        try {
+            mealCatalogFacade.saveProduct(deviceId, new SaveProductRequest(
+                    title, mealType, caloriesKcal, proteinGrams, fatGrams,
+                    carbohydratesGrams, healthRating
+            ));
+        } catch (Exception e) {
+            log.warn("Failed to save product to catalog for device {}: {}",
+                    SecurityUtils.maskDeviceId(deviceId), e.getMessage());
+        }
+    }
+
+    private List<MealImportResponse.ImportedItem> mapItems(List<ExtractedMealData.ExtractedItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        return items.stream()
+                .map(item -> new MealImportResponse.ImportedItem(
+                        item.title(), item.source(), item.caloriesKcal(),
+                        item.proteinGrams(), item.fatGrams(), item.carbohydratesGrams(),
+                        item.healthRating()
+                ))
+                .toList();
     }
 }

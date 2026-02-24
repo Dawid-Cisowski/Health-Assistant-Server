@@ -6,6 +6,7 @@ import com.healthassistant.calories.api.CaloriesFacade
 import com.healthassistant.dailysummary.api.DailySummaryFacade
 import com.healthassistant.healthevents.api.HealthEventsFacade
 import com.healthassistant.heartrate.api.HeartRateFacade
+import com.healthassistant.mealcatalog.api.MealCatalogFacade
 import com.healthassistant.meals.api.MealsFacade
 import com.healthassistant.sleep.api.SleepFacade
 import com.healthassistant.steps.api.StepsFacade
@@ -94,6 +95,9 @@ abstract class BaseIntegrationSpec extends Specification {
     BodyMeasurementsFacade bodyMeasurementsFacade
 
     @Autowired
+    MealCatalogFacade mealCatalogFacade
+
+    @Autowired
     JdbcTemplate jdbcTemplate
 
     @Shared
@@ -163,7 +167,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Reports specs
             "test-reports",
             // Assistant mutation specs
-            "test-assistant-mutation"
+            "test-assistant-mutation",
+            // Meal catalog specs
+            "test-meal-catalog"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
@@ -1001,6 +1007,11 @@ abstract class BaseIntegrationSpec extends Specification {
         jdbcTemplate.update("DELETE FROM heart_rate_projections WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM resting_heart_rate_projections WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM body_measurement_projections WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_catalog_products WHERE device_id = ?", deviceId)
+    }
+
+    void cleanupMealCatalogForDevice(String deviceId) {
+        jdbcTemplate.update("DELETE FROM meal_catalog_products WHERE device_id = ?", deviceId)
     }
 }
 
