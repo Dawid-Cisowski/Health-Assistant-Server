@@ -10,6 +10,7 @@ import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultEntry;
 import com.healthassistant.medicalexams.api.dto.LabResultResponse;
+import com.healthassistant.medicalexams.api.dto.LinkedExaminationResponse;
 import com.healthassistant.medicalexams.api.dto.MarkerDataPoint;
 import com.healthassistant.medicalexams.api.dto.MarkerTrendResponse;
 import com.healthassistant.medicalexams.api.dto.UpdateExaminationRequest;
@@ -40,6 +41,7 @@ class MedicalExamsService implements MedicalExamsFacade {
     private final ExamTypeDefinitionRepository examTypeRepository;
     private final MarkerDefinitionRepository markerDefinitionRepository;
     private final FileStorageService fileStorageService;
+    private final ExaminationLinkRepository examinationLinkRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -257,6 +259,44 @@ class MedicalExamsService implements MedicalExamsFacade {
                 attachmentId, examId, maskDeviceId(deviceId));
     }
 
+    @Override
+    public ExaminationDetailResponse linkExaminations(String deviceId, UUID examId, UUID linkedExaminationId) {
+        if (examId.equals(linkedExaminationId)) {
+            throw new IllegalArgumentException("Cannot link an examination to itself");
+        }
+        var exam = findExamForDevice(deviceId, examId);
+        var linkedExam = findExamForDevice(deviceId, linkedExaminationId);
+
+        var ids = orderedIds(examId, linkedExaminationId);
+        examinationLinkRepository.findLinkByOrderedIds(ids[0], ids[1]).ifPresent(existing -> {
+            throw new ExaminationLinkAlreadyExistsException(examId, linkedExaminationId);
+        });
+
+        examinationLinkRepository.save(ExaminationLink.create(exam, linkedExam));
+        log.info("Linked examination {} with {} for device {}", examId, linkedExaminationId, maskDeviceId(deviceId));
+        return toDetailResponse(exam);
+    }
+
+    @Override
+    public void unlinkExaminations(String deviceId, UUID examId, UUID linkedExaminationId) {
+        findExamForDevice(deviceId, examId);
+        findExamForDevice(deviceId, linkedExaminationId);
+
+        var ids = orderedIds(examId, linkedExaminationId);
+        var link = examinationLinkRepository.findLinkByOrderedIds(ids[0], ids[1])
+                .orElseThrow(() -> new ExaminationLinkNotFoundException(examId, linkedExaminationId));
+
+        examinationLinkRepository.delete(link);
+        log.info("Unlinked examination {} from {} for device {}", examId, linkedExaminationId, maskDeviceId(deviceId));
+    }
+
+    private UUID[] orderedIds(UUID idA, UUID idB) {
+        if (idA.toString().compareTo(idB.toString()) < 0) {
+            return new UUID[]{idA, idB};
+        }
+        return new UUID[]{idB, idA};
+    }
+
     private Examination findExamForDevice(String deviceId, UUID examId) {
         return examinationRepository.findByDeviceIdAndIdWithDetails(deviceId, examId)
                 .orElseThrow(() -> new ExaminationNotFoundException(examId));
@@ -319,6 +359,12 @@ class MedicalExamsService implements MedicalExamsFacade {
                 .map(this::toAttachmentResponse)
                 .toList();
 
+        var linkedExaminations = examinationLinkRepository.findAllLinksForExamination(exam.getId()).stream()
+                .map(link -> link.getExaminationA().getId().equals(exam.getId())
+                        ? link.getExaminationB() : link.getExaminationA())
+                .map(this::toLinkedExaminationResponse)
+                .toList();
+
         return new ExaminationDetailResponse(
                 exam.getId(),
                 exam.getExamType().getCode(),
@@ -339,8 +385,20 @@ class MedicalExamsService implements MedicalExamsFacade {
                 exam.getSource(),
                 results,
                 attachments,
+                linkedExaminations,
                 exam.getCreatedAt(),
                 exam.getUpdatedAt());
+    }
+
+    private LinkedExaminationResponse toLinkedExaminationResponse(Examination exam) {
+        return new LinkedExaminationResponse(
+                exam.getId(),
+                exam.getExamType().getCode(),
+                exam.getTitle(),
+                exam.getDate(),
+                exam.getStatus(),
+                exam.getDisplayType(),
+                exam.getSpecialties());
     }
 
     private LabResultResponse toLabResultResponse(LabResult result) {

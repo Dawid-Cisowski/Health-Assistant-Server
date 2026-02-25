@@ -48,4 +48,8 @@ public interface MedicalExamsFacade {
     List<ExaminationAttachmentResponse> getAttachments(String deviceId, UUID examId);
 
     void deleteAttachment(String deviceId, UUID examId, UUID attachmentId);
+
+    ExaminationDetailResponse linkExaminations(String deviceId, UUID examId, UUID linkedExaminationId);
+
+    void unlinkExaminations(String deviceId, UUID examId, UUID linkedExaminationId);
 }

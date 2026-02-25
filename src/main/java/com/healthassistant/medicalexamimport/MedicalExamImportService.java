@@ -79,7 +79,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
     }
 
     @Override
-    public ExaminationDetailResponse confirmDraft(UUID draftId, String deviceId) {
+    public ExaminationDetailResponse confirmDraft(UUID draftId, String deviceId, UUID relatedExaminationId) {
         var draft = findDraftForDevice(draftId, deviceId);
         validateDraftEditable(draft);
 
@@ -112,6 +112,10 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                     .toList();
             var addRequest = new AddLabResultsRequest(labEntries);
             examination = medicalExamsFacade.addResults(deviceId, examination.id(), addRequest);
+        }
+
+        if (relatedExaminationId != null) {
+            examination = medicalExamsFacade.linkExaminations(deviceId, examination.id(), relatedExaminationId);
         }
 
         draft.markConfirmed();

@@ -1,9 +1,11 @@
 package com.healthassistant.medicalexamimport;
 
 import com.healthassistant.medicalexamimport.api.MedicalExamImportFacade;
+import com.healthassistant.medicalexamimport.api.dto.ConfirmDraftRequest;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftResponse;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftUpdateRequest;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -156,11 +158,13 @@ class MedicalExamImportController {
     })
     ResponseEntity<ExaminationDetailResponse> confirmDraft(
             @PathVariable UUID draftId,
-            @RequestAttribute("deviceId") String deviceId) {
+            @RequestAttribute("deviceId") String deviceId,
+            @Valid @RequestBody(required = false) ConfirmDraftRequest request) {
         log.info("Draft confirm request for {} from device {}", draftId, maskDeviceId(deviceId));
 
         try {
-            var result = medicalExamImportFacade.confirmDraft(draftId, deviceId);
+            var relatedId = request != null ? request.relatedExaminationId() : null;
+            var result = medicalExamImportFacade.confirmDraft(draftId, deviceId, relatedId);
             return ResponseEntity.status(HttpStatus.CREATED).body(result);
         } catch (DraftNotFoundException e) {
             log.warn("Draft not found {} for device {}", draftId, maskDeviceId(deviceId));
