@@ -28,8 +28,8 @@ class ExerciseDefinitionEntity {
     @Column(name = "primary_muscle", nullable = false)
     private String primaryMuscle;
 
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "muscles", nullable = false, columnDefinition = "TEXT[]")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "muscles", nullable = false, columnDefinition = "jsonb")
     private List<String> muscles;
 
     @Column(name = "created_at", nullable = false, updatable = false)

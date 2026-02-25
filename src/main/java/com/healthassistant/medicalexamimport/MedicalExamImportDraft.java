@@ -75,6 +75,7 @@ class MedicalExamImportDraft {
     record ExtractedData(
             String examTypeCode,
             String title,
+            String date,
             String performedAt,
             String laboratory,
             String orderingDoctor,
@@ -111,6 +112,7 @@ class MedicalExamImportDraft {
         draft.extractedData = new ExtractedData(
                 extraction.examTypeCode(),
                 extraction.title(),
+                extraction.date() != null ? extraction.date().toString() : null,
                 extraction.performedAt() != null ? extraction.performedAt().toString() : null,
                 extraction.laboratory(),
                 extraction.orderingDoctor(),
@@ -126,6 +128,7 @@ class MedicalExamImportDraft {
         this.extractedData = new ExtractedData(
                 request.examTypeCode() != null ? request.examTypeCode() : current.examTypeCode(),
                 request.title() != null ? request.title() : current.title(),
+                request.date() != null ? request.date().toString() : current.date(),
                 request.performedAt() != null ? request.performedAt().toString() : current.performedAt(),
                 request.laboratory() != null ? request.laboratory() : current.laboratory(),
                 request.orderingDoctor() != null ? request.orderingDoctor() : current.orderingDoctor(),

@@ -8,6 +8,7 @@ record AiMedicalExamExtractionResponse(
         double confidence,
         String examTypeCode,
         String title,
+        String date,
         String performedAt,
         String laboratory,
         String orderingDoctor,

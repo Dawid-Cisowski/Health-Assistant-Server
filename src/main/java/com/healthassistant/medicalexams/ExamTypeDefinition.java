@@ -33,12 +33,12 @@ class ExamTypeDefinition {
     private String displayType;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "specialties", columnDefinition = "jsonb")
+    @Column(name = "specialties", columnDefinition = "jsonb", nullable = false)
     private List<String> specialties;
 
     @Column(name = "category", nullable = false, length = 50)
     private String category;
 
-    @Column(name = "sort_order")
+    @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 }

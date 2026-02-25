@@ -58,6 +58,7 @@ class CatalogProduct {
     private Instant updatedAt;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     CatalogProduct(String deviceId, String title, String mealType,

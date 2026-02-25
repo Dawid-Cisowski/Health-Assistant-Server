@@ -48,6 +48,6 @@ class MarkerDefinition {
     @Column(name = "ref_range_high_default", precision = 12, scale = 4)
     private BigDecimal refRangeHighDefault;
 
-    @Column(name = "sort_order")
+    @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 }

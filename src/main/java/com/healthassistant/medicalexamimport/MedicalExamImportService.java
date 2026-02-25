@@ -87,9 +87,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
 
         // Build CreateExaminationRequest from draft data
         Instant performedAt = parseInstant(data.performedAt());
-        LocalDate examDate = performedAt != null
-                ? performedAt.atZone(ZoneId.of("Europe/Warsaw")).toLocalDate()
-                : LocalDate.now(ZoneId.of("Europe/Warsaw"));
+        LocalDate examDate = resolveExamDate(data.date(), performedAt);
         var createRequest = new CreateExaminationRequest(
                 data.examTypeCode(),
                 data.title() != null ? data.title() : "Badanie medyczne",
@@ -160,6 +158,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                 draft.getId(),
                 data.examTypeCode(),
                 data.title(),
+                parseLocalDate(data.date()),
                 parseInstant(data.performedAt()),
                 data.laboratory(),
                 data.orderingDoctor(),
@@ -171,6 +170,23 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                 draft.getExpiresAt(),
                 null
         );
+    }
+
+    private LocalDate resolveExamDate(String dateStr, Instant performedAt) {
+        LocalDate parsed = parseLocalDate(dateStr);
+        if (parsed != null) return parsed;
+        if (performedAt != null) return performedAt.atZone(ZoneId.of("Europe/Warsaw")).toLocalDate();
+        log.warn("No exam date available in draft — falling back to today");
+        return LocalDate.now(ZoneId.of("Europe/Warsaw"));
+    }
+
+    private LocalDate parseLocalDate(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return LocalDate.parse(value);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private Instant parseInstant(String value) {

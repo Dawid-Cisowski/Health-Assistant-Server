@@ -14,7 +14,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Component
@@ -91,6 +94,14 @@ class MedicalExamContentExtractor {
 
                 FLAG DETERMINATION: Do NOT determine flags — leave that to the system.
 
+                DATE EXTRACTION RULES:
+                - Extract the exam/collection date as "date" field in YYYY-MM-DD format (e.g. "2024-03-15")
+                - "date" contains only the calendar date — no time, no timezone
+                - If the document shows a date with time, extract the full datetime into "performedAt"
+                  (ISO-8601 with Z suffix, e.g. "2024-03-15T08:30:00Z") and also set "date" to the date part
+                - If only a date is visible (no time), set "date" to that date and leave "performedAt" null
+                - If no date is found anywhere in the document, set both "date" and "performedAt" to null
+
                 IMPORTANT RULES:
                 1. Set isMedicalReport=false if document is NOT a medical exam result
                 2. Extract ALL lab markers you can find, including reference ranges
@@ -128,10 +139,16 @@ class MedicalExamContentExtractor {
 
     private String resolveMimeType(MultipartFile file) {
         String contentType = file.getContentType();
-        if (contentType == null || contentType.equals("application/octet-stream")) {
-            return "image/jpeg";
+        if (contentType != null && !contentType.equals("application/octet-stream")) {
+            return "image/jpg".equals(contentType) ? "image/jpeg" : contentType;
         }
-        return "image/jpg".equals(contentType) ? "image/jpeg" : contentType;
+        String filename = file.getOriginalFilename();
+        if (filename == null) return "image/jpeg";
+        String lower = filename.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".pdf")) return "application/pdf";
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".webp")) return "image/webp";
+        return "image/jpeg";
     }
 
     private ExtractedExamData transformToExtractedData(AiMedicalExamExtractionResponse response) {
@@ -147,11 +164,12 @@ class MedicalExamContentExtractor {
             return ExtractedExamData.invalid("Missing required fields (examTypeCode or title)", confidence);
         }
 
+        LocalDate date = parseLocalDate(response.date());
         Instant performedAt = parseInstant(response.performedAt());
         List<ExtractedResultData> results = transformResults(response.results());
 
         return ExtractedExamData.valid(
-                response.examTypeCode(), response.title(), performedAt,
+                response.examTypeCode(), response.title(), date, performedAt,
                 response.laboratory(), response.orderingDoctor(),
                 response.reportText(), response.conclusions(),
                 results, confidence, null, null);
@@ -171,6 +189,16 @@ class MedicalExamContentExtractor {
                         r.refRangeLow(), r.refRangeHigh(), r.refRangeText(),
                         r.valueText(), r.sortOrder()))
                 .toList();
+    }
+
+    private LocalDate parseLocalDate(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException e) {
+            log.warn("Could not parse date field from AI response: {}", value);
+            return null;
+        }
     }
 
     private Instant parseInstant(String value) {

@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -181,15 +182,29 @@ class MedicalExamImportController {
             if (file.getSize() > MAX_FILE_SIZE) {
                 throw new IllegalArgumentException("File too large");
             }
-            var contentType = file.getContentType();
-            if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            var filename = file.getOriginalFilename();
+            var effectiveContentType = resolveEffectiveContentType(file.getContentType(), filename);
+            if (!ALLOWED_CONTENT_TYPES.contains(effectiveContentType)) {
                 throw new IllegalArgumentException("Unsupported file type");
             }
-            var filename = file.getOriginalFilename();
             if (filename != null && (filename.contains("..") || filename.contains("/") || filename.contains("\\"))) {
                 throw new IllegalArgumentException("Invalid filename");
             }
         });
+    }
+
+    private String resolveEffectiveContentType(String contentType, String filename) {
+        if (contentType == null || contentType.equals("application/octet-stream")) {
+            if (filename != null) {
+                String lower = filename.toLowerCase(Locale.ROOT);
+                if (lower.endsWith(".pdf")) return "application/pdf";
+                if (lower.endsWith(".png")) return "image/png";
+                if (lower.endsWith(".webp")) return "image/webp";
+                if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+            }
+        }
+        if ("image/jpg".equals(contentType)) return "image/jpeg";
+        return contentType != null ? contentType : "application/octet-stream";
     }
 
     private String maskDeviceId(String deviceId) {
