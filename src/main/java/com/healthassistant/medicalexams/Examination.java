@@ -35,6 +35,7 @@ class Examination {
     private UUID id;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @Column(name = "device_id", nullable = false)
@@ -69,7 +70,7 @@ class Examination {
     private String displayType;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "specialties", columnDefinition = "jsonb")
+    @Column(name = "specialties", columnDefinition = "jsonb", nullable = false)
     private List<String> specialties;
 
     @Column(columnDefinition = "TEXT")

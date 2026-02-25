@@ -28,6 +28,7 @@ class ExaminationAttachment {
     private UUID id;
 
     @Version
+    @Column(nullable = false)
     private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY)

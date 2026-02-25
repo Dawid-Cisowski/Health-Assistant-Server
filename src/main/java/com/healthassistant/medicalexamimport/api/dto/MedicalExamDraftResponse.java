@@ -2,6 +2,7 @@ package com.healthassistant.medicalexamimport.api.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,6 +10,7 @@ public record MedicalExamDraftResponse(
         UUID draftId,
         String examTypeCode,
         String title,
+        LocalDate date,
         Instant performedAt,
         String laboratory,
         String orderingDoctor,
@@ -22,7 +24,7 @@ public record MedicalExamDraftResponse(
 ) {
     public static MedicalExamDraftResponse failure(String errorMessage) {
         return new MedicalExamDraftResponse(
-                null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null,
                 List.of(), BigDecimal.ZERO, "FAILED", null, errorMessage
         );
     }
