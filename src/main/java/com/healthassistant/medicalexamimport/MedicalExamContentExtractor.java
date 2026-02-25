@@ -84,6 +84,14 @@ class MedicalExamContentExtractor {
                 CRP, ESR, FERR (inflammation)
                 VIT_D, VIT_B12, FE, TIBC (vitamins)
                 IGE_TOTAL, IGE_SPECIFIC (allergy)
+                ENDO_PH (pH measurement), ENDO_POLYP_COUNT (number of polyps),
+                ENDO_POLYP_SIZE_MM (largest polyp size in mm),
+                ENDO_BIOPSY_COUNT (number of biopsy samples taken),
+                ENDO_LESION_SIZE_MM (lesion/ulcer size in mm),
+                ENDO_STENOSIS_PCT (stenosis degree in %),
+                ENDO_HPYLORI (H. pylori result: 1=positive, 0=negative),
+                ENDO_BARRETT_LENGTH_CM (Barrett's esophagus length in cm),
+                ENDO_POLYP_REMOVED (number of polyps removed)
 
                 UNIT STANDARDIZATION RULES:
                 - Cholesterol (CHOL, LDL, HDL): if in mmol/L, convert to mg/dL (multiply by 38.67)
@@ -102,10 +110,25 @@ class MedicalExamContentExtractor {
                 - If only a date is visible (no time), set "date" to that date and leave "performedAt" null
                 - If no date is found anywhere in the document, set both "date" and "performedAt" to null
 
+                ENDOSCOPY / IMAGING EXTRACTION RULES (applies to GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO):
+                - ALWAYS set reportText with the FULL descriptive findings text from the document
+                - ALSO extract every measurable/quantitative finding into results[], for example:
+                    * polyp count, polyp sizes → ENDO_POLYP_COUNT, ENDO_POLYP_SIZE_MM
+                    * pH measurements → ENDO_PH
+                    * H. pylori status → ENDO_HPYLORI (valueNumeric=1 if positive, 0 if negative, valueText="positive"/"negative")
+                    * lesion / ulcer sizes → ENDO_LESION_SIZE_MM
+                    * biopsy sample count → ENDO_BIOPSY_COUNT
+                    * stenosis degree → ENDO_STENOSIS_PCT
+                    * organ sizes (spleen, liver, kidney dimensions) → use descriptive markerCode e.g. USG_LIVER_SIZE_MM
+                    * ejection fraction (ECHO) → markerCode ECHO_EF, unit "%"
+                    * any other numeric value mentioned in the report
+                - Use valueText for findings that cannot be expressed as a number (e.g. mucosal description)
+                - reportText and results[] are NOT mutually exclusive — populate BOTH
+
                 IMPORTANT RULES:
                 1. Set isMedicalReport=false if document is NOT a medical exam result
                 2. Extract ALL lab markers you can find, including reference ranges
-                3. For descriptive reports (USG, endoscopy), set reportText with the full findings
+                3. For descriptive reports (USG, endoscopy), always set reportText with the full findings
                 4. For each result, always provide markerCode (use the codes above when possible)
                 5. Report confidence (0.0-1.0) based on document clarity
                 """;
