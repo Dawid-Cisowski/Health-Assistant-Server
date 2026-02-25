@@ -13,6 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **No production code without tests. No exceptions.**
 
+After finishing a feature, run `/pipeline` (build + integration tests + sonar + code review).
+For AI-related changes (assistant, *import, guardrails) run `/pipeline-ai` instead (adds eval tests).
+
 ---
 
 ## Build & Development Commands
@@ -27,11 +30,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run integration tests (requires Docker for Testcontainers)
 ./gradlew :integration-tests:test
 
-# Run specific integration test
-./gradlew :integration-tests:test --tests "*BatchEventIngestionSpec"
+# Run specific integration test class
+./gradlew :integration-tests:test --tests "*MedicalExamAttachmentSpec"
 
 # Run AI evaluation tests (requires GEMINI_API_KEY)
-GEMINI_API_KEY=your-key ./gradlew :integration-tests:test --tests "*AiMutationToolSpec"
+GEMINI_API_KEY=your-key ./gradlew :integration-tests:evaluationTest --tests "*AiMedicalExamImportEvalSpec"
 
 # Run locally (requires PostgreSQL)
 ./gradlew bootRun
@@ -45,7 +48,7 @@ docker-compose up --build
 ## CRITICAL: Code Quality Rules
 
 ### 1. NO Imperative Loops
-**FORBIDDEN**: `for`, `while`, `do-while`. **REQUIRED**: Stream API, `datesUntil()`, `iterate()`.
+**FORBIDDEN**: `for`, `while`, `do-while`. **REQUIRED**: Stream API, `datesUntil()`, `IntStream.range()`, `iterate()`.
 
 ### 2. NO @Setter on Entities
 **FORBIDDEN**: `@Setter` on any JPA entity. **REQUIRED**: Business methods with meaningful names (Rich Domain Model).
@@ -68,6 +71,9 @@ Validate length and check for injection patterns before sending user input to AI
 ### 8. DTOs as Records, Value Objects for Domain Concepts
 All DTOs should be Java Records. Use Value Objects (Records with validation) instead of primitive types for IDs, etc.
 
+### 9. PMD: UseLocaleWithCaseConversions
+`toLowerCase()` / `toUpperCase()` must use `Locale.ROOT`: `str.toLowerCase(Locale.ROOT)`.
+
 ---
 
 ## Architecture Overview
@@ -75,11 +81,11 @@ All DTOs should be Java Records. Use Value Objects (Records with validation) ins
 ### Tech Stack
 - **Java 21** (virtual threads, records, sealed classes, pattern matching)
 - **Spring Boot 4.0.2** + **Spring AI 2.0.0-M2** (Gemini) + **Spring Modulith 2.0.1**
-- **PostgreSQL 16** (JSONB) + **Flyway** (V1-V48)
+- **PostgreSQL 16** (JSONB) + **Flyway** (V1–V58)
 - **Spock** (Groovy) + **Testcontainers** + **REST Assured** + **WireMock**
 - **SpotBugs + PMD + JaCoCo** for code quality
 
-### Modular Architecture (23 modules, verified by Spring Modulith)
+### Modular Architecture (26 modules, verified by Spring Modulith)
 
 Each module has `api/` public subpackage (facade + DTOs) and package-private internals:
 ```
@@ -91,7 +97,7 @@ module/
   ModuleController.java
 ```
 
-**Modules**: appevents, healthevents, dailysummary, steps, workout, workoutimport, sleep, sleepimport, calories, activity, meals, mealimport, weight, weightimport, heartrate, bodymeasurements, googlefit, assistant, guardrails, notifications, reports, security, config
+**Modules**: appevents, healthevents, dailysummary, steps, workout, workoutimport, sleep, sleepimport, calories, activity, meals, mealimport, mealcatalog, weight, weightimport, heartrate, bodymeasurements, googlefit, assistant, guardrails, notifications, reports, security, config, **medicalexams**, **medicalexamimport**
 
 **Key Rules**:
 - Only `api/` subpackage classes are public
@@ -119,6 +125,19 @@ Events are projected into query-optimized views (eventually consistent):
 
 All projection entities use `@Version` with retry on `ObjectOptimisticLockingFailureException`.
 
+### Medical Exam Import (Draft-Confirm Flow)
+
+AI-powered import using a two-step draft pattern:
+
+1. `POST /v1/medical-exams/import/analyze` — AI extracts data from files/description, stores draft (JSONB), uploads source files to GCS as `StoredFile` records
+2. `PATCH /v1/medical-exams/import/{draftId}` — user corrects extracted data before confirming
+3. `POST /v1/medical-exams/import/{draftId}/confirm` — creates `Examination` + `LabResult` records, registers source files as `ExaminationAttachment` (type `SOURCE_DOCUMENT`) for UI viewing
+
+Drafts expire after 24 hours. `DraftCleanupScheduler` purges expired drafts.
+File storage: `GcsStorageService` (when `app.medicalexams.gcs.enabled=true`) or `LocalFileStorageService` (default/test).
+
+**Download URLs**: `GET /v1/medical-exams/{examId}/attachments/{attachmentId}/download` generates a fresh signed URL on demand (GCS: 3600s; LOCAL: `url=null`).
+
 ### AI Health Assistant (Spring AI + Gemini)
 
 Natural language interface with **18 tools** (11 read + 7 mutation):
@@ -137,6 +156,7 @@ Natural language interface with **18 tools** (11 read + 7 mutation):
 - System instruction must include current date for relative date recognition
 - All tool parameters are Strings (Spring AI + Gemini limitation), parsed internally
 - SSE streaming: `ContentEvent`, `ToolCallEvent`, `ToolResultEvent`, `DoneEvent`
+- Spring AI structured output: use `.call().entity(ClassName.class)` — do NOT parse with `ObjectMapper` manually
 
 ### HMAC Authentication
 
@@ -162,9 +182,31 @@ When adding a new module, you MUST update these files:
 4. **Flyway migration** - include `version` column in any new projection table
 
 Other gotchas:
-- Integration tests (77 specs) all fail without Docker/Testcontainers - this is normal
+- Integration test specs (~84 files) all fail without Docker/Testcontainers — this is normal for `./gradlew :test`
 - PMD has a pre-existing false positive on `projectionModulesShouldNotDependOnImportModules`
-- `@ConditionalOnProperty` required for optional features (AI, notifications)
+- `@ConditionalOnProperty` required for optional features (AI, GCS storage, notifications)
+- `DraftCleanupScheduler` in `medicalexamimport` must use `@Component("medicalExamDraftCleanupScheduler")` to avoid Spring bean name conflict with `mealimport`'s scheduler
+- `@PostMapping("/{draftId}/confirm")` has `@RequestBody(required = false)` — callers MUST send `Content-Type: application/json` even with no body, otherwise Spring returns 415
+- `@ManyToOne @MapsId` requires explicit `@JoinColumn(name = "col")` — Hibernate will derive the wrong column name from the field name otherwise
+
+---
+
+## Configuration
+
+### Required
+- `DB_URL`, `DB_USER`, `DB_PASSWORD` - PostgreSQL
+- `HMAC_DEVICES_JSON` - `'{"device-id":"base64-secret"}'`
+
+### Optional
+- `GEMINI_API_KEY` - for AI assistant + image imports
+- `GEMINI_MODEL` - default: `gemini-3-flash-preview`
+- `app.medicalexams.gcs.enabled=true` - enables GCS file storage
+- `app.medicalexams.gcs.bucket-name` - GCS bucket
+- `app.medicalexams.gcs.credentials-json` - service account JSON (env var)
+- `app.medicalexams.gcs.credentials-file` - path to credentials file
+- `app.medicalexams.gcs.signed-url-hours` - default: 168 (7 days for stored URL)
+- `app.notifications.enabled` - FCM push (default: false)
+- `GOOGLE_FIT_CLIENT_ID/SECRET/REFRESH_TOKEN` - legacy sync
 
 ---
 
@@ -218,24 +260,29 @@ See `EventValidator.java` for detailed validation rules.
 ### Import APIs (AI-powered, multipart)
 - `POST /v1/sleep/import-image`, `/v1/workouts/import-image`, `/v1/meals/import-image`, `/v1/weight/import-image`
 
+### Medical Exams
+- `POST /v1/medical-exams` - Create examination
+- `GET /v1/medical-exams` | `GET /v1/medical-exams/{examId}` - List / get
+- `PATCH /v1/medical-exams/{examId}` - Update
+- `DELETE /v1/medical-exams/{examId}` - Delete
+- `POST /v1/medical-exams/{examId}/results` - Add lab results
+- `GET /v1/medical-exams/{examId}/attachments` - List attachments
+- `POST /v1/medical-exams/{examId}/attachments` - Upload attachment
+- `GET /v1/medical-exams/{examId}/attachments/{attachmentId}/download` - Fresh download URL
+- `DELETE /v1/medical-exams/{examId}/attachments/{attachmentId}` - Delete attachment
+- `GET /v1/medical-exams/types` - Exam type definitions
+- `GET /v1/medical-exams/marker-trend?markerCode=` - Trend over time
+
+### Medical Exam Import (AI)
+- `POST /v1/medical-exams/import/analyze` - Analyze files/description → draft
+- `GET /v1/medical-exams/import/{draftId}` - Get draft
+- `PATCH /v1/medical-exams/import/{draftId}` - Update draft
+- `POST /v1/medical-exams/import/{draftId}/confirm` - Confirm → creates Examination
+
 ### Other
 - `POST /v1/notifications/fcm-token` | `DELETE /v1/notifications/fcm-token`
 - `POST /v1/google-fit/sync/day?date=YYYY-MM-DD` (legacy backfill)
 - `GET /actuator/health` | `GET /actuator/prometheus` | `GET /swagger-ui.html`
-
----
-
-## Configuration
-
-### Required
-- `DB_URL`, `DB_USER`, `DB_PASSWORD` - PostgreSQL
-- `HMAC_DEVICES_JSON` - `'{"device-id":"base64-secret"}'`
-
-### Optional
-- `GEMINI_API_KEY` - for AI assistant + imports
-- `GEMINI_MODEL` - default: `gemini-3-flash-preview`
-- `app.notifications.enabled` - FCM push (default: false)
-- `GOOGLE_FIT_CLIENT_ID/SECRET/REFRESH_TOKEN` - legacy sync
 
 ---
 
@@ -255,3 +302,10 @@ See `EventValidator.java` for detailed validation rules.
 3. Projector class wired into `StoreHealthEventsCommandHandler.projectEvents()`
 4. Query endpoints + facade
 5. Integration tests
+
+### Adding a Medical Exam Import Extractor (AI)
+1. Add fields to `AiMedicalExamExtractionResponse` record
+2. Update system prompt in `MedicalExamContentExtractor.buildSystemPrompt()`
+3. Map new fields in `transformToExtractedData()`
+4. Propagate through `ExtractedExamData` → `MedicalExamImportDraft.ExtractedData` (JSONB — no migration needed for new fields) → `MedicalExamDraftResponse`
+5. Use `.call().entity(AiMedicalExamExtractionResponse.class)` for Spring AI structured output

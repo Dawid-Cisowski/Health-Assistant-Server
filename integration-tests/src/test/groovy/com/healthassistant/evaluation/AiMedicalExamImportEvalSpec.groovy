@@ -216,23 +216,29 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
         reportText.length() > 30
     }
 
-    def "E-MED-09: USG image produces no meaningful clinical numeric lab values (descriptive exam)"() {
-        given: "real USG report image which contains only descriptive text, no clinical lab values"
+    def "E-MED-09: USG image produces empty results[] - full findings in reportText and conclusions only"() {
+        given: "real USG report image - imaging exam should have no structured markers"
         def imageBytes = loadTestImage(USG_IMAGE_PATH)
 
         when: "analyzing the USG image"
         def response = analyzeExamWithFile(imageBytes, "usg.png")
 
-        then: "no clinical results have actual numeric values (REPORT_METADATA markers like photo count are excluded)"
+        then: "results[] is empty — all findings are in reportText and conclusions"
         response.statusCode() == 200
-        def results = response.body().jsonPath().getList("results")
+        def body = response.body().jsonPath()
+        def results = body.getList("results")
         println "DEBUG: E-MED-09 USG results count: ${results.size()}"
-        // Exclude REPORT_METADATA category (e.g. 'Wydano zdjęć') — those are not clinical lab values
-        def clinicalNumericResults = results.findAll {
-            it.valueNumeric != null && (it.valueNumeric as double) > 0 && it.category != "REPORT_METADATA"
-        }
-        println "DEBUG: E-MED-09 USG numeric results (valueNumeric > 0): ${clinicalNumericResults.size()}"
-        clinicalNumericResults.size() == 0
+        results.size() == 0
+
+        and: "reportText contains full descriptive findings"
+        def reportText = body.getString("reportText")
+        println "DEBUG: E-MED-09 reportText (${reportText?.length()} chars): ${reportText?.take(100)}"
+        reportText != null && reportText.length() > 30
+
+        and: "conclusions contains a summary"
+        def conclusions = body.getString("conclusions")
+        println "DEBUG: E-MED-09 conclusions: ${conclusions?.take(200)}"
+        conclusions != null && conclusions.length() > 10
     }
 
     // ==================== Private helpers ====================
