@@ -4,8 +4,10 @@ import com.healthassistant.medicalexamimport.api.MedicalExamImportFacade;
 import com.healthassistant.medicalexamimport.api.dto.ExtractedResultData;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftResponse;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftUpdateRequest;
+import com.healthassistant.medicalexams.api.FileStorageService;
 import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
+import com.healthassistant.medicalexams.api.dto.AttachmentStorageResult;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultEntry;
@@ -15,13 +17,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 @Service
 @Transactional
@@ -32,6 +36,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
     private final MedicalExamImportDraftRepository draftRepository;
     private final MedicalExamContentExtractor contentExtractor;
     private final MedicalExamsFacade medicalExamsFacade;
+    private final FileStorageService fileStorageService;
 
     @Override
     public MedicalExamDraftResponse analyzeExam(String description, List<MultipartFile> files,
@@ -56,6 +61,12 @@ class MedicalExamImportService implements MedicalExamImportFacade {
 
         var draft = MedicalExamImportDraft.create(deviceId, extraction, filenames);
         draftRepository.save(draft);
+
+        var storedFiles = uploadFilesToStorage(draft.getId(), extraction.examTypeCode(), files);
+        if (!storedFiles.isEmpty()) {
+            draft.attachStoredFiles(storedFiles);
+            draftRepository.save(draft);
+        }
 
         log.info("Created medical exam import draft {} for device {}", draft.getId(), maskDeviceId(deviceId));
         return toDraftResponse(draft);
@@ -118,6 +129,25 @@ class MedicalExamImportService implements MedicalExamImportFacade {
             examination = medicalExamsFacade.linkExaminations(deviceId, examination.id(), relatedExaminationId);
         }
 
+        // Register source documents as attachments so users can view them from UI
+        var storedFiles = draft.getStoredFiles();
+        if (storedFiles != null && !storedFiles.isEmpty()) {
+            var examId = examination.id();
+            var validFiles = storedFiles.stream()
+                    .filter(sf -> sf.storageKey() != null)
+                    .toList();
+            IntStream.range(0, validFiles.size()).forEach(i -> {
+                var sf = validFiles.get(i);
+                var storageResult = new AttachmentStorageResult(
+                        sf.storageKey(), sf.publicUrl(), null, sf.provider());
+                medicalExamsFacade.addAttachmentFromStorage(
+                        deviceId, examId,
+                        sf.filename(), sf.contentType(), sf.fileSize(),
+                        storageResult,
+                        i == 0);
+            });
+        }
+
         draft.markConfirmed();
         draftRepository.save(draft);
 
@@ -125,6 +155,25 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                 draftId, examination.id(), maskDeviceId(deviceId));
 
         return examination;
+    }
+
+    private List<MedicalExamImportDraft.StoredFile> uploadFilesToStorage(
+            UUID draftId, String examTypeCode, List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) return List.of();
+        var stored = new ArrayList<MedicalExamImportDraft.StoredFile>();
+        files.forEach(file -> {
+            try {
+                var result = fileStorageService.store(
+                        draftId, examTypeCode,
+                        file.getOriginalFilename(), file.getContentType(), file.getBytes());
+                stored.add(new MedicalExamImportDraft.StoredFile(
+                        result.storageKey(), result.publicUrl(), result.provider(),
+                        file.getOriginalFilename(), file.getContentType(), file.getSize()));
+            } catch (IOException e) {
+                log.warn("Failed to upload file {} to storage: {}", file.getOriginalFilename(), e.getMessage());
+            }
+        });
+        return stored;
     }
 
     private MedicalExamImportDraft findDraftForDevice(UUID draftId, String deviceId) {

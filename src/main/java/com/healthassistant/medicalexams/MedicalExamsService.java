@@ -3,6 +3,7 @@ package com.healthassistant.medicalexams;
 import com.healthassistant.medicalexams.api.FileStorageService;
 import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
+import com.healthassistant.medicalexams.api.dto.AttachmentStorageResult;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
@@ -235,6 +236,20 @@ class MedicalExamsService implements MedicalExamsFacade {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read uploaded file", e);
         }
+    }
+
+    @Override
+    public ExaminationAttachmentResponse addAttachmentFromStorage(String deviceId, UUID examId,
+                                                                   String filename, String contentType,
+                                                                   long fileSize, AttachmentStorageResult storageResult,
+                                                                   boolean isPrimary) {
+        var exam = findExamForDevice(deviceId, examId);
+        var attachment = ExaminationAttachment.create(exam, deviceId,
+                filename, contentType, fileSize, storageResult, "SOURCE_DOCUMENT", isPrimary, null);
+        exam.addAttachment(attachment);
+        examinationRepository.save(exam);
+        log.info("Registered source document attachment for examination {} for device {}", examId, maskDeviceId(deviceId));
+        return toAttachmentResponse(attachment);
     }
 
     @Override

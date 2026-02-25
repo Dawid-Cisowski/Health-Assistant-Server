@@ -42,6 +42,10 @@ class MedicalExamImportDraft {
     @Column(name = "original_filenames", columnDefinition = "jsonb")
     private List<String> originalFilenames;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "stored_files", columnDefinition = "jsonb")
+    private List<StoredFile> storedFiles;
+
     @Column(name = "ai_confidence", precision = 3, scale = 2)
     private BigDecimal aiConfidence;
 
@@ -67,6 +71,20 @@ class MedicalExamImportDraft {
     enum DraftStatus {
         PENDING, CONFIRMED, EXPIRED
     }
+
+    /**
+     * Metadata for a file already uploaded to storage during the analyze step.
+     * Allows attaching the original document to the examination at confirm time
+     * without re-uploading.
+     */
+    record StoredFile(
+            String storageKey,
+            String publicUrl,
+            String provider,
+            String filename,
+            String contentType,
+            long fileSize
+    ) {}
 
     /**
      * Embedded record stored as JSONB — holds all extracted exam data that can be
@@ -99,6 +117,11 @@ class MedicalExamImportDraft {
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    void attachStoredFiles(List<StoredFile> files) {
+        this.storedFiles = files;
+        this.updatedAt = Instant.now();
     }
 
     static MedicalExamImportDraft create(String deviceId, ExtractedExamData extraction,

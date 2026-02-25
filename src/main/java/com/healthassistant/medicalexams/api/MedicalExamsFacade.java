@@ -1,6 +1,7 @@
 package com.healthassistant.medicalexams.api;
 
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
+import com.healthassistant.medicalexams.api.dto.AttachmentStorageResult;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
@@ -44,6 +45,10 @@ public interface MedicalExamsFacade {
 
     ExaminationAttachmentResponse addAttachment(String deviceId, UUID examId, MultipartFile file,
                                                  String attachmentType, String description, boolean isPrimary);
+
+    ExaminationAttachmentResponse addAttachmentFromStorage(String deviceId, UUID examId,
+                                                            String filename, String contentType, long fileSize,
+                                                            AttachmentStorageResult storageResult, boolean isPrimary);
 
     List<ExaminationAttachmentResponse> getAttachments(String deviceId, UUID examId);
 
