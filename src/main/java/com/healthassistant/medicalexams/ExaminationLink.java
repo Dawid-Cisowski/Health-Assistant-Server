@@ -5,6 +5,7 @@ import jakarta.persistence.Embeddable;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
@@ -28,10 +29,12 @@ class ExaminationLink {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("idA")
+    @JoinColumn(name = "id_a")
     private Examination examinationA;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("idB")
+    @JoinColumn(name = "id_b")
     private Examination examinationB;
 
     @Column(name = "created_at", nullable = false, updatable = false)
