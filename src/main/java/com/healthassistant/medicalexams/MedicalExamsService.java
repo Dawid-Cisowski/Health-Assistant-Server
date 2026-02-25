@@ -3,6 +3,7 @@ package com.healthassistant.medicalexams;
 import com.healthassistant.medicalexams.api.FileStorageService;
 import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
+import com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse;
 import com.healthassistant.medicalexams.api.dto.AttachmentStorageResult;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
@@ -250,6 +251,19 @@ class MedicalExamsService implements MedicalExamsFacade {
         examinationRepository.save(exam);
         log.info("Registered source document attachment for examination {} for device {}", examId, maskDeviceId(deviceId));
         return toAttachmentResponse(attachment);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AttachmentDownloadUrlResponse getAttachmentDownloadUrl(String deviceId, UUID examId, UUID attachmentId) {
+        findExamForDevice(deviceId, examId);
+        var attachment = attachmentRepository.findByIdAndExaminationId(attachmentId, examId)
+                .orElseThrow(() -> new AttachmentNotFoundException(attachmentId));
+        var url = fileStorageService.generateDownloadUrl(attachment.getStorageKey());
+        log.info("Generated download URL for attachment {} in examination {} for device {}",
+                attachmentId, examId, maskDeviceId(deviceId));
+        return new AttachmentDownloadUrlResponse(url, attachment.getStorageProvider(),
+                attachment.getStorageProvider().equals("GCS") ? 3600 : 0);
     }
 
     @Override

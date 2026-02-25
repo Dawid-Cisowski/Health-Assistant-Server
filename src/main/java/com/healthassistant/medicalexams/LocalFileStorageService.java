@@ -49,6 +49,11 @@ class LocalFileStorageService implements FileStorageService {
         }
     }
 
+    @Override
+    public String generateDownloadUrl(String storageKey) {
+        return null; // Local files have no public URL
+    }
+
     private String sanitizeFilename(String filename) {
         if (filename == null) return "file";
         return filename.replaceAll("[^a-zA-Z0-9._-]", "_");

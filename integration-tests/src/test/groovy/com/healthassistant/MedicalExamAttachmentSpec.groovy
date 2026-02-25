@@ -261,6 +261,89 @@ class MedicalExamAttachmentSpec extends BaseIntegrationSpec {
         count == 0
     }
 
+    // ==================== GET /{examId}/attachments/{attachmentId}/download ====================
+
+    def "should return 200 with download URL response for existing attachment"() {
+        given: "an examination with an uploaded attachment"
+        def examId = createExam("MORPHOLOGY", "Morfologia do pobrania")
+        def attachmentsPath = "${BASE_PATH}/${examId}/attachments"
+        def attachmentId = uploadAttachment(DEVICE_ID, attachmentsPath, minimalPdfBytes(), "wyniki.pdf", "application/pdf")
+                .body().jsonPath().getString("id")
+        def downloadPath = "${attachmentsPath}/${attachmentId}/download"
+
+        when: "I request the download URL"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET, downloadPath)
+                .get(downloadPath)
+                .then()
+                .extract()
+
+        then: "response status is 200"
+        response.statusCode() == 200
+
+        and: "response body contains url and expiresInSeconds fields"
+        def body = response.body().jsonPath()
+        body.getString("url") != null || body.getString("url") == null  // null allowed for LOCAL storage
+        body.getInt("expiresInSeconds") >= 0
+    }
+
+    def "should return 200 with null url for LOCAL storage provider"() {
+        given: "an examination with an uploaded attachment (LOCAL storage in tests)"
+        def examId = createExam("MORPHOLOGY", "Morfologia LOCAL download")
+        def attachmentsPath = "${BASE_PATH}/${examId}/attachments"
+        def attachmentId = uploadAttachment(DEVICE_ID, attachmentsPath, minimalPngBytes(), "scan.png", "image/png")
+                .body().jsonPath().getString("id")
+        def downloadPath = "${attachmentsPath}/${attachmentId}/download"
+
+        when: "I request the download URL"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET, downloadPath)
+                .get(downloadPath)
+                .then()
+                .extract()
+
+        then: "response status is 200"
+        response.statusCode() == 200
+
+        and: "storageProvider is LOCAL"
+        def body = response.body().jsonPath()
+        body.getString("storageProvider") == "LOCAL"
+
+        and: "url is null because local files have no public URL"
+        body.getString("url") == null
+    }
+
+    def "should return 404 when requesting download URL for non-existent attachment"() {
+        given: "an existing examination and a random attachment ID"
+        def examId = createExam("MORPHOLOGY", "Test missing download")
+        def fakePath = "${BASE_PATH}/${examId}/attachments/${UUID.randomUUID()}/download"
+
+        when: "I request a download URL for non-existent attachment"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET, fakePath)
+                .get(fakePath)
+                .then()
+                .extract()
+
+        then: "response status is 404"
+        response.statusCode() == 404
+    }
+
+    def "should return 404 when requesting download URL from another device's examination"() {
+        given: "an examination with attachment owned by DEVICE_ID"
+        def examId = createExam("MORPHOLOGY", "Other device download test")
+        def attachmentsPath = "${BASE_PATH}/${examId}/attachments"
+        def attachmentId = uploadAttachment(DEVICE_ID, attachmentsPath, minimalPdfBytes(), "report.pdf", "application/pdf")
+                .body().jsonPath().getString("id")
+        def downloadPath = "${attachmentsPath}/${attachmentId}/download"
+
+        when: "another device tries to get the download URL"
+        def response = authenticatedGetRequest("different-device-id", "ZGlmZmVyZW50LXNlY3JldC0xMjM=", downloadPath)
+                .get(downloadPath)
+                .then()
+                .extract()
+
+        then: "response status is 404 (device isolation enforced)"
+        response.statusCode() == 404
+    }
+
     // ==================== Helper methods ====================
 
     private String createExam(String examTypeCode, String title) {

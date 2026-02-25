@@ -4,6 +4,7 @@ import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
+import com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
@@ -271,6 +272,24 @@ class MedicalExamsController {
             @RequestAttribute("deviceId") String deviceId,
             @PathVariable UUID examId) {
         var result = medicalExamsFacade.getAttachments(deviceId, examId);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{examId}/attachments/{attachmentId}/download")
+    @Operation(summary = "Get attachment download URL",
+            description = "Returns a fresh time-limited download URL for an attachment. " +
+                    "For LOCAL storage (dev/test), url will be null.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Download URL generated"),
+            @ApiResponse(responseCode = "404", description = "Examination or attachment not found"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<AttachmentDownloadUrlResponse> getAttachmentDownloadUrl(
+            @RequestAttribute("deviceId") String deviceId,
+            @PathVariable UUID examId,
+            @PathVariable UUID attachmentId) {
+        var result = medicalExamsFacade.getAttachmentDownloadUrl(deviceId, examId, attachmentId);
         return ResponseEntity.ok(result);
     }
 

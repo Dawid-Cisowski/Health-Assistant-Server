@@ -1,6 +1,7 @@
 package com.healthassistant.medicalexams.api;
 
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
+import com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse;
 import com.healthassistant.medicalexams.api.dto.AttachmentStorageResult;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
@@ -53,6 +54,8 @@ public interface MedicalExamsFacade {
     List<ExaminationAttachmentResponse> getAttachments(String deviceId, UUID examId);
 
     void deleteAttachment(String deviceId, UUID examId, UUID attachmentId);
+
+    AttachmentDownloadUrlResponse getAttachmentDownloadUrl(String deviceId, UUID examId, UUID attachmentId);
 
     ExaminationDetailResponse linkExaminations(String deviceId, UUID examId, UUID linkedExaminationId);
 
