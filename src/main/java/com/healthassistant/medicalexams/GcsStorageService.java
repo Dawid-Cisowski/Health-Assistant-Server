@@ -86,6 +86,12 @@ class GcsStorageService implements FileStorageService {
         }
     }
 
+    @Override
+    public String generateDownloadUrl(String storageKey) {
+        var blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, storageKey)).build();
+        return generateSignedUrl(blobInfo);
+    }
+
     private String buildObjectName(String examTypeCode, UUID examId, String filename) {
         var safe = filename != null
                 ? filename.replaceAll("[^a-zA-Z0-9._-]", "_")

@@ -216,20 +216,23 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
         reportText.length() > 30
     }
 
-    def "E-MED-09: USG image produces no meaningful numeric lab values (descriptive exam)"() {
-        given: "real USG report image which contains only descriptive text, no lab values"
+    def "E-MED-09: USG image produces no meaningful clinical numeric lab values (descriptive exam)"() {
+        given: "real USG report image which contains only descriptive text, no clinical lab values"
         def imageBytes = loadTestImage(USG_IMAGE_PATH)
 
         when: "analyzing the USG image"
         def response = analyzeExamWithFile(imageBytes, "usg.png")
 
-        then: "no results have actual numeric values — descriptive findings may appear with valueNumeric=0"
+        then: "no clinical results have actual numeric values (REPORT_METADATA markers like photo count are excluded)"
         response.statusCode() == 200
         def results = response.body().jsonPath().getList("results")
         println "DEBUG: E-MED-09 USG results count: ${results.size()}"
-        def numericResults = results.findAll { it.valueNumeric != null && (it.valueNumeric as double) > 0 }
-        println "DEBUG: E-MED-09 USG numeric results (valueNumeric > 0): ${numericResults.size()}"
-        numericResults.size() == 0
+        // Exclude REPORT_METADATA category (e.g. 'Wydano zdjęć') — those are not clinical lab values
+        def clinicalNumericResults = results.findAll {
+            it.valueNumeric != null && (it.valueNumeric as double) > 0 && it.category != "REPORT_METADATA"
+        }
+        println "DEBUG: E-MED-09 USG numeric results (valueNumeric > 0): ${clinicalNumericResults.size()}"
+        clinicalNumericResults.size() == 0
     }
 
     // ==================== Private helpers ====================
@@ -263,6 +266,7 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
                 .header("X-Timestamp", timestamp)
                 .header("X-Nonce", nonce)
                 .header("X-Signature", signature)
+                .contentType(io.restassured.http.ContentType.JSON)
                 .post(path)
                 .then()
                 .extract()

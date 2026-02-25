@@ -25,6 +25,7 @@ public record ExaminationDetailResponse(
         String source,
         List<LabResultResponse> results,
         List<ExaminationAttachmentResponse> attachments,
+        List<LinkedExaminationResponse> linkedExaminations,
         Instant createdAt,
         Instant updatedAt
 ) {

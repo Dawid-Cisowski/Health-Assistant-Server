@@ -4,10 +4,12 @@ import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
+import com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultResponse;
+import com.healthassistant.medicalexams.api.dto.LinkExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.MarkerTrendResponse;
 import com.healthassistant.medicalexams.api.dto.UpdateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.UpdateLabResultRequest;
@@ -273,6 +275,24 @@ class MedicalExamsController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/{examId}/attachments/{attachmentId}/download")
+    @Operation(summary = "Get attachment download URL",
+            description = "Returns a fresh time-limited download URL for an attachment. " +
+                    "For LOCAL storage (dev/test), url will be null.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Download URL generated"),
+            @ApiResponse(responseCode = "404", description = "Examination or attachment not found"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<AttachmentDownloadUrlResponse> getAttachmentDownloadUrl(
+            @RequestAttribute("deviceId") String deviceId,
+            @PathVariable UUID examId,
+            @PathVariable UUID attachmentId) {
+        var result = medicalExamsFacade.getAttachmentDownloadUrl(deviceId, examId, attachmentId);
+        return ResponseEntity.ok(result);
+    }
+
     @DeleteMapping("/{examId}/attachments/{attachmentId}")
     @Operation(summary = "Delete attachment", description = "Deletes a specific attachment from an examination",
             security = @SecurityRequirement(name = "HmacHeaderAuth"))
@@ -288,6 +308,42 @@ class MedicalExamsController {
         log.info("Deleting attachment {} from examination {} for device {}",
                 attachmentId, examId, maskDeviceId(deviceId));
         medicalExamsFacade.deleteAttachment(deviceId, examId, attachmentId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{examId}/links")
+    @Operation(summary = "Link examinations", description = "Creates a bidirectional link between two examinations",
+            security = @SecurityRequirement(name = "HmacHeaderAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Link created"),
+            @ApiResponse(responseCode = "400", description = "Invalid request (e.g. self-link)"),
+            @ApiResponse(responseCode = "404", description = "Examination not found"),
+            @ApiResponse(responseCode = "409", description = "Link already exists"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<ExaminationDetailResponse> linkExaminations(
+            @RequestAttribute("deviceId") String deviceId,
+            @PathVariable UUID examId,
+            @Valid @RequestBody LinkExaminationRequest request) {
+        log.info("Linking examination {} with {} for device {}", examId, request.linkedExaminationId(), maskDeviceId(deviceId));
+        var result = medicalExamsFacade.linkExaminations(deviceId, examId, request.linkedExaminationId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    @DeleteMapping("/{examId}/links/{linkedExamId}")
+    @Operation(summary = "Unlink examinations", description = "Removes the link between two examinations",
+            security = @SecurityRequirement(name = "HmacHeaderAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Link removed"),
+            @ApiResponse(responseCode = "404", description = "Examination or link not found"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<Void> unlinkExaminations(
+            @RequestAttribute("deviceId") String deviceId,
+            @PathVariable UUID examId,
+            @PathVariable UUID linkedExamId) {
+        log.info("Unlinking examination {} from {} for device {}", examId, linkedExamId, maskDeviceId(deviceId));
+        medicalExamsFacade.unlinkExaminations(deviceId, examId, linkedExamId);
         return ResponseEntity.noContent().build();
     }
 
@@ -307,6 +363,18 @@ class MedicalExamsController {
     ResponseEntity<Void> handleAttachmentNotFound(AttachmentNotFoundException ex) {
         log.warn("Attachment not found");
         return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(ExaminationLinkNotFoundException.class)
+    ResponseEntity<Void> handleExaminationLinkNotFound(ExaminationLinkNotFoundException ex) {
+        log.warn("Examination link not found");
+        return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(ExaminationLinkAlreadyExistsException.class)
+    ResponseEntity<String> handleExaminationLinkAlreadyExists(ExaminationLinkAlreadyExistsException ex) {
+        log.warn("Examination link already exists");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body("Link already exists between these examinations");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
