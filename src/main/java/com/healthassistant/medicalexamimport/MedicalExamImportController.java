@@ -1,5 +1,6 @@
 package com.healthassistant.medicalexamimport;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.medicalexamimport.api.MedicalExamImportFacade;
 import com.healthassistant.medicalexamimport.api.dto.ConfirmDraftRequest;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftResponse;
@@ -41,8 +42,9 @@ class MedicalExamImportController {
 
     private static final long MAX_FILE_SIZE = 15 * 1024 * 1024L;
     private static final int MAX_DESCRIPTION_LENGTH = 5000;
+    private static final String MIME_JPEG = "image/jpeg";
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg", "image/png", "image/webp", "application/pdf"
+            MIME_JPEG, "image/png", "image/webp", "application/pdf"
     );
 
     private final MedicalExamImportFacade medicalExamImportFacade;
@@ -64,7 +66,7 @@ class MedicalExamImportController {
             @RequestParam(value = "description", required = false) String description,
             @RequestAttribute("deviceId") String deviceId) {
         log.info("Medical exam analysis request from device {}, files: {}, description: {}",
-                maskDeviceId(deviceId),
+                SecurityUtils.maskDeviceId(deviceId),
                 files != null ? files.size() : 0,
                 description != null ? description.length() + " chars" : "none");
 
@@ -78,10 +80,10 @@ class MedicalExamImportController {
             var response = medicalExamImportFacade.analyzeExam(description, files, deviceId);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid medical exam import from device {}", maskDeviceId(deviceId));
+            log.warn("Invalid medical exam import from device {}", SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.badRequest().body(MedicalExamDraftResponse.failure("Invalid input"));
         } catch (MedicalExamExtractionException e) {
-            log.warn("AI extraction failed for device {}: {}", maskDeviceId(deviceId), e.getMessage());
+            log.warn("AI extraction failed for device {}: {}", SecurityUtils.maskDeviceId(deviceId), e.getMessage());
             return ResponseEntity.badRequest().body(MedicalExamDraftResponse.failure("Failed to process medical document"));
         }
     }
@@ -124,9 +126,9 @@ class MedicalExamImportController {
     })
     ResponseEntity<MedicalExamDraftResponse> updateDraft(
             @PathVariable UUID draftId,
-            @RequestBody MedicalExamDraftUpdateRequest request,
+            @Valid @RequestBody MedicalExamDraftUpdateRequest request,
             @RequestAttribute("deviceId") String deviceId) {
-        log.info("Draft update request for {} from device {}", draftId, maskDeviceId(deviceId));
+        log.info("Draft update request for {} from device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
 
         try {
             var response = medicalExamImportFacade.updateDraft(draftId, request, deviceId);
@@ -146,34 +148,34 @@ class MedicalExamImportController {
     @PostMapping("/{draftId}/confirm")
     @Operation(
             summary = "Confirm draft",
-            description = "Finalize an import draft and save it as a medical examination record",
+            description = "Finalize an import draft and save it as one or more medical examination records (one per section)",
             security = @SecurityRequirement(name = "HmacHeaderAuth")
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Examination saved"),
+            @ApiResponse(responseCode = "201", description = "Examinations saved"),
             @ApiResponse(responseCode = "404", description = "Draft not found"),
             @ApiResponse(responseCode = "409", description = "Draft already confirmed"),
             @ApiResponse(responseCode = "410", description = "Draft has expired"),
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
-    ResponseEntity<ExaminationDetailResponse> confirmDraft(
+    ResponseEntity<List<ExaminationDetailResponse>> confirmDraft(
             @PathVariable UUID draftId,
             @RequestAttribute("deviceId") String deviceId,
             @Valid @RequestBody(required = false) ConfirmDraftRequest request) {
-        log.info("Draft confirm request for {} from device {}", draftId, maskDeviceId(deviceId));
+        log.info("Draft confirm request for {} from device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
 
         try {
             var relatedId = request != null ? request.relatedExaminationId() : null;
             var result = medicalExamImportFacade.confirmDraft(draftId, deviceId, relatedId);
             return ResponseEntity.status(HttpStatus.CREATED).body(result);
         } catch (DraftNotFoundException e) {
-            log.warn("Draft not found {} for device {}", draftId, maskDeviceId(deviceId));
+            log.warn("Draft not found {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (DraftAlreadyConfirmedException e) {
-            log.warn("Draft already confirmed {} for device {}", draftId, maskDeviceId(deviceId));
+            log.warn("Draft already confirmed {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
         } catch (DraftExpiredException e) {
-            log.warn("Draft expired {} for device {}", draftId, maskDeviceId(deviceId));
+            log.warn("Draft expired {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.GONE).build();
         }
     }
@@ -199,20 +201,20 @@ class MedicalExamImportController {
 
     private String resolveEffectiveContentType(String contentType, String filename) {
         if (contentType == null || contentType.equals("application/octet-stream")) {
-            if (filename != null) {
-                String lower = filename.toLowerCase(Locale.ROOT);
-                if (lower.endsWith(".pdf")) return "application/pdf";
-                if (lower.endsWith(".png")) return "image/png";
-                if (lower.endsWith(".webp")) return "image/webp";
-                if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-            }
+            return resolveFromFilename(filename);
         }
-        if ("image/jpg".equals(contentType)) return "image/jpeg";
-        return contentType != null ? contentType : "application/octet-stream";
+        if ("image/jpg".equals(contentType)) return MIME_JPEG;
+        return contentType;
     }
 
-    private String maskDeviceId(String deviceId) {
-        if (deviceId == null || deviceId.length() <= 8) return "****";
-        return deviceId.substring(0, 4) + "****" + deviceId.substring(deviceId.length() - 4);
+    private static String resolveFromFilename(String filename) {
+        if (filename == null) return "application/octet-stream";
+        String lower = filename.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".pdf")) return "application/pdf";
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MIME_JPEG;
+        return "application/octet-stream";
     }
+
 }

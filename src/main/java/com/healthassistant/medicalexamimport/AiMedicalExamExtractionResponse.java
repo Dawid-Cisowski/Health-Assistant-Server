@@ -6,17 +6,21 @@ import java.util.List;
 record AiMedicalExamExtractionResponse(
         boolean isMedicalReport,
         double confidence,
-        String examTypeCode,
-        String title,
+        String validationError,
         String date,
         String performedAt,
         String laboratory,
         String orderingDoctor,
-        String reportText,
-        String conclusions,
-        String validationError,
-        List<AiExtractedResult> results
+        List<AiExamSection> sections
 ) {
+    record AiExamSection(
+            String examTypeCode,
+            String title,
+            String reportText,
+            String conclusions,
+            List<AiExtractedResult> results
+    ) {}
+
     record AiExtractedResult(
             String markerCode,
             String markerName,
