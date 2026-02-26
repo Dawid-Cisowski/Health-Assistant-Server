@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ClinicalDocument xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <effectiveTime value="20251104085701"/>
+  <author>
+    <assignedAuthor>
+      <representedOrganization>
+        <name>Zakład Diagnostyki Laboratoryjnej</name>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <componentOf>
+    <encompassingEncounter>
+      <effectiveTime value="20251103092800"/>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <entry typeCode="COMP">
+            <observation classCode="OBS" moodCode="EVN">
+              <code code="C55" codeSystem="2.16.840.1.113883.3.4424.11.2.6" codeSystemName="ICD-9-PL" displayName="Morfologia krwi (pełna) (ICD-9: C55)"/>
+              <effectiveTime value="20251103113843"/>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="C5502" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="Erytrocyty"/>
+                  <effectiveTime value="20251103113843"/>
+                  <value unit="mln/µl" value="4.80" xsi:type="PQ"/>
+                  <referenceRange typeCode="REFV">
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low unit="mln/µl" value="4.60"/>
+                        <high unit="mln/µl" value="6.50"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </entryRelationship>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="C5503" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="Hemoglobina"/>
+                  <effectiveTime value="20251103113843"/>
+                  <value unit="g/dl" value="15.2" xsi:type="PQ"/>
+                  <referenceRange typeCode="REFV">
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low unit="g/dl" value="13.5"/>
+                        <high unit="g/dl" value="18.0"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </entryRelationship>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="SEP" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="-"/>
+                  <effectiveTime value="20251103113843"/>
+                  <value xsi:type="ST">-</value>
+                </observation>
+              </entryRelationship>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="C5501" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="Leukocyty"/>
+                  <effectiveTime value="20251103113843"/>
+                  <value unit="tys/µl" value="6.5" xsi:type="PQ"/>
+                  <referenceRange typeCode="REFV">
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low unit="tys/µl" value="4.0"/>
+                        <high unit="tys/µl" value="10.0"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </entryRelationship>
+            </observation>
+          </entry>
+          <entry typeCode="COMP">
+            <observation classCode="OBS" moodCode="EVN">
+              <code code="A19" codeSystem="2.16.840.1.113883.3.4424.11.2.6" codeSystemName="ICD-9-PL" displayName="Osad moczu met. cytometrii (ICD-9: A19)"/>
+              <effectiveTime value="20251103115531"/>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="A19C.01" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="Erytrocyty"/>
+                  <effectiveTime value="20251103115531"/>
+                  <value unit="/µl" value="6.30" xsi:type="PQ"/>
+                  <referenceRange typeCode="REFV">
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low unit="/µl" value="0.00"/>
+                        <high unit="/µl" value="13.60"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </entryRelationship>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="A19C.02" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="Leukocyty"/>
+                  <effectiveTime value="20251103115531"/>
+                  <value unit="/µl" value="1.90" xsi:type="PQ"/>
+                  <referenceRange typeCode="REFV">
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low unit="/µl" value="0.00"/>
+                        <high unit="/µl" value="13.20"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </entryRelationship>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="A19C.03" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="Nabłonki płaskie"/>
+                  <effectiveTime value="20251103115531"/>
+                  <value unit="/µl" value="0.90" xsi:type="PQ"/>
+                  <referenceRange typeCode="REFV">
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low unit="/µl" value="0.00"/>
+                        <high unit="/µl" value="5.70"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </entryRelationship>
+            </observation>
+          </entry>
+          <entry typeCode="COMP">
+            <observation classCode="OBS" moodCode="EVN">
+              <code code="G21" codeSystem="2.16.840.1.113883.3.4424.11.2.6" codeSystemName="ICD-9-PL" displayName="PT (INR)"/>
+              <effectiveTime value="20251104085251"/>
+              <entryRelationship typeCode="COMP">
+                <observation classCode="OBS" moodCode="EVN">
+                  <code code="G21.01" codeSystem="2.16.840.1.113883.3.4424.2.7.95881.1.8" codeSystemName="Parametry badań" displayName="INR (ICD-9: G21)"/>
+                  <effectiveTime value="20251104085251"/>
+                  <value xsi:type="ST">,</value>
+                  <referenceRange typeCode="REFV">
+                    <observationRange>
+                      <value xsi:type="IVL_PQ">
+                        <low value="0.90"/>
+                        <high value="1.20"/>
+                      </value>
+                    </observationRange>
+                  </referenceRange>
+                </observation>
+              </entryRelationship>
+            </observation>
+          </entry>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

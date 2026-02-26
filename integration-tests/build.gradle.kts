@@ -1,4 +1,5 @@
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
 
 plugins {
     groovy
@@ -210,6 +211,68 @@ tasks.register<Test>("benchmarkTest") {
         println("Benchmark reports:")
         println("  JSON: ${layout.buildDirectory.get()}/reports/benchmark/benchmark-report.json")
         println("  HTML: ${layout.buildDirectory.get()}/reports/benchmark/benchmark-report.html")
+    }
+}
+
+// ===========================================================================
+// Test Summary — prints a pass/fail table after each test run
+// Failures are sorted to the top. For evaluationTest (which uses @Retry),
+// failed tests are annotated with [retried] so you know all attempts failed.
+// ===========================================================================
+
+fun printTestSummary(taskName: String, entries: List<Array<String>>) {
+    if (entries.isEmpty()) return
+    // entries: [spec, test, status, note]  where status = PASS | FAIL | SKIP
+    val sorted = entries.sortedWith(compareBy({ it[2] != "FAIL" }, { it[0] }, { it[1] }))
+    val passed = entries.count { it[2] == "PASS" }
+    val failed = entries.count { it[2] == "FAIL" }
+    val skipped = entries.count { it[2] == "SKIP" }
+    val specW = sorted.maxOfOrNull { it[0].length }?.coerceIn(4, 40) ?: 4
+    val testW = sorted.maxOfOrNull { it[1].length }?.coerceIn(4, 60) ?: 4
+    val hasNotes = sorted.any { it[3].isNotEmpty() }
+    val noteW = if (hasNotes) 12 else 0
+    val width = specW + testW + 14 + noteW
+    val bar = "=".repeat(width)
+    val sep = "-".repeat(width)
+    println("")
+    println(bar)
+    println(" TEST SUMMARY [$taskName]  |  Total: ${entries.size}  PASS: $passed  FAIL: $failed  SKIP: $skipped")
+    println(bar)
+    val noteHeader = if (hasNotes) "  ${"NOTE".padEnd(noteW)}" else ""
+    println(" ${"SPEC".padEnd(specW)}  ${"TEST".padEnd(testW)}  STATUS$noteHeader")
+    println(sep)
+    sorted.forEach { e ->
+        val noteCol = when {
+            e[3].isNotEmpty() -> "  ${e[3].take(noteW).padEnd(noteW)}"
+            hasNotes -> "  ${" ".repeat(noteW)}"
+            else -> ""
+        }
+        val suffix = if (e[2] == "FAIL") " <--" else ""
+        println(" ${e[0].take(specW).padEnd(specW)}  ${e[1].take(testW).padEnd(testW)}  ${e[2]}$noteCol$suffix")
+    }
+    println(bar)
+    println("")
+}
+
+tasks.named<Test>("evaluationTest") {
+    val entries = CopyOnWriteArrayList<Array<String>>()
+    addTestListener(object : TestListener {
+        override fun beforeSuite(suite: TestDescriptor) {}
+        override fun afterSuite(suite: TestDescriptor, result: TestResult) {}
+        override fun beforeTest(descriptor: TestDescriptor) {}
+        override fun afterTest(descriptor: TestDescriptor, result: TestResult) {
+            val spec = descriptor.className?.substringAfterLast('.') ?: "Unknown"
+            val status = when (result.resultType) {
+                TestResult.ResultType.SUCCESS -> "PASS"
+                TestResult.ResultType.FAILURE -> "FAIL"
+                else -> "SKIP"
+            }
+            val note = if (result.resultType == TestResult.ResultType.FAILURE) "[retried]" else ""
+            entries.add(arrayOf(spec, descriptor.displayName, status, note))
+        }
+    })
+    doLast {
+        printTestSummary("evaluationTest", entries.toList())
     }
 }
 

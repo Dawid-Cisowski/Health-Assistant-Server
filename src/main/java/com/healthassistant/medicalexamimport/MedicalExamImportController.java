@@ -43,8 +43,10 @@ class MedicalExamImportController {
     private static final long MAX_FILE_SIZE = 15 * 1024 * 1024L;
     private static final int MAX_DESCRIPTION_LENGTH = 5000;
     private static final String MIME_JPEG = "image/jpeg";
+    private static final String MIME_OCTET_STREAM = "application/octet-stream";
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            MIME_JPEG, "image/png", "image/webp", "application/pdf"
+            MIME_JPEG, "image/png", "image/webp", "application/pdf",
+            "text/xml", "application/xml"
     );
 
     private final MedicalExamImportFacade medicalExamImportFacade;
@@ -200,7 +202,7 @@ class MedicalExamImportController {
     }
 
     private String resolveEffectiveContentType(String contentType, String filename) {
-        if (contentType == null || contentType.equals("application/octet-stream")) {
+        if (contentType == null || contentType.equals(MIME_OCTET_STREAM)) {
             return resolveFromFilename(filename);
         }
         if ("image/jpg".equals(contentType)) return MIME_JPEG;
@@ -208,13 +210,14 @@ class MedicalExamImportController {
     }
 
     private static String resolveFromFilename(String filename) {
-        if (filename == null) return "application/octet-stream";
+        if (filename == null) return MIME_OCTET_STREAM;
         String lower = filename.toLowerCase(Locale.ROOT);
         if (lower.endsWith(".pdf")) return "application/pdf";
         if (lower.endsWith(".png")) return "image/png";
         if (lower.endsWith(".webp")) return "image/webp";
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MIME_JPEG;
-        return "application/octet-stream";
+        if (lower.endsWith(".cda") || lower.endsWith(".xml")) return "text/xml";
+        return MIME_OCTET_STREAM;
     }
 
 }

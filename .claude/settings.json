@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/dawidcidowski/IdeaProjects/HealthAssistantServer/.claude/hooks/mark-dirty.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/dawidcidowski/IdeaProjects/HealthAssistantServer/.claude/hooks/quality-check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
