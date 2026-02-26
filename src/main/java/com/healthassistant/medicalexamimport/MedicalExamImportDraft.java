@@ -96,7 +96,8 @@ class MedicalExamImportDraft {
             String performedAt,
             String laboratory,
             String orderingDoctor,
-            List<SectionRecord> sections
+            List<SectionRecord> sections,
+            String importSource
     ) {
         record SectionRecord(
                 String examTypeCode,
@@ -146,7 +147,8 @@ class MedicalExamImportDraft {
                 extraction.performedAt() != null ? extraction.performedAt().toString() : null,
                 extraction.laboratory(),
                 extraction.orderingDoctor(),
-                sections
+                sections,
+                extraction.importSource()
         );
         return draft;
     }
@@ -165,7 +167,8 @@ class MedicalExamImportDraft {
                 request.performedAt() != null ? request.performedAt().toString() : current.performedAt(),
                 request.laboratory() != null ? request.laboratory() : current.laboratory(),
                 request.orderingDoctor() != null ? request.orderingDoctor() : current.orderingDoctor(),
-                updatedSections
+                updatedSections,
+                current.importSource()
         );
         this.updatedAt = Instant.now();
     }

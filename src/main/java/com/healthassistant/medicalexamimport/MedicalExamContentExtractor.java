@@ -72,19 +72,32 @@ class MedicalExamContentExtractor {
                 AVAILABLE EXAM TYPE CODES:
                 MORPHOLOGY, LIPID_PANEL, THYROID, GLUCOSE, URINE, ALLERGY_PANEL, HISTOPATHOLOGY,
                 LIVER_PANEL, KIDNEY_PANEL, ELECTROLYTES, INFLAMMATION, VITAMINS, HORMONES, COAGULATION,
+                CARDIAC_BIOMARKERS, STOOL_TEST,
                 ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO, ECG, GASTROSCOPY, COLONOSCOPY, OTHER
 
+                CARDIAC_BIOMARKERS: NT pro-BNP, BNP, Troponin, CK-MB and other cardiac markers.
+                STOOL_TEST: Fecal occult blood (krew utajona w kale), calprotectin, stool culture, parasitology.
+
                 COMMON MARKER CODES (use these when applicable, for LAB exams only):
-                WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, NEUT, LYMPH, MONO, EOS, BASO (morphology)
-                CHOL, LDL, HDL, TG (lipid panel)
-                TSH, FT3, FT4 (thyroid)
-                GLU, HBA1C, INSULIN (glucose)
-                ALT, AST, GGT, BILIR, ALP (liver)
+                WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, NEUT, LYMPH, MONO, EOS, BASO (morphology basic)
+                RDW_SD, RDW_CV, PDW, MPV, PLCR, PCT (morphology extended platelet/RBC indices)
+                IG_PERC, IG_ABS, NRBC, NRBC_PERC (morphology - immature cells)
+                NEUT_ABS, LYMPH_ABS, MONO_ABS, EOS_ABS, BASO_ABS (morphology - absolute WBC counts)
+                CHOL, LDL, HDL, TG, NON_HDL, LPA, APO_B, APO_A1 (lipid panel)
+                TSH, FT3, FT4, ANTI_TPO, ANTI_TG (thyroid)
+                GLU, HBA1C, HBA1C_IFCC, INSULIN, INSULIN_FASTING (glucose)
+                ALT, AST, GGT, BILIR, ALP, ALBUMIN (liver)
                 CREAT, UREA, UA, EGFR (kidney)
                 CRP, ESR, FERR (inflammation)
+                CA, MG, NA, K, P, CL (electrolytes)
+                INR, PT, PT_PERCENT, APTT, FIBRINOGEN, D_DIMER (coagulation)
+                NT_PRO_BNP, BNP, TROPONIN_I, TROPONIN_T, CK_MB (cardiac biomarkers)
+                TESTOSTERONE, ESTRADIOL, PROGESTERONE, FSH, LH, PROLACTIN, CORTISOL, DHEAS, SHBG (hormones)
                 VIT_D, VIT_B12, FE, TIBC (vitamins)
                 IGE_TOTAL, IGE_SPECIFIC (allergy)
-                PT, INR, APTT, FIBRINOGEN (coagulation)
+                URINE_PH, URINE_SG, URINE_PROTEIN, URINE_GLUCOSE, URINE_KETONES, URINE_RBC, URINE_WBC,
+                URINE_BACTERIA, URINE_BILIRUBIN, URINE_UROBILINOGEN, URINE_CASTS, URINE_EPITHELIAL (urine)
+                OCCULT_BLOOD, CALPROTECTIN (stool)
 
                 UNIT STANDARDIZATION RULES:
                 - Cholesterol (CHOL, LDL, HDL): if in mmol/L, convert to mg/dL (multiply by 38.67)
@@ -202,7 +215,7 @@ class MedicalExamContentExtractor {
 
         return ExtractedExamData.valid(
                 date, performedAt, response.laboratory(), response.orderingDoctor(),
-                sections, confidence);
+                sections, confidence, "AI_IMPORT");
     }
 
     private List<ExtractedResultData> transformResults(List<AiMedicalExamExtractionResponse.AiExtractedResult> aiResults) {

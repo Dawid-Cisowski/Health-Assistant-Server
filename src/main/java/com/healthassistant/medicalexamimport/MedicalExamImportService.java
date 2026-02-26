@@ -20,10 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -36,6 +38,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
 
     private final MedicalExamImportDraftRepository draftRepository;
     private final MedicalExamContentExtractor contentExtractor;
+    private final CdaExamExtractor cdaExamExtractor;
     private final MedicalExamsFacade medicalExamsFacade;
     private final FileStorageService fileStorageService;
 
@@ -48,13 +51,15 @@ class MedicalExamImportService implements MedicalExamImportFacade {
             throw new IllegalArgumentException("At least one file or a description is required");
         }
 
-        var extraction = contentExtractor.extract(description, files);
+        var extraction = isCdaFile(files)
+                ? extractCda(files)
+                : contentExtractor.extract(description, files);
 
         if (!extraction.valid()) {
-            log.warn("AI extraction failed for device {}: {}",
+            log.warn("Extraction failed for device {}: {}",
                     SecurityUtils.maskDeviceId(deviceId),
                     SecurityUtils.sanitizeForLog(extraction.errorMessage()));
-            throw new MedicalExamExtractionException("AI could not extract medical exam data");
+            throw new MedicalExamExtractionException("Could not extract medical exam data");
         }
 
         List<String> filenames = Optional.ofNullable(files)
@@ -138,6 +143,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
             MedicalExamImportDraft.ExtractedData sharedData,
             LocalDate examDate, Instant performedAt) {
 
+        var importSource = Optional.ofNullable(sharedData.importSource()).orElse("AI_IMPORT");
         var createRequest = new CreateExaminationRequest(
                 section.examTypeCode(),
                 section.title() != null ? section.title() : "Badanie medyczne",
@@ -150,7 +156,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                 section.reportText(),
                 section.conclusions(),
                 null,
-                "AI_IMPORT"
+                importSource
         );
 
         var examination = medicalExamsFacade.createExamination(deviceId, createRequest);
@@ -224,6 +230,40 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                     SecurityUtils.sanitizeForLog(file.getOriginalFilename()), e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private static boolean isCdaMultipartFile(MultipartFile f) {
+        String ct = f.getContentType();
+        String name = f.getOriginalFilename();
+        if (ct == null || "application/octet-stream".equals(ct)) {
+            String lower = name != null ? name.toLowerCase(Locale.ROOT) : "";
+            return lower.endsWith(".cda") || lower.endsWith(".xml");
+        }
+        return "text/xml".equals(ct) || "application/xml".equals(ct)
+                || (name != null && name.toLowerCase(Locale.ROOT).endsWith(".cda"));
+    }
+
+    private boolean isCdaFile(List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) return false;
+        return files.stream().anyMatch(MedicalExamImportService::isCdaMultipartFile);
+    }
+
+    private ExtractedExamData extractCda(List<MultipartFile> files) {
+        var cdaFiles = files.stream().filter(MedicalExamImportService::isCdaMultipartFile).toList();
+        if (cdaFiles.size() > 1) {
+            log.warn("Multiple CDA files uploaded — only the first will be parsed ({} ignored)", cdaFiles.size() - 1);
+        }
+        return cdaFiles.stream()
+                .findFirst()
+                .map(f -> {
+                    try {
+                        return cdaExamExtractor.extract(f.getBytes());
+                    } catch (IOException e) {
+                        log.error("Failed to read CDA file bytes: {}", SecurityUtils.sanitizeForLog(e.getMessage()));
+                        return ExtractedExamData.invalid("Failed to read CDA file", BigDecimal.ZERO);
+                    }
+                })
+                .orElseThrow(() -> new MedicalExamExtractionException("No CDA file found"));
     }
 
     private MedicalExamImportDraft findDraftForDevice(UUID draftId, String deviceId) {

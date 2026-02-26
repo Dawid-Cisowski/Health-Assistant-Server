@@ -15,7 +15,8 @@ record ExtractedExamData(
         Instant performedAt,
         String laboratory,
         String orderingDoctor,
-        List<ExtractedSectionData> sections
+        List<ExtractedSectionData> sections,
+        String importSource
 ) {
     record ExtractedSectionData(
             String examTypeCode,
@@ -27,15 +28,15 @@ record ExtractedExamData(
 
     static ExtractedExamData valid(
             LocalDate date, Instant performedAt, String laboratory, String orderingDoctor,
-            List<ExtractedSectionData> sections, BigDecimal confidence) {
+            List<ExtractedSectionData> sections, BigDecimal confidence, String importSource) {
         return new ExtractedExamData(
                 true, null, confidence,
-                date, performedAt, laboratory, orderingDoctor, sections);
+                date, performedAt, laboratory, orderingDoctor, sections, importSource);
     }
 
     static ExtractedExamData invalid(String errorMessage, BigDecimal confidence) {
         return new ExtractedExamData(
                 false, errorMessage, confidence,
-                null, null, null, null, List.of());
+                null, null, null, null, List.of(), null);
     }
 }

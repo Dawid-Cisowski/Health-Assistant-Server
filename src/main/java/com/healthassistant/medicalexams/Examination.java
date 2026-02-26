@@ -193,8 +193,8 @@ class Examination {
     String getPrimaryAttachmentUrl() {
         return attachments.stream()
                 .filter(ExaminationAttachment::isPrimary)
-                .map(ExaminationAttachment::getPublicUrl)
                 .findFirst()
+                .map(ExaminationAttachment::getPublicUrl)
                 .orElse(null);
     }
 }
