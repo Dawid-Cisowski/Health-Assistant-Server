@@ -9,34 +9,33 @@ import java.util.List;
 
 record ExtractedExamData(
         boolean valid,
-        String examTypeCode,
-        String title,
+        String errorMessage,
+        BigDecimal confidence,
         LocalDate date,
         Instant performedAt,
         String laboratory,
         String orderingDoctor,
-        String reportText,
-        String conclusions,
-        List<ExtractedResultData> results,
-        BigDecimal confidence,
-        Long promptTokens,
-        Long completionTokens,
-        String errorMessage
+        List<ExtractedSectionData> sections
 ) {
+    record ExtractedSectionData(
+            String examTypeCode,
+            String title,
+            String reportText,
+            String conclusions,
+            List<ExtractedResultData> results
+    ) {}
+
     static ExtractedExamData valid(
-            String examTypeCode, String title, LocalDate date, Instant performedAt,
-            String laboratory, String orderingDoctor, String reportText,
-            String conclusions, List<ExtractedResultData> results,
-            BigDecimal confidence, Long promptTokens, Long completionTokens) {
+            LocalDate date, Instant performedAt, String laboratory, String orderingDoctor,
+            List<ExtractedSectionData> sections, BigDecimal confidence) {
         return new ExtractedExamData(
-                true, examTypeCode, title, date, performedAt, laboratory,
-                orderingDoctor, reportText, conclusions, results,
-                confidence, promptTokens, completionTokens, null);
+                true, null, confidence,
+                date, performedAt, laboratory, orderingDoctor, sections);
     }
 
     static ExtractedExamData invalid(String errorMessage, BigDecimal confidence) {
         return new ExtractedExamData(
-                false, null, null, null, null, null, null, null, null,
-                List.of(), confidence, null, null, errorMessage);
+                false, errorMessage, confidence,
+                null, null, null, null, List.of());
     }
 }

@@ -1,5 +1,6 @@
 package com.healthassistant.medicalexamimport;
 
+import com.healthassistant.medicalexamimport.api.dto.DraftSectionUpdateRequest;
 import com.healthassistant.medicalexamimport.api.dto.ExtractedResultData;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftUpdateRequest;
 import jakarta.persistence.*;
@@ -50,10 +51,10 @@ class MedicalExamImportDraft {
     private BigDecimal aiConfidence;
 
     @Column(name = "prompt_tokens")
-    private Long promptTokens;
+    private Long promptTokens;  // reserved for future token tracking
 
     @Column(name = "completion_tokens")
-    private Long completionTokens;
+    private Long completionTokens;  // reserved for future token tracking
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -88,19 +89,23 @@ class MedicalExamImportDraft {
 
     /**
      * Embedded record stored as JSONB — holds all extracted exam data that can be
-     * user-modified before confirmation.
+     * user-modified before confirmation. Supports multiple sections from a single document.
      */
     record ExtractedData(
-            String examTypeCode,
-            String title,
             String date,
             String performedAt,
             String laboratory,
             String orderingDoctor,
-            String reportText,
-            String conclusions,
-            List<ExtractedResultData> results
-    ) {}
+            List<SectionRecord> sections
+    ) {
+        record SectionRecord(
+                String examTypeCode,
+                String title,
+                String reportText,
+                String conclusions,
+                List<ExtractedResultData> results
+        ) {}
+    }
 
     @PrePersist
     void onCreate() {
@@ -130,34 +135,37 @@ class MedicalExamImportDraft {
         draft.deviceId = deviceId;
         draft.originalFilenames = originalFilenames;
         draft.aiConfidence = extraction.confidence();
-        draft.promptTokens = extraction.promptTokens();
-        draft.completionTokens = extraction.completionTokens();
+
+        var sections = extraction.sections().stream()
+                .map(s -> new ExtractedData.SectionRecord(
+                        s.examTypeCode(), s.title(), s.reportText(), s.conclusions(), s.results()))
+                .toList();
+
         draft.extractedData = new ExtractedData(
-                extraction.examTypeCode(),
-                extraction.title(),
                 extraction.date() != null ? extraction.date().toString() : null,
                 extraction.performedAt() != null ? extraction.performedAt().toString() : null,
                 extraction.laboratory(),
                 extraction.orderingDoctor(),
-                extraction.reportText(),
-                extraction.conclusions(),
-                extraction.results()
+                sections
         );
         return draft;
     }
 
     void applyUpdate(MedicalExamDraftUpdateRequest request) {
         var current = this.extractedData;
+
+        var updatedSections = request.sections() != null
+                ? request.sections().stream()
+                        .map(MedicalExamImportDraft::toSectionRecord)
+                        .toList()
+                : current.sections();
+
         this.extractedData = new ExtractedData(
-                request.examTypeCode() != null ? request.examTypeCode() : current.examTypeCode(),
-                request.title() != null ? request.title() : current.title(),
                 request.date() != null ? request.date().toString() : current.date(),
                 request.performedAt() != null ? request.performedAt().toString() : current.performedAt(),
                 request.laboratory() != null ? request.laboratory() : current.laboratory(),
                 request.orderingDoctor() != null ? request.orderingDoctor() : current.orderingDoctor(),
-                request.reportText() != null ? request.reportText() : current.reportText(),
-                request.conclusions() != null ? request.conclusions() : current.conclusions(),
-                request.results() != null ? request.results() : current.results()
+                updatedSections
         );
         this.updatedAt = Instant.now();
     }
@@ -173,5 +181,11 @@ class MedicalExamImportDraft {
 
     boolean isExpired() {
         return this.expiresAt.isBefore(Instant.now());
+    }
+
+    private static ExtractedData.SectionRecord toSectionRecord(DraftSectionUpdateRequest s) {
+        return new ExtractedData.SectionRecord(
+                s.examTypeCode(), s.title(), s.reportText(), s.conclusions(),
+                s.results() != null ? s.results() : List.of());
     }
 }

@@ -1,6 +1,8 @@
 package com.healthassistant.medicalexamimport;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.medicalexamimport.api.MedicalExamImportFacade;
+import com.healthassistant.medicalexamimport.api.dto.DraftSectionResponse;
 import com.healthassistant.medicalexamimport.api.dto.ExtractedResultData;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftResponse;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftUpdateRequest;
@@ -21,7 +23,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,7 +42,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
     @Override
     public MedicalExamDraftResponse analyzeExam(String description, List<MultipartFile> files,
                                                  String deviceId) {
-        log.info("Analyzing medical exam for device {}", maskDeviceId(deviceId));
+        log.info("Analyzing medical exam for device {}", SecurityUtils.maskDeviceId(deviceId));
 
         if ((files == null || files.isEmpty()) && (description == null || description.isBlank())) {
             throw new IllegalArgumentException("At least one file or a description is required");
@@ -50,9 +51,10 @@ class MedicalExamImportService implements MedicalExamImportFacade {
         var extraction = contentExtractor.extract(description, files);
 
         if (!extraction.valid()) {
-            log.warn("AI extraction failed for device {}: {}", maskDeviceId(deviceId), extraction.errorMessage());
-            throw new MedicalExamExtractionException(
-                    extraction.errorMessage() != null ? extraction.errorMessage() : "AI could not extract medical exam data");
+            log.warn("AI extraction failed for device {}: {}",
+                    SecurityUtils.maskDeviceId(deviceId),
+                    SecurityUtils.sanitizeForLog(extraction.errorMessage()));
+            throw new MedicalExamExtractionException("AI could not extract medical exam data");
         }
 
         List<String> filenames = Optional.ofNullable(files)
@@ -62,13 +64,19 @@ class MedicalExamImportService implements MedicalExamImportFacade {
         var draft = MedicalExamImportDraft.create(deviceId, extraction, filenames);
         draftRepository.save(draft);
 
-        var storedFiles = uploadFilesToStorage(draft.getId(), extraction.examTypeCode(), files);
+        var firstSectionCode = extraction.sections().stream()
+                .map(ExtractedExamData.ExtractedSectionData::examTypeCode)
+                .filter(code -> code != null)
+                .findFirst()
+                .orElse("OTHER");
+        var storedFiles = uploadFilesToStorage(draft.getId(), firstSectionCode, files);
         if (!storedFiles.isEmpty()) {
             draft.attachStoredFiles(storedFiles);
             draftRepository.save(draft);
         }
 
-        log.info("Created medical exam import draft {} for device {}", draft.getId(), maskDeviceId(deviceId));
+        log.info("Created medical exam import draft {} ({} sections) for device {}",
+                draft.getId(), extraction.sections().size(), SecurityUtils.maskDeviceId(deviceId));
         return toDraftResponse(draft);
     }
 
@@ -90,90 +98,132 @@ class MedicalExamImportService implements MedicalExamImportFacade {
     }
 
     @Override
-    public ExaminationDetailResponse confirmDraft(UUID draftId, String deviceId, UUID relatedExaminationId) {
+    public List<ExaminationDetailResponse> confirmDraft(UUID draftId, String deviceId, UUID relatedExaminationId) {
         var draft = findDraftForDevice(draftId, deviceId);
         validateDraftEditable(draft);
 
         var data = draft.getExtractedData();
-
-        // Build CreateExaminationRequest from draft data
-        Instant performedAt = parseInstant(data.performedAt());
+        Instant performedAt = MedicalExamDateParser.parseInstant(data.performedAt());
         LocalDate examDate = resolveExamDate(data.date(), performedAt);
+
+        var sections = Optional.ofNullable(data.sections()).orElse(List.of());
+        var examinations = sections.stream()
+                .map(section -> createExamFromSection(deviceId, section, data, examDate, performedAt))
+                .toList();
+
+        linkExaminationsToEachOther(deviceId, examinations);
+
+        if (relatedExaminationId != null) {
+            examinations.forEach(exam ->
+                    medicalExamsFacade.linkExaminations(deviceId, exam.id(), relatedExaminationId));
+        }
+
+        attachStoredFilesToAll(deviceId, draft, examinations);
+
+        draft.markConfirmed();
+        draftRepository.save(draft);
+
+        log.info("Confirmed medical exam import draft {} → {} examination(s) for device {}",
+                draftId, examinations.size(), SecurityUtils.maskDeviceId(deviceId));
+
+        // Re-fetch examinations to include all created links in the response
+        return examinations.stream()
+                .map(exam -> medicalExamsFacade.getExamination(deviceId, exam.id()))
+                .toList();
+    }
+
+    private ExaminationDetailResponse createExamFromSection(
+            String deviceId,
+            MedicalExamImportDraft.ExtractedData.SectionRecord section,
+            MedicalExamImportDraft.ExtractedData sharedData,
+            LocalDate examDate, Instant performedAt) {
+
         var createRequest = new CreateExaminationRequest(
-                data.examTypeCode(),
-                data.title() != null ? data.title() : "Badanie medyczne",
+                section.examTypeCode(),
+                section.title() != null ? section.title() : "Badanie medyczne",
                 examDate,
                 performedAt,
                 null,
-                data.laboratory(),
-                data.orderingDoctor(),
+                sharedData.laboratory(),
+                sharedData.orderingDoctor(),
                 null,
-                data.reportText(),
-                data.conclusions(),
+                section.reportText(),
+                section.conclusions(),
                 null,
                 "AI_IMPORT"
         );
 
         var examination = medicalExamsFacade.createExamination(deviceId, createRequest);
 
-        // Add lab results if any
-        if (data.results() != null && !data.results().isEmpty()) {
-            var labEntries = data.results().stream()
+        var results = Optional.ofNullable(section.results()).orElse(List.of());
+        if (!results.isEmpty()) {
+            var labEntries = results.stream()
                     .map(this::toLabResultEntry)
                     .toList();
-            var addRequest = new AddLabResultsRequest(labEntries);
-            examination = medicalExamsFacade.addResults(deviceId, examination.id(), addRequest);
+            examination = medicalExamsFacade.addResults(deviceId, examination.id(), new AddLabResultsRequest(labEntries));
         }
-
-        if (relatedExaminationId != null) {
-            examination = medicalExamsFacade.linkExaminations(deviceId, examination.id(), relatedExaminationId);
-        }
-
-        // Register source documents as attachments so users can view them from UI
-        var storedFiles = draft.getStoredFiles();
-        if (storedFiles != null && !storedFiles.isEmpty()) {
-            var examId = examination.id();
-            var validFiles = storedFiles.stream()
-                    .filter(sf -> sf.storageKey() != null)
-                    .toList();
-            IntStream.range(0, validFiles.size()).forEach(i -> {
-                var sf = validFiles.get(i);
-                var storageResult = new AttachmentStorageResult(
-                        sf.storageKey(), sf.publicUrl(), null, sf.provider());
-                medicalExamsFacade.addAttachmentFromStorage(
-                        deviceId, examId,
-                        sf.filename(), sf.contentType(), sf.fileSize(),
-                        storageResult,
-                        i == 0);
-            });
-        }
-
-        draft.markConfirmed();
-        draftRepository.save(draft);
-
-        log.info("Confirmed medical exam import draft {} → examination {} for device {}",
-                draftId, examination.id(), maskDeviceId(deviceId));
 
         return examination;
+    }
+
+    private void linkExaminationsToEachOther(String deviceId, List<ExaminationDetailResponse> examinations) {
+        if (examinations.size() < 2) return;
+        // O(n²) pair linking — acceptable for typical section counts (3-5 per document)
+        var examIds = examinations.stream().map(ExaminationDetailResponse::id).toList();
+        IntStream.range(0, examIds.size())
+                .forEach(i -> IntStream.range(i + 1, examIds.size())
+                        .forEach(j -> medicalExamsFacade.linkExaminations(deviceId, examIds.get(i), examIds.get(j))));
+    }
+
+    private void attachStoredFilesToAll(String deviceId, MedicalExamImportDraft draft,
+                                        List<ExaminationDetailResponse> examinations) {
+        var storedFiles = draft.getStoredFiles();
+        if (storedFiles == null || storedFiles.isEmpty()) return;
+
+        var validFiles = storedFiles.stream()
+                .filter(sf -> sf.storageKey() != null)
+                .toList();
+        if (validFiles.isEmpty()) return;
+
+        examinations.forEach(exam -> {
+            var first = validFiles.getFirst();
+            medicalExamsFacade.addAttachmentFromStorage(
+                    deviceId, exam.id(),
+                    first.filename(), first.contentType(), first.fileSize(),
+                    new AttachmentStorageResult(first.storageKey(), first.publicUrl(), null, first.provider()),
+                    true);
+            validFiles.stream().skip(1).forEach(sf ->
+                    medicalExamsFacade.addAttachmentFromStorage(
+                            deviceId, exam.id(),
+                            sf.filename(), sf.contentType(), sf.fileSize(),
+                            new AttachmentStorageResult(sf.storageKey(), sf.publicUrl(), null, sf.provider()),
+                            false));
+        });
     }
 
     private List<MedicalExamImportDraft.StoredFile> uploadFilesToStorage(
             UUID draftId, String examTypeCode, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) return List.of();
-        var stored = new ArrayList<MedicalExamImportDraft.StoredFile>();
-        files.forEach(file -> {
-            try {
-                var result = fileStorageService.store(
-                        draftId, examTypeCode,
-                        file.getOriginalFilename(), file.getContentType(), file.getBytes());
-                stored.add(new MedicalExamImportDraft.StoredFile(
-                        result.storageKey(), result.publicUrl(), result.provider(),
-                        file.getOriginalFilename(), file.getContentType(), file.getSize()));
-            } catch (IOException e) {
-                log.warn("Failed to upload file {} to storage: {}", file.getOriginalFilename(), e.getMessage());
-            }
-        });
-        return stored;
+        return files.stream()
+                .map(file -> uploadSingleFile(draftId, examTypeCode, file))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    private Optional<MedicalExamImportDraft.StoredFile> uploadSingleFile(
+            UUID draftId, String examTypeCode, MultipartFile file) {
+        try {
+            var result = fileStorageService.store(
+                    draftId, examTypeCode,
+                    file.getOriginalFilename(), file.getContentType(), file.getBytes());
+            return Optional.of(new MedicalExamImportDraft.StoredFile(
+                    result.storageKey(), result.publicUrl(), result.provider(),
+                    file.getOriginalFilename(), file.getContentType(), file.getSize()));
+        } catch (IOException e) {
+            log.warn("Failed to upload file {} to storage: {}",
+                    SecurityUtils.sanitizeForLog(file.getOriginalFilename()), e.getMessage());
+            return Optional.empty();
+        }
     }
 
     private MedicalExamImportDraft findDraftForDevice(UUID draftId, String deviceId) {
@@ -207,52 +257,30 @@ class MedicalExamImportService implements MedicalExamImportFacade {
 
     private MedicalExamDraftResponse toDraftResponse(MedicalExamImportDraft draft) {
         var data = draft.getExtractedData();
-        return new MedicalExamDraftResponse(
+        var sections = Optional.ofNullable(data.sections()).orElse(List.of()).stream()
+                .map(s -> new DraftSectionResponse(
+                        s.examTypeCode(), s.title(), s.reportText(), s.conclusions(),
+                        Optional.ofNullable(s.results()).orElse(List.of())))
+                .toList();
+
+        return MedicalExamDraftResponse.success(
                 draft.getId(),
-                data.examTypeCode(),
-                data.title(),
-                parseLocalDate(data.date()),
-                parseInstant(data.performedAt()),
+                MedicalExamDateParser.parseLocalDate(data.date()),
+                MedicalExamDateParser.parseInstant(data.performedAt()),
                 data.laboratory(),
                 data.orderingDoctor(),
-                data.reportText(),
-                data.conclusions(),
-                data.results() != null ? data.results() : List.of(),
+                sections,
                 draft.getAiConfidence(),
                 draft.getStatus().name(),
-                draft.getExpiresAt(),
-                null
+                draft.getExpiresAt()
         );
     }
 
     private LocalDate resolveExamDate(String dateStr, Instant performedAt) {
-        LocalDate parsed = parseLocalDate(dateStr);
+        LocalDate parsed = MedicalExamDateParser.parseLocalDate(dateStr);
         if (parsed != null) return parsed;
         if (performedAt != null) return performedAt.atZone(ZoneId.of("Europe/Warsaw")).toLocalDate();
         log.warn("No exam date available in draft — falling back to today");
         return LocalDate.now(ZoneId.of("Europe/Warsaw"));
-    }
-
-    private LocalDate parseLocalDate(String value) {
-        if (value == null || value.isBlank()) return null;
-        try {
-            return LocalDate.parse(value);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private Instant parseInstant(String value) {
-        if (value == null || value.isBlank()) return null;
-        try {
-            return Instant.parse(value);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String maskDeviceId(String deviceId) {
-        if (deviceId == null || deviceId.length() <= 8) return "****";
-        return deviceId.substring(0, 4) + "****" + deviceId.substring(deviceId.length() - 4);
     }
 }

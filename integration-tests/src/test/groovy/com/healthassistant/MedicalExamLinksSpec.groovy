@@ -22,15 +22,20 @@ class MedicalExamLinksSpec extends BaseIntegrationSpec {
     {
       "isMedicalReport": true,
       "confidence": 0.95,
-      "examTypeCode": "MORPHOLOGY",
-      "title": "Morfologia krwi - AI",
+      "date": null,
       "performedAt": "2025-03-15T09:00:00Z",
       "laboratory": "Diagnostyka",
       "orderingDoctor": null,
-      "reportText": null,
-      "conclusions": null,
       "validationError": null,
-      "results": []
+      "sections": [
+        {
+          "examTypeCode": "MORPHOLOGY",
+          "title": "Morfologia krwi - AI",
+          "reportText": null,
+          "conclusions": null,
+          "results": []
+        }
+      ]
     }
     '''
 
@@ -289,11 +294,14 @@ class MedicalExamLinksSpec extends BaseIntegrationSpec {
 
         then: "examination is created with 201"
         response.statusCode() == 201
-        def newExamId = response.jsonPath().getString("id")
+        def exams = response.jsonPath().getList(".")
+        exams.size() == 1
+        def newExam = exams[0]
+        def newExamId = newExam.id as String
         newExamId != null
 
         and: "new examination shows the existing exam in linkedExaminations"
-        def linked = response.jsonPath().getList("linkedExaminations")
+        def linked = newExam.linkedExaminations as List
         linked.size() == 1
         linked[0].id == existingExamId
 

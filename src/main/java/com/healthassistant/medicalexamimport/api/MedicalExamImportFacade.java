@@ -16,5 +16,5 @@ public interface MedicalExamImportFacade {
 
     MedicalExamDraftResponse updateDraft(UUID draftId, MedicalExamDraftUpdateRequest request, String deviceId);
 
-    ExaminationDetailResponse confirmDraft(UUID draftId, String deviceId, UUID relatedExaminationId);
+    List<ExaminationDetailResponse> confirmDraft(UUID draftId, String deviceId, UUID relatedExaminationId);
 }

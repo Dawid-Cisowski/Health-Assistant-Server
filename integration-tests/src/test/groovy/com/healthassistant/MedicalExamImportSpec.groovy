@@ -16,64 +16,130 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
     static final String IMPORT_BASE = "/v1/medical-exams/import"
     static final String EXAMS_BASE = "/v1/medical-exams"
 
-    // Valid mock AI response for morphology
+    // Valid mock AI response for morphology (multi-section format)
     static final String MORPHOLOGY_AI_RESPONSE = '''
     {
       "isMedicalReport": true,
       "confidence": 0.95,
-      "examTypeCode": "MORPHOLOGY",
-      "title": "Morfologia krwi - Diagnostyka",
+      "date": null,
       "performedAt": "2025-03-15T09:00:00Z",
       "laboratory": "Diagnostyka",
       "orderingDoctor": "Dr. Kowalski",
-      "reportText": null,
-      "conclusions": "Wyniki w normie",
       "validationError": null,
-      "results": [
+      "sections": [
         {
-          "markerCode": "WBC",
-          "markerName": "Leukocyty",
-          "category": "MORPHOLOGY",
-          "valueNumeric": 6.8,
-          "unit": "tys/ul",
-          "originalValueNumeric": 6.8,
-          "originalUnit": "tys/ul",
-          "conversionApplied": false,
-          "refRangeLow": 4.0,
-          "refRangeHigh": 10.0,
-          "refRangeText": "4.0-10.0",
-          "valueText": null,
-          "sortOrder": 0
+          "examTypeCode": "MORPHOLOGY",
+          "title": "Morfologia krwi - Diagnostyka",
+          "reportText": null,
+          "conclusions": "Wyniki w normie",
+          "results": [
+            {
+              "markerCode": "WBC",
+              "markerName": "Leukocyty",
+              "category": "MORPHOLOGY",
+              "valueNumeric": 6.8,
+              "unit": "tys/ul",
+              "originalValueNumeric": 6.8,
+              "originalUnit": "tys/ul",
+              "conversionApplied": false,
+              "refRangeLow": 4.0,
+              "refRangeHigh": 10.0,
+              "refRangeText": "4.0-10.0",
+              "valueText": null,
+              "sortOrder": 0
+            },
+            {
+              "markerCode": "RBC",
+              "markerName": "Erytrocyty",
+              "category": "MORPHOLOGY",
+              "valueNumeric": 4.8,
+              "unit": "mln/ul",
+              "originalValueNumeric": 4.8,
+              "originalUnit": "mln/ul",
+              "conversionApplied": false,
+              "refRangeLow": 4.2,
+              "refRangeHigh": 5.4,
+              "refRangeText": "4.2-5.4",
+              "valueText": null,
+              "sortOrder": 1
+            },
+            {
+              "markerCode": "HGB",
+              "markerName": "Hemoglobina",
+              "category": "MORPHOLOGY",
+              "valueNumeric": 14.2,
+              "unit": "g/dl",
+              "originalValueNumeric": 14.2,
+              "originalUnit": "g/dl",
+              "conversionApplied": false,
+              "refRangeLow": 12.0,
+              "refRangeHigh": 18.0,
+              "refRangeText": "12.0-18.0",
+              "valueText": null,
+              "sortOrder": 2
+            }
+          ]
+        }
+      ]
+    }
+    '''
+
+    // Multi-section AI response: morphology + urine
+    static final String MULTI_SECTION_AI_RESPONSE = '''
+    {
+      "isMedicalReport": true,
+      "confidence": 0.92,
+      "date": "2025-04-10",
+      "performedAt": "2025-04-10T07:30:00Z",
+      "laboratory": "Synevo",
+      "orderingDoctor": null,
+      "validationError": null,
+      "sections": [
+        {
+          "examTypeCode": "MORPHOLOGY",
+          "title": "Morfologia krwi",
+          "reportText": null,
+          "conclusions": "Wyniki w normie",
+          "results": [
+            {
+              "markerCode": "WBC",
+              "markerName": "Leukocyty",
+              "category": "MORPHOLOGY",
+              "valueNumeric": 5.5,
+              "unit": "tys/ul",
+              "originalValueNumeric": 5.5,
+              "originalUnit": "tys/ul",
+              "conversionApplied": false,
+              "refRangeLow": 4.0,
+              "refRangeHigh": 10.0,
+              "refRangeText": "4.0-10.0",
+              "valueText": null,
+              "sortOrder": 0
+            }
+          ]
         },
         {
-          "markerCode": "RBC",
-          "markerName": "Erytrocyty",
-          "category": "MORPHOLOGY",
-          "valueNumeric": 4.8,
-          "unit": "mln/ul",
-          "originalValueNumeric": 4.8,
-          "originalUnit": "mln/ul",
-          "conversionApplied": false,
-          "refRangeLow": 4.2,
-          "refRangeHigh": 5.4,
-          "refRangeText": "4.2-5.4",
-          "valueText": null,
-          "sortOrder": 1
-        },
-        {
-          "markerCode": "HGB",
-          "markerName": "Hemoglobina",
-          "category": "MORPHOLOGY",
-          "valueNumeric": 14.2,
-          "unit": "g/dl",
-          "originalValueNumeric": 14.2,
-          "originalUnit": "g/dl",
-          "conversionApplied": false,
-          "refRangeLow": 12.0,
-          "refRangeHigh": 18.0,
-          "refRangeText": "12.0-18.0",
-          "valueText": null,
-          "sortOrder": 2
+          "examTypeCode": "URINE",
+          "title": "Badanie ogólne moczu",
+          "reportText": null,
+          "conclusions": null,
+          "results": [
+            {
+              "markerCode": "PH_URINE",
+              "markerName": "pH moczu",
+              "category": "URINE",
+              "valueNumeric": 6.5,
+              "unit": null,
+              "originalValueNumeric": 6.5,
+              "originalUnit": null,
+              "conversionApplied": false,
+              "refRangeLow": 5.0,
+              "refRangeHigh": 8.0,
+              "refRangeText": "5.0-8.0",
+              "valueText": null,
+              "sortOrder": 0
+            }
+          ]
         }
       ]
     }
@@ -84,29 +150,34 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
     {
       "isMedicalReport": true,
       "confidence": 0.92,
-      "examTypeCode": "LIPID_PANEL",
-      "title": "Lipidogram",
+      "date": null,
       "performedAt": "2025-03-20T08:30:00Z",
       "laboratory": "Synevo",
       "orderingDoctor": null,
-      "reportText": null,
-      "conclusions": null,
       "validationError": null,
-      "results": [
+      "sections": [
         {
-          "markerCode": "CHOL",
-          "markerName": "Cholesterol całkowity",
-          "category": "LIPID_PANEL",
-          "valueNumeric": 193.35,
-          "unit": "mg/dL",
-          "originalValueNumeric": 5.0,
-          "originalUnit": "mmol/L",
-          "conversionApplied": true,
-          "refRangeLow": null,
-          "refRangeHigh": 200.0,
-          "refRangeText": "<200",
-          "valueText": null,
-          "sortOrder": 0
+          "examTypeCode": "LIPID_PANEL",
+          "title": "Lipidogram",
+          "reportText": null,
+          "conclusions": null,
+          "results": [
+            {
+              "markerCode": "CHOL",
+              "markerName": "Cholesterol całkowity",
+              "category": "LIPID_PANEL",
+              "valueNumeric": 193.35,
+              "unit": "mg/dL",
+              "originalValueNumeric": 5.0,
+              "originalUnit": "mmol/L",
+              "conversionApplied": true,
+              "refRangeLow": null,
+              "refRangeHigh": 200.0,
+              "refRangeText": "<200",
+              "valueText": null,
+              "sortOrder": 0
+            }
+          ]
         }
       ]
     }
@@ -116,15 +187,8 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
     {
       "isMedicalReport": false,
       "confidence": 0.10,
-      "examTypeCode": null,
-      "title": null,
-      "performedAt": null,
-      "laboratory": null,
-      "orderingDoctor": null,
-      "reportText": null,
-      "conclusions": null,
       "validationError": "Document is not a medical report",
-      "results": []
+      "sections": []
     }
     '''
 
@@ -151,12 +215,12 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
         def body = response.jsonPath()
         body.getString("draftId") != null
-        body.getString("examTypeCode") == "MORPHOLOGY"
-        body.getString("title") == "Morfologia krwi - Diagnostyka"
+        body.getString("sections[0].examTypeCode") == "MORPHOLOGY"
+        body.getString("sections[0].title") == "Morfologia krwi - Diagnostyka"
         body.getString("laboratory") == "Diagnostyka"
         body.getString("status") == "PENDING"
         body.getString("expiresAt") != null
-        body.getList("results").size() == 3
+        body.getList("sections[0].results").size() == 3
         body.getFloat("confidence") >= 0.9f
     }
 
@@ -172,7 +236,7 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
 
         then: "results are extracted with marker codes"
         response.statusCode() == 200
-        def results = response.jsonPath().getList("results")
+        def results = response.jsonPath().getList("sections[0].results")
         results.size() == 3
         results[0].markerCode == "WBC"
         results[0].valueNumeric == 6.8f
@@ -193,7 +257,7 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
 
         then: "draft contains converted values"
         response.statusCode() == 200
-        def results = response.jsonPath().getList("results")
+        def results = response.jsonPath().getList("sections[0].results")
         results.size() == 1
         results[0].markerCode == "CHOL"
         results[0].conversionApplied == true
@@ -272,9 +336,7 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
         def updatePath = "${IMPORT_BASE}/${draftId}"
         def updateBody = """
         {
-            "title": "Morfologia - Synevo",
-            "laboratory": "Synevo",
-            "conclusions": "Wyniki prawidłowe"
+            "laboratory": "Synevo"
         }
         """
         def response = RestAssured.given()
@@ -308,12 +370,46 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
 
         then: "examination is created with 201"
         response.statusCode() == 201
-        def body = response.jsonPath()
-        body.getString("id") != null
-        body.getString("examTypeCode") == "MORPHOLOGY"
-        body.getString("title") == "Morfologia krwi - Diagnostyka"
-        body.getString("source") == "AI_IMPORT"
-        body.getList("results").size() == 3
+        def exams = response.jsonPath().getList(".")
+        exams.size() == 1
+        def exam = exams[0]
+        exam.id != null
+        exam.examTypeCode == "MORPHOLOGY"
+        exam.title == "Morfologia krwi - Diagnostyka"
+        exam.source == "AI_IMPORT"
+        (exam.results as List).size() == 3
+    }
+
+    def "should confirm multi-section draft and create multiple examinations"() {
+        given: "AI returns a two-section response (morphology + urine)"
+        TestChatModelConfiguration.setResponse(MULTI_SECTION_AI_RESPONSE)
+        def createResponse = authenticatedPostRequest(DEVICE_ID, TEST_SECRET_BASE64, ANALYZE_ENDPOINT)
+                .contentType(ContentType.MULTIPART)
+                .multiPart("description", "Morfologia i mocz")
+                .post(ANALYZE_ENDPOINT)
+        def draftId = createResponse.jsonPath().getString("draftId")
+
+        when: "confirming the draft"
+        def confirmPath = "${IMPORT_BASE}/${draftId}/confirm"
+        def response = authenticatedPostRequest(DEVICE_ID, TEST_SECRET_BASE64, confirmPath)
+                .post(confirmPath)
+
+        then: "two examinations are created with 201"
+        response.statusCode() == 201
+        def exams = response.jsonPath().getList(".")
+        exams.size() == 2
+        def morphExam = exams.find { it.examTypeCode == "MORPHOLOGY" }
+        def urineExam = exams.find { it.examTypeCode == "URINE" }
+        morphExam != null
+        urineExam != null
+        morphExam.source == "AI_IMPORT"
+        urineExam.source == "AI_IMPORT"
+        (morphExam.results as List).size() == 1
+        (urineExam.results as List).size() == 1
+
+        and: "both examinations share the same laboratory"
+        morphExam.laboratory == "Synevo"
+        urineExam.laboratory == "Synevo"
     }
 
     def "should return 409 when confirming already confirmed draft"() {
@@ -372,12 +468,11 @@ class MedicalExamImportSpec extends BaseIntegrationSpec {
         def confirmPath = "${IMPORT_BASE}/${draftId}/confirm"
         def confirmResponse = authenticatedPostRequest(DEVICE_ID, TEST_SECRET_BASE64, confirmPath)
                 .post(confirmPath)
-        def examId = confirmResponse.jsonPath().getString("id")
+        def examId = confirmResponse.jsonPath().getList(".")[0].id as String
 
         // Step 3: verify exam appears in list
         def listResponse = authenticatedGetRequest(DEVICE_ID, TEST_SECRET_BASE64, EXAMS_BASE)
                 .get(EXAMS_BASE)
-        def exams = listResponse.jsonPath().getList("id")
 
         then: "exam is created and retrievable"
         analyzeResponse.statusCode() == 200

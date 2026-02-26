@@ -56,11 +56,14 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
         when: "analyzing the morphology image"
         def response = analyzeExamWithFile(imageBytes, "morphology.png")
 
-        then: "exam type is correctly identified as MORPHOLOGY"
+        then: "exam type is correctly identified as MORPHOLOGY in first section"
         response.statusCode() == 200
         def body = response.body().jsonPath()
         println "DEBUG: E-MED-01 response: ${response.body().asString()?.take(300)}"
-        body.getString("examTypeCode") == "MORPHOLOGY"
+        def sections = body.getList("sections")
+        sections.size() >= 1
+        def morphSection = sections.find { it.examTypeCode == "MORPHOLOGY" }
+        morphSection != null
         body.getString("status") == "PENDING"
         body.getFloat("confidence") >= 0.7f
         body.getString("draftId") != null
@@ -75,7 +78,10 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
 
         then: "WBC marker is extracted with value close to 4.18"
         response.statusCode() == 200
-        def results = response.body().jsonPath().getList("results")
+        def sections = response.body().jsonPath().getList("sections")
+        def morphSection = sections.find { it.examTypeCode == "MORPHOLOGY" }
+        morphSection != null
+        def results = morphSection.results as List
         def markerCodes = results.collect { it.markerCode }
         println "DEBUG: E-MED-02 extracted markers: ${markerCodes}"
 
@@ -96,7 +102,10 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
 
         then: "RBC is extracted with value around 3.32 and reference range"
         response.statusCode() == 200
-        def results = response.body().jsonPath().getList("results")
+        def sections = response.body().jsonPath().getList("sections")
+        def morphSection = sections.find { it.examTypeCode == "MORPHOLOGY" }
+        morphSection != null
+        def results = morphSection.results as List
 
         def rbc = results.find { it.markerCode == "RBC" }
         rbc != null
@@ -118,7 +127,10 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
 
         then: "sufficient number of markers are extracted"
         response.statusCode() == 200
-        def results = response.body().jsonPath().getList("results")
+        def sections = response.body().jsonPath().getList("sections")
+        def morphSection = sections.find { it.examTypeCode == "MORPHOLOGY" }
+        morphSection != null
+        def results = morphSection.results as List
         println "DEBUG: E-MED-04 extracted ${results.size()} markers: ${results.collect { it.markerCode }}"
         results.size() >= 15
     }
@@ -132,7 +144,10 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
 
         then: "PLT is extracted with value around 266"
         response.statusCode() == 200
-        def results = response.body().jsonPath().getList("results")
+        def sections = response.body().jsonPath().getList("sections")
+        def morphSection = sections.find { it.examTypeCode == "MORPHOLOGY" }
+        morphSection != null
+        def results = morphSection.results as List
 
         def plt = results.find { it.markerCode == "PLT" }
         plt != null
@@ -149,29 +164,33 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
         when: "step 1 - analyze the image"
         def analyzeResponse = analyzeExamWithFile(imageBytes, "morphology.png")
 
-        then: "draft is created successfully"
+        then: "draft is created successfully with MORPHOLOGY section"
         analyzeResponse.statusCode() == 200
         def draftId = analyzeResponse.body().jsonPath().getString("draftId")
         draftId != null
-        analyzeResponse.body().jsonPath().getString("examTypeCode") == "MORPHOLOGY"
+        def sections = analyzeResponse.body().jsonPath().getList("sections")
+        sections.find { it.examTypeCode == "MORPHOLOGY" } != null
 
         when: "step 2 - confirm the draft"
         def confirmPath = "${IMPORT_BASE}/${draftId}/confirm"
         def confirmResponse = authenticatedPost(confirmPath)
 
-        then: "examination is created with AI_IMPORT source and lab results"
+        then: "examinations are created with AI_IMPORT source and lab results"
         confirmResponse.statusCode() == 201
-        def examBody = confirmResponse.body().jsonPath()
-        println "DEBUG: E-MED-06 confirmed exam: ${confirmResponse.body().asString()?.take(300)}"
-        def examId = examBody.getString("id")
-        examId != null
-        examBody.getString("examTypeCode") == "MORPHOLOGY"
-        examBody.getString("source") == "AI_IMPORT"
-        def savedResults = examBody.getList("results")
+        def exams = confirmResponse.body().jsonPath().getList(".")
+        println "DEBUG: E-MED-06 confirmed exams count: ${exams.size()}"
+        exams.size() >= 1
+        def morphExam = exams.find { it.examTypeCode == "MORPHOLOGY" }
+        println "DEBUG: E-MED-06 confirmed exam: ${morphExam}"
+        morphExam != null
+        morphExam.id != null
+        morphExam.source == "AI_IMPORT"
+        def savedResults = morphExam.results as List
         println "DEBUG: E-MED-06 saved ${savedResults.size()} results"
         savedResults.size() >= 10
 
         when: "step 3 - query exam details from GET endpoint"
+        def examId = morphExam.id as String
         def detailPath = "${EXAMS_BASE}/${examId}"
         def detailResponse = authenticatedGet(detailPath)
 
@@ -194,7 +213,10 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
         response.statusCode() == 200
         def body = response.body().jsonPath()
         println "DEBUG: E-MED-07 USG response: ${response.body().asString()}"
-        body.getString("examTypeCode") == "ABDOMINAL_USG"
+        def sections = body.getList("sections")
+        sections.size() >= 1
+        def usgSection = sections.find { it.examTypeCode == "ABDOMINAL_USG" }
+        usgSection != null
         body.getString("status") == "PENDING"
         body.getFloat("confidence") >= 0.6f
     }
@@ -208,8 +230,10 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
 
         then: "report text is extracted and contains organ findings"
         response.statusCode() == 200
-        def body = response.body().jsonPath()
-        def reportText = body.getString("reportText")
+        def sections = response.body().jsonPath().getList("sections")
+        def usgSection = sections.find { it.examTypeCode == "ABDOMINAL_USG" }
+        usgSection != null
+        def reportText = usgSection.reportText as String
         println "DEBUG: E-MED-08 reportText (${reportText?.length()} chars): ${reportText?.take(200)}"
         // Report text must be present and contain meaningful content
         reportText != null
@@ -225,18 +249,20 @@ class AiMedicalExamImportEvalSpec extends BaseEvaluationSpec {
 
         then: "results[] is empty — all findings are in reportText and conclusions"
         response.statusCode() == 200
-        def body = response.body().jsonPath()
-        def results = body.getList("results")
+        def sections = response.body().jsonPath().getList("sections")
+        def usgSection = sections.find { it.examTypeCode == "ABDOMINAL_USG" }
+        usgSection != null
+        def results = usgSection.results as List
         println "DEBUG: E-MED-09 USG results count: ${results.size()}"
         results.size() == 0
 
         and: "reportText contains full descriptive findings"
-        def reportText = body.getString("reportText")
+        def reportText = usgSection.reportText as String
         println "DEBUG: E-MED-09 reportText (${reportText?.length()} chars): ${reportText?.take(100)}"
         reportText != null && reportText.length() > 30
 
         and: "conclusions contains a summary"
-        def conclusions = body.getString("conclusions")
+        def conclusions = usgSection.conclusions as String
         println "DEBUG: E-MED-09 conclusions: ${conclusions?.take(200)}"
         conclusions != null && conclusions.length() > 10
     }
