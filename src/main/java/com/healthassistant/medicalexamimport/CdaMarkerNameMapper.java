@@ -147,7 +147,7 @@ final class CdaMarkerNameMapper {
     static String normalize(String name) {
         if (name == null) return "";
         // Strip "(ICD-9: XXX)" suffix (case-insensitive match)
-        String stripped = name.replaceAll("(?i)\\s*\\(ICD-9:[^)]*\\)\\s*", "").trim();
+        String stripped = name.replaceAll("(?i)\\s*+\\(ICD-9:[^)]*+\\)\\s*+", "").trim();
         return stripped.toLowerCase(Locale.ROOT).trim();
     }
 }
