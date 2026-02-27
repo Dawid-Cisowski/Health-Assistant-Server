@@ -174,7 +174,9 @@ abstract class BaseIntegrationSpec extends Specification {
             "test-medical-exams", "test-medical-exam-import", "test-medical-attach",
             "test-medical-links",
             // CDA import specs
-            "test-cda-import"
+            "test-cda-import",
+            // Section interpretation specs
+            "test-section-interp"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true

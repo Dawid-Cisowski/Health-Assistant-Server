@@ -41,6 +41,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
     private final CdaExamExtractor cdaExamExtractor;
     private final MedicalExamsFacade medicalExamsFacade;
     private final FileStorageService fileStorageService;
+    private final MedicalExamSectionInterpreter sectionInterpreter;
 
     @Override
     public MedicalExamDraftResponse analyzeExam(String description, List<MultipartFile> files,
@@ -66,7 +67,8 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                 .map(f -> f.stream().map(MultipartFile::getOriginalFilename).toList())
                 .orElse(List.of());
 
-        var draft = MedicalExamImportDraft.create(deviceId, extraction, filenames);
+        var interpretations = sectionInterpreter.interpretSections(extraction.sections());
+        var draft = MedicalExamImportDraft.create(deviceId, extraction, filenames, interpretations);
         draftRepository.save(draft);
 
         var firstSectionCode = extraction.sections().stream()

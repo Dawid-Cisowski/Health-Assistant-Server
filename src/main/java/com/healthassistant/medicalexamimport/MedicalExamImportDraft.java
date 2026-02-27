@@ -14,7 +14,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 @Entity
 @Table(name = "medical_exam_import_drafts", indexes = {
@@ -131,15 +133,23 @@ class MedicalExamImportDraft {
     }
 
     static MedicalExamImportDraft create(String deviceId, ExtractedExamData extraction,
-                                         List<String> originalFilenames) {
+                                         List<String> originalFilenames,
+                                         List<String> aiInterpretations) {
         var draft = new MedicalExamImportDraft();
         draft.deviceId = deviceId;
         draft.originalFilenames = originalFilenames;
         draft.aiConfidence = extraction.confidence();
 
-        var sections = extraction.sections().stream()
-                .map(s -> new ExtractedData.SectionRecord(
-                        s.examTypeCode(), s.title(), s.reportText(), s.conclusions(), s.results()))
+        var sectionsList = extraction.sections();
+        var interpretations = Optional.ofNullable(aiInterpretations).orElse(List.of());
+        var sections = IntStream.range(0, sectionsList.size())
+                .mapToObj(i -> {
+                    var s = sectionsList.get(i);
+                    var aiConclusion = i < interpretations.size() ? interpretations.get(i) : null;
+                    var conclusions = aiConclusion != null ? aiConclusion : s.conclusions();
+                    return new ExtractedData.SectionRecord(
+                            s.examTypeCode(), s.title(), s.reportText(), conclusions, s.results());
+                })
                 .toList();
 
         draft.extractedData = new ExtractedData(

@@ -19,14 +19,20 @@ class TestChatModelConfiguration {
     // Shared state using AtomicReference for thread-safe cross-thread access
     private static final AtomicReference<String> CONFIGURED_RESPONSE = new AtomicReference<>("Test response")
     private static final AtomicInteger CALL_COUNT = new AtomicInteger(0)
+    private static final java.util.concurrent.atomic.AtomicBoolean SHOULD_THROW = new java.util.concurrent.atomic.AtomicBoolean(false)
 
     static void setResponse(String response) {
         CONFIGURED_RESPONSE.set(response)
     }
 
+    static void setThrowOnAllCalls() {
+        SHOULD_THROW.set(true)
+    }
+
     static void resetResponse() {
         CONFIGURED_RESPONSE.set("Test response")
         CALL_COUNT.set(0)
+        SHOULD_THROW.set(false)
     }
 
     static int getCallCount() {
@@ -44,6 +50,9 @@ class TestChatModelConfiguration {
             @Override
             ChatResponse call(Prompt prompt) {
                 CALL_COUNT.incrementAndGet()
+                if (SHOULD_THROW.get()) {
+                    throw new RuntimeException("Simulated AI failure for testing graceful degradation")
+                }
                 String response = CONFIGURED_RESPONSE.get()
                 return new ChatResponse([new Generation(new AssistantMessage(response))])
             }
@@ -51,6 +60,9 @@ class TestChatModelConfiguration {
             @Override
             Flux<ChatResponse> stream(Prompt prompt) {
                 CALL_COUNT.incrementAndGet()
+                if (SHOULD_THROW.get()) {
+                    throw new RuntimeException("Simulated AI failure for testing graceful degradation")
+                }
                 String response = CONFIGURED_RESPONSE.get()
                 String[] words = response.split("(?<=\\s)")
                 if (words.length <= 1) {
