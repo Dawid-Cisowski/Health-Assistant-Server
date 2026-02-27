@@ -37,7 +37,7 @@ class CdaExamExtractor {
     private static final DateTimeFormatter CDA_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter CDA_DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    private record RawEntry(String examTypeCode, String sectionTitle, List<ExtractedResultData> results) {}
+    private record RawEntry(String icd9Code, String examTypeCode, String sectionTitle, List<ExtractedResultData> results) {}
 
     ExtractedExamData extract(byte[] cdaBytes) {
         try {
@@ -108,30 +108,37 @@ class CdaExamExtractor {
     }
 
     private List<ExtractedExamData.ExtractedSectionData> buildSections(Document doc) {
-        // Use LinkedHashMap to preserve document order; merge results from same exam type
+        // Group by ICD-9 code to preserve individual test identity (e.g. VIT_B12 vs VIT_D as separate exams)
         Map<String, List<ExtractedResultData>> grouped = new LinkedHashMap<>();
         Map<String, String> titles = new LinkedHashMap<>();
+        Map<String, String> examTypes = new LinkedHashMap<>();
 
         nodeListToStream(doc.getElementsByTagNameNS("*", "entry"))
                 .filter(e -> "COMP".equals(e.getAttribute("typeCode")))
                 .map(this::parseEntry)
                 .filter(Objects::nonNull)
                 .forEach(raw -> {
-                    grouped.merge(raw.examTypeCode(), raw.results(), (existing, incoming) -> {
+                    grouped.merge(raw.icd9Code(), raw.results(), (existing, incoming) -> {
                         var merged = new java.util.ArrayList<>(existing);
                         merged.addAll(incoming);
                         return merged;
                     });
-                    titles.putIfAbsent(raw.examTypeCode(), raw.sectionTitle());
+                    titles.putIfAbsent(raw.icd9Code(), raw.sectionTitle());
+                    examTypes.putIfAbsent(raw.icd9Code(), raw.examTypeCode());
                 });
 
         return grouped.entrySet().stream()
                 .map(e -> new ExtractedExamData.ExtractedSectionData(
-                        e.getKey(),
-                        titles.get(e.getKey()),
+                        examTypes.get(e.getKey()),
+                        stripIcd9Suffix(titles.get(e.getKey())),
                         null, null,
                         e.getValue()))
                 .toList();
+    }
+
+    private String stripIcd9Suffix(String title) {
+        if (title == null) return null;
+        return title.replaceAll("(?i)\\s*+\\(ICD-9:[^)]*+\\)\\s*+", "").trim();
     }
 
     private RawEntry parseEntry(Element entry) {
@@ -156,7 +163,7 @@ class CdaExamExtractor {
         if (directChildren(outerObs, "value").findFirst().isPresent()) {
             ExtractedResultData result = parseMarker(outerObs, examTypeCode, 0);
             if (result == null) return null;
-            return new RawEntry(examTypeCode, sectionTitle, List.of(result));
+            return new RawEntry(icd9Code, examTypeCode, sectionTitle, List.of(result));
         }
 
         // Structure B: multi-marker section — values in entryRelationships
@@ -171,7 +178,7 @@ class CdaExamExtractor {
                 .filter(Objects::nonNull)
                 .toList();
 
-        return new RawEntry(examTypeCode, sectionTitle, results);
+        return new RawEntry(icd9Code, examTypeCode, sectionTitle, results);
     }
 
     private ExtractedResultData parseMarker(Element markerObs, String examTypeCode, int sortOrder) {

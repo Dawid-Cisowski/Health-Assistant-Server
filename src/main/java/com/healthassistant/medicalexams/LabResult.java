@@ -140,6 +140,20 @@ class LabResult {
             this.valueNumeric = this.valueNumeric.multiply(conversionFactor).setScale(4, RoundingMode.HALF_UP);
             this.unit = standardUnit;
             this.conversionApplied = true;
+            if (this.refRangeLow != null) {
+                this.refRangeLow = this.refRangeLow.multiply(conversionFactor).setScale(4, RoundingMode.HALF_UP);
+            }
+            if (this.refRangeHigh != null) {
+                this.refRangeHigh = this.refRangeHigh.multiply(conversionFactor).setScale(4, RoundingMode.HALF_UP);
+            }
+            if (this.refRangeLow != null && this.refRangeHigh != null) {
+                this.refRangeText = this.refRangeLow.stripTrailingZeros().toPlainString()
+                        + " - " + this.refRangeHigh.stripTrailingZeros().toPlainString();
+            } else if (this.refRangeLow != null) {
+                this.refRangeText = ">= " + this.refRangeLow.stripTrailingZeros().toPlainString();
+            } else if (this.refRangeHigh != null) {
+                this.refRangeText = "<= " + this.refRangeHigh.stripTrailingZeros().toPlainString();
+            }
             this.flag = calculateFlag(this.valueNumeric, this.refRangeLow, this.refRangeHigh,
                     this.defaultRefRangeLow, this.defaultRefRangeHigh);
             this.updatedAt = Instant.now();

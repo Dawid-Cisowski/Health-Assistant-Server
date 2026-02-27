@@ -32,6 +32,7 @@ final class CdaMarkerNameMapper {
             Map.entry("leukocyty", "WBC"),
             // Coagulation
             Map.entry("inr", "INR"),
+            Map.entry("pt (inr)", "INR"),
             Map.entry("wskaźnik protrombiny (quicka)", "PT_PERCENT"),
             Map.entry("czas protrombinowy", "PT"),
             Map.entry("aptt", "APTT"),
@@ -60,6 +61,8 @@ final class CdaMarkerNameMapper {
             Map.entry("ggtp", "GGT"),
             Map.entry("ggt", "GGT"),
             Map.entry("bilirubina", "BILIR"),
+            Map.entry("bilirubina całkowita", "BILIR"),
+            Map.entry("fosfataza zasadowa", "ALP"),
             // Lipids
             Map.entry("cholesterol całkowity", "CHOL"),
             Map.entry("cholesterol nie-hdl", "NON_HDL"),
@@ -105,7 +108,12 @@ final class CdaMarkerNameMapper {
             Map.entry("dhea-s", "DHEAS"),
             Map.entry("shbg", "SHBG"),
             // Advanced lipids
-            Map.entry("lipoproteina(a) [lp(a)]", "LPA")
+            Map.entry("lipoproteina(a) [lp(a)]", "LPA"),
+            // Morphology — immature/rare cells
+            Map.entry("niedojrzałe granulocyty ig %", "IG_PERC"),
+            Map.entry("niedojrzałe granulocyty ig il.", "IG_ABS"),
+            Map.entry("nrbc#", "NRBC"),
+            Map.entry("nrbc%", "NRBC_PERC")
     );
 
     static Optional<String> resolve(String displayName, String examTypeCode) {
@@ -140,6 +148,7 @@ final class CdaMarkerNameMapper {
             case "bilirubina" -> Optional.of("URINE_BILIRUBIN");
             case "ph" -> Optional.of("URINE_PH");
             case "azotyny" -> Optional.of("URINE_NITRITES");
+            case "ciężar właściwy" -> Optional.of("URINE_SG");
             default -> Optional.empty();
         };
     }
