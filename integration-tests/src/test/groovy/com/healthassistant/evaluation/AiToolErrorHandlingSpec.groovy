@@ -2,6 +2,7 @@ package com.healthassistant.evaluation
 
 import org.springframework.ai.evaluation.EvaluationRequest
 import spock.lang.Requires
+import spock.lang.Retry
 import spock.lang.Timeout
 
 import java.time.LocalDate

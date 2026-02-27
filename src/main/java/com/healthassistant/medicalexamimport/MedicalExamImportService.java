@@ -193,20 +193,24 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                 .toList();
         if (validFiles.isEmpty()) return;
 
-        examinations.forEach(exam -> {
-            var first = validFiles.getFirst();
-            medicalExamsFacade.addAttachmentFromStorage(
-                    deviceId, exam.id(),
-                    first.filename(), first.contentType(), first.fileSize(),
-                    new AttachmentStorageResult(first.storageKey(), first.publicUrl(), null, first.provider()),
-                    true);
-            validFiles.stream().skip(1).forEach(sf ->
-                    medicalExamsFacade.addAttachmentFromStorage(
-                            deviceId, exam.id(),
-                            sf.filename(), sf.contentType(), sf.fileSize(),
-                            new AttachmentStorageResult(sf.storageKey(), sf.publicUrl(), null, sf.provider()),
-                            false));
-        });
+        var primary = selectPrimaryFile(validFiles);
+        examinations.forEach(exam ->
+                validFiles.forEach(sf ->
+                        medicalExamsFacade.addAttachmentFromStorage(
+                                deviceId, exam.id(),
+                                sf.filename(), sf.contentType(), sf.fileSize(),
+                                new AttachmentStorageResult(sf.storageKey(), sf.publicUrl(), null, sf.provider()),
+                                sf.equals(primary))));
+    }
+
+    private MedicalExamImportDraft.StoredFile selectPrimaryFile(List<MedicalExamImportDraft.StoredFile> files) {
+        return files.stream()
+                .filter(f -> "application/pdf".equals(f.contentType()))
+                .findFirst()
+                .or(() -> files.stream()
+                        .filter(f -> f.contentType() != null && f.contentType().startsWith("image/"))
+                        .findFirst())
+                .orElse(files.getFirst());
     }
 
     private List<MedicalExamImportDraft.StoredFile> uploadFilesToStorage(
