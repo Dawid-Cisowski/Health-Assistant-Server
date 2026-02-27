@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -66,9 +67,11 @@ class MedicalExamsController {
             @RequestParam(required = false) String specialty,
             @RequestParam(required = false) String examType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) @Size(max = 200) String q,
+            @RequestParam(required = false) Boolean abnormal) {
         log.info("Listing examinations for device {}", maskDeviceId(deviceId));
-        var result = medicalExamsFacade.listExaminations(deviceId, specialty, examType, from, to);
+        var result = medicalExamsFacade.listExaminations(deviceId, specialty, examType, from, to, q, abnormal);
         return ResponseEntity.ok(result);
     }
 
