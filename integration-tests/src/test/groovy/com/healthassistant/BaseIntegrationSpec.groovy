@@ -176,7 +176,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // CDA import specs
             "test-cda-import",
             // Section interpretation specs
-            "test-section-interp"
+            "test-section-interp",
+            // Primary attachment selection specs
+            "test-primary-attachment"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true

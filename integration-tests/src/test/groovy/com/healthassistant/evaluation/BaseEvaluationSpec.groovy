@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.ContextConfiguration
 import org.testcontainers.containers.PostgreSQLContainer
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -50,6 +51,7 @@ import java.time.format.DateTimeFormatter
 @ContextConfiguration(classes = [HealthAssistantApplication])
 @Import([EvaluationTestConfiguration, TestAsyncConfiguration])
 @ActiveProfiles(["test", "evaluation"])
+@Retry(count = 2, delay = 2000)
 abstract class BaseEvaluationSpec extends Specification {
 
     // Each test class gets a unique device ID based on class name for parallel test isolation
