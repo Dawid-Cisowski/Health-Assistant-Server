@@ -172,7 +172,7 @@ abstract class BaseIntegrationSpec extends Specification {
             "test-meal-catalog",
             // Medical exams specs
             "test-medical-exams", "test-medical-exam-import", "test-medical-attach",
-            "test-medical-links",
+            "test-medical-links", "test-medical-search",
             // CDA import specs
             "test-cda-import",
             // Section interpretation specs

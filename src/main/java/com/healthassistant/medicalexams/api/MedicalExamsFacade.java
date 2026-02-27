@@ -20,7 +20,8 @@ import java.util.UUID;
 
 public interface MedicalExamsFacade {
 
-    List<ExaminationSummaryResponse> listExaminations(String deviceId, String specialty, String examType, LocalDate from, LocalDate to);
+    List<ExaminationSummaryResponse> listExaminations(String deviceId, String specialty, String examType,
+                                                      LocalDate from, LocalDate to, String q, Boolean abnormal);
 
     ExaminationDetailResponse getExamination(String deviceId, UUID examId);
 

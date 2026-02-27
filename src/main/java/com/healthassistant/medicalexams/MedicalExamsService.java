@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -48,17 +49,28 @@ class MedicalExamsService implements MedicalExamsFacade {
     @Override
     @Transactional(readOnly = true)
     public List<ExaminationSummaryResponse> listExaminations(String deviceId, String specialty,
-                                                              String examType, LocalDate from, LocalDate to) {
-        var exams = (from != null || to != null)
-                ? examinationRepository.findAllByDeviceIdAndDateBetweenWithDetails(
-                        deviceId,
-                        from != null ? from : LocalDate.of(2000, 1, 1),
-                        to != null ? to : LocalDate.now())
-                : examinationRepository.findAllByDeviceIdWithDetails(deviceId);
+                                                              String examType, LocalDate from, LocalDate to,
+                                                              String q, Boolean abnormal) {
+        var searchActive = q != null && !q.isBlank();
+        List<Examination> exams;
+        if (searchActive) {
+            var likePattern = buildLikePattern(q);
+            var effectiveFrom = from != null ? from : LocalDate.of(2000, 1, 1);
+            var effectiveTo = to != null ? to : LocalDate.now();
+            exams = examinationRepository.findAllByDeviceIdWithSearch(deviceId, effectiveFrom, effectiveTo, likePattern);
+        } else {
+            exams = (from != null || to != null)
+                    ? examinationRepository.findAllByDeviceIdAndDateBetweenWithDetails(
+                            deviceId,
+                            from != null ? from : LocalDate.of(2000, 1, 1),
+                            to != null ? to : LocalDate.now())
+                    : examinationRepository.findAllByDeviceIdWithDetails(deviceId);
+        }
 
         return exams.stream()
                 .filter(e -> specialty == null || (e.getSpecialties() != null && e.getSpecialties().contains(specialty)))
                 .filter(e -> examType == null || examType.equals(e.getExamType().getCode()))
+                .filter(e -> !Boolean.TRUE.equals(abnormal) || "ABNORMAL".equals(e.getStatus()))
                 .map(this::toSummaryResponse)
                 .toList();
     }
@@ -463,6 +475,14 @@ class MedicalExamsService implements MedicalExamsFacade {
                 attachment.isPrimary(),
                 attachment.getDescription(),
                 attachment.getCreatedAt());
+    }
+
+    private String buildLikePattern(String q) {
+        var sanitized = q.strip().toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + sanitized + "%";
     }
 
     private String maskDeviceId(String deviceId) {
