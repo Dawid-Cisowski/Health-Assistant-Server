@@ -1,5 +1,6 @@
 package com.healthassistant.sleep;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +32,7 @@ class SleepProjector {
             doSaveProjection(session);
         } catch (ObjectOptimisticLockingFailureException e) {
             log.warn("Version conflict for sleep session {}/{}, retrying once",
-                    maskDeviceId(session.deviceId()), session.date());
+                    SecurityUtils.maskDeviceId(session.deviceId()), session.date());
             doSaveProjection(session);
         }
     }
@@ -41,6 +42,7 @@ class SleepProjector {
 
         SleepSessionProjectionJpaEntity entity;
         LocalDate previousDate = null;
+        java.util.Set<LocalDate> replacedDates = new java.util.HashSet<>();
 
         if (existingByEventId.isPresent()) {
             entity = existingByEventId.get();
@@ -56,8 +58,29 @@ class SleepProjector {
                 previousDate = entity.getDate();
                 entity.updateFrom(session);
                 log.info("Replacing sleep session by sleepStart match for device {}, date {}",
-                        maskDeviceId(session.deviceId()), session.date());
+                        SecurityUtils.maskDeviceId(session.deviceId()), session.date());
             } else {
+                List<SleepSessionProjectionJpaEntity> overlapping = sessionRepository
+                        .findOverlappingByDeviceIdAndDate(session.deviceId(), session.date(),
+                                session.sleepStart(), session.sleepEnd());
+
+                boolean shorterThanExisting = overlapping.stream()
+                        .anyMatch(e -> e.getDurationMinutes() != null
+                                && e.getDurationMinutes() >= session.durationMinutes());
+
+                if (shorterThanExisting) {
+                    log.info("Skipping overlapping sleep session (shorter than existing): newDuration={}min, device={}",
+                            session.durationMinutes(), SecurityUtils.maskDeviceId(session.deviceId()));
+                    return;
+                }
+
+                overlapping.forEach(e -> {
+                    replacedDates.add(e.getDate());
+                    sessionRepository.deleteByEventId(e.getEventId());
+                    log.info("Replaced shorter overlapping sleep session: eventId={}, duration={}min",
+                            e.getEventId(), e.getDurationMinutes());
+                });
+
                 int sessionNumber = calculateNextSessionNumber(session.deviceId(), session.date());
                 entity = SleepSessionProjectionJpaEntity.from(session, sessionNumber);
                 log.debug("Creating new sleep session #{} for date {} from event {}",
@@ -70,6 +93,9 @@ class SleepProjector {
         if (previousDate != null && !previousDate.equals(session.date())) {
             updateDailyProjection(session.deviceId(), previousDate);
         }
+        replacedDates.stream()
+                .filter(d -> !d.equals(session.date()))
+                .forEach(d -> updateDailyProjection(session.deviceId(), d));
         updateDailyProjection(session.deviceId(), session.date());
     }
 
@@ -103,14 +129,12 @@ class SleepProjector {
             dailyRepository.findByDeviceIdAndDate(deviceId, date)
                     .ifPresent(daily -> {
                         dailyRepository.delete(daily);
-                        log.debug("Deleted empty daily sleep projection for {}/{}", maskDeviceId(deviceId), date);
+                        log.debug("Deleted empty daily sleep projection for {}/{}", SecurityUtils.maskDeviceId(deviceId), date);
                     });
             return;
         }
 
-        int totalSleepMinutes = sessions.stream()
-                .mapToInt(SleepSessionProjectionJpaEntity::getDurationMinutes)
-                .sum();
+        int totalSleepMinutes = calculateMergedSleepMinutes(sessions);
 
         int sleepCount = sessions.size();
 
@@ -187,10 +211,36 @@ class SleepProjector {
         dailyRepository.save(daily);
     }
 
-    private String maskDeviceId(String deviceId) {
-        if (deviceId == null || deviceId.length() < 8) {
-            return "***";
-        }
-        return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    /**
+     * Sums durationMinutes of sessions, excluding shorter sessions that overlap with a longer one.
+     * Overlap is detected using timestamps; the total uses the stored durationMinutes (from payload),
+     * not the raw time difference, because apps may subtract awake periods from the total.
+     */
+    private int calculateMergedSleepMinutes(List<SleepSessionProjectionJpaEntity> sessions) {
+        return sessions.stream()
+                .filter(candidate -> sessions.stream()
+                        .filter(other -> !other.getEventId().equals(candidate.getEventId()))
+                        .noneMatch(other -> sessionsTimeOverlap(candidate, other)
+                                && isOtherLongerOrHasPriority(other, candidate)))
+                .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
+                .sum();
     }
+
+    private boolean sessionsTimeOverlap(SleepSessionProjectionJpaEntity a, SleepSessionProjectionJpaEntity b) {
+        if (a.getSleepStart() == null || a.getSleepEnd() == null
+                || b.getSleepStart() == null || b.getSleepEnd() == null) {
+            return false;
+        }
+        return a.getSleepStart().isBefore(b.getSleepEnd()) && a.getSleepEnd().isAfter(b.getSleepStart());
+    }
+
+    private boolean isOtherLongerOrHasPriority(SleepSessionProjectionJpaEntity other,
+                                                SleepSessionProjectionJpaEntity candidate) {
+        if (other.getDurationMinutes() == null || candidate.getDurationMinutes() == null) return false;
+        if (!other.getDurationMinutes().equals(candidate.getDurationMinutes())) {
+            return other.getDurationMinutes() > candidate.getDurationMinutes();
+        }
+        return other.getEventId().compareTo(candidate.getEventId()) > 0;
+    }
+
 }

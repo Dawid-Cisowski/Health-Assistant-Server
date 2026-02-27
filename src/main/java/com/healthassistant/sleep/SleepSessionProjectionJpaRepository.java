@@ -1,6 +1,8 @@
 package com.healthassistant.sleep;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -16,6 +18,14 @@ interface SleepSessionProjectionJpaRepository extends JpaRepository<SleepSession
     Optional<SleepSessionProjectionJpaEntity> findByDeviceIdAndSleepStart(String deviceId, Instant sleepStart);
 
     List<SleepSessionProjectionJpaEntity> findByDeviceIdAndDateOrderBySessionNumberAsc(String deviceId, LocalDate date);
+
+    @Query("SELECT s FROM SleepSessionProjectionJpaEntity s WHERE s.deviceId = :deviceId " +
+            "AND s.date = :date AND s.sleepStart < :sleepEnd AND s.sleepEnd > :sleepStart")
+    List<SleepSessionProjectionJpaEntity> findOverlappingByDeviceIdAndDate(
+            @Param("deviceId") String deviceId,
+            @Param("date") LocalDate date,
+            @Param("sleepStart") Instant sleepStart,
+            @Param("sleepEnd") Instant sleepEnd);
 
     void deleteByDeviceId(String deviceId);
 

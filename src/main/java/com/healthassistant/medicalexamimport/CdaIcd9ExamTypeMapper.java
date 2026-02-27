@@ -39,7 +39,8 @@ final class CdaIcd9ExamTypeMapper {
             Map.entry("L05", "INFLAMMATION"),
             Map.entry("N24", "CARDIAC_BIOMARKERS"),
             Map.entry("O41", "HORMONES"),
-            Map.entry("M69", "LIPID_PANEL")
+            Map.entry("M69", "LIPID_PANEL"),
+            Map.entry("99.999", "LIVER_PANEL")
     );
 
     static String resolve(String icd9Code) {

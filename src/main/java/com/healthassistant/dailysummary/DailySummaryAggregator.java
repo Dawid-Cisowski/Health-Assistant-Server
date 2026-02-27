@@ -200,27 +200,50 @@ class DailySummaryAggregator {
     }
 
     private List<Sleep> aggregateSleep(List<EventData> events) {
-        return events.stream()
+        List<SleepSessionPayload> sessions = events.stream()
                 .filter(e -> e.payload() instanceof SleepSessionPayload)
                 .collect(java.util.stream.Collectors.toMap(
                         e -> ((SleepSessionPayload) e.payload()).sleepStart(),
-                        e -> e,
+                        e -> (SleepSessionPayload) e.payload(),
                         (older, newer) -> newer,
                         java.util.LinkedHashMap::new
                 ))
                 .values()
                 .stream()
-                .map(this::toSleep)
+                .toList();
+
+        return removeShorterOverlappingSleepSessions(sessions).stream()
+                .map(s -> new Sleep(s.sleepStart(), s.sleepEnd(), s.totalMinutes()))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    private Sleep toSleep(EventData event) {
-        if (!(event.payload() instanceof SleepSessionPayload sleep)) {
-            return null;
-        }
+    private List<SleepSessionPayload> removeShorterOverlappingSleepSessions(List<SleepSessionPayload> sessions) {
+        return java.util.stream.IntStream.range(0, sessions.size())
+                .filter(i -> java.util.stream.IntStream.range(0, sessions.size())
+                        .filter(j -> j != i)
+                        .noneMatch(j -> sleepSessionsOverlap(sessions.get(i), sessions.get(j))
+                                && isOtherSleepLongerOrHasPriority(sessions.get(j), sessions.get(i), j, i)))
+                .mapToObj(sessions::get)
+                .toList();
+    }
 
-        return new Sleep(sleep.sleepStart(), sleep.sleepEnd(), sleep.totalMinutes());
+    private boolean isOtherSleepLongerOrHasPriority(SleepSessionPayload other, SleepSessionPayload candidate,
+                                                     int otherIndex, int candidateIndex) {
+        int otherMinutes = other.totalMinutes() != null ? other.totalMinutes() : 0;
+        int candidateMinutes = candidate.totalMinutes() != null ? candidate.totalMinutes() : 0;
+        if (otherMinutes != candidateMinutes) {
+            return otherMinutes > candidateMinutes;
+        }
+        return otherIndex > candidateIndex;
+    }
+
+    private boolean sleepSessionsOverlap(SleepSessionPayload a, SleepSessionPayload b) {
+        if (a.sleepStart() == null || a.sleepEnd() == null
+                || b.sleepStart() == null || b.sleepEnd() == null) {
+            return false;
+        }
+        return a.sleepStart().isBefore(b.sleepEnd()) && a.sleepEnd().isAfter(b.sleepStart());
     }
 
     private Heart aggregateHeart(List<EventData> events, String deviceId, LocalDate date) {
