@@ -10,6 +10,8 @@ import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarDetailResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultEntry;
 import com.healthassistant.medicalexams.api.dto.LabResultResponse;
 import com.healthassistant.medicalexams.api.dto.LinkedExaminationResponse;
@@ -46,6 +48,7 @@ class MedicalExamsService implements MedicalExamsFacade {
     private final MarkerDefinitionRepository markerDefinitionRepository;
     private final FileStorageService fileStorageService;
     private final ExaminationLinkRepository examinationLinkRepository;
+    private final HealthPillarService healthPillarService;
 
     @Override
     @Transactional(readOnly = true)
@@ -329,6 +332,18 @@ class MedicalExamsService implements MedicalExamsFacade {
         examinationLinkRepository.save(ExaminationLink.create(exam, linkedExam));
         log.info("Linked examination {} with {} for device {}", examId, linkedExaminationId, maskDeviceId(deviceId));
         return toDetailResponse(exam);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HealthPillarSummaryResponse> getHealthPillars(String deviceId) {
+        return healthPillarService.getHealthPillars(deviceId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public HealthPillarDetailResponse getHealthPillarDetail(String deviceId, String pillarCode) {
+        return healthPillarService.getHealthPillarDetail(deviceId, pillarCode);
     }
 
     @Override

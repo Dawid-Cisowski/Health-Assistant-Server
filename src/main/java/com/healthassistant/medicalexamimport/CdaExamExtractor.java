@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -36,6 +37,7 @@ class CdaExamExtractor {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
     private static final DateTimeFormatter CDA_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter CDA_DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final Pattern ICD9_SUFFIX_PATTERN = Pattern.compile("(?i)\\s*\\(ICD-9:[^)]*\\)\\s*");
 
     private record RawEntry(String icd9Code, String examTypeCode, String sectionTitle, List<ExtractedResultData> results) {}
 
@@ -138,7 +140,7 @@ class CdaExamExtractor {
 
     private String stripIcd9Suffix(String title) {
         if (title == null) return null;
-        return title.replaceAll("(?i)\\s*+\\(ICD-9:[^)]*+\\)\\s*+", "").trim();
+        return ICD9_SUFFIX_PATTERN.matcher(title).replaceAll("").trim();
     }
 
     private RawEntry parseEntry(Element entry) {

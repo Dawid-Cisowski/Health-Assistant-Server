@@ -178,7 +178,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Section interpretation specs
             "test-section-interp",
             // Primary attachment selection specs
-            "test-primary-attachment"
+            "test-primary-attachment",
+            // Health pillars specs
+            "test-health-pillars"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
