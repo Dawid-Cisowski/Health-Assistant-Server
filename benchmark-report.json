@@ -1,29 +1,29 @@
 {
-    "timestamp": "2026-02-23T06:54:37.265714268Z",
+    "timestamp": "2026-03-02T06:46:17.913591582Z",
     "summary": {
-        "totalTests": 22,
-        "passedTests": 22,
-        "failedTests": 0,
-        "totalTokens": 32991,
-        "totalCostUsd": 0.024795525,
-        "avgResponseMs": 1683.6818181818
+        "totalTests": 24,
+        "passedTests": 23,
+        "failedTests": 1,
+        "totalTokens": 19762,
+        "totalCostUsd": 0.021032975,
+        "avgResponseMs": 1992.4583333333
     },
     "byModel": {
         "gemini-3-pro-preview": {
-            "passed": 11,
+            "passed": 12,
             "failed": 0,
-            "inputTokens": 15765,
-            "outputTokens": 738,
-            "totalCostUsd": 0.02339625,
-            "avgResponseMs": 1747
+            "inputTokens": 9354,
+            "outputTokens": 1684,
+            "totalCostUsd": 0.0201125,
+            "avgResponseMs": 2129.4166666667
         },
         "gemini-3-flash-preview": {
             "passed": 11,
-            "failed": 0,
-            "inputTokens": 15765,
-            "outputTokens": 723,
-            "totalCostUsd": 0.001399275,
-            "avgResponseMs": 1620.3636363636
+            "failed": 1,
+            "inputTokens": 7541,
+            "outputTokens": 1183,
+            "totalCostUsd": 9.20475E-4,
+            "avgResponseMs": 1855.5
         }
     },
     "tests": [
@@ -35,9 +35,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 2501,
+            "responseTimeMs": 2647,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:27.256526727Z",
+            "timestamp": "2026-03-02T06:44:44.102846400Z",
             "errorMessage": null
         },
         {
@@ -48,9 +48,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1533,
+            "responseTimeMs": 1665,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:29.877634329Z",
+            "timestamp": "2026-03-02T06:44:47.159832977Z",
             "errorMessage": null
         },
         {
@@ -61,10 +61,23 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1160,
+            "responseTimeMs": 1412,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:33.570206356Z",
+            "timestamp": "2026-03-02T06:44:51.734049351Z",
             "errorMessage": null
+        },
+        {
+            "testId": "BM-02",
+            "testName": "Multi-turn conversation",
+            "model": "gemini-3-flash-preview",
+            "passed": false,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 870,
+            "ttftMs": null,
+            "timestamp": "2026-03-02T06:44:55.450704391Z",
+            "errorMessage": "Judge score: 0.0, reason: The assistant claimed we didn't discuss sleep, even though sleep duration is available in the daily summary for today. It should have reported the sleep duration, and been contextually relevant to the follow-up question. The assistant should have also provided the sleep data in Polish since that is the language the user is using. This is critical error."
         },
         {
             "testId": "BM-02",
@@ -74,9 +87,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1404,
+            "responseTimeMs": 1603,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:37.462145255Z",
+            "timestamp": "2026-03-02T06:45:02.197705481Z",
             "errorMessage": null
         },
         {
@@ -84,12 +97,12 @@
             "testName": "AI daily summary",
             "model": "gemini-3-pro-preview",
             "passed": true,
-            "inputTokens": 2860,
-            "outputTokens": 36,
-            "estimatedCostUsd": 0.003755,
-            "responseTimeMs": 748,
+            "inputTokens": 695,
+            "outputTokens": 33,
+            "estimatedCostUsd": 0.00103375,
+            "responseTimeMs": 929,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:40.312911946Z",
+            "timestamp": "2026-03-02T06:45:05.689880109Z",
             "errorMessage": null
         },
         {
@@ -97,12 +110,12 @@
             "testName": "AI daily summary",
             "model": "gemini-3-flash-preview",
             "passed": true,
-            "inputTokens": 2860,
-            "outputTokens": 36,
-            "estimatedCostUsd": 2.253E-4,
-            "responseTimeMs": 867,
+            "inputTokens": 695,
+            "outputTokens": 43,
+            "estimatedCostUsd": 6.5025E-5,
+            "responseTimeMs": 911,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:42.340564328Z",
+            "timestamp": "2026-03-02T06:45:07.849675557Z",
             "errorMessage": null
         },
         {
@@ -110,12 +123,12 @@
             "testName": "Meal import - banana",
             "model": "gemini-3-pro-preview",
             "passed": true,
-            "inputTokens": 3733,
-            "outputTokens": 200,
-            "estimatedCostUsd": 0.00566625,
-            "responseTimeMs": 1938,
+            "inputTokens": 1786,
+            "outputTokens": 311,
+            "estimatedCostUsd": 0.0037875,
+            "responseTimeMs": 2238,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:45.097481991Z",
+            "timestamp": "2026-03-02T06:45:10.973272660Z",
             "errorMessage": null
         },
         {
@@ -123,12 +136,12 @@
             "testName": "Meal import - banana",
             "model": "gemini-3-flash-preview",
             "passed": true,
-            "inputTokens": 3733,
-            "outputTokens": 195,
-            "estimatedCostUsd": 3.38475E-4,
-            "responseTimeMs": 1636,
+            "inputTokens": 1786,
+            "outputTokens": 380,
+            "estimatedCostUsd": 2.4795E-4,
+            "responseTimeMs": 2529,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:46.836097669Z",
+            "timestamp": "2026-03-02T06:45:13.609815895Z",
             "errorMessage": null
         },
         {
@@ -136,12 +149,25 @@
             "testName": "Meal import - complex",
             "model": "gemini-3-pro-preview",
             "passed": true,
-            "inputTokens": 3760,
-            "outputTokens": 348,
-            "estimatedCostUsd": 0.00644,
-            "responseTimeMs": 2716,
+            "inputTokens": 1813,
+            "outputTokens": 595,
+            "estimatedCostUsd": 0.00524125,
+            "responseTimeMs": 3566,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:49.632664060Z",
+            "timestamp": "2026-03-02T06:45:17.262827138Z",
+            "errorMessage": null
+        },
+        {
+            "testId": "BM-05",
+            "testName": "Meal import - complex",
+            "model": "gemini-3-pro-preview",
+            "passed": true,
+            "inputTokens": 1813,
+            "outputTokens": 591,
+            "estimatedCostUsd": 0.00522125,
+            "responseTimeMs": 3466,
+            "ttftMs": null,
+            "timestamp": "2026-03-02T06:45:23.160554274Z",
             "errorMessage": null
         },
         {
@@ -149,12 +175,12 @@
             "testName": "Meal import - complex",
             "model": "gemini-3-flash-preview",
             "passed": true,
-            "inputTokens": 3760,
-            "outputTokens": 338,
-            "estimatedCostUsd": 3.834E-4,
-            "responseTimeMs": 2686,
+            "inputTokens": 1813,
+            "outputTokens": 605,
+            "estimatedCostUsd": 3.17475E-4,
+            "responseTimeMs": 3721,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:52.404219814Z",
+            "timestamp": "2026-03-02T06:45:26.976160370Z",
             "errorMessage": null
         },
         {
@@ -162,12 +188,12 @@
             "testName": "Sleep import - screenshot",
             "model": "gemini-3-pro-preview",
             "passed": true,
-            "inputTokens": 5412,
+            "inputTokens": 3247,
             "outputTokens": 154,
-            "estimatedCostUsd": 0.007535,
-            "responseTimeMs": 2540,
+            "estimatedCostUsd": 0.00482875,
+            "responseTimeMs": 2773,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:55.030372011Z",
+            "timestamp": "2026-03-02T06:45:29.828199146Z",
             "errorMessage": null
         },
         {
@@ -175,12 +201,12 @@
             "testName": "Sleep import - screenshot",
             "model": "gemini-3-flash-preview",
             "passed": true,
-            "inputTokens": 5412,
-            "outputTokens": 154,
-            "estimatedCostUsd": 4.521E-4,
-            "responseTimeMs": 2433,
+            "inputTokens": 3247,
+            "outputTokens": 155,
+            "estimatedCostUsd": 2.90025E-4,
+            "responseTimeMs": 2622,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:57.564615892Z",
+            "timestamp": "2026-03-02T06:45:32.523506338Z",
             "errorMessage": null
         },
         {
@@ -191,9 +217,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1122,
+            "responseTimeMs": 1377,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:53:58.985920727Z",
+            "timestamp": "2026-03-02T06:45:34.205922508Z",
             "errorMessage": null
         },
         {
@@ -204,9 +230,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1630,
+            "responseTimeMs": 1274,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:01.674529846Z",
+            "timestamp": "2026-03-02T06:45:36.539219603Z",
             "errorMessage": null
         },
         {
@@ -217,9 +243,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1398,
+            "responseTimeMs": 1474,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:03.970513970Z",
+            "timestamp": "2026-03-02T06:45:39.030465798Z",
             "errorMessage": null
         },
         {
@@ -230,9 +256,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1393,
+            "responseTimeMs": 1599,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:06.205680697Z",
+            "timestamp": "2026-03-02T06:45:41.543439611Z",
             "errorMessage": null
         },
         {
@@ -243,9 +269,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1707,
+            "responseTimeMs": 2233,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:08.881405610Z",
+            "timestamp": "2026-03-02T06:45:44.900366799Z",
             "errorMessage": null
         },
         {
@@ -256,9 +282,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 810,
+            "responseTimeMs": 1928,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:10.729159459Z",
+            "timestamp": "2026-03-02T06:45:47.955167663Z",
             "errorMessage": null
         },
         {
@@ -269,9 +295,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1341,
+            "responseTimeMs": 1530,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:13.324177974Z",
+            "timestamp": "2026-03-02T06:45:50.792392561Z",
             "errorMessage": null
         },
         {
@@ -282,9 +308,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1458,
+            "responseTimeMs": 1576,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:15.882135527Z",
+            "timestamp": "2026-03-02T06:45:53.590387093Z",
             "errorMessage": null
         },
         {
@@ -295,9 +321,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 2046,
+            "responseTimeMs": 1908,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:26.328683024Z",
+            "timestamp": "2026-03-02T06:46:04.860779310Z",
             "errorMessage": null
         },
         {
@@ -308,9 +334,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 1974,
+            "responseTimeMs": 1968,
             "ttftMs": null,
-            "timestamp": "2026-02-23T06:54:36.536358476Z",
+            "timestamp": "2026-03-02T06:46:17.141181059Z",
             "errorMessage": null
         }
     ]
