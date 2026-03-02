@@ -6,6 +6,7 @@ import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.HealthPillarDetailResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarsDashboardResponse;
 import com.healthassistant.medicalexams.api.dto.HealthPillarSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.MarkerDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse;
@@ -107,7 +108,7 @@ class MedicalExamsController {
             @ApiResponse(responseCode = "200", description = "Health pillars retrieved"),
             @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
-    ResponseEntity<List<HealthPillarSummaryResponse>> getHealthPillars(
+    ResponseEntity<HealthPillarsDashboardResponse> getHealthPillars(
             @RequestAttribute("deviceId") String deviceId) {
         log.info("Getting health pillars for device {}", SecurityUtils.maskDeviceId(deviceId));
         return ResponseEntity.ok(medicalExamsFacade.getHealthPillars(deviceId));

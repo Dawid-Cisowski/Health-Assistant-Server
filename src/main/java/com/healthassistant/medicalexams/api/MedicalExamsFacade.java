@@ -9,6 +9,7 @@ import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.HealthPillarDetailResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarsDashboardResponse;
 import com.healthassistant.medicalexams.api.dto.HealthPillarSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultResponse;
 import com.healthassistant.medicalexams.api.dto.MarkerDefinitionResponse;
@@ -67,7 +68,7 @@ public interface MedicalExamsFacade {
 
     void unlinkExaminations(String deviceId, UUID examId, UUID linkedExaminationId);
 
-    List<HealthPillarSummaryResponse> getHealthPillars(String deviceId);
+    HealthPillarsDashboardResponse getHealthPillars(String deviceId);
 
     HealthPillarDetailResponse getHealthPillarDetail(String deviceId, String pillarCode);
 }

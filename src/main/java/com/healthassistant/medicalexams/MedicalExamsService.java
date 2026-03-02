@@ -11,6 +11,7 @@ import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.HealthPillarDetailResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarsDashboardResponse;
 import com.healthassistant.medicalexams.api.dto.HealthPillarSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultEntry;
 import com.healthassistant.medicalexams.api.dto.LabResultResponse;
@@ -28,11 +29,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -49,6 +52,7 @@ class MedicalExamsService implements MedicalExamsFacade {
     private final FileStorageService fileStorageService;
     private final ExaminationLinkRepository examinationLinkRepository;
     private final HealthPillarService healthPillarService;
+    private final Optional<HealthPillarAiService> healthPillarAiService;
 
     @Override
     @Transactional(readOnly = true)
@@ -119,6 +123,7 @@ class MedicalExamsService implements MedicalExamsFacade {
                 .map(ExaminationAttachment::getStorageKey)
                 .forEach(fileStorageService::delete);
         examinationRepository.delete(exam);
+        healthPillarAiService.ifPresent(svc -> svc.invalidateForDevice(deviceId, Instant.now()));
         log.info("Deleted examination {} for device {}", examId, maskDeviceId(deviceId));
     }
 
@@ -135,6 +140,7 @@ class MedicalExamsService implements MedicalExamsFacade {
 
         exam.recalculateStatus();
         examinationRepository.save(exam);
+        healthPillarAiService.ifPresent(svc -> svc.invalidateForDevice(deviceId, Instant.now()));
         log.info("Added {} results to examination {} for device {}",
                 request.results().size(), examId, maskDeviceId(deviceId));
         return toDetailResponse(exam);
@@ -152,6 +158,7 @@ class MedicalExamsService implements MedicalExamsFacade {
         labResultRepository.save(result);
         exam.recalculateStatus();
         examinationRepository.save(exam);
+        healthPillarAiService.ifPresent(svc -> svc.invalidateForDevice(deviceId, Instant.now()));
         log.info("Updated result {} in examination {} for device {}", resultId, examId, maskDeviceId(deviceId));
         return toLabResultResponse(result);
     }
@@ -165,6 +172,7 @@ class MedicalExamsService implements MedicalExamsFacade {
         exam.removeResult(result);
         exam.recalculateStatus();
         examinationRepository.save(exam);
+        healthPillarAiService.ifPresent(svc -> svc.invalidateForDevice(deviceId, Instant.now()));
         log.info("Deleted result {} from examination {} for device {}", resultId, examId, maskDeviceId(deviceId));
     }
 
@@ -336,7 +344,7 @@ class MedicalExamsService implements MedicalExamsFacade {
 
     @Override
     @Transactional(readOnly = true)
-    public List<HealthPillarSummaryResponse> getHealthPillars(String deviceId) {
+    public HealthPillarsDashboardResponse getHealthPillars(String deviceId) {
         return healthPillarService.getHealthPillars(deviceId);
     }
 

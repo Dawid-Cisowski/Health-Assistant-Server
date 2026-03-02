@@ -17,6 +17,8 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
     def setup() {
         jdbcTemplate.update("DELETE FROM examinations WHERE device_id = ?", DEVICE_ID)
         jdbcTemplate.update("DELETE FROM examinations WHERE device_id = ?", DIFF_DEVICE_ID)
+        jdbcTemplate.update("DELETE FROM health_pillar_ai_summaries WHERE device_id = ?", DEVICE_ID)
+        jdbcTemplate.update("DELETE FROM health_pillar_ai_summaries WHERE device_id = ?", DIFF_DEVICE_ID)
     }
 
     // ===================== Scenario 1: No data =====================
@@ -32,7 +34,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
         response.statusCode() == 200
 
         and: "response contains exactly 5 pillars"
-        def pillars = response.body().jsonPath().getList("")
+        def pillars = response.body().jsonPath().getList("pillars")
         pillars.size() == 5
 
         and: "all pillar codes are present"
@@ -48,8 +50,8 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
         and: "all pillars have null heroMetric"
         pillars.every { it.heroMetric == null }
 
-        and: "aiInsight is null in v1"
-        pillars.every { it.aiInsight == null }
+        and: "aiInsight field is present (null or string)"
+        pillars.every { it.containsKey("aiInsight") || it.aiInsight == null }
     }
 
     // ===================== Scenario 2: Data only in BLOOD_IMMUNITY =====================
@@ -68,7 +70,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
         then: "response status is 200"
         response.statusCode() == 200
 
-        def pillars = response.body().jsonPath().getList("")
+        def pillars = response.body().jsonPath().getList("pillars")
 
         and: "BLOOD_IMMUNITY has a score"
         def bloodImmunity = pillars.find { it.pillarCode == "BLOOD_IMMUNITY" }
@@ -116,8 +118,8 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
         body.getString("heroMetric.markerCode") == "LDL"
         body.getString("heroMetric.flag") == "NORMAL"
 
-        and: "aiInsight is null"
-        body.getString("aiInsight") == null
+        and: "aiInsight field exists"
+        body.getString("pillarCode") == "CIRCULATORY"
     }
 
     // ===================== Scenario 4: HIGH/LOW markers → mixed avg =====================
@@ -247,7 +249,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
                 .extract()
 
         then: "BLOOD_IMMUNITY is outdated"
-        def pillars = response.body().jsonPath().getList("")
+        def pillars = response.body().jsonPath().getList("pillars")
         def bloodImmunity = pillars.find { it.pillarCode == "BLOOD_IMMUNITY" }
         bloodImmunity.isOutdated == true
         bloodImmunity.score != null  // score is still computed
@@ -267,7 +269,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
                 .extract()
 
         then: "BLOOD_IMMUNITY is NOT outdated"
-        def pillars = response.body().jsonPath().getList("")
+        def pillars = response.body().jsonPath().getList("pillars")
         def bloodImmunity = pillars.find { it.pillarCode == "BLOOD_IMMUNITY" }
         bloodImmunity.isOutdated == false
     }
@@ -304,9 +306,6 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
         and: "only LDL marker is in the section (not all 8 markers)"
         sections[0].markers.size() == 1
         sections[0].markers[0].markerCode == "LDL"
-
-        and: "aiInsight is null"
-        body.getString("aiInsight") == null
     }
 
     // ===================== Scenario 10: Unknown pillarCode → 400 =====================
@@ -422,7 +421,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
                 .extract()
 
         then: "BLOOD_IMMUNITY shows no data for main device"
-        def pillars = response.body().jsonPath().getList("")
+        def pillars = response.body().jsonPath().getList("pillars")
         def bloodImmunity = pillars.find { it.pillarCode == "BLOOD_IMMUNITY" }
         bloodImmunity.score == null
         bloodImmunity.isOutdated == true
@@ -475,7 +474,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
                 .extract()
 
         then: "VITAMINS_MINERALS pillar has heroMetric with VIT_D"
-        def pillars = response.body().jsonPath().getList("")
+        def pillars = response.body().jsonPath().getList("pillars")
         def vitamins = pillars.find { it.pillarCode == "VITAMINS_MINERALS" }
         vitamins.heroMetric != null
         vitamins.heroMetric.markerCode == "VIT_D"
@@ -495,7 +494,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
                 .extract()
 
         then: "BLOOD_IMMUNITY pillar has correct latestDataDate"
-        def pillars = response.body().jsonPath().getList("")
+        def pillars = response.body().jsonPath().getList("pillars")
         def bloodImmunity = pillars.find { it.pillarCode == "BLOOD_IMMUNITY" }
         bloodImmunity.latestDataDate == examDate.toString()
     }

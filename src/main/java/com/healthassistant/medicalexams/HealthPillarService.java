@@ -7,7 +7,9 @@ import com.healthassistant.medicalexams.api.dto.HealthPillarHeroMetric;
 import com.healthassistant.medicalexams.api.dto.HealthPillarMarkerResult;
 import com.healthassistant.medicalexams.api.dto.HealthPillarSectionResponse;
 import com.healthassistant.medicalexams.api.dto.HealthPillarSummaryResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarsDashboardResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 class HealthPillarService {
 
     private static final String HOMA_IR_CODE = "HOMA_IR";
@@ -34,16 +37,20 @@ class HealthPillarService {
 
     private final LabResultRepository labResultRepository;
     private final MarkerDefinitionRepository markerDefinitionRepository;
+    private final Optional<HealthPillarAiService> healthPillarAiService;
 
     @Transactional(readOnly = true)
-    List<HealthPillarSummaryResponse> getHealthPillars(String deviceId) {
+    HealthPillarsDashboardResponse getHealthPillars(String deviceId) {
         var allCodes = HealthPillarDefinitions.allMarkerCodes();
         var latestResults = fetchLatestResults(deviceId, allCodes);
         var markerNames = fetchMarkerNames(allCodes);
 
-        return HealthPillarDefinitions.PILLARS.stream()
+        var summaries = HealthPillarDefinitions.PILLARS.stream()
                 .map(pillar -> buildSummary(pillar, latestResults, markerNames))
                 .toList();
+
+        var overallInsight = safeGetOverallInsight(deviceId, summaries);
+        return new HealthPillarsDashboardResponse(overallInsight, summaries);
     }
 
     @Transactional(readOnly = true)
@@ -55,7 +62,11 @@ class HealthPillarService {
         var latestResults = fetchLatestResults(deviceId, pillarCodes);
         var markerNames = fetchMarkerNames(pillarCodes);
 
-        return buildDetail(pillar, latestResults, markerNames);
+        var detail = buildDetail(pillar, latestResults, markerNames);
+        var insight = safeGetPillarInsight(deviceId, pillarCode, detail);
+        return new HealthPillarDetailResponse(
+                detail.pillarCode(), detail.pillarNamePl(), detail.score(), detail.isOutdated(),
+                detail.latestDataDate(), detail.heroMetric(), detail.sections(), insight);
     }
 
     private Map<String, LabResult> fetchLatestResults(String deviceId, List<String> codes) {
@@ -218,6 +229,34 @@ class HealthPillarService {
             case "HIGH", "LOW" -> 50;
             default -> null;
         };
+    }
+
+    private String safeGetOverallInsight(String deviceId, List<HealthPillarSummaryResponse> summaries) {
+        return healthPillarAiService.map(svc -> {
+            try {
+                return svc.getOrGenerateOverallInsight(deviceId, summaries);
+            } catch (Exception e) {
+                log.warn("Failed to generate overall AI insight for device {}, returning null", maskDeviceId(deviceId), e);
+                return null;
+            }
+        }).orElse(null);
+    }
+
+    private String safeGetPillarInsight(String deviceId, String pillarCode, HealthPillarDetailResponse detail) {
+        return healthPillarAiService.map(svc -> {
+            try {
+                return svc.getOrGeneratePillarInsight(deviceId, pillarCode, detail);
+            } catch (Exception e) {
+                log.warn("Failed to generate AI insight for pillar {} device {}, returning null",
+                        pillarCode, maskDeviceId(deviceId), e);
+                return null;
+            }
+        }).orElse(null);
+    }
+
+    private static String maskDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.length() <= 8) return "***";
+        return deviceId.substring(0, 4) + "***" + deviceId.substring(deviceId.length() - 4);
     }
 
     private record PillarData(

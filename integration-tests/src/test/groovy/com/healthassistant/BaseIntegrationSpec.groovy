@@ -180,7 +180,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Primary attachment selection specs
             "test-primary-attachment",
             // Health pillars specs
-            "test-health-pillars"
+            "test-health-pillars",
+            // Health pillars AI summary specs
+            "test-hp-ai", "test-hp-ai-d2"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
@@ -1022,6 +1024,7 @@ abstract class BaseIntegrationSpec extends Specification {
         // Medical exams cleanup (cascade: lab_results + attachments deleted automatically)
         jdbcTemplate.update("DELETE FROM examinations WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM medical_exam_import_drafts WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM health_pillar_ai_summaries WHERE device_id = ?", deviceId)
     }
 
     void cleanupMealCatalogForDevice(String deviceId) {
