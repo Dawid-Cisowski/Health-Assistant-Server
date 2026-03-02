@@ -2,6 +2,7 @@ package com.healthassistant.medicalexams;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -10,4 +11,6 @@ interface MarkerDefinitionRepository extends JpaRepository<MarkerDefinition, Str
     Optional<MarkerDefinition> findByCode(String code);
 
     List<MarkerDefinition> findAllByOrderBySortOrderAsc();
+
+    List<MarkerDefinition> findAllByCodeIn(Collection<String> codes);
 }

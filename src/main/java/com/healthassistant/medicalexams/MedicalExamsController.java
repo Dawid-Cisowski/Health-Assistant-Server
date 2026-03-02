@@ -1,9 +1,12 @@
 package com.healthassistant.medicalexams;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarDetailResponse;
+import com.healthassistant.medicalexams.api.dto.HealthPillarSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.MarkerDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
@@ -71,7 +74,7 @@ class MedicalExamsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) @Size(max = 200) String q,
             @RequestParam(required = false) Boolean abnormal) {
-        log.info("Listing examinations for device {}", maskDeviceId(deviceId));
+        log.info("Listing examinations for device {}", SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.listExaminations(deviceId, specialty, examType, from, to, q, abnormal);
         return ResponseEntity.ok(result);
     }
@@ -97,6 +100,34 @@ class MedicalExamsController {
         return ResponseEntity.ok(medicalExamsFacade.getMarkers());
     }
 
+    @GetMapping("/health-pillars")
+    @Operation(summary = "Get health pillars", description = "Returns the 5 health pillar scores aggregated from the latest lab results",
+            security = @SecurityRequirement(name = "HmacHeaderAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Health pillars retrieved"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<List<HealthPillarSummaryResponse>> getHealthPillars(
+            @RequestAttribute("deviceId") String deviceId) {
+        log.info("Getting health pillars for device {}", SecurityUtils.maskDeviceId(deviceId));
+        return ResponseEntity.ok(medicalExamsFacade.getHealthPillars(deviceId));
+    }
+
+    @GetMapping("/health-pillars/{pillarCode}")
+    @Operation(summary = "Get health pillar detail", description = "Returns detailed section and marker breakdown for a single health pillar",
+            security = @SecurityRequirement(name = "HmacHeaderAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Health pillar detail retrieved"),
+            @ApiResponse(responseCode = "400", description = "Unknown pillar code"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<HealthPillarDetailResponse> getHealthPillarDetail(
+            @RequestAttribute("deviceId") String deviceId,
+            @PathVariable String pillarCode) {
+        log.info("Getting health pillar detail for {} for device {}", SecurityUtils.sanitizeForLog(pillarCode), SecurityUtils.maskDeviceId(deviceId));
+        return ResponseEntity.ok(medicalExamsFacade.getHealthPillarDetail(deviceId, pillarCode));
+    }
+
     @PostMapping
     @Operation(summary = "Create examination", description = "Creates a new medical examination record",
             security = @SecurityRequirement(name = "HmacHeaderAuth"))
@@ -108,7 +139,7 @@ class MedicalExamsController {
     ResponseEntity<ExaminationDetailResponse> createExamination(
             @RequestAttribute("deviceId") String deviceId,
             @Valid @RequestBody CreateExaminationRequest request) {
-        log.info("Creating examination for device {}", maskDeviceId(deviceId));
+        log.info("Creating examination for device {}", SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.createExamination(deviceId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
@@ -140,7 +171,7 @@ class MedicalExamsController {
             @RequestAttribute("deviceId") String deviceId,
             @PathVariable UUID examId,
             @Valid @RequestBody UpdateExaminationRequest request) {
-        log.info("Updating examination {} for device {}", examId, maskDeviceId(deviceId));
+        log.info("Updating examination {} for device {}", examId, SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.updateExamination(deviceId, examId, request);
         return ResponseEntity.ok(result);
     }
@@ -156,7 +187,7 @@ class MedicalExamsController {
     ResponseEntity<Void> deleteExamination(
             @RequestAttribute("deviceId") String deviceId,
             @PathVariable UUID examId) {
-        log.info("Deleting examination {} for device {}", examId, maskDeviceId(deviceId));
+        log.info("Deleting examination {} for device {}", examId, SecurityUtils.maskDeviceId(deviceId));
         medicalExamsFacade.deleteExamination(deviceId, examId);
         return ResponseEntity.noContent().build();
     }
@@ -175,7 +206,7 @@ class MedicalExamsController {
             @PathVariable UUID examId,
             @Valid @RequestBody AddLabResultsRequest request) {
         log.info("Adding {} results to examination {} for device {}",
-                request.results().size(), examId, maskDeviceId(deviceId));
+                request.results().size(), examId, SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.addResults(deviceId, examId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
@@ -193,7 +224,7 @@ class MedicalExamsController {
             @PathVariable UUID examId,
             @PathVariable UUID resultId,
             @Valid @RequestBody UpdateLabResultRequest request) {
-        log.info("Updating result {} in examination {} for device {}", resultId, examId, maskDeviceId(deviceId));
+        log.info("Updating result {} in examination {} for device {}", resultId, examId, SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.updateResult(deviceId, examId, resultId, request);
         return ResponseEntity.ok(result);
     }
@@ -210,7 +241,7 @@ class MedicalExamsController {
             @RequestAttribute("deviceId") String deviceId,
             @PathVariable UUID examId,
             @PathVariable UUID resultId) {
-        log.info("Deleting result {} from examination {} for device {}", resultId, examId, maskDeviceId(deviceId));
+        log.info("Deleting result {} from examination {} for device {}", resultId, examId, SecurityUtils.maskDeviceId(deviceId));
         medicalExamsFacade.deleteResult(deviceId, examId, resultId);
         return ResponseEntity.noContent().build();
     }
@@ -228,7 +259,7 @@ class MedicalExamsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         log.info("Getting marker trend from {} to {} for device {}",
-                from, to, maskDeviceId(deviceId));
+                from, to, SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.getMarkerTrend(deviceId, markerCode, from, to);
         return ResponseEntity.ok(result);
     }
@@ -245,7 +276,7 @@ class MedicalExamsController {
             @PathVariable String examTypeCode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        log.info("Getting examination history for device {}", maskDeviceId(deviceId));
+        log.info("Getting examination history for device {}", SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.getExaminationHistory(deviceId, examTypeCode, from, to);
         return ResponseEntity.ok(result);
     }
@@ -266,7 +297,7 @@ class MedicalExamsController {
             @RequestParam(defaultValue = "DOCUMENT") String attachmentType,
             @RequestParam(required = false) String description,
             @RequestParam(defaultValue = "false") boolean isPrimary) {
-        log.info("Adding attachment to examination {} for device {}", examId, maskDeviceId(deviceId));
+        log.info("Adding attachment to examination {} for device {}", examId, SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.addAttachment(deviceId, examId, file, attachmentType, description, isPrimary);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
@@ -317,7 +348,7 @@ class MedicalExamsController {
             @PathVariable UUID examId,
             @PathVariable UUID attachmentId) {
         log.info("Deleting attachment {} from examination {} for device {}",
-                attachmentId, examId, maskDeviceId(deviceId));
+                attachmentId, examId, SecurityUtils.maskDeviceId(deviceId));
         medicalExamsFacade.deleteAttachment(deviceId, examId, attachmentId);
         return ResponseEntity.noContent().build();
     }
@@ -336,7 +367,7 @@ class MedicalExamsController {
             @RequestAttribute("deviceId") String deviceId,
             @PathVariable UUID examId,
             @Valid @RequestBody LinkExaminationRequest request) {
-        log.info("Linking examination {} with {} for device {}", examId, request.linkedExaminationId(), maskDeviceId(deviceId));
+        log.info("Linking examination {} with {} for device {}", examId, request.linkedExaminationId(), SecurityUtils.maskDeviceId(deviceId));
         var result = medicalExamsFacade.linkExaminations(deviceId, examId, request.linkedExaminationId());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
@@ -353,7 +384,7 @@ class MedicalExamsController {
             @RequestAttribute("deviceId") String deviceId,
             @PathVariable UUID examId,
             @PathVariable UUID linkedExamId) {
-        log.info("Unlinking examination {} from {} for device {}", examId, linkedExamId, maskDeviceId(deviceId));
+        log.info("Unlinking examination {} from {} for device {}", examId, linkedExamId, SecurityUtils.maskDeviceId(deviceId));
         medicalExamsFacade.unlinkExaminations(deviceId, examId, linkedExamId);
         return ResponseEntity.noContent().build();
     }
@@ -394,8 +425,4 @@ class MedicalExamsController {
         return ResponseEntity.badRequest().body("Invalid request parameters");
     }
 
-    private String maskDeviceId(String deviceId) {
-        if (deviceId == null || deviceId.length() <= 8) return "****";
-        return deviceId.substring(0, 4) + "****" + deviceId.substring(deviceId.length() - 4);
-    }
 }
