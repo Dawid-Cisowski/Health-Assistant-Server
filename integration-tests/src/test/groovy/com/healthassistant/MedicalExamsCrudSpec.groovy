@@ -3,6 +3,7 @@ package com.healthassistant
 import spock.lang.Title
 
 import java.time.LocalDate
+import java.util.Locale
 
 @Title("Feature: Medical Examinations CRUD Operations")
 class MedicalExamsCrudSpec extends BaseIntegrationSpec {
@@ -56,6 +57,130 @@ class MedicalExamsCrudSpec extends BaseIntegrationSpec {
         specialties.contains("HEMATOLOGY")
         specialties.contains("CARDIOLOGY")
         specialties.contains("ENDOCRINOLOGY")
+    }
+
+    // ===================== GET /v1/medical-exams/markers =====================
+
+    def "should return all marker definitions with Polish names and descriptions"() {
+        when: "I fetch marker definitions"
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET, "${BASE_PATH}/markers")
+                .get("${BASE_PATH}/markers")
+                .then()
+                .extract()
+
+        then: "response status is 200"
+        response.statusCode() == 200
+
+        and: "response contains a significant number of markers"
+        def markers = response.body().jsonPath().getList("")
+        markers.size() >= 50
+
+        and: "every marker has a non-blank code and Polish name"
+        markers.every { it.code != null && !it.code.isEmpty() }
+        markers.every { it.namePl != null && !it.namePl.isEmpty() }
+
+        and: "every marker has a non-null description"
+        markers.every { it.description != null && !it.description.isEmpty() }
+    }
+
+    def "should return marker with correct Polish name after V67 name fix"() {
+        when: "I fetch marker definitions"
+        def markers = authenticatedGetRequest(DEVICE_ID, SECRET, "${BASE_PATH}/markers")
+                .get("${BASE_PATH}/markers")
+                .then()
+                .extract()
+                .body()
+                .jsonPath()
+                .getList("")
+
+        then: "MCV has descriptive Polish name (not just the acronym)"
+        def mcv = markers.find { it.code == "MCV" }
+        mcv != null
+        mcv.namePl.contains("MCV")
+        !mcv.namePl.equals("MCV")
+
+        and: "TSH has descriptive Polish name"
+        def tsh = markers.find { it.code == "TSH" }
+        tsh != null
+        tsh.namePl.contains("TSH")
+        !tsh.namePl.equals("TSH")
+
+        and: "BNP has descriptive Polish name"
+        def bnp = markers.find { it.code == "BNP" }
+        bnp != null
+        !bnp.namePl.equals("BNP")
+
+        and: "FSH has descriptive Polish name"
+        def fsh = markers.find { it.code == "FSH" }
+        fsh != null
+        !fsh.namePl.equals("FSH")
+
+        and: "INR has descriptive Polish name"
+        def inr = markers.find { it.code == "INR" }
+        inr != null
+        !inr.namePl.equals("INR")
+    }
+
+    def "should return marker definitions with correct category and standard unit"() {
+        when: "I fetch marker definitions"
+        def markers = authenticatedGetRequest(DEVICE_ID, SECRET, "${BASE_PATH}/markers")
+                .get("${BASE_PATH}/markers")
+                .then()
+                .extract()
+                .body()
+                .jsonPath()
+                .getList("")
+
+        then: "WBC has correct morphology category and unit"
+        def wbc = markers.find { it.code == "WBC" }
+        wbc != null
+        wbc.category == "MORPHOLOGY"
+        wbc.standardUnit == "tys/ul"
+        wbc.refRangeLowDefault == 4.0
+        wbc.refRangeHighDefault == 10.0
+
+        and: "HGB description mentions niedokrwistość"
+        def hgb = markers.find { it.code == "HGB" }
+        hgb != null
+        hgb.description.toLowerCase(Locale.ROOT).contains("niedokrwisto")
+
+        and: "TSH description mentions tarczyca"
+        def tsh = markers.find { it.code == "TSH" }
+        tsh != null
+        tsh.description.toLowerCase(Locale.ROOT).contains("tarczyc")
+
+        and: "markers are sorted by sortOrder ascending"
+        def sortOrders = markers.collect { it.sortOrder as int }
+        sortOrders == sortOrders.sort()
+    }
+
+    def "should return marker definition including SIBO and immunology markers from newer migrations"() {
+        when: "I fetch marker definitions"
+        def markers = authenticatedGetRequest(DEVICE_ID, SECRET, "${BASE_PATH}/markers")
+                .get("${BASE_PATH}/markers")
+                .then()
+                .extract()
+                .body()
+                .jsonPath()
+                .getList("")
+
+        then: "SIBO marker H2_DELTA is present with description"
+        def h2delta = markers.find { it.code == "H2_DELTA" }
+        h2delta != null
+        h2delta.category == "SIBO"
+        h2delta.description != null
+
+        and: "immunoglobulin IGA has full Polish name (not just IgA)"
+        def iga = markers.find { it.code == "IGA" }
+        iga != null
+        !iga.namePl.equals("IgA")
+        iga.description != null
+
+        and: "serology marker ASO has full Polish name"
+        def aso = markers.find { it.code == "ASO" }
+        aso != null
+        !aso.namePl.equals("ASO")
+        aso.description != null
     }
 
     // ===================== POST /v1/medical-exams =====================

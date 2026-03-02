@@ -9,6 +9,7 @@ import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultResponse;
+import com.healthassistant.medicalexams.api.dto.MarkerDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.MarkerTrendResponse;
 import com.healthassistant.medicalexams.api.dto.UpdateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.UpdateLabResultRequest;
@@ -44,6 +45,8 @@ public interface MedicalExamsFacade {
     List<ExamTypeDefinitionResponse> getExamTypes();
 
     List<String> getSpecialties();
+
+    List<MarkerDefinitionResponse> getMarkers();
 
     ExaminationAttachmentResponse addAttachment(String deviceId, UUID examId, MultipartFile file,
                                                  String attachmentType, String description, boolean isPrimary);
