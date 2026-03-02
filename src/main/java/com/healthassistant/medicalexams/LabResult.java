@@ -187,16 +187,27 @@ class LabResult {
         this.updatedAt = Instant.now();
     }
 
+    void normalizeCategory(String standardCategory) {
+        this.category = standardCategory;
+        this.updatedAt = Instant.now();
+    }
+
     private static String calculateFlag(BigDecimal value, BigDecimal refLow, BigDecimal refHigh,
                                          BigDecimal defaultLow, BigDecimal defaultHigh) {
         if (value == null) return "UNKNOWN";
 
-        BigDecimal low = refLow != null ? refLow : defaultLow;
-        BigDecimal high = refHigh != null ? refHigh : defaultHigh;
+        // Treat 0/0 as absent — AI extraction artifact when the document has no
+        // numeric reference range (e.g. "≥40" for HDL results in 0/0 being stored).
+        // Fall through to marker_definitions defaults in that case.
+        boolean docRangeIsZeroZero = refLow  != null && refLow.compareTo(BigDecimal.ZERO)  == 0
+                                  && refHigh != null && refHigh.compareTo(BigDecimal.ZERO) == 0;
+
+        BigDecimal low  = (!docRangeIsZeroZero && refLow  != null) ? refLow  : defaultLow;
+        BigDecimal high = (!docRangeIsZeroZero && refHigh != null) ? refHigh : defaultHigh;
 
         if (low == null && high == null) return "UNKNOWN";
         if (high != null && value.compareTo(high) > 0) return "HIGH";
-        if (low != null && value.compareTo(low) < 0) return "LOW";
+        if (low  != null && value.compareTo(low)  < 0) return "LOW";
         return "NORMAL";
     }
 }

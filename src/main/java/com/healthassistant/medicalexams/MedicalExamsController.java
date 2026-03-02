@@ -4,6 +4,7 @@ import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
 import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest;
 import com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse;
+import com.healthassistant.medicalexams.api.dto.MarkerDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse;
 import com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse;
@@ -87,6 +88,13 @@ class MedicalExamsController {
             security = @SecurityRequirement(name = "HmacHeaderAuth"))
     ResponseEntity<List<String>> getSpecialties() {
         return ResponseEntity.ok(medicalExamsFacade.getSpecialties());
+    }
+
+    @GetMapping("/markers")
+    @Operation(summary = "Get marker definitions", description = "Lists all lab marker definitions with Polish names and descriptions",
+            security = @SecurityRequirement(name = "HmacHeaderAuth"))
+    ResponseEntity<List<MarkerDefinitionResponse>> getMarkers() {
+        return ResponseEntity.ok(medicalExamsFacade.getMarkers());
     }
 
     @PostMapping

@@ -72,17 +72,21 @@ class MedicalExamContentExtractor {
                 AVAILABLE EXAM TYPE CODES:
                 MORPHOLOGY, LIPID_PANEL, THYROID, GLUCOSE, URINE, ALLERGY_PANEL, HISTOPATHOLOGY,
                 LIVER_PANEL, KIDNEY_PANEL, ELECTROLYTES, INFLAMMATION, VITAMINS, HORMONES, COAGULATION,
-                CARDIAC_BIOMARKERS, STOOL_TEST,
+                CARDIAC_BIOMARKERS, STOOL_TEST, SIBO, SEROLOGY, IMMUNOLOGY,
                 ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO, ECG, GASTROSCOPY, COLONOSCOPY, OTHER
 
                 CARDIAC_BIOMARKERS: NT pro-BNP, BNP, Troponin, CK-MB and other cardiac markers.
                 STOOL_TEST: Fecal occult blood (krew utajona w kale), calprotectin, stool culture, parasitology.
+                SIBO: Hydrogen/methane breath test (SIBO, IMO, test oddechowy wodorowy/metanowy).
+                SEROLOGY: Antibody tests — ASO (antystreptolizyna), anti-tTG IgA (celiakia), ANCA, ANA, etc.
+                IMMUNOLOGY: Immunoglobulin quantification — IgA, IgG, IgM levels.
 
                 COMMON MARKER CODES (use these when applicable, for LAB exams only):
-                WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT, NEUT, LYMPH, MONO, EOS, BASO (morphology basic)
-                RDW_SD, RDW_CV, PDW, MPV, PLCR, PCT (morphology extended platelet/RBC indices)
-                IG_PERC, IG_ABS, NRBC, NRBC_PERC (morphology - immature cells)
-                NEUT_ABS, LYMPH_ABS, MONO_ABS, EOS_ABS, BASO_ABS (morphology - absolute WBC counts)
+                WBC, RBC, HGB, HCT, MCV, MCH, MCHC, PLT (morphology — basic parameters)
+                RDW_SD, RDW_CV, PDW, MPV, PLCR, PCT (morphology — platelet/RBC indices)
+                IG_PERC, IG_ABS, NRBC, NRBC_PERC (morphology — immature cells)
+                NEUT, LYMPH, MONO, EOS, BASO (morphology — WBC PERCENTAGES only, unit must be %)
+                NEUT_ABS, LYMPH_ABS, MONO_ABS, EOS_ABS, BASO_ABS (morphology — WBC ABSOLUTE COUNTS, unit tys/µl or G/L)
                 CHOL, LDL, HDL, TG, NON_HDL, LPA, APO_B, APO_A1 (lipid panel)
                 TSH, FT3, FT4, ANTI_TPO, ANTI_TG (thyroid)
                 GLU, HBA1C, HBA1C_IFCC, INSULIN, INSULIN_FASTING (glucose)
@@ -93,18 +97,41 @@ class MedicalExamContentExtractor {
                 INR, PT, PT_PERCENT, APTT, FIBRINOGEN, D_DIMER (coagulation)
                 NT_PRO_BNP, BNP, TROPONIN_I, TROPONIN_T, CK_MB (cardiac biomarkers)
                 TESTOSTERONE, ESTRADIOL, PROGESTERONE, FSH, LH, PROLACTIN, CORTISOL, DHEAS, SHBG (hormones)
-                VIT_D, VIT_B12, FE, TIBC (vitamins)
+                VIT_D, VIT_B12, FOLIC_ACID, FE, TIBC (vitamins/minerals)
+                IGA, IGG, IGM (immunoglobulins)
+                ASO, ANTY_TGT_IGA (serology)
                 IGE_TOTAL, IGE_SPECIFIC (allergy)
-                URINE_PH, URINE_SG, URINE_PROTEIN, URINE_GLUCOSE, URINE_KETONES, URINE_RBC, URINE_WBC,
-                URINE_BACTERIA, URINE_BILIRUBIN, URINE_UROBILINOGEN, URINE_CASTS, URINE_EPITHELIAL (urine)
-                OCCULT_BLOOD, CALPROTECTIN (stool)
+                URINE_PH, URINE_SG, URINE_COLOR, URINE_CLARITY, URINE_PROTEIN, URINE_GLUCOSE,
+                URINE_KETONES, URINE_NITRITES, URINE_RBC, URINE_WBC, URINE_BACTERIA,
+                URINE_BILIRUBIN, URINE_UROBILINOGEN, URINE_CASTS, URINE_EPITHELIAL,
+                URINE_EPITHELIAL_ROUND, URINE_WBC_SEDIMENT, URINE_MUCUS (urine)
+                OCCULT_BLOOD, CALPROTECTIN, GIARDIA (stool)
+                H2_START, H2_DELTA, CH4_MAX, H2_CH4_DELTA (SIBO breath test)
+
+                CRITICAL — WBC DIFFERENTIAL COUNTS:
+                - NEUT/LYMPH/MONO/EOS/BASO: use ONLY when unit is % (percentage value 0-100)
+                - NEUT_ABS/LYMPH_ABS/MONO_ABS/EOS_ABS/BASO_ABS: use when unit is tys/µl, G/L, 10^3/µl (absolute count)
+                - Example: "Neutrofile 53%" → NEUT; "Neutrofile 3.5 tys/µl" → NEUT_ABS
+                - Do NOT use NEUT for absolute counts even if the label just says "Neutrofile"
 
                 UNIT STANDARDIZATION RULES:
-                - Cholesterol (CHOL, LDL, HDL): if in mmol/L, convert to mg/dL (multiply by 38.67)
-                - Triglycerides (TG): if in mmol/L, convert to mg/dL (multiply by 88.57)
-                - Glucose (GLU): if in mmol/L, convert to mg/dL (multiply by 18.02)
-                - When converting: set originalValueNumeric and originalUnit to the source values,
-                  set valueNumeric and unit to the converted values, set conversionApplied to true
+                - Cholesterol (CHOL, LDL, HDL, NON_HDL): if in mmol/L, convert to mg/dL (× 38.67)
+                - Triglycerides (TG): if in mmol/L, convert to mg/dL (× 88.57)
+                - Glucose (GLU): if in mmol/L, convert to mg/dL (× 18.02)
+                - CREAT, BILIR, UA: standard unit is µmol/L — do NOT convert, report as-is
+                - FT3: standard unit is pg/mL — do NOT convert, report as-is
+                - FT4: standard unit is ng/dL — do NOT convert, report as-is
+                - When converting: set originalValueNumeric/originalUnit to source values,
+                  set valueNumeric/unit to converted values, set conversionApplied to true
+                - CRITICAL: when converting a value, ALSO multiply refRangeLow and refRangeHigh
+                  by the same factor so they stay in the same unit as the converted value
+
+                CATEGORY FIELD RULES:
+                - The "category" field of each result MUST be the exam section's examTypeCode
+                - Use the standardized code (e.g. "LIPID_PANEL"), NEVER the document's Polish section
+                  name (e.g. NOT "Lipidogram", "Morfologia", "Tarczyca", "Wątroba")
+                - If a result belongs to a MORPHOLOGY section, set category = "MORPHOLOGY"
+                - If a result belongs to a LIPID_PANEL section, set category = "LIPID_PANEL", etc.
 
                 FLAG DETERMINATION: Do NOT determine flags — leave that to the system.
 

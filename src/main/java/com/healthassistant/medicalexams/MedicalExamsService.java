@@ -13,6 +13,7 @@ import com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse;
 import com.healthassistant.medicalexams.api.dto.LabResultEntry;
 import com.healthassistant.medicalexams.api.dto.LabResultResponse;
 import com.healthassistant.medicalexams.api.dto.LinkedExaminationResponse;
+import com.healthassistant.medicalexams.api.dto.MarkerDefinitionResponse;
 import com.healthassistant.medicalexams.api.dto.MarkerDataPoint;
 import com.healthassistant.medicalexams.api.dto.MarkerTrendResponse;
 import com.healthassistant.medicalexams.api.dto.UpdateExaminationRequest;
@@ -228,6 +229,18 @@ class MedicalExamsService implements MedicalExamsFacade {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<MarkerDefinitionResponse> getMarkers() {
+        return markerDefinitionRepository.findAllByOrderBySortOrderAsc().stream()
+                .map(md -> new MarkerDefinitionResponse(
+                        md.getCode(), md.getNamePl(), md.getNameEn(),
+                        md.getCategory(), md.getSpecialty(), md.getStandardUnit(),
+                        md.getRefRangeLowDefault(), md.getRefRangeHighDefault(),
+                        md.getDescription(), md.getSortOrder()))
+                .toList();
+    }
+
+    @Override
     public ExaminationAttachmentResponse addAttachment(String deviceId, UUID examId, MultipartFile file,
                                                         String attachmentType, String description, boolean isPrimary) {
         FileValidationUtils.validate(file);
@@ -352,6 +365,12 @@ class MedicalExamsService implements MedicalExamsFacade {
 
     private void enrichWithMarkerDefinition(LabResult result) {
         markerDefinitionRepository.findByCode(result.getMarkerCode()).ifPresent(markerDef -> {
+            // Normalize category to the standardized code from marker_definitions,
+            // replacing raw document section names like "Lipidogram" or "Morfologia".
+            if (markerDef.getCategory() != null) {
+                result.normalizeCategory(markerDef.getCategory());
+            }
+
             result.populateDefaultRanges(markerDef.getRefRangeLowDefault(), markerDef.getRefRangeHighDefault());
 
             if (markerDef.getStandardUnit() != null && result.getUnit() != null
