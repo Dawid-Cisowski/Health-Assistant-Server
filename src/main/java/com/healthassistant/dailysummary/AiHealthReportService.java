@@ -14,7 +14,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Locale;
@@ -35,7 +34,7 @@ class AiHealthReportService {
     );
 
     private final DailySummaryFacade dailySummaryFacade;
-    private final DailySummaryJpaRepository repository;
+    private final DailySummaryCacheStore cacheStore;
     private final ChatClient chatClient;
     private final GuardrailFacade guardrailFacade;
     private final AiMetricsRecorder aiMetrics;
@@ -116,12 +115,11 @@ class AiHealthReportService {
         - 3-5 bullet points with key trends, achievements, and recommendations
         """;
 
-    @Transactional
     AiHealthReportResponse generateDailyReport(String deviceId, LocalDate date) {
         log.info("Generating AI daily report for device {} date: {}", maskDeviceId(deviceId), date);
         var sample = aiMetrics.startTimer();
 
-        var entityOpt = repository.findByDeviceIdAndDate(deviceId, date);
+        var entityOpt = cacheStore.findByDeviceAndDate(deviceId, date);
         if (entityOpt.isEmpty()) {
             log.info("No daily summary entity found for device {} date: {}", maskDeviceId(deviceId), date);
             return AiHealthReportResponse.noData(date, date);
@@ -141,7 +139,7 @@ class AiHealthReportService {
                         String dataContext = summary.toAiDataContext(this::sanitizeForPrompt);
                         AiResult result = callAi(DAILY_REPORT_SYSTEM_PROMPT,
                                 "Generate a detailed health report for " + date + " based on this data:\n\n" + dataContext);
-                        cacheReport(entity, result.content());
+                        cacheStore.trySaveReportCache(deviceId, date, result.content());
                         aiMetrics.recordSummaryTokens("daily_report", result.promptTokens(), result.completionTokens());
                         aiMetrics.recordSummaryRequest("daily_report", sample, "success", false);
                         return AiHealthReportResponse.daily(date, result.content(), true);
@@ -188,12 +186,6 @@ class AiHealthReportService {
             return true;
         }
         return !entity.getLastEventAt().isAfter(entity.getAiReportGeneratedAt());
-    }
-
-    private void cacheReport(DailySummaryJpaEntity entity, String report) {
-        entity.cacheAiReport(report);
-        repository.save(entity);
-        log.info("Cached AI report for date: {}", entity.getDate());
     }
 
     private record AiResult(String content, Long promptTokens, Long completionTokens) { }
