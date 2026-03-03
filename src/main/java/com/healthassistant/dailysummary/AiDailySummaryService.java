@@ -13,7 +13,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -33,7 +32,7 @@ class AiDailySummaryService {
     private static final int GOAL_ACTIVITY_MINUTES = 300;
 
     private final DailySummaryFacade dailySummaryFacade;
-    private final DailySummaryJpaRepository repository;
+    private final DailySummaryCacheStore cacheStore;
     private final ChatClient chatClient;
     private final GuardrailFacade guardrailFacade;
     private final AiMetricsRecorder aiMetrics;
@@ -78,12 +77,11 @@ class AiDailySummaryService {
         - "no slabo to wyglada... **malo snu** i sniadanie moglo byc lepsze"
         """;
 
-    @Transactional
     public AiDailySummaryResponse generateSummary(String deviceId, LocalDate date) {
         log.info("Generating AI daily summary for device {} date: {}", maskDeviceId(deviceId), date);
         var sample = aiMetrics.startTimer();
 
-        var entityOpt = repository.findByDeviceIdAndDate(deviceId, date);
+        var entityOpt = cacheStore.findByDeviceAndDate(deviceId, date);
         if (entityOpt.isEmpty()) {
             log.info("No daily summary entity found for device {} date: {}", maskDeviceId(deviceId), date);
             aiMetrics.recordSummaryRequest("daily_summary", sample, "success", false);
@@ -103,7 +101,7 @@ class AiDailySummaryService {
         return dailySummaryFacade.getDailySummary(deviceId, date)
                 .map(summary -> {
                     AiGenerationResult result = generateFromData(summary, timeOfDay);
-                    cacheAiSummary(entity, result.content());
+                    cacheStore.trySaveSummaryCache(deviceId, date, result.content());
                     aiMetrics.recordSummaryTokens("daily_summary", result.promptTokens(), result.completionTokens());
                     aiMetrics.recordSummaryRequest("daily_summary", sample, "success", false);
                     return AiDailySummaryResponse.withTokens(date, result.content(), true,
@@ -122,12 +120,6 @@ class AiDailySummaryService {
             return true;
         }
         return !entity.getLastEventAt().isAfter(entity.getAiSummaryGeneratedAt());
-    }
-
-    private void cacheAiSummary(DailySummaryJpaEntity entity, String aiSummary) {
-        entity.cacheAiSummary(aiSummary);
-        repository.save(entity);
-        log.info("Cached AI summary for date: {}", entity.getDate());
     }
 
     private String getTimeOfDayContext() {
