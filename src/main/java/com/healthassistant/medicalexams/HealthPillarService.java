@@ -226,6 +226,7 @@ class HealthPillarService {
     private Integer flagToScore(String flag) {
         return switch (flag) {
             case "NORMAL" -> 100;
+            case "WARNING" -> 75;
             case "HIGH", "LOW" -> 50;
             default -> null;
         };

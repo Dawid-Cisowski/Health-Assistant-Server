@@ -18,11 +18,14 @@ final class HealthPillarDefinitions {
                     new SectionDefinition("LIPID_PROFILE", "Profil lipidowy",
                             List.of("CHOL", "LDL", "HDL", "TG", "NON_HDL", "LPA", "APO_B", "APO_A1")),
                     new SectionDefinition("HEART_HEALTH", "Biomarkery sercowe",
-                            List.of("NT_PRO_BNP", "BNP", "TROPONIN_I", "TROPONIN_T", "CK_MB", "HOMOCYSTEINE")),
+                            List.of("NT_PRO_BNP", "BNP", "TROPONIN_I", "TROPONIN_T", "CK_MB", "HOMOCYSTEINE",
+                                    "ECHO_OVERALL")),
                     new SectionDefinition("COAGULATION", "Układ krzepnięcia",
                             List.of("INR", "PT", "PT_PERCENT", "APTT", "FIBRINOGEN", "D_DIMER")),
                     new SectionDefinition("ECG_SMARTWATCH", "EKG z zegarka",
-                            List.of("ECG_RHYTHM", "ECG_AVG_HR", "ECG_DURATION_SEC", "ECG_GAIN", "ECG_PAPER_SPEED"))
+                            List.of("ECG_RHYTHM", "ECG_AVG_HR", "ECG_DURATION_SEC", "ECG_GAIN", "ECG_PAPER_SPEED")),
+                    new SectionDefinition("CHEST_IMAGING", "RTG klatki piersiowej",
+                            List.of("CHEST_XRAY_OVERALL"))
             )),
 
             new PillarDefinition("DIGESTIVE", "Układ Pokarmowy i Nerkowy", 12, "ALT", List.of(
@@ -39,14 +42,16 @@ final class HealthPillarDefinitions {
                             List.of("AMYLASE", "LIPASE")),
                     new SectionDefinition("GUT", "Przewód pokarmowy",
                             List.of("OCCULT_BLOOD", "CALPROTECTIN", "GIARDIA", "H2_START", "H2_DELTA",
-                                    "CH4_MAX", "H2_CH4_DELTA"))
+                                    "CH4_MAX", "H2_CH4_DELTA",
+                                    "GASTROSCOPY_OVERALL", "COLONOSCOPY_OVERALL",
+                                    "USG_ABDOMINAL_OVERALL", "HISTOPATH_OVERALL"))
             )),
 
             new PillarDefinition("METABOLISM", "Metabolizm i Hormony", 12, "GLU", List.of(
                     new SectionDefinition("GLUCOSE_METABOLISM", "Metabolizm glukozy",
                             List.of("GLU", "HBA1C", "HBA1C_IFCC", "INSULIN", "INSULIN_FASTING")),
                     new SectionDefinition("THYROID", "Tarczyca",
-                            List.of("TSH", "FT3", "FT4", "ANTI_TPO", "ANTI_TG")),
+                            List.of("TSH", "FT3", "FT4", "ANTI_TPO", "ANTI_TG", "USG_THYROID_OVERALL")),
                     new SectionDefinition("SEX_HORMONES", "Hormony płciowe",
                             List.of("TESTOSTERONE", "ESTRADIOL", "PROGESTERONE", "FSH", "LH", "SHBG")),
                     new SectionDefinition("STRESS_ADRENAL", "Kortyzol i DHEA-S",

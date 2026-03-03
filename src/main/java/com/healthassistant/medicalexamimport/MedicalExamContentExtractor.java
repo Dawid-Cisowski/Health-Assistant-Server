@@ -108,6 +108,8 @@ class MedicalExamContentExtractor {
                 OCCULT_BLOOD, CALPROTECTIN, GIARDIA (stool)
                 H2_START, H2_DELTA, CH4_MAX, H2_CH4_DELTA (SIBO breath test)
                 ECG_RHYTHM, ECG_AVG_HR, ECG_DURATION_SEC, ECG_GAIN, ECG_PAPER_SPEED (ECG examination)
+                GASTROSCOPY_OVERALL, COLONOSCOPY_OVERALL, USG_ABDOMINAL_OVERALL, HISTOPATH_OVERALL,
+                USG_THYROID_OVERALL, ECHO_OVERALL, CHEST_XRAY_OVERALL (imaging/endoscopy overall status)
 
                 CRITICAL — WBC DIFFERENTIAL COUNTS:
                 - NEUT/LYMPH/MONO/EOS/BASO: use ONLY when unit is % (percentage value 0-100)
@@ -161,11 +163,21 @@ class MedicalExamContentExtractor {
                 - Leave results[] for all ECG structural markers (P-wave, QRS, QT/QTc intervals etc.)
                   as separate lab results if found. Use codes from COMMON MARKER CODES if available.
 
-                ENDOSCOPY / IMAGING EXTRACTION RULES (applies to GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO):
+                ENDOSCOPY / IMAGING EXTRACTION RULES (applies to GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO, HISTOPATHOLOGY):
                 - Set reportText with the COMPLETE verbatim findings text copied from the document (all organs, observations, measurements), formatted as Markdown
                 - Set conclusions with a 2-3 sentence medical summary of the key findings — write in Polish, formatted as Markdown
-                - Leave results[] EMPTY — do NOT extract any numeric markers or findings into results for these exam types
-                - The full clinical value is in reportText + conclusions, not in structured markers
+                - ALSO add exactly ONE status result to results[]:
+                    - markerCode: use the exam-specific overall code (e.g. GASTROSCOPY_OVERALL for GASTROSCOPY, ECHO_OVERALL for ECHO,
+                      USG_ABDOMINAL_OVERALL for ABDOMINAL_USG, USG_THYROID_OVERALL for THYROID_USG,
+                      CHEST_XRAY_OVERALL for CHEST_XRAY, COLONOSCOPY_OVERALL for COLONOSCOPY,
+                      HISTOPATH_OVERALL for HISTOPATHOLOGY)
+                    - valueNumeric: 2 if findings are normal/unremarkable, 1 if minor/watchful findings requiring monitoring,
+                                   0 if significant/pathological findings requiring follow-up or treatment
+                    - valueText: "Prawidłowe" (when valueNumeric=2) | "Wymaga obserwacji" (when valueNumeric=1) | "Nieprawidłowe" (when valueNumeric=0)
+                    - markerName: Polish name matching the exam (e.g. "Wynik gastroskopii", "Wynik echa serca")
+                    - category: the examTypeCode (e.g. "GASTROSCOPY")
+                    - sortOrder: 1
+                    - Leave all other result fields null (no refRangeLow/High — system handles thresholds automatically)
 
                 OUTPUT FORMAT RULES (apply to ALL exam types):
                 - reportText: format as Markdown — use bullet points, bold for organ names or key findings, preserve document structure
@@ -174,7 +186,7 @@ class MedicalExamContentExtractor {
                 IMPORTANT RULES:
                 1. Set isMedicalReport=false if document is NOT a medical exam result
                 2. For LAB exams (MORPHOLOGY, LIPID_PANEL, THYROID, etc.): extract ALL markers into results[], include reference ranges
-                3. For IMAGING/ENDOSCOPY exams (GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO): results[] MUST be empty — use reportText + conclusions only
+                3. For IMAGING/ENDOSCOPY exams (GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO, HISTOPATHOLOGY): add exactly ONE overall status result to results[] — use reportText + conclusions for full narrative
                 4. For each lab result, always provide markerCode (use the codes above when possible)
                 5. Report confidence (0.0-1.0) based on document clarity
                 """;

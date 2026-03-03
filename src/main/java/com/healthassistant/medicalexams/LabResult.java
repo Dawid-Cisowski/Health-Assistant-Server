@@ -79,6 +79,9 @@ class LabResult {
     @Column(name = "default_ref_range_high", precision = 12, scale = 4)
     private BigDecimal defaultRefRangeHigh;
 
+    @Column(name = "default_ref_range_warning_high", precision = 12, scale = 4)
+    private BigDecimal defaultRefRangeWarningHigh;
+
     @Column(name = "value_text", length = 500)
     private String valueText;
 
@@ -126,7 +129,7 @@ class LabResult {
         result.sortOrder = sortOrder;
         result.performedAt = examination.getPerformedAt();
         result.date = examination.getDate();
-        result.flag = calculateFlag(valueNumeric, refRangeLow, refRangeHigh, defaultRefRangeLow, defaultRefRangeHigh);
+        result.flag = calculateFlag(valueNumeric, refRangeLow, refRangeHigh, defaultRefRangeLow, defaultRefRangeHigh, null);
         var now = Instant.now();
         result.createdAt = now;
         result.updatedAt = now;
@@ -155,15 +158,17 @@ class LabResult {
                 this.refRangeText = "<= " + this.refRangeHigh.stripTrailingZeros().toPlainString();
             }
             this.flag = calculateFlag(this.valueNumeric, this.refRangeLow, this.refRangeHigh,
-                    this.defaultRefRangeLow, this.defaultRefRangeHigh);
+                    this.defaultRefRangeLow, this.defaultRefRangeHigh, this.defaultRefRangeWarningHigh);
             this.updatedAt = Instant.now();
         }
     }
 
-    void populateDefaultRanges(BigDecimal defaultLow, BigDecimal defaultHigh) {
+    void populateDefaultRanges(BigDecimal defaultLow, BigDecimal defaultHigh, BigDecimal defaultWarningHigh) {
         this.defaultRefRangeLow = defaultLow;
         this.defaultRefRangeHigh = defaultHigh;
-        this.flag = calculateFlag(this.valueNumeric, this.refRangeLow, this.refRangeHigh, defaultLow, defaultHigh);
+        this.defaultRefRangeWarningHigh = defaultWarningHigh;
+        this.flag = calculateFlag(this.valueNumeric, this.refRangeLow, this.refRangeHigh,
+                defaultLow, defaultHigh, defaultWarningHigh);
         this.updatedAt = Instant.now();
     }
 
@@ -183,7 +188,7 @@ class LabResult {
         if (valueText != null) this.valueText = valueText;
         this.conversionApplied = false;
         this.flag = calculateFlag(this.valueNumeric, this.refRangeLow, this.refRangeHigh,
-                this.defaultRefRangeLow, this.defaultRefRangeHigh);
+                this.defaultRefRangeLow, this.defaultRefRangeHigh, this.defaultRefRangeWarningHigh);
         this.updatedAt = Instant.now();
     }
 
@@ -193,7 +198,8 @@ class LabResult {
     }
 
     private static String calculateFlag(BigDecimal value, BigDecimal refLow, BigDecimal refHigh,
-                                         BigDecimal defaultLow, BigDecimal defaultHigh) {
+                                         BigDecimal defaultLow, BigDecimal defaultHigh,
+                                         BigDecimal defaultWarningHigh) {
         if (value == null) return "UNKNOWN";
 
         // Treat 0/0 as absent — AI extraction artifact when the document has no
@@ -205,8 +211,10 @@ class LabResult {
         BigDecimal low  = (!docRangeIsZeroZero && refLow  != null) ? refLow  : defaultLow;
         BigDecimal high = (!docRangeIsZeroZero && refHigh != null) ? refHigh : defaultHigh;
 
-        if (low == null && high == null) return "UNKNOWN";
+        if (low == null && high == null && defaultWarningHigh == null) return "UNKNOWN";
         if (high != null && value.compareTo(high) > 0) return "HIGH";
+        if (defaultWarningHigh != null && value.compareTo(defaultWarningHigh) > 0) return "NORMAL";
+        if (defaultWarningHigh != null && (low == null || value.compareTo(low) >= 0)) return "WARNING";
         if (low  != null && value.compareTo(low)  < 0) return "LOW";
         return "NORMAL";
     }

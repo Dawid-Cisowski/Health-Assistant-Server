@@ -10,6 +10,7 @@ public record MarkerDefinitionResponse(
         String specialty,
         String standardUnit,
         BigDecimal refRangeLowDefault,
+        BigDecimal refRangeWarningHighDefault,
         BigDecimal refRangeHighDefault,
         String description,
         int sortOrder
