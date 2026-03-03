@@ -107,6 +107,7 @@ class MedicalExamContentExtractor {
                 URINE_EPITHELIAL_ROUND, URINE_WBC_SEDIMENT, URINE_MUCUS (urine)
                 OCCULT_BLOOD, CALPROTECTIN, GIARDIA (stool)
                 H2_START, H2_DELTA, CH4_MAX, H2_CH4_DELTA (SIBO breath test)
+                ECG_RHYTHM, ECG_AVG_HR, ECG_DURATION_SEC, ECG_GAIN, ECG_PAPER_SPEED (ECG examination)
 
                 CRITICAL — WBC DIFFERENTIAL COUNTS:
                 - NEUT/LYMPH/MONO/EOS/BASO: use ONLY when unit is % (percentage value 0-100)
@@ -149,6 +150,16 @@ class MedicalExamContentExtractor {
                 - Each section has its own examTypeCode, title, and results[]
                 - Single-section documents return sections[] with exactly one element
                 - Shared metadata (date, laboratory, orderingDoctor) belongs at the top level, NOT inside sections
+
+                ECG EXTRACTION RULES (applies to ECG exam type):
+                - ECG_RHYTHM: set valueText to the rhythm classification in Polish (e.g., "Rytm zatokowy",
+                  "Migotanie przedsionków"). Set valueNumeric to null.
+                - ECG_AVG_HR: average heart rate in bpm during the ECG recording. Numeric value.
+                - ECG_DURATION_SEC: recording duration in seconds. Numeric value.
+                - ECG_GAIN: amplifier gain setting (e.g., "10mm/mV"). Set as valueText, valueNumeric=null.
+                - ECG_PAPER_SPEED: paper speed setting (e.g., "25mm/s"). Set as valueText, valueNumeric=null.
+                - Leave results[] for all ECG structural markers (P-wave, QRS, QT/QTc intervals etc.)
+                  as separate lab results if found. Use codes from COMMON MARKER CODES if available.
 
                 ENDOSCOPY / IMAGING EXTRACTION RULES (applies to GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO):
                 - Set reportText with the COMPLETE verbatim findings text copied from the document (all organs, observations, measurements), formatted as Markdown

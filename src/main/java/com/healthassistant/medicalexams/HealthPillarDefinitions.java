@@ -20,7 +20,9 @@ final class HealthPillarDefinitions {
                     new SectionDefinition("HEART_HEALTH", "Biomarkery sercowe",
                             List.of("NT_PRO_BNP", "BNP", "TROPONIN_I", "TROPONIN_T", "CK_MB", "HOMOCYSTEINE")),
                     new SectionDefinition("COAGULATION", "Układ krzepnięcia",
-                            List.of("INR", "PT", "PT_PERCENT", "APTT", "FIBRINOGEN", "D_DIMER"))
+                            List.of("INR", "PT", "PT_PERCENT", "APTT", "FIBRINOGEN", "D_DIMER")),
+                    new SectionDefinition("ECG_SMARTWATCH", "EKG z zegarka",
+                            List.of("ECG_RHYTHM", "ECG_AVG_HR", "ECG_DURATION_SEC", "ECG_GAIN", "ECG_PAPER_SPEED"))
             )),
 
             new PillarDefinition("DIGESTIVE", "Układ Pokarmowy i Nerkowy", 12, "ALT", List.of(

@@ -159,6 +159,8 @@ class HealthPillarAiService {
         if (m.valueNumeric() != null) {
             sb.append(m.valueNumeric());
             if (m.unit() != null) sb.append(" ").append(m.unit());
+        } else if (m.valueText() != null) {
+            sb.append(m.valueText());
         } else {
             sb.append("brak wartości");
         }

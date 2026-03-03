@@ -182,7 +182,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Health pillars specs
             "test-health-pillars",
             // Health pillars AI summary specs
-            "test-hp-ai", "test-hp-ai-d2"
+            "test-hp-ai", "test-hp-ai-d2",
+            // Health pillars ECG specs
+            "test-hp-ecg"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true

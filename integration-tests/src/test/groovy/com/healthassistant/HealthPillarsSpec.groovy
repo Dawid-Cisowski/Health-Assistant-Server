@@ -276,7 +276,7 @@ class HealthPillarsSpec extends BaseIntegrationSpec {
 
     // ===================== Scenario 9: Detail endpoint structure =====================
 
-    def "should return CIRCULATORY detail with 3 sections and markers only where data exists"() {
+    def "should return CIRCULATORY detail with only populated sections when single marker exists"() {
         given: "an LDL result (only in LIPID_PROFILE section)"
         createExamWithResult(DEVICE_ID, SECRET, LocalDate.now(), "LDL", "LDL",
                 100.0, 0.0, 130.0)
