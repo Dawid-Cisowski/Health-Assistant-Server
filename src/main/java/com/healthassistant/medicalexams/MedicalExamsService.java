@@ -246,7 +246,7 @@ class MedicalExamsService implements MedicalExamsFacade {
                 .map(md -> new MarkerDefinitionResponse(
                         md.getCode(), md.getNamePl(), md.getNameEn(),
                         md.getCategory(), md.getSpecialty(), md.getStandardUnit(),
-                        md.getRefRangeLowDefault(), md.getRefRangeHighDefault(),
+                        md.getRefRangeLowDefault(), md.getRefRangeWarningHighDefault(), md.getRefRangeHighDefault(),
                         md.getDescription(), md.getSortOrder()))
                 .toList();
     }
@@ -394,7 +394,8 @@ class MedicalExamsService implements MedicalExamsFacade {
                 result.normalizeCategory(markerDef.getCategory());
             }
 
-            result.populateDefaultRanges(markerDef.getRefRangeLowDefault(), markerDef.getRefRangeHighDefault());
+            result.populateDefaultRanges(markerDef.getRefRangeLowDefault(), markerDef.getRefRangeHighDefault(),
+                    markerDef.getRefRangeWarningHighDefault());
 
             if (markerDef.getStandardUnit() != null && result.getUnit() != null
                     && !markerDef.getStandardUnit().equalsIgnoreCase(result.getUnit())
@@ -500,6 +501,7 @@ class MedicalExamsService implements MedicalExamsFacade {
                 result.getRefRangeText(),
                 result.getDefaultRefRangeLow(),
                 result.getDefaultRefRangeHigh(),
+                result.getDefaultRefRangeWarningHigh(),
                 result.getValueText(),
                 result.getFlag(),
                 result.getSortOrder());

@@ -148,7 +148,7 @@ class HealthPillarService {
         var refHigh = result.getRefRangeHigh() != null ? result.getRefRangeHigh()
                 : (def != null ? def.getRefRangeHighDefault() : null);
         return new HealthPillarMarkerResult(
-                code, namePl, result.getValueNumeric(), result.getUnit(),
+                code, namePl, result.getValueNumeric(), result.getUnit(), result.getValueText(),
                 result.getFlag(), score, result.getDate(), refLow, refHigh);
     }
 
@@ -176,7 +176,7 @@ class HealthPillarService {
                 .orElse(null);
 
         var homaMarker = new HealthPillarMarkerResult(
-                HOMA_IR_CODE, HOMA_IR_NAME_PL, homaIr, null, flag, score, date, null, HOMA_IR_THRESHOLD);
+                HOMA_IR_CODE, HOMA_IR_NAME_PL, homaIr, null, null, flag, score, date, null, HOMA_IR_THRESHOLD);
 
         var withHoma = new ArrayList<>(existing);
         withHoma.add(homaMarker);
@@ -226,6 +226,7 @@ class HealthPillarService {
     private Integer flagToScore(String flag) {
         return switch (flag) {
             case "NORMAL" -> 100;
+            case "WARNING" -> 75;
             case "HIGH", "LOW" -> 50;
             default -> null;
         };

@@ -45,6 +45,9 @@ class MarkerDefinition {
     @Column(name = "ref_range_low_default", precision = 12, scale = 4)
     private BigDecimal refRangeLowDefault;
 
+    @Column(name = "ref_range_warning_high_default", precision = 12, scale = 4)
+    private BigDecimal refRangeWarningHighDefault;
+
     @Column(name = "ref_range_high_default", precision = 12, scale = 4)
     private BigDecimal refRangeHighDefault;
 

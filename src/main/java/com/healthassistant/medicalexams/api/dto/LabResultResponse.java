@@ -18,6 +18,7 @@ public record LabResultResponse(
         String refRangeText,
         BigDecimal defaultRefRangeLow,
         BigDecimal defaultRefRangeHigh,
+        BigDecimal defaultRefRangeWarningHigh,
         String valueText,
         String flag,
         int sortOrder

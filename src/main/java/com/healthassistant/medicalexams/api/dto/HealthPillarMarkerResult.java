@@ -8,6 +8,7 @@ public record HealthPillarMarkerResult(
         String markerNamePl,
         BigDecimal valueNumeric,
         String unit,
+        String valueText,
         String flag,
         Integer score,
         LocalDate date,
