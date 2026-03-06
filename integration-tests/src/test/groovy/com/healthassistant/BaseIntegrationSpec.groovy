@@ -8,6 +8,7 @@ import com.healthassistant.healthevents.api.HealthEventsFacade
 import com.healthassistant.heartrate.api.HeartRateFacade
 import com.healthassistant.mealcatalog.api.MealCatalogFacade
 import com.healthassistant.meals.api.MealsFacade
+import com.healthassistant.medicalexams.api.MedicalExamsFacade
 import com.healthassistant.sleep.api.SleepFacade
 import com.healthassistant.steps.api.StepsFacade
 import com.healthassistant.weight.api.WeightFacade
@@ -98,6 +99,9 @@ abstract class BaseIntegrationSpec extends Specification {
     MealCatalogFacade mealCatalogFacade
 
     @Autowired
+    MedicalExamsFacade medicalExamsFacade
+
+    @Autowired
     JdbcTemplate jdbcTemplate
 
     @Shared
@@ -186,7 +190,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Health pillars ECG specs
             "test-hp-ecg",
             // Health pillars imaging specs
-            "test-hp-imaging"
+            "test-hp-imaging",
+            // Assistant medical exam tools specs
+            "test-assistant-medical"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
