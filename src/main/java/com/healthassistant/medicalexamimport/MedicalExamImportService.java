@@ -6,6 +6,7 @@ import com.healthassistant.medicalexamimport.api.dto.DraftSectionResponse;
 import com.healthassistant.medicalexamimport.api.dto.ExtractedResultData;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftResponse;
 import com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftUpdateRequest;
+import com.healthassistant.medicalexams.api.ExamSource;
 import com.healthassistant.medicalexams.api.FileStorageService;
 import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
@@ -145,7 +146,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
             MedicalExamImportDraft.ExtractedData sharedData,
             LocalDate examDate, Instant performedAt) {
 
-        var importSource = Optional.ofNullable(sharedData.importSource()).orElse("AI_IMPORT");
+        var importSource = Optional.ofNullable(sharedData.importSource()).orElse(ExamSource.AI_IMPORT.name());
         var createRequest = new CreateExaminationRequest(
                 section.examTypeCode(),
                 section.title() != null ? section.title() : "Badanie medyczne",

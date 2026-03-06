@@ -149,7 +149,7 @@ class HealthPillarService {
                 : (def != null ? def.getRefRangeHighDefault() : null);
         return new HealthPillarMarkerResult(
                 code, namePl, result.getValueNumeric(), result.getUnit(), result.getValueText(),
-                result.getFlag(), score, result.getDate(), refLow, refHigh);
+                result.getFlag().name(), score, result.getDate(), refLow, refHigh);
     }
 
     private List<HealthPillarMarkerResult> injectHomaIr(List<HealthPillarMarkerResult> existing,
@@ -168,15 +168,15 @@ class HealthPillarService {
 
         var homaIr = glu.getValueNumeric().multiply(insulin.getValueNumeric())
                 .divide(HOMA_IR_DIVISOR, 4, RoundingMode.HALF_UP);
-        var flag = homaIr.compareTo(HOMA_IR_THRESHOLD) >= 0 ? "HIGH" : "NORMAL";
-        var score = flagToScore(flag);
+        var homaFlag = homaIr.compareTo(HOMA_IR_THRESHOLD) >= 0 ? ResultFlag.HIGH : ResultFlag.NORMAL;
+        var score = flagToScore(homaFlag);
         var date = Stream.of(glu.getDate(), insulin.getDate())
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
 
         var homaMarker = new HealthPillarMarkerResult(
-                HOMA_IR_CODE, HOMA_IR_NAME_PL, homaIr, null, null, flag, score, date, null, HOMA_IR_THRESHOLD);
+                HOMA_IR_CODE, HOMA_IR_NAME_PL, homaIr, null, null, homaFlag.name(), score, date, null, HOMA_IR_THRESHOLD);
 
         var withHoma = new ArrayList<>(existing);
         withHoma.add(homaMarker);
@@ -190,7 +190,7 @@ class HealthPillarService {
                     var def = names.get(heroCode);
                     var namePl = def != null ? def.getNamePl() : heroCode;
                     return new HealthPillarHeroMetric(heroCode, namePl, r.getValueNumeric(),
-                            r.getUnit(), r.getFlag(), r.getDate());
+                            r.getUnit(), r.getFlag().name(), r.getDate());
                 })
                 .orElse(null);
     }
@@ -223,11 +223,11 @@ class HealthPillarService {
         return (int) Math.round((double) sum / nonNull.size());
     }
 
-    private Integer flagToScore(String flag) {
+    private Integer flagToScore(ResultFlag flag) {
         return switch (flag) {
-            case "NORMAL" -> 100;
-            case "WARNING" -> 75;
-            case "HIGH", "LOW" -> 50;
+            case NORMAL -> 100;
+            case WARNING -> 75;
+            case HIGH, LOW -> 50;
             default -> null;
         };
     }
