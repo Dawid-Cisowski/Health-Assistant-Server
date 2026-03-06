@@ -3,6 +3,8 @@ package com.healthassistant.medicalexams;
 import com.healthassistant.medicalexams.api.dto.AttachmentStorageResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -59,8 +61,9 @@ class ExaminationAttachment {
     @Column(name = "public_url", length = 2000)
     private String publicUrl;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "attachment_type", nullable = false, length = 30)
-    private String attachmentType;
+    private AttachmentType attachmentType;
 
     @Column(name = "is_primary", nullable = false)
     private boolean primary;
@@ -73,7 +76,7 @@ class ExaminationAttachment {
 
     static ExaminationAttachment create(Examination examination, String deviceId,
                                          String filename, String contentType, long fileSizeBytes,
-                                         AttachmentStorageResult storageResult, String attachmentType,
+                                         AttachmentStorageResult storageResult, AttachmentType attachmentType,
                                          boolean isPrimary, String description) {
         var attachment = new ExaminationAttachment();
         attachment.id = UUID.randomUUID();
@@ -86,7 +89,7 @@ class ExaminationAttachment {
         attachment.storageKey = storageResult.storageKey();
         attachment.driveFolderId = storageResult.folderId();
         attachment.publicUrl = storageResult.publicUrl();
-        attachment.attachmentType = attachmentType != null ? attachmentType : "DOCUMENT";
+        attachment.attachmentType = attachmentType != null ? attachmentType : AttachmentType.DOCUMENT;
         attachment.primary = isPrimary;
         attachment.description = description;
         attachment.createdAt = Instant.now();

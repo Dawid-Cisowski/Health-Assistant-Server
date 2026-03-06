@@ -1,5 +1,6 @@
 package com.healthassistant.medicalexams;
 
+import com.healthassistant.medicalexams.api.ExamSource;
 import com.healthassistant.medicalexams.api.FileStorageService;
 import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest;
@@ -31,7 +32,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,8 +78,8 @@ class MedicalExamsService implements MedicalExamsFacade {
         return exams.stream()
                 .filter(e -> specialty == null || (e.getSpecialties() != null && e.getSpecialties().contains(specialty)))
                 .filter(e -> examType == null || examType.equals(e.getExamType().getCode()))
-                .filter(e -> !Boolean.TRUE.equals(abnormal) || "ABNORMAL".equals(e.getStatus()))
-                .map(this::toSummaryResponse)
+                .filter(e -> !Boolean.TRUE.equals(abnormal) || ExaminationStatus.ABNORMAL == e.getStatus())
+                .map(ExaminationResponseMapper::toSummaryResponse)
                 .toList();
     }
 
@@ -95,10 +95,11 @@ class MedicalExamsService implements MedicalExamsFacade {
         var examType = examTypeRepository.findById(request.examTypeCode())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown exam type: " + request.examTypeCode()));
 
+        var examSource = request.source() != null ? ExamSource.valueOf(request.source()) : ExamSource.MANUAL;
         var exam = Examination.create(deviceId, examType, request.title(), request.date(),
                 request.performedAt(), request.resultsReceivedAt(), request.laboratory(),
                 request.orderingDoctor(), request.notes(), request.reportText(),
-                request.conclusions(), request.recommendations(), request.source());
+                request.conclusions(), request.recommendations(), examSource);
 
         examinationRepository.save(exam);
         log.info("Created examination {} for device {}", exam.getId(), maskDeviceId(deviceId));
@@ -149,25 +150,22 @@ class MedicalExamsService implements MedicalExamsFacade {
     @Override
     public LabResultResponse updateResult(String deviceId, UUID examId, UUID resultId, UpdateLabResultRequest request) {
         var exam = findExamForDevice(deviceId, examId);
-        var result = labResultRepository.findByIdAndExaminationId(resultId, examId)
-                .orElseThrow(() -> new LabResultNotFoundException(resultId));
+        var result = exam.findResult(resultId).orElseThrow(() -> new LabResultNotFoundException(resultId));
 
         result.updateDetails(request.valueNumeric(), request.unit(), request.refRangeLow(),
                 request.refRangeHigh(), request.refRangeText(), request.valueText());
 
-        labResultRepository.save(result);
         exam.recalculateStatus();
         examinationRepository.save(exam);
         healthPillarAiService.ifPresent(svc -> svc.invalidateForDevice(deviceId, Instant.now()));
         log.info("Updated result {} in examination {} for device {}", resultId, examId, maskDeviceId(deviceId));
-        return toLabResultResponse(result);
+        return ExaminationResponseMapper.toLabResultResponse(result);
     }
 
     @Override
     public void deleteResult(String deviceId, UUID examId, UUID resultId) {
         var exam = findExamForDevice(deviceId, examId);
-        var result = labResultRepository.findByIdAndExaminationId(resultId, examId)
-                .orElseThrow(() -> new LabResultNotFoundException(resultId));
+        var result = exam.findResult(resultId).orElseThrow(() -> new LabResultNotFoundException(resultId));
 
         exam.removeResult(result);
         exam.recalculateStatus();
@@ -187,7 +185,7 @@ class MedicalExamsService implements MedicalExamsFacade {
                 .map(r -> new MarkerDataPoint(
                         r.getDate(),
                         r.getValueNumeric(),
-                        r.getFlag(),
+                        r.getFlag().name(),
                         r.getExamination().getId(),
                         r.getExamination().getTitle(),
                         r.getRefRangeLow(),
@@ -213,7 +211,7 @@ class MedicalExamsService implements MedicalExamsFacade {
                 : examinationRepository.findAllByDeviceIdAndExamTypeCodeWithDetails(deviceId, examTypeCode);
 
         return exams.stream()
-                .map(this::toSummaryResponse)
+                .map(ExaminationResponseMapper::toSummaryResponse)
                 .toList();
     }
 
@@ -262,14 +260,15 @@ class MedicalExamsService implements MedicalExamsFacade {
                     examId, exam.getExamType().getCode(),
                     file.getOriginalFilename(), file.getContentType(), file.getBytes());
 
+            var parsedAttachmentType = attachmentType != null ? AttachmentType.valueOf(attachmentType) : AttachmentType.DOCUMENT;
             var attachment = ExaminationAttachment.create(exam, deviceId,
                     file.getOriginalFilename(), file.getContentType(), file.getSize(),
-                    storageResult, attachmentType, isPrimary, description);
+                    storageResult, parsedAttachmentType, isPrimary, description);
 
             exam.addAttachment(attachment);
             examinationRepository.save(exam);
             log.info("Added attachment to examination {} for device {}", examId, maskDeviceId(deviceId));
-            return toAttachmentResponse(attachment);
+            return ExaminationResponseMapper.toAttachmentResponse(attachment);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read uploaded file", e);
         }
@@ -282,19 +281,18 @@ class MedicalExamsService implements MedicalExamsFacade {
                                                                    boolean isPrimary) {
         var exam = findExamForDevice(deviceId, examId);
         var attachment = ExaminationAttachment.create(exam, deviceId,
-                filename, contentType, fileSize, storageResult, "SOURCE_DOCUMENT", isPrimary, null);
+                filename, contentType, fileSize, storageResult, AttachmentType.SOURCE_DOCUMENT, isPrimary, null);
         exam.addAttachment(attachment);
         examinationRepository.save(exam);
         log.info("Registered source document attachment for examination {} for device {}", examId, maskDeviceId(deviceId));
-        return toAttachmentResponse(attachment);
+        return ExaminationResponseMapper.toAttachmentResponse(attachment);
     }
 
     @Override
     @Transactional(readOnly = true)
     public AttachmentDownloadUrlResponse getAttachmentDownloadUrl(String deviceId, UUID examId, UUID attachmentId) {
-        findExamForDevice(deviceId, examId);
-        var attachment = attachmentRepository.findByIdAndExaminationId(attachmentId, examId)
-                .orElseThrow(() -> new AttachmentNotFoundException(attachmentId));
+        var exam = findExamForDevice(deviceId, examId);
+        var attachment = exam.findAttachment(attachmentId).orElseThrow(() -> new AttachmentNotFoundException(attachmentId));
         var url = fileStorageService.generateDownloadUrl(attachment.getStorageKey());
         log.info("Generated download URL for attachment {} in examination {} for device {}",
                 attachmentId, examId, maskDeviceId(deviceId));
@@ -307,15 +305,14 @@ class MedicalExamsService implements MedicalExamsFacade {
     public List<ExaminationAttachmentResponse> getAttachments(String deviceId, UUID examId) {
         findExamForDevice(deviceId, examId);
         return attachmentRepository.findByExaminationId(examId).stream()
-                .map(this::toAttachmentResponse)
+                .map(ExaminationResponseMapper::toAttachmentResponse)
                 .toList();
     }
 
     @Override
     public void deleteAttachment(String deviceId, UUID examId, UUID attachmentId) {
         var exam = findExamForDevice(deviceId, examId);
-        var attachment = attachmentRepository.findByIdAndExaminationId(attachmentId, examId)
-                .orElseThrow(() -> new AttachmentNotFoundException(attachmentId));
+        var attachment = exam.findAttachment(attachmentId).orElseThrow(() -> new AttachmentNotFoundException(attachmentId));
 
         fileStorageService.delete(attachment.getStorageKey());
         exam.removeAttachment(attachment);
@@ -416,109 +413,14 @@ class MedicalExamsService implements MedicalExamsFacade {
                 .orElse(null);
     }
 
-    private ExaminationSummaryResponse toSummaryResponse(Examination exam) {
-        return new ExaminationSummaryResponse(
-                exam.getId(),
-                exam.getExamType().getCode(),
-                exam.getTitle(),
-                exam.getDate(),
-                exam.getStatus(),
-                exam.getDisplayType(),
-                exam.getSpecialties(),
-                exam.getLaboratory(),
-                exam.getResultCount(),
-                exam.getAbnormalCount(),
-                exam.hasPrimaryAttachment(),
-                exam.getPrimaryAttachmentUrl(),
-                exam.getCreatedAt());
-    }
-
     private ExaminationDetailResponse toDetailResponse(Examination exam) {
-        var results = exam.getResults().stream()
-                .sorted(Comparator.comparingInt(LabResult::getSortOrder))
-                .map(this::toLabResultResponse)
-                .toList();
-
-        var attachments = exam.getAttachments().stream()
-                .map(this::toAttachmentResponse)
-                .toList();
-
         var linkedExaminations = examinationLinkRepository.findAllLinksForExamination(exam.getId()).stream()
                 .map(link -> link.getExaminationA().getId().equals(exam.getId())
                         ? link.getExaminationB() : link.getExaminationA())
-                .map(this::toLinkedExaminationResponse)
+                .map(ExaminationResponseMapper::toLinkedExaminationResponse)
                 .toList();
 
-        return new ExaminationDetailResponse(
-                exam.getId(),
-                exam.getExamType().getCode(),
-                exam.getTitle(),
-                exam.getDate(),
-                exam.getStatus(),
-                exam.getDisplayType(),
-                exam.getSpecialties(),
-                exam.getPerformedAt(),
-                exam.getResultsReceivedAt(),
-                exam.getLaboratory(),
-                exam.getOrderingDoctor(),
-                exam.getNotes(),
-                exam.getSummary(),
-                exam.getReportText(),
-                exam.getConclusions(),
-                exam.getRecommendations(),
-                exam.getSource(),
-                results,
-                attachments,
-                linkedExaminations,
-                exam.getCreatedAt(),
-                exam.getUpdatedAt());
-    }
-
-    private LinkedExaminationResponse toLinkedExaminationResponse(Examination exam) {
-        return new LinkedExaminationResponse(
-                exam.getId(),
-                exam.getExamType().getCode(),
-                exam.getTitle(),
-                exam.getDate(),
-                exam.getStatus(),
-                exam.getDisplayType(),
-                exam.getSpecialties());
-    }
-
-    private LabResultResponse toLabResultResponse(LabResult result) {
-        return new LabResultResponse(
-                result.getId(),
-                result.getMarkerCode(),
-                result.getMarkerName(),
-                result.getCategory(),
-                result.getValueNumeric(),
-                result.getUnit(),
-                result.getOriginalValueNumeric(),
-                result.getOriginalUnit(),
-                result.isConversionApplied(),
-                result.getRefRangeLow(),
-                result.getRefRangeHigh(),
-                result.getRefRangeText(),
-                result.getDefaultRefRangeLow(),
-                result.getDefaultRefRangeHigh(),
-                result.getDefaultRefRangeWarningHigh(),
-                result.getValueText(),
-                result.getFlag(),
-                result.getSortOrder());
-    }
-
-    private ExaminationAttachmentResponse toAttachmentResponse(ExaminationAttachment attachment) {
-        return new ExaminationAttachmentResponse(
-                attachment.getId(),
-                attachment.getFilename(),
-                attachment.getContentType(),
-                attachment.getFileSizeBytes(),
-                attachment.getStorageProvider(),
-                attachment.getPublicUrl(),
-                attachment.getAttachmentType(),
-                attachment.isPrimary(),
-                attachment.getDescription(),
-                attachment.getCreatedAt());
+        return ExaminationResponseMapper.toDetailResponse(exam, linkedExaminations);
     }
 
     private String buildLikePattern(String q) {
