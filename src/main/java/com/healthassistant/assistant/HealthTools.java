@@ -17,6 +17,7 @@ import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.meals.api.dto.RecordMealRequest;
 import com.healthassistant.meals.api.dto.UpdateMealRequest;
+import com.healthassistant.medicalexams.api.MedicalExamsFacade;
 import com.healthassistant.sleep.api.SleepFacade;
 import com.healthassistant.steps.api.StepsFacade;
 import com.healthassistant.weight.api.WeightFacade;
@@ -61,6 +62,7 @@ class HealthTools {
     private final BodyMeasurementsFacade bodyMeasurementsFacade;
     private final HealthEventsFacade healthEventsFacade;
     private final MealCatalogFacade mealCatalogFacade;
+    private final MedicalExamsFacade medicalExamsFacade;
     private final ObjectMapper objectMapper;
     private final AiMetricsRecorder aiMetrics;
 
@@ -287,6 +289,234 @@ class HealthTools {
             log.error("Error searching meal catalog", e);
             aiMetrics.recordToolCall("searchMealCatalog", sample, "error");
             return new ToolError("Unable to search meal catalog. Please estimate the values yourself.");
+        }
+    }
+
+    // ==================== MEDICAL EXAM READ TOOLS ====================
+
+    @Tool(name = "getMedicalExams",
+          description = "Retrieves the user's medical examinations with optional filters. " +
+                        "Use this to list exams by specialty, type, date range, or to find abnormal results. " +
+                        "PARAMETERS: specialty (String, optional) - e.g. 'HEMATOLOGY', 'CARDIOLOGY'. " +
+                        "examType (String, optional) - exam type code, e.g. 'MORPHOLOGY', 'LIPIDOGRAM'. " +
+                        "startDate and endDate (String, optional) - ISO-8601 format (YYYY-MM-DD). " +
+                        "query (String, optional) - text search in exam title or laboratory. " +
+                        "abnormalOnly (String, optional) - 'true' to return only exams with abnormal results.")
+    public Object getMedicalExams(String specialty, String examType, String startDate, String endDate,
+                                  String query, String abnormalOnly, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("getMedicalExams called - deviceId: {}, specialty: {}, examType: {}",
+                maskDeviceId(deviceId), sanitizeForLog(specialty), sanitizeForLog(examType));
+        var sample = aiMetrics.startTimer();
+
+        var fromResult = parseOptionalDate(startDate);
+        if (fromResult instanceof ToolError error) {
+            aiMetrics.recordToolCall("getMedicalExams", sample, "validation_error");
+            return error;
+        }
+        var toResult = parseOptionalDate(endDate);
+        if (toResult instanceof ToolError error) {
+            aiMetrics.recordToolCall("getMedicalExams", sample, "validation_error");
+            return error;
+        }
+
+        try {
+            var from = fromResult != null ? (LocalDate) fromResult : null;
+            var to = toResult != null ? (LocalDate) toResult : null;
+            var specialtyParam = specialty != null && !specialty.isBlank() ? specialty : null;
+            var examTypeParam = examType != null && !examType.isBlank() ? examType : null;
+            var queryParam = query != null && !query.isBlank() ? query : null;
+            Boolean abnormal = abnormalOnly != null && !abnormalOnly.isBlank() ? "true".equalsIgnoreCase(abnormalOnly) : null;
+
+            var result = medicalExamsFacade.listExaminations(deviceId, specialtyParam, examTypeParam, from, to, queryParam, abnormal);
+            log.info("getMedicalExams returned {} exams", result.size());
+            aiMetrics.recordToolCall("getMedicalExams", sample, "success");
+            return result;
+        } catch (Exception e) {
+            log.error("Error in getMedicalExams", e);
+            aiMetrics.recordToolCall("getMedicalExams", sample, "error");
+            return new ToolError("Unable to retrieve medical exams. Please try again later.");
+        }
+    }
+
+    @Tool(name = "getMedicalExamDetail",
+          description = "Retrieves full detail of a single medical examination, including all lab results. " +
+                        "Use getMedicalExams first to find the exam ID. " +
+                        "PARAMETER: examId (String, required) - UUID of the examination.")
+    public Object getMedicalExamDetail(String examId, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("getMedicalExamDetail called - deviceId: {}, examId: {}", maskDeviceId(deviceId), sanitizeForLog(examId));
+        var sample = aiMetrics.startTimer();
+
+        if (examId == null || examId.isBlank()) {
+            aiMetrics.recordToolCall("getMedicalExamDetail", sample, "validation_error");
+            return new ToolError("examId cannot be empty. Please provide a valid UUID.");
+        }
+
+        UUID parsedId;
+        try {
+            parsedId = UUID.fromString(examId.trim());
+        } catch (IllegalArgumentException e) {
+            aiMetrics.recordToolCall("getMedicalExamDetail", sample, "validation_error");
+            return new ToolError("Invalid examId: '" + sanitizeForLog(examId) + "'. Must be a valid UUID.");
+        }
+
+        try {
+            var result = medicalExamsFacade.getExamination(deviceId, parsedId);
+            log.info("getMedicalExamDetail returned exam: {}", result.id());
+            aiMetrics.recordToolCall("getMedicalExamDetail", sample, "success");
+            return result;
+        } catch (Exception e) {
+            log.error("Error in getMedicalExamDetail for examId: {}", sanitizeForLog(examId), e);
+            aiMetrics.recordToolCall("getMedicalExamDetail", sample, "error");
+            return new ToolError(mapExamReadErrorMessage(e));
+        }
+    }
+
+    @Tool(name = "getMedicalExamHistory",
+          description = "Retrieves history of a specific exam type over time. " +
+                        "Use this to compare results across multiple instances of the same exam type, e.g. all morphology results. " +
+                        "PARAMETERS: examTypeCode (String, required) - e.g. 'MORPHOLOGY', 'LIPIDOGRAM', 'TSH'. " +
+                        "startDate and endDate (String, optional) - ISO-8601 format (YYYY-MM-DD).")
+    public Object getMedicalExamHistory(String examTypeCode, String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("getMedicalExamHistory called - deviceId: {}, examType: {}", maskDeviceId(deviceId), sanitizeForLog(examTypeCode));
+        var sample = aiMetrics.startTimer();
+
+        if (examTypeCode == null || examTypeCode.isBlank()) {
+            aiMetrics.recordToolCall("getMedicalExamHistory", sample, "validation_error");
+            return new ToolError("examTypeCode cannot be empty.");
+        }
+
+        var fromResult = parseOptionalDate(startDate);
+        if (fromResult instanceof ToolError error) {
+            aiMetrics.recordToolCall("getMedicalExamHistory", sample, "validation_error");
+            return error;
+        }
+        var toResult = parseOptionalDate(endDate);
+        if (toResult instanceof ToolError error) {
+            aiMetrics.recordToolCall("getMedicalExamHistory", sample, "validation_error");
+            return error;
+        }
+
+        try {
+            var result = medicalExamsFacade.getExaminationHistory(deviceId, examTypeCode,
+                    fromResult != null ? (LocalDate) fromResult : null,
+                    toResult != null ? (LocalDate) toResult : null);
+            log.info("getMedicalExamHistory returned {} exams for type {}", result.size(), sanitizeForLog(examTypeCode));
+            aiMetrics.recordToolCall("getMedicalExamHistory", sample, "success");
+            return result;
+        } catch (Exception e) {
+            log.error("Error in getMedicalExamHistory for type: {}", sanitizeForLog(examTypeCode), e);
+            aiMetrics.recordToolCall("getMedicalExamHistory", sample, "error");
+            return new ToolError("Unable to retrieve examination history. Please try again later.");
+        }
+    }
+
+    @Tool(name = "getMarkerTrend",
+          description = "Retrieves trend data for a specific lab marker over time. " +
+                        "Use this to analyze changes in a single lab result value, e.g. 'Is my cholesterol increasing?'. " +
+                        "PARAMETERS: markerCode (String, required) - lab marker code, e.g. 'WBC', 'CHOLESTEROL_TOTAL', 'GLUCOSE', 'TSH'. " +
+                        "startDate and endDate (String, optional) - ISO-8601 format (YYYY-MM-DD).")
+    public Object getMarkerTrend(String markerCode, String startDate, String endDate, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("getMarkerTrend called - deviceId: {}, marker: {}", maskDeviceId(deviceId), sanitizeForLog(markerCode));
+        var sample = aiMetrics.startTimer();
+
+        if (markerCode == null || markerCode.isBlank()) {
+            aiMetrics.recordToolCall("getMarkerTrend", sample, "validation_error");
+            return new ToolError("markerCode cannot be empty.");
+        }
+
+        var fromResult = parseOptionalDate(startDate);
+        if (fromResult instanceof ToolError error) {
+            aiMetrics.recordToolCall("getMarkerTrend", sample, "validation_error");
+            return error;
+        }
+        var toResult = parseOptionalDate(endDate);
+        if (toResult instanceof ToolError error) {
+            aiMetrics.recordToolCall("getMarkerTrend", sample, "validation_error");
+            return error;
+        }
+
+        try {
+            var result = medicalExamsFacade.getMarkerTrend(deviceId, markerCode,
+                    fromResult != null ? (LocalDate) fromResult : null,
+                    toResult != null ? (LocalDate) toResult : null);
+            log.info("getMarkerTrend returned {} data points for marker {}", result.dataPoints().size(), sanitizeForLog(markerCode));
+            aiMetrics.recordToolCall("getMarkerTrend", sample, "success");
+            return result;
+        } catch (Exception e) {
+            log.error("Error in getMarkerTrend for marker: {}", sanitizeForLog(markerCode), e);
+            aiMetrics.recordToolCall("getMarkerTrend", sample, "error");
+            return new ToolError("Unable to retrieve marker trend. Please try again later.");
+        }
+    }
+
+    @Tool(name = "getHealthPillars",
+          description = "Retrieves the user's health pillar dashboard overview. " +
+                        "Returns a summary of all health pillars (CIRCULATORY, DIGESTIVE, METABOLISM, BLOOD_IMMUNITY, VITAMINS_MINERALS) " +
+                        "with their current status, score, and key markers. " +
+                        "Use this for general health overview questions.")
+    public Object getHealthPillars(ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("getHealthPillars called - deviceId: {}", maskDeviceId(deviceId));
+        var sample = aiMetrics.startTimer();
+
+        try {
+            var result = medicalExamsFacade.getHealthPillars(deviceId);
+            log.info("getHealthPillars returned {} pillars", result.pillars().size());
+            aiMetrics.recordToolCall("getHealthPillars", sample, "success");
+            return result;
+        } catch (Exception e) {
+            log.error("Error in getHealthPillars", e);
+            aiMetrics.recordToolCall("getHealthPillars", sample, "error");
+            return new ToolError("Unable to retrieve health pillars. Please try again later.");
+        }
+    }
+
+    @Tool(name = "getHealthPillarDetail",
+          description = "Retrieves detailed information for a specific health pillar, including sections and individual marker results. " +
+                        "PARAMETER: pillarCode (String, required) - one of: CIRCULATORY, DIGESTIVE, METABOLISM, BLOOD_IMMUNITY, VITAMINS_MINERALS.")
+    public Object getHealthPillarDetail(String pillarCode, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("getHealthPillarDetail called - deviceId: {}, pillar: {}", maskDeviceId(deviceId), sanitizeForLog(pillarCode));
+        var sample = aiMetrics.startTimer();
+
+        if (pillarCode == null || pillarCode.isBlank()) {
+            aiMetrics.recordToolCall("getHealthPillarDetail", sample, "validation_error");
+            return new ToolError("pillarCode cannot be empty. Valid values: CIRCULATORY, DIGESTIVE, METABOLISM, BLOOD_IMMUNITY, VITAMINS_MINERALS.");
+        }
+
+        try {
+            var result = medicalExamsFacade.getHealthPillarDetail(deviceId, pillarCode);
+            aiMetrics.recordToolCall("getHealthPillarDetail", sample, "success");
+            return result;
+        } catch (Exception e) {
+            log.error("Error in getHealthPillarDetail for pillar: {}", sanitizeForLog(pillarCode), e);
+            aiMetrics.recordToolCall("getHealthPillarDetail", sample, "error");
+            return new ToolError(mapExamReadErrorMessage(e));
+        }
+    }
+
+    @Tool(name = "getAvailableExamTypes",
+          description = "Retrieves all available medical examination type definitions. " +
+                        "Returns exam type codes, Polish names, categories (LAB_TEST, IMAGING, etc.), and associated specialties. " +
+                        "Use this when you need to know what exam types are supported or to find the correct examTypeCode.")
+    public Object getAvailableExamTypes(ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("getAvailableExamTypes called - deviceId: {}", maskDeviceId(deviceId));
+        var sample = aiMetrics.startTimer();
+
+        try {
+            var result = medicalExamsFacade.getExamTypes();
+            log.info("getAvailableExamTypes returned {} exam types", result.size());
+            aiMetrics.recordToolCall("getAvailableExamTypes", sample, "success");
+            return result;
+        } catch (Exception e) {
+            log.error("Error in getAvailableExamTypes", e);
+            aiMetrics.recordToolCall("getAvailableExamTypes", sample, "error");
+            return new ToolError("Unable to retrieve exam types. Please try again later.");
         }
     }
 
@@ -823,6 +1053,26 @@ class HealthTools {
     private static String maskDeviceId(String deviceId) {
         if (deviceId == null || deviceId.length() <= 8) return "***";
         return deviceId.substring(0, 4) + "..." + deviceId.substring(deviceId.length() - 4);
+    }
+
+    private Object parseOptionalDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(dateStr.trim());
+        } catch (DateTimeParseException e) {
+            log.warn("Invalid optional date format: {}", dateStr);
+            return new ToolError("Invalid date format: '" + dateStr + "'. Please use ISO-8601 format (YYYY-MM-DD), e.g. '2025-01-24'.");
+        }
+    }
+
+    private String mapExamReadErrorMessage(Exception e) {
+        var message = e.getMessage();
+        if (message == null) return "Unable to retrieve data. Please try again later.";
+        if (message.contains("not found") || message.contains("NotFoundException")) return "The requested examination was not found.";
+        if (message.contains("Invalid") || message.contains("invalid")) return "Invalid request parameters. Please check the provided values.";
+        return "Unable to retrieve data. Please try again later.";
     }
 
     // ==================== FUNCTIONAL INTERFACES & RECORDS ====================
