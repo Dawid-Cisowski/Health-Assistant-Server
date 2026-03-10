@@ -3,6 +3,7 @@ package com.healthassistant.medicalexamimport;
 import com.healthassistant.guardrails.api.GuardrailFacade;
 import com.healthassistant.guardrails.api.GuardrailProfile;
 import com.healthassistant.medicalexamimport.api.dto.ExtractedResultData;
+import com.healthassistant.medicalexams.api.ExamSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -265,7 +266,7 @@ class MedicalExamContentExtractor {
 
         return ExtractedExamData.valid(
                 date, performedAt, response.laboratory(), response.orderingDoctor(),
-                sections, confidence, "AI_IMPORT");
+                sections, confidence, ExamSource.AI_IMPORT.name());
     }
 
     private List<ExtractedResultData> transformResults(List<AiMedicalExamExtractionResponse.AiExtractedResult> aiResults) {

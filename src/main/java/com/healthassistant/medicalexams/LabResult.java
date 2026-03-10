@@ -2,6 +2,8 @@ package com.healthassistant.medicalexams;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -85,8 +87,9 @@ class LabResult {
     @Column(name = "value_text", length = 500)
     private String valueText;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String flag;
+    private ResultFlag flag;
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
@@ -197,10 +200,10 @@ class LabResult {
         this.updatedAt = Instant.now();
     }
 
-    private static String calculateFlag(BigDecimal value, BigDecimal refLow, BigDecimal refHigh,
-                                         BigDecimal defaultLow, BigDecimal defaultHigh,
-                                         BigDecimal defaultWarningHigh) {
-        if (value == null) return "UNKNOWN";
+    private static ResultFlag calculateFlag(BigDecimal value, BigDecimal refLow, BigDecimal refHigh,
+                                             BigDecimal defaultLow, BigDecimal defaultHigh,
+                                             BigDecimal defaultWarningHigh) {
+        if (value == null) return ResultFlag.UNKNOWN;
 
         // Treat 0/0 as absent — AI extraction artifact when the document has no
         // numeric reference range (e.g. "≥40" for HDL results in 0/0 being stored).
@@ -211,11 +214,11 @@ class LabResult {
         BigDecimal low  = (!docRangeIsZeroZero && refLow  != null) ? refLow  : defaultLow;
         BigDecimal high = (!docRangeIsZeroZero && refHigh != null) ? refHigh : defaultHigh;
 
-        if (low == null && high == null && defaultWarningHigh == null) return "UNKNOWN";
-        if (high != null && value.compareTo(high) > 0) return "HIGH";
-        if (defaultWarningHigh != null && value.compareTo(defaultWarningHigh) > 0) return "NORMAL";
-        if (defaultWarningHigh != null && (low == null || value.compareTo(low) >= 0)) return "WARNING";
-        if (low  != null && value.compareTo(low)  < 0) return "LOW";
-        return "NORMAL";
+        if (low == null && high == null && defaultWarningHigh == null) return ResultFlag.UNKNOWN;
+        if (high != null && value.compareTo(high) > 0) return ResultFlag.HIGH;
+        if (defaultWarningHigh != null && value.compareTo(defaultWarningHigh) > 0) return ResultFlag.NORMAL;
+        if (defaultWarningHigh != null && (low == null || value.compareTo(low) >= 0)) return ResultFlag.WARNING;
+        if (low  != null && value.compareTo(low)  < 0) return ResultFlag.LOW;
+        return ResultFlag.NORMAL;
     }
 }

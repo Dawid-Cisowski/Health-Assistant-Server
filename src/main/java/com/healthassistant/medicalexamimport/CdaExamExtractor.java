@@ -2,6 +2,7 @@ package com.healthassistant.medicalexamimport;
 
 import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.medicalexamimport.api.dto.ExtractedResultData;
+import com.healthassistant.medicalexams.api.ExamSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
@@ -53,7 +54,7 @@ class CdaExamExtractor {
                     collectionDate, performedAt, laboratory, sections.size());
 
             return ExtractedExamData.valid(collectionDate, performedAt, laboratory, null,
-                    sections, BigDecimal.ONE, "CDA_IMPORT");
+                    sections, BigDecimal.ONE, ExamSource.CDA_IMPORT.name());
         } catch (Exception e) {
             log.error("CDA parsing failed: {}", SecurityUtils.sanitizeForLog(e.getMessage()), e);
             return ExtractedExamData.invalid("CDA parsing failed", BigDecimal.ZERO);

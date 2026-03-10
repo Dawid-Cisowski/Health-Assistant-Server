@@ -1,8 +1,11 @@
 package com.healthassistant.medicalexams;
 
+import com.healthassistant.medicalexams.api.ExamSource;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -22,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -63,8 +67,9 @@ class Examination {
     @Column(name = "ordering_doctor", length = 255)
     private String orderingDoctor;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
-    private String status;
+    private ExaminationStatus status;
 
     @Column(name = "display_type", nullable = false, length = 30)
     private String displayType;
@@ -92,8 +97,9 @@ class Examination {
     @Column(columnDefinition = "TEXT")
     private String recommendations;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 20)
-    private String source;
+    private ExamSource source;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -110,7 +116,7 @@ class Examination {
     static Examination create(String deviceId, ExamTypeDefinition examType, String title, LocalDate date,
                               Instant performedAt, Instant resultsReceivedAt, String laboratory,
                               String orderingDoctor, String notes, String reportText,
-                              String conclusions, String recommendations, String source) {
+                              String conclusions, String recommendations, ExamSource source) {
         var exam = new Examination();
         exam.id = UUID.randomUUID();
         exam.deviceId = deviceId;
@@ -125,8 +131,8 @@ class Examination {
         exam.reportText = reportText;
         exam.conclusions = conclusions;
         exam.recommendations = recommendations;
-        exam.source = source != null ? source : "MANUAL";
-        exam.status = "COMPLETED";
+        exam.source = source != null ? source : ExamSource.MANUAL;
+        exam.status = ExaminationStatus.COMPLETED;
         exam.displayType = examType.getDisplayType();
         exam.specialties = examType.getSpecialties() != null ? new ArrayList<>(examType.getSpecialties()) : new ArrayList<>();
         var now = Instant.now();
@@ -153,10 +159,8 @@ class Examination {
     }
 
     void recalculateStatus() {
-        boolean hasAbnormal = results.stream()
-                .anyMatch(r -> "HIGH".equals(r.getFlag()) || "LOW".equals(r.getFlag())
-                        || "CRITICAL_HIGH".equals(r.getFlag()) || "CRITICAL_LOW".equals(r.getFlag()));
-        this.status = hasAbnormal ? "ABNORMAL" : "COMPLETED";
+        boolean hasAbnormal = results.stream().anyMatch(r -> r.getFlag().isAbnormal());
+        this.status = hasAbnormal ? ExaminationStatus.ABNORMAL : ExaminationStatus.COMPLETED;
         this.updatedAt = Instant.now();
     }
 
@@ -176,13 +180,21 @@ class Examination {
         attachments.remove(attachment);
     }
 
+    Optional<LabResult> findResult(UUID resultId) {
+        return results.stream().filter(r -> r.getId().equals(resultId)).findFirst();
+    }
+
+    Optional<ExaminationAttachment> findAttachment(UUID attachmentId) {
+        return attachments.stream().filter(a -> a.getId().equals(attachmentId)).findFirst();
+    }
+
     int getResultCount() {
         return results.size();
     }
 
     int getAbnormalCount() {
         return (int) results.stream()
-                .filter(r -> !"NORMAL".equals(r.getFlag()) && !"UNKNOWN".equals(r.getFlag()))
+                .filter(r -> r.getFlag() != ResultFlag.NORMAL && r.getFlag() != ResultFlag.UNKNOWN)
                 .count();
     }
 
