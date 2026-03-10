@@ -13,6 +13,10 @@ import com.healthassistant.weight.api.WeightFacade
 import com.healthassistant.heartrate.api.HeartRateFacade
 import com.healthassistant.mealcatalog.api.MealCatalogFacade
 import com.healthassistant.mealcatalog.api.dto.SaveProductRequest
+import com.healthassistant.medicalexams.api.MedicalExamsFacade
+import com.healthassistant.medicalexams.api.dto.AddLabResultsRequest
+import com.healthassistant.medicalexams.api.dto.CreateExaminationRequest
+import com.healthassistant.medicalexams.api.dto.LabResultEntry
 import io.restassured.RestAssured
 import io.restassured.http.ContentType
 import org.awaitility.Awaitility
@@ -103,6 +107,9 @@ abstract class BaseEvaluationSpec extends Specification {
     MealCatalogFacade mealCatalogFacade
 
     @Autowired
+    MedicalExamsFacade medicalExamsFacade
+
+    @Autowired
     JdbcTemplate jdbcTemplate
 
     @Autowired(required = false)
@@ -142,7 +149,8 @@ abstract class BaseEvaluationSpec extends Specification {
             "AiMealCatalogBenchmarkSpec",
             "AiMedicalExamImportEvalSpec",
             "AiMedicalExamBenchmarkSpec",
-            "AiMedicalExamSectionInterpretEvalSpec"
+            "AiMedicalExamSectionInterpretEvalSpec",
+            "AiMedicalExamToolsEvalSpec"
         ]
 
         def devicesMap = new StringBuilder('{')
@@ -216,6 +224,23 @@ abstract class BaseEvaluationSpec extends Specification {
 
     void seedCatalogProduct(String title, String mealType, int calories, int protein, int fat, int carbs, String healthRating) {
         mealCatalogFacade.saveProduct(getTestDeviceId(), new SaveProductRequest(title, mealType, calories, protein, fat, carbs, healthRating))
+    }
+
+    // ==================== Medical Exam Helpers ====================
+
+    UUID seedExamination(String examTypeCode, String title, LocalDate date, String laboratory = null) {
+        def request = new CreateExaminationRequest(
+                examTypeCode, title, date,
+                null, null, laboratory, null, null, null, null, null, "MANUAL"
+        )
+        def exam = medicalExamsFacade.createExamination(getTestDeviceId(), request)
+        return exam.id()
+    }
+
+    void seedLabResult(UUID examId, String markerCode, String markerName, BigDecimal value, String unit,
+                       BigDecimal refLow = null, BigDecimal refHigh = null) {
+        def entry = new LabResultEntry(markerCode, markerName, null, value, unit, refLow, refHigh, null, null, 1)
+        medicalExamsFacade.addResults(getTestDeviceId(), examId, new AddLabResultsRequest(List.of(entry)))
     }
 
     // ==================== Meal Import Helpers ====================

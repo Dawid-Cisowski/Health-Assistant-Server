@@ -2,11 +2,13 @@ package com.healthassistant.assistant;
 
 import com.healthassistant.bodymeasurements.api.BodyMeasurementsFacade;
 import com.healthassistant.bodymeasurements.api.dto.BodyPart;
+import com.healthassistant.bodymeasurements.api.dto.UpdateBodyMeasurementRequest;
 import com.healthassistant.dailysummary.api.DailySummaryFacade;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.mealcatalog.api.MealCatalogFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
+import com.healthassistant.healthevents.api.dto.payload.BodyMeasurementPayload;
 import com.healthassistant.healthevents.api.dto.payload.HealthRating;
 import com.healthassistant.healthevents.api.dto.payload.MealType;
 import com.healthassistant.healthevents.api.dto.payload.SleepSessionPayload;
@@ -776,6 +778,164 @@ class HealthTools {
         });
     }
 
+    @Tool(name = "recordBodyMeasurement",
+          description = "Records a new body measurement (dimensions like biceps, waist, chest, etc.). " +
+                        "PARAMETERS: measuredAt (String, optional) - ISO-8601 UTC timestamp, defaults to now. " +
+                        "All body part params are optional Strings in cm (must provide at least one): " +
+                        "bicepsLeftCm, bicepsRightCm, forearmLeftCm, forearmRightCm, chestCm, waistCm, abdomenCm, hipsCm, neckCm, shouldersCm, thighLeftCm, thighRightCm, calfLeftCm, calfRightCm. " +
+                        "notes (String, optional) - additional notes.")
+    public Object recordBodyMeasurement(String measuredAt, String bicepsLeftCm, String bicepsRightCm,
+            String forearmLeftCm, String forearmRightCm, String chestCm, String waistCm,
+            String abdomenCm, String hipsCm, String neckCm, String shouldersCm,
+            String thighLeftCm, String thighRightCm, String calfLeftCm, String calfRightCm,
+            String notes, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Recording body measurement for device {}", maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("recordBodyMeasurement", () -> {
+            var parsedBicepsLeft = parseOptionalPositiveBigDecimal(bicepsLeftCm, "bicepsLeftCm");
+            var parsedBicepsRight = parseOptionalPositiveBigDecimal(bicepsRightCm, "bicepsRightCm");
+            var parsedForearmLeft = parseOptionalPositiveBigDecimal(forearmLeftCm, "forearmLeftCm");
+            var parsedForearmRight = parseOptionalPositiveBigDecimal(forearmRightCm, "forearmRightCm");
+            var parsedChest = parseOptionalPositiveBigDecimal(chestCm, "chestCm");
+            var parsedWaist = parseOptionalPositiveBigDecimal(waistCm, "waistCm");
+            var parsedAbdomen = parseOptionalPositiveBigDecimal(abdomenCm, "abdomenCm");
+            var parsedHips = parseOptionalPositiveBigDecimal(hipsCm, "hipsCm");
+            var parsedNeck = parseOptionalPositiveBigDecimal(neckCm, "neckCm");
+            var parsedShoulders = parseOptionalPositiveBigDecimal(shouldersCm, "shouldersCm");
+            var parsedThighLeft = parseOptionalPositiveBigDecimal(thighLeftCm, "thighLeftCm");
+            var parsedThighRight = parseOptionalPositiveBigDecimal(thighRightCm, "thighRightCm");
+            var parsedCalfLeft = parseOptionalPositiveBigDecimal(calfLeftCm, "calfLeftCm");
+            var parsedCalfRight = parseOptionalPositiveBigDecimal(calfRightCm, "calfRightCm");
+
+            boolean hasAnyMeasurement = java.util.stream.Stream.of(
+                    parsedBicepsLeft, parsedBicepsRight, parsedForearmLeft, parsedForearmRight,
+                    parsedChest, parsedWaist, parsedAbdomen, parsedHips,
+                    parsedNeck, parsedShoulders, parsedThighLeft, parsedThighRight,
+                    parsedCalfLeft, parsedCalfRight
+            ).anyMatch(java.util.Objects::nonNull);
+
+            if (!hasAnyMeasurement) {
+                throw new IllegalArgumentException("at least one measurement field must be provided");
+            }
+
+            var timestamp = measuredAt != null && !measuredAt.isBlank()
+                    ? parseInstant(measuredAt, "measuredAt")
+                    : Instant.now();
+
+            var measurementId = "assistant-body-" + UUID.randomUUID();
+            var payload = new BodyMeasurementPayload(
+                    measurementId, timestamp,
+                    parsedBicepsLeft, parsedBicepsRight,
+                    parsedForearmLeft, parsedForearmRight,
+                    parsedChest, parsedWaist, parsedAbdomen, parsedHips,
+                    parsedNeck, parsedShoulders,
+                    parsedThighLeft, parsedThighRight,
+                    parsedCalfLeft, parsedCalfRight,
+                    validateNotes(notes)
+            );
+
+            var idempotencyKey = deviceId + "|body-measurement|" + measurementId;
+            var command = new StoreHealthEventsCommand(
+                    List.of(new StoreHealthEventsCommand.EventEnvelope(
+                            new IdempotencyKey(idempotencyKey),
+                            "BodyMeasurementRecorded.v1",
+                            timestamp,
+                            payload
+                    )),
+                    new DeviceId(deviceId)
+            );
+
+            var result = healthEventsFacade.storeHealthEvents(command);
+            validateStoreResult(result, "body measurement");
+
+            var eventId = result.results().getFirst().eventId().value();
+            log.info("Body measurement recorded: measurementId={}", sanitizeForLog(measurementId));
+            return new MutationSuccess("Body measurement recorded successfully",
+                    new BodyMeasurementRecordResult(eventId, measurementId, timestamp));
+        });
+    }
+
+    @Tool(name = "deleteBodyMeasurement",
+          description = "Deletes a body measurement. Use getBodyMeasurementsData first to get the eventId. " +
+                        "IMPORTANT: Always confirm with the user before deleting. " +
+                        "PARAMETER: eventId (String, required) - the eventId of the body measurement to delete.")
+    public Object deleteBodyMeasurement(String eventId, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Deleting body measurement {} for device {}", sanitizeForLog(eventId), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("deleteBodyMeasurement", () -> {
+            validateEventId(eventId);
+            bodyMeasurementsFacade.deleteBodyMeasurement(deviceId, eventId);
+            log.info("Body measurement deleted: eventId={}", sanitizeForLog(eventId));
+            return new MutationSuccess("Body measurement deleted successfully", null);
+        });
+    }
+
+    @Tool(name = "updateBodyMeasurement",
+          description = "Updates an existing body measurement. Use getBodyMeasurementsData first to get the eventId. " +
+                        "Only provided fields will be updated, others keep their existing values. " +
+                        "PARAMETERS: eventId (String, required) - the eventId of the body measurement to update. " +
+                        "measuredAt (String, optional) - ISO-8601 UTC timestamp. " +
+                        "All body part params are optional Strings in cm (must provide at least one): " +
+                        "bicepsLeftCm, bicepsRightCm, forearmLeftCm, forearmRightCm, chestCm, waistCm, abdomenCm, hipsCm, neckCm, shouldersCm, thighLeftCm, thighRightCm, calfLeftCm, calfRightCm. " +
+                        "notes (String, optional) - additional notes.")
+    public Object updateBodyMeasurement(String eventId, String measuredAt, String bicepsLeftCm, String bicepsRightCm,
+            String forearmLeftCm, String forearmRightCm, String chestCm, String waistCm,
+            String abdomenCm, String hipsCm, String neckCm, String shouldersCm,
+            String thighLeftCm, String thighRightCm, String calfLeftCm, String calfRightCm,
+            String notes, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Updating body measurement {} for device {}", sanitizeForLog(eventId), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("updateBodyMeasurement", () -> {
+            validateEventId(eventId);
+
+            var parsedBicepsLeft = parseOptionalPositiveBigDecimal(bicepsLeftCm, "bicepsLeftCm");
+            var parsedBicepsRight = parseOptionalPositiveBigDecimal(bicepsRightCm, "bicepsRightCm");
+            var parsedForearmLeft = parseOptionalPositiveBigDecimal(forearmLeftCm, "forearmLeftCm");
+            var parsedForearmRight = parseOptionalPositiveBigDecimal(forearmRightCm, "forearmRightCm");
+            var parsedChest = parseOptionalPositiveBigDecimal(chestCm, "chestCm");
+            var parsedWaist = parseOptionalPositiveBigDecimal(waistCm, "waistCm");
+            var parsedAbdomen = parseOptionalPositiveBigDecimal(abdomenCm, "abdomenCm");
+            var parsedHips = parseOptionalPositiveBigDecimal(hipsCm, "hipsCm");
+            var parsedNeck = parseOptionalPositiveBigDecimal(neckCm, "neckCm");
+            var parsedShoulders = parseOptionalPositiveBigDecimal(shouldersCm, "shouldersCm");
+            var parsedThighLeft = parseOptionalPositiveBigDecimal(thighLeftCm, "thighLeftCm");
+            var parsedThighRight = parseOptionalPositiveBigDecimal(thighRightCm, "thighRightCm");
+            var parsedCalfLeft = parseOptionalPositiveBigDecimal(calfLeftCm, "calfLeftCm");
+            var parsedCalfRight = parseOptionalPositiveBigDecimal(calfRightCm, "calfRightCm");
+
+            var parsedMeasuredAt = measuredAt != null && !measuredAt.isBlank()
+                    ? parseInstant(measuredAt, "measuredAt")
+                    : null;
+
+            boolean hasAnyUpdate = java.util.stream.Stream.of(
+                    parsedBicepsLeft, parsedBicepsRight, parsedForearmLeft, parsedForearmRight,
+                    parsedChest, parsedWaist, parsedAbdomen, parsedHips,
+                    parsedNeck, parsedShoulders, parsedThighLeft, parsedThighRight,
+                    parsedCalfLeft, parsedCalfRight
+            ).anyMatch(java.util.Objects::nonNull)
+                    || parsedMeasuredAt != null
+                    || (notes != null && !notes.isBlank());
+
+            if (!hasAnyUpdate) {
+                throw new IllegalArgumentException("at least one measurement field must be provided");
+            }
+
+            var request = new UpdateBodyMeasurementRequest(
+                    parsedBicepsLeft, parsedBicepsRight, parsedForearmLeft, parsedForearmRight,
+                    parsedChest, parsedWaist, parsedAbdomen, parsedHips,
+                    parsedNeck, parsedShoulders, parsedThighLeft, parsedThighRight,
+                    parsedCalfLeft, parsedCalfRight, parsedMeasuredAt, validateNotes(notes)
+            );
+
+            bodyMeasurementsFacade.updateBodyMeasurement(deviceId, eventId, request);
+            log.info("Body measurement updated: eventId={}", sanitizeForLog(eventId));
+            return new MutationSuccess("Body measurement updated successfully", null);
+        });
+    }
+
     // ==================== HELPER METHODS ====================
 
     private <T> Object validateAndExecuteMutation(String toolName, MutationCommand<T> command) {
@@ -955,6 +1115,28 @@ class HealthTools {
         }
     }
 
+    private static String validateNotes(String notes) {
+        if (notes != null && notes.length() > 500) {
+            throw new IllegalArgumentException("notes must not exceed 500 characters");
+        }
+        return notes;
+    }
+
+    private BigDecimal parseOptionalPositiveBigDecimal(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            var parsed = new BigDecimal(value.trim());
+            if (parsed.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException(fieldName + " must be a positive number, got: " + value);
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(fieldName + " must be a valid decimal number, got: " + value, e);
+        }
+    }
+
     private BigDecimal parsePositiveBigDecimal(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " cannot be empty");
@@ -1112,4 +1294,6 @@ class HealthTools {
     record WorkoutRecordResult(String eventId, String workoutId, Instant performedAt, int exerciseCount, int totalSets) {}
 
     record SleepRecordResult(String eventId, Instant sleepStart, Instant sleepEnd, int totalMinutes) {}
+
+    record BodyMeasurementRecordResult(String eventId, String measurementId, Instant measuredAt) {}
 }

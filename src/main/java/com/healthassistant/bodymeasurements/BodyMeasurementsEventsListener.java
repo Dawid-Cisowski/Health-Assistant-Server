@@ -1,5 +1,6 @@
 package com.healthassistant.bodymeasurements;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.dto.events.BodyMeasurementsEventsStoredEvent;
 import com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredEvent;
 import lombok.RequiredArgsConstructor;
@@ -24,11 +25,11 @@ class BodyMeasurementsEventsListener {
         var results = event.events().stream()
                 .map(eventData -> {
                     try {
-                        log.debug("Processing BodyMeasurementRecorded event: {}", eventData.eventId().value());
+                        log.debug("Processing BodyMeasurementRecorded event: {}", SecurityUtils.sanitizeForLog(eventData.eventId().value()));
                         bodyMeasurementsProjector.projectBodyMeasurement(eventData);
                         return true;
                     } catch (Exception e) {
-                        log.error("Failed to project body measurement for event: {}", eventData.eventId().value(), e);
+                        log.error("Failed to project body measurement for event: {}", SecurityUtils.sanitizeForLog(eventData.eventId().value()), e);
                         return false;
                     }
                 })
@@ -51,30 +52,38 @@ class BodyMeasurementsEventsListener {
                 .filter(d -> BODY_MEASUREMENT_V1.equals(d.targetEventType()))
                 .toList();
 
-        if (bodyMeasurementDeletions.isEmpty()) {
+        var bodyMeasurementCorrections = event.corrections().stream()
+                .filter(c -> BODY_MEASUREMENT_V1.equals(c.targetEventType()) || BODY_MEASUREMENT_V1.equals(c.correctedEventType()))
+                .toList();
+
+        if (bodyMeasurementDeletions.isEmpty() && bodyMeasurementCorrections.isEmpty()) {
             return;
         }
 
-        log.info("Body measurements listener processing {} deletions", bodyMeasurementDeletions.size());
+        log.info("Body measurements listener processing {} deletions and {} corrections",
+                bodyMeasurementDeletions.size(), bodyMeasurementCorrections.size());
 
-        var results = bodyMeasurementDeletions.stream()
-                .map(deletion -> {
-                    try {
-                        bodyMeasurementsProjector.deleteByEventId(deletion.targetEventId());
-                        return true;
-                    } catch (Exception e) {
-                        log.error("Failed to delete body measurement projection for eventId: {}", deletion.targetEventId(), e);
-                        return false;
-                    }
-                })
-                .toList();
+        bodyMeasurementDeletions.forEach(deletion -> {
+            try {
+                bodyMeasurementsProjector.deleteByEventId(deletion.targetEventId());
+            } catch (Exception e) {
+                log.error("Failed to delete body measurement projection for eventId: {}", SecurityUtils.sanitizeForLog(deletion.targetEventId()), e);
+            }
+        });
 
-        long successCount = results.stream().filter(Boolean::booleanValue).count();
-        long failureCount = results.size() - successCount;
-
-        if (failureCount > 0) {
-            log.error("Body measurements deletion completed with failures: {} succeeded, {} failed",
-                    successCount, failureCount);
-        }
+        bodyMeasurementCorrections.forEach(correction -> {
+            try {
+                bodyMeasurementsProjector.deleteByEventId(correction.targetEventId());
+                if (BODY_MEASUREMENT_V1.equals(correction.correctedEventType()) && correction.correctedPayload() != null) {
+                    bodyMeasurementsProjector.projectCorrectedBodyMeasurement(
+                            event.deviceId(),
+                            correction.correctedPayload(),
+                            correction.correctedOccurredAt()
+                    );
+                }
+            } catch (Exception e) {
+                log.error("Failed to process correction for body measurement eventId: {}", SecurityUtils.sanitizeForLog(correction.targetEventId()), e);
+            }
+        });
     }
 }

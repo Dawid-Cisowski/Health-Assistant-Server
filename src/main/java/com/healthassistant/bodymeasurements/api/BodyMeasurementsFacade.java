@@ -6,6 +6,7 @@ import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementSummaryResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyPart;
 import com.healthassistant.bodymeasurements.api.dto.BodyPartHistoryResponse;
+import com.healthassistant.bodymeasurements.api.dto.UpdateBodyMeasurementRequest;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 
 import java.time.LocalDate;
@@ -81,4 +82,24 @@ public interface BodyMeasurementsFacade {
      * @param events the events to project
      */
     void projectEvents(List<StoredEventData> events);
+
+    /**
+     * Deletes a body measurement by its event ID.
+     *
+     * @param deviceId the device identifier
+     * @param eventId the event identifier of the body measurement to delete
+     * @throws IllegalArgumentException if the event is not found or not a body measurement
+     */
+    void deleteBodyMeasurement(String deviceId, String eventId);
+
+    /**
+     * Updates a body measurement by correcting the original event.
+     *
+     * @param deviceId the device identifier
+     * @param eventId the event identifier of the body measurement to update
+     * @param request the update request with new measurement values
+     * @return the updated body measurement response
+     * @throws IllegalArgumentException if the event is not found or not a body measurement
+     */
+    BodyMeasurementResponse updateBodyMeasurement(String deviceId, String eventId, UpdateBodyMeasurementRequest request);
 }

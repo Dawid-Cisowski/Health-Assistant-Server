@@ -1,5 +1,6 @@
 package com.healthassistant.bodymeasurements;
 
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.bodymeasurements.api.BodyMeasurementsFacade;
 import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementLatestResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementRangeSummaryResponse;
@@ -7,10 +8,19 @@ import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyMeasurementSummaryResponse;
 import com.healthassistant.bodymeasurements.api.dto.BodyPart;
 import com.healthassistant.bodymeasurements.api.dto.BodyPartHistoryResponse;
+import com.healthassistant.bodymeasurements.api.dto.UpdateBodyMeasurementRequest;
 import com.healthassistant.config.SecurityUtils;
+import com.healthassistant.healthevents.api.HealthEventsFacade;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
+import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import lombok.RequiredArgsConstructor;
+import com.healthassistant.healthevents.api.dto.payload.BodyMeasurementPayload;
+import com.healthassistant.healthevents.api.dto.payload.EventCorrectedPayload;
+import com.healthassistant.healthevents.api.dto.payload.EventDeletedPayload;
+import com.healthassistant.healthevents.api.model.DeviceId;
+import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +29,6 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,15 +36,31 @@ import java.util.Optional;
 import java.util.function.Function;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
 class BodyMeasurementsService implements BodyMeasurementsFacade {
 
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+    private static final String BODY_MEASUREMENT_V1 = "BodyMeasurementRecorded.v1";
+    private static final String EVENT_DELETED_V1 = "EventDeleted.v1";
+    private static final String EVENT_CORRECTED_V1 = "EventCorrected.v1";
 
     private final BodyMeasurementProjectionJpaRepository repository;
     private final BodyMeasurementsProjector bodyMeasurementsProjector;
+    private final HealthEventsFacade healthEventsFacade;
+    private final ObjectMapper objectMapper;
+
+    BodyMeasurementsService(
+            BodyMeasurementProjectionJpaRepository repository,
+            BodyMeasurementsProjector bodyMeasurementsProjector,
+            @Lazy HealthEventsFacade healthEventsFacade,
+            ObjectMapper objectMapper
+    ) {
+        this.repository = repository;
+        this.bodyMeasurementsProjector = bodyMeasurementsProjector;
+        this.healthEventsFacade = healthEventsFacade;
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public Optional<BodyMeasurementLatestResponse> getLatestMeasurement(String deviceId) {
@@ -265,8 +290,158 @@ class BodyMeasurementsService implements BodyMeasurementsFacade {
         }
     }
 
+    @Override
+    @Transactional
+    public void deleteBodyMeasurement(String deviceId, String eventId) {
+        StoredEventData existingEvent = healthEventsFacade.findEventById(deviceId, eventId)
+                .orElseGet(() -> {
+                    log.warn("Security: Device {} attempted to delete eventId {} which doesn't exist or belongs to another device",
+                            SecurityUtils.maskDeviceId(deviceId), sanitizeForLog(eventId));
+                    throw new BodyMeasurementNotFoundException(eventId);
+                });
+
+        if (!BODY_MEASUREMENT_V1.equals(existingEvent.eventType().value())) {
+            log.warn("Security: Device {} attempted to delete eventId {} which is not a body measurement event (type: {})",
+                    SecurityUtils.maskDeviceId(deviceId), sanitizeForLog(eventId), existingEvent.eventType().value());
+            throw new BodyMeasurementNotFoundException(eventId);
+        }
+
+        var payload = new EventDeletedPayload(
+                eventId,
+                existingEvent.idempotencyKey().value(),
+                "User requested deletion"
+        );
+
+        var idempotencyKey = deviceId + "|delete|" + eventId;
+
+        var command = new StoreHealthEventsCommand(
+                List.of(new StoreHealthEventsCommand.EventEnvelope(
+                        new IdempotencyKey(idempotencyKey),
+                        EVENT_DELETED_V1,
+                        Instant.now(),
+                        payload
+                )),
+                new DeviceId(deviceId)
+        );
+
+        log.info("Deleting body measurement {} for device {}", sanitizeForLog(eventId), SecurityUtils.maskDeviceId(deviceId));
+        StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
+
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+            log.error("Failed to delete body measurement for device {}: unexpected result",
+                    SecurityUtils.maskDeviceId(deviceId));
+            throw new IllegalStateException("Failed to delete body measurement");
+        }
+    }
+
+    @Override
+    @Transactional
+    public BodyMeasurementResponse updateBodyMeasurement(String deviceId, String eventId, UpdateBodyMeasurementRequest request) {
+        StoredEventData existingEvent = healthEventsFacade.findEventById(deviceId, eventId)
+                .orElseGet(() -> {
+                    log.warn("Security: Device {} attempted to update eventId {} which doesn't exist or belongs to another device",
+                            SecurityUtils.maskDeviceId(deviceId), sanitizeForLog(eventId));
+                    throw new BodyMeasurementNotFoundException(eventId);
+                });
+
+        if (!BODY_MEASUREMENT_V1.equals(existingEvent.eventType().value())) {
+            log.warn("Security: Device {} attempted to update eventId {} which is not a body measurement event (type: {})",
+                    SecurityUtils.maskDeviceId(deviceId), sanitizeForLog(eventId), existingEvent.eventType().value());
+            throw new BodyMeasurementNotFoundException(eventId);
+        }
+
+        BodyMeasurementPayload existingPayload = (BodyMeasurementPayload) existingEvent.payload();
+        Instant newOccurredAt = request.measuredAt() != null ? request.measuredAt() : existingEvent.occurredAt();
+
+        BodyMeasurementPayload correctedPayload = new BodyMeasurementPayload(
+                existingPayload.measurementId(),
+                newOccurredAt,
+                request.bicepsLeftCm() != null ? request.bicepsLeftCm() : existingPayload.bicepsLeftCm(),
+                request.bicepsRightCm() != null ? request.bicepsRightCm() : existingPayload.bicepsRightCm(),
+                request.forearmLeftCm() != null ? request.forearmLeftCm() : existingPayload.forearmLeftCm(),
+                request.forearmRightCm() != null ? request.forearmRightCm() : existingPayload.forearmRightCm(),
+                request.chestCm() != null ? request.chestCm() : existingPayload.chestCm(),
+                request.waistCm() != null ? request.waistCm() : existingPayload.waistCm(),
+                request.abdomenCm() != null ? request.abdomenCm() : existingPayload.abdomenCm(),
+                request.hipsCm() != null ? request.hipsCm() : existingPayload.hipsCm(),
+                request.neckCm() != null ? request.neckCm() : existingPayload.neckCm(),
+                request.shouldersCm() != null ? request.shouldersCm() : existingPayload.shouldersCm(),
+                request.thighLeftCm() != null ? request.thighLeftCm() : existingPayload.thighLeftCm(),
+                request.thighRightCm() != null ? request.thighRightCm() : existingPayload.thighRightCm(),
+                request.calfLeftCm() != null ? request.calfLeftCm() : existingPayload.calfLeftCm(),
+                request.calfRightCm() != null ? request.calfRightCm() : existingPayload.calfRightCm(),
+                request.notes() != null ? request.notes() : existingPayload.notes()
+        );
+
+        Map<String, Object> payloadMap = objectMapper.convertValue(
+                correctedPayload,
+                new tools.jackson.core.type.TypeReference<Map<String, Object>>() {}
+        );
+
+        var correctionEvent = new EventCorrectedPayload(
+                eventId,
+                existingEvent.idempotencyKey().value(),
+                BODY_MEASUREMENT_V1,
+                payloadMap,
+                newOccurredAt,
+                "User requested update"
+        );
+
+        var idempotencyKey = deviceId + "|correct|" + eventId + "|" + newOccurredAt.toEpochMilli();
+
+        var command = new StoreHealthEventsCommand(
+                List.of(new StoreHealthEventsCommand.EventEnvelope(
+                        new IdempotencyKey(idempotencyKey),
+                        EVENT_CORRECTED_V1,
+                        Instant.now(),
+                        correctionEvent
+                )),
+                new DeviceId(deviceId)
+        );
+
+        log.info("Updating body measurement {} for device {}", sanitizeForLog(eventId), SecurityUtils.maskDeviceId(deviceId));
+        StoreHealthEventsResult result = healthEventsFacade.storeHealthEvents(command);
+
+        if (result.results().isEmpty() || result.results().getFirst().status() == StoreHealthEventsResult.EventStatus.invalid) {
+            log.error("Failed to update body measurement for device {}: unexpected result",
+                    SecurityUtils.maskDeviceId(deviceId));
+            throw new IllegalStateException("Failed to update body measurement");
+        }
+
+        String newEventId = result.results().getFirst().eventId().value();
+        LocalDate date = newOccurredAt.atZone(POLAND_ZONE).toLocalDate();
+
+        return new BodyMeasurementResponse(
+                newEventId,
+                existingPayload.measurementId(),
+                date,
+                newOccurredAt,
+                correctedPayload.bicepsLeftCm(),
+                correctedPayload.bicepsRightCm(),
+                correctedPayload.forearmLeftCm(),
+                correctedPayload.forearmRightCm(),
+                correctedPayload.chestCm(),
+                correctedPayload.waistCm(),
+                correctedPayload.abdomenCm(),
+                correctedPayload.hipsCm(),
+                correctedPayload.neckCm(),
+                correctedPayload.shouldersCm(),
+                correctedPayload.thighLeftCm(),
+                correctedPayload.thighRightCm(),
+                correctedPayload.calfLeftCm(),
+                correctedPayload.calfRightCm(),
+                correctedPayload.notes()
+        );
+    }
+
+    private static String sanitizeForLog(String value) {
+        if (value == null) return "null";
+        return value.replaceAll("[\\r\\n\\t]", "_").substring(0, Math.min(value.length(), 100));
+    }
+
     private BodyMeasurementResponse toResponse(BodyMeasurementProjectionJpaEntity entity) {
         return new BodyMeasurementResponse(
+                entity.getEventId(),
                 entity.getMeasurementId(),
                 entity.getDate(),
                 entity.getMeasuredAt(),

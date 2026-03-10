@@ -9,6 +9,10 @@ import java.time.LocalDate;
 
 @Schema(description = "Body measurement with all dimensions")
 public record BodyMeasurementResponse(
+    @JsonProperty("eventId")
+    @Schema(description = "Event identifier for mutation operations", example = "evt_abc123")
+    String eventId,
+
     @JsonProperty("measurementId")
     @Schema(description = "Unique measurement identifier", example = "body-2025-01-15-abc123")
     String measurementId,

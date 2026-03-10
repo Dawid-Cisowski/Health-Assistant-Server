@@ -8,6 +8,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -62,10 +64,16 @@ class BodyMeasurementsProjector {
     }
 
     @Transactional
+    public void projectCorrectedBodyMeasurement(String deviceId, Map<String, Object> payload, Instant occurredAt) {
+        bodyMeasurementFactory.createFromCorrectionPayload(deviceId, payload, occurredAt)
+                .ifPresent(this::saveProjection);
+    }
+
+    @Transactional
     public void deleteByEventId(String eventId) {
         repository.findByEventId(eventId).ifPresent(entity -> {
             repository.deleteByEventId(eventId);
-            log.info("Deleted body measurement projection for eventId: {}", eventId);
+            log.info("Deleted body measurement projection for eventId: {}", SecurityUtils.sanitizeForLog(eventId));
         });
     }
 }
