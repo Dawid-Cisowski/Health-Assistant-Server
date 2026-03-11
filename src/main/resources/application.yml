@@ -73,7 +73,7 @@ server:
   shutdown: graceful
   tomcat:
     max-http-form-post-size: 50MB
-    connection-timeout: 120000
+    connection-timeout: 300000
   error:
     include-message: always
     include-binding-errors: always
