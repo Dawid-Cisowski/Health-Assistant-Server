@@ -1,13 +1,14 @@
 package com.healthassistant.mealimport.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonRawValue;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MealImportJobResponse(
     String jobId,
     String status,
     String jobType,
-    Object result,
+    @JsonRawValue String result,
     String errorMessage
 ) {
     public static MealImportJobResponse pending(String jobId, String jobType) {
@@ -18,7 +19,7 @@ public record MealImportJobResponse(
         return new MealImportJobResponse(jobId, "PROCESSING", jobType, null, null);
     }
 
-    public static MealImportJobResponse done(String jobId, String jobType, Object result) {
+    public static MealImportJobResponse done(String jobId, String jobType, String result) {
         return new MealImportJobResponse(jobId, "DONE", jobType, result, null);
     }
 

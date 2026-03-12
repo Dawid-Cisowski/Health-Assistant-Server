@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 
-@Component
+@Component("mealImportDraftCleanupScheduler")
 @RequiredArgsConstructor
 @Slf4j
 class DraftCleanupScheduler {
@@ -29,7 +29,8 @@ class DraftCleanupScheduler {
         }
 
         int deletedJobs = jobRepository.deleteByStatusInAndExpiresAtBefore(
-            List.of(MealImportJobStatus.DONE, MealImportJobStatus.FAILED), now
+            List.of(MealImportJobStatus.DONE, MealImportJobStatus.FAILED,
+                    MealImportJobStatus.PROCESSING, MealImportJobStatus.PENDING), now
         );
         if (deletedJobs > 0) {
             log.info("Cleaned up {} expired meal import jobs", deletedJobs);

@@ -34,7 +34,7 @@ class InMemoryMultipartFile implements MultipartFile {
     public long getSize() { return content != null ? content.length : 0; }
 
     @Override
-    public byte[] getBytes() { return content != null ? content : new byte[0]; }
+    public byte[] getBytes() { return content != null ? content.clone() : new byte[0]; }
 
     @Override
     public InputStream getInputStream() { return new ByteArrayInputStream(getBytes()); }

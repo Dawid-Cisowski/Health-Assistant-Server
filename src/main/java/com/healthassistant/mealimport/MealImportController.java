@@ -1,5 +1,6 @@
 package com.healthassistant.mealimport;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.mealimport.api.MealImportFacade;
 import com.healthassistant.mealimport.api.dto.MealDraftResponse;
@@ -51,7 +52,7 @@ class MealImportController {
         @RequestAttribute("deviceId") String deviceId
     ) {
         log.info("Meal import request from device {}, description: {}, images: {}",
-            deviceId,
+            SecurityUtils.maskDeviceId(deviceId),
             description != null ? description.length() + " chars" : "none",
             images != null ? images.size() : 0);
 
@@ -61,7 +62,7 @@ class MealImportController {
             );
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("jobId", jobId));
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid meal import from device {}: {}", deviceId, e.getMessage());
+            log.warn("Invalid meal import from device {}: {}", SecurityUtils.maskDeviceId(deviceId), e.getMessage());
             return ResponseEntity.badRequest().body(MealImportResponse.failure(e.getMessage()));
         }
     }
@@ -85,7 +86,7 @@ class MealImportController {
         @RequestAttribute("deviceId") String deviceId
     ) {
         log.info("Meal analysis request from device {}, description: {}, images: {}",
-            deviceId,
+            SecurityUtils.maskDeviceId(deviceId),
             description != null ? description.length() + " chars" : "none",
             images != null ? images.size() : 0);
 
@@ -95,7 +96,7 @@ class MealImportController {
             );
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("jobId", jobId));
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid meal analysis from device {}: {}", deviceId, e.getMessage());
+            log.warn("Invalid meal analysis from device {}: {}", SecurityUtils.maskDeviceId(deviceId), e.getMessage());
             return ResponseEntity.badRequest().body(MealDraftResponse.failure(e.getMessage()));
         }
     }
@@ -141,7 +142,7 @@ class MealImportController {
         @RequestBody MealDraftUpdateRequest request,
         @RequestAttribute("deviceId") String deviceId
     ) {
-        log.info("Draft update request for {} from device {}", draftId, deviceId);
+        log.info("Draft update request for {} from device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
 
         try {
             MealDraftResponse response = mealImportFacade.updateDraft(
@@ -149,15 +150,15 @@ class MealImportController {
             );
             return ResponseEntity.ok(response);
         } catch (DraftNotFoundException e) {
-            log.warn("Draft not found {} for device {}", draftId, deviceId);
+            log.warn("Draft not found {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(MealDraftResponse.failure(e.getMessage()));
         } catch (DraftAlreadyConfirmedException e) {
-            log.warn("Draft already confirmed {} for device {}", draftId, deviceId);
+            log.warn("Draft already confirmed {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(MealDraftResponse.failure(e.getMessage()));
         } catch (DraftExpiredException e) {
-            log.warn("Draft expired {} for device {}", draftId, deviceId);
+            log.warn("Draft expired {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.GONE)
                 .body(MealDraftResponse.failure(e.getMessage()));
         }
@@ -180,7 +181,7 @@ class MealImportController {
         @PathVariable UUID draftId,
         @RequestAttribute("deviceId") String deviceId
     ) {
-        log.info("Draft confirm request for {} from device {}", draftId, deviceId);
+        log.info("Draft confirm request for {} from device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
 
         try {
             MealImportResponse response = mealImportFacade.confirmDraft(
@@ -188,15 +189,15 @@ class MealImportController {
             );
             return ResponseEntity.ok(response);
         } catch (DraftNotFoundException e) {
-            log.warn("Draft not found {} for device {}", draftId, deviceId);
+            log.warn("Draft not found {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(MealImportResponse.failure(e.getMessage()));
         } catch (DraftAlreadyConfirmedException e) {
-            log.warn("Draft already confirmed {} for device {}", draftId, deviceId);
+            log.warn("Draft already confirmed {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(MealImportResponse.failure(e.getMessage()));
         } catch (DraftExpiredException e) {
-            log.warn("Draft expired {} for device {}", draftId, deviceId);
+            log.warn("Draft expired {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.GONE)
                 .body(MealImportResponse.failure(e.getMessage()));
         }

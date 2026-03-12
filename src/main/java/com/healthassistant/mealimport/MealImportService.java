@@ -1,6 +1,5 @@
 package com.healthassistant.mealimport;
 
-import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.ImageValidationUtils;
 import com.healthassistant.config.SecurityUtils;
@@ -20,7 +19,6 @@ import com.healthassistant.mealimport.api.dto.MealDraftResponse;
 import com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest;
 import com.healthassistant.mealimport.api.dto.MealImportJobResponse;
 import com.healthassistant.mealimport.api.dto.MealImportResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -55,7 +53,6 @@ class MealImportService implements MealImportFacade {
     private final MealsFacade mealsFacade;
     private final MealCatalogFacade mealCatalogFacade;
     private final AiMetricsRecorder aiMetrics;
-    private final ObjectMapper objectMapper;
 
     MealImportService(
             MealContentExtractor contentExtractor,
@@ -66,8 +63,7 @@ class MealImportService implements MealImportFacade {
             @Lazy MealImportJobProcessor jobProcessor,
             MealsFacade mealsFacade,
             MealCatalogFacade mealCatalogFacade,
-            AiMetricsRecorder aiMetrics,
-            ObjectMapper objectMapper
+            AiMetricsRecorder aiMetrics
     ) {
         this.contentExtractor = contentExtractor;
         this.eventMapper = eventMapper;
@@ -78,54 +74,37 @@ class MealImportService implements MealImportFacade {
         this.mealsFacade = mealsFacade;
         this.mealCatalogFacade = mealCatalogFacade;
         this.aiMetrics = aiMetrics;
-        this.objectMapper = objectMapper;
     }
 
     @Override
     @Transactional
     public String submitImportJob(String description, List<MultipartFile> images, DeviceId deviceId) {
-        validateInput(description, images);
-        if (images != null && !images.isEmpty()) {
-            images.forEach(ImageValidationUtils::validateImage);
-        }
-
-        List<MealImportJob.ImageEntry> imageData = serializeImages(images);
-
-        MealImportJob job = MealImportJob.createImportJob(deviceId.value(), description, imageData);
-        job = jobRepository.save(job);
-
-        UUID jobId = job.getId();
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    jobProcessor.processJob(jobId);
-                }
-            }
-        );
-
-        return jobId.toString();
+        return submitJob(MealImportJobType.IMPORT, description, images, deviceId);
     }
 
     @Override
     @Transactional
     public String submitAnalyzeJob(String description, List<MultipartFile> images, DeviceId deviceId) {
+        return submitJob(MealImportJobType.ANALYZE, description, images, deviceId);
+    }
+
+    private String submitJob(MealImportJobType jobType, String description, List<MultipartFile> images, DeviceId deviceId) {
         validateInput(description, images);
         if (images != null && !images.isEmpty()) {
             images.forEach(ImageValidationUtils::validateImage);
         }
 
         List<MealImportJob.ImageEntry> imageData = serializeImages(images);
-
-        MealImportJob job = MealImportJob.createAnalyzeJob(deviceId.value(), description, imageData);
+        MealImportJob job = MealImportJob.create(jobType, deviceId.value(), description, imageData);
         job = jobRepository.save(job);
 
         UUID jobId = job.getId();
+        String deviceIdStr = deviceId.value();
         TransactionSynchronizationManager.registerSynchronization(
             new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    jobProcessor.processJob(jobId);
+                    jobProcessor.processJob(jobId, jobType, deviceIdStr, description, imageData);
                 }
             }
         );
@@ -142,10 +121,7 @@ class MealImportService implements MealImportFacade {
         return switch (job.getStatus()) {
             case PENDING -> MealImportJobResponse.pending(jobId.toString(), job.getJobType().name());
             case PROCESSING -> MealImportJobResponse.processing(jobId.toString(), job.getJobType().name());
-            case DONE -> {
-                Object result = parseResult(job.getResult(), job.getJobType());
-                yield MealImportJobResponse.done(jobId.toString(), job.getJobType().name(), result);
-            }
+            case DONE -> MealImportJobResponse.done(jobId.toString(), job.getJobType().name(), job.getResult());
             case FAILED -> MealImportJobResponse.failed(jobId.toString(), job.getJobType().name(), job.getErrorMessage());
         };
     }
@@ -528,20 +504,6 @@ class MealImportService implements MealImportFacade {
                 }
             })
             .toList();
-    }
-
-    private Object parseResult(String resultJson, MealImportJobType jobType) {
-        if (resultJson == null) return null;
-        try {
-            if (jobType == MealImportJobType.IMPORT) {
-                return objectMapper.readValue(resultJson, MealImportResponse.class);
-            } else {
-                return objectMapper.readValue(resultJson, MealDraftResponse.class);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse job result JSON: {}", e.getMessage());
-            return null;
-        }
     }
 
     private MealTimeContext buildMealTimeContext(String deviceId) {
