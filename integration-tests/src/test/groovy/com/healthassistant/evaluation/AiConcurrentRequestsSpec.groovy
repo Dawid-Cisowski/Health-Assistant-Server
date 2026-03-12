@@ -70,11 +70,11 @@ class AiConcurrentRequestsSpec extends BaseEvaluationSpec {
         results.every { it.response.contains('"type":"content"') }
     }
 
-    def "Concurrent meal imports create separate events"() {
+    def "Concurrent meal imports create separate jobs"() {
         given: "executor for parallel imports"
         ExecutorService executor = Executors.newFixedThreadPool(3)
         def successCount = new AtomicInteger(0)
-        def mealIds = Collections.synchronizedList([])
+        def jobIds = Collections.synchronizedList([])
 
         when: "importing 3 meals concurrently"
         def futures = (1..3).collect { mealNum ->
@@ -85,12 +85,11 @@ class AiConcurrentRequestsSpec extends BaseEvaluationSpec {
                     def response = importMeal(description)
                     println "DEBUG: Meal import ${mealNum} response: ${response}"
 
-                    if (response.contains('"status":"success"')) {
+                    if (response.contains('"jobId"')) {
                         successCount.incrementAndGet()
-                        // Extract mealId
-                        def matcher = response =~ /"mealId":"([^"]+)"/
+                        def matcher = response =~ /"jobId":"([^"]+)"/
                         if (matcher.find()) {
-                            mealIds.add(matcher.group(1))
+                            jobIds.add(matcher.group(1))
                         }
                     }
                     return response
@@ -104,12 +103,12 @@ class AiConcurrentRequestsSpec extends BaseEvaluationSpec {
         futures.each { it.get(120, TimeUnit.SECONDS) }
         executor.shutdown()
 
-        then: "all imports succeeded"
+        then: "all imports accepted"
         successCount.get() == 3
 
-        and: "each meal has unique ID"
-        mealIds.size() == 3
-        mealIds.unique().size() == 3
+        and: "each import has unique job ID"
+        jobIds.size() == 3
+        jobIds.unique().size() == 3
     }
 
     def "Rapid fire requests don't cause server errors"() {

@@ -3,6 +3,7 @@ package com.healthassistant.mealimport.api;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.mealimport.api.dto.MealDraftResponse;
 import com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest;
+import com.healthassistant.mealimport.api.dto.MealImportJobResponse;
 import com.healthassistant.mealimport.api.dto.MealImportResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -11,9 +12,11 @@ import java.util.UUID;
 
 public interface MealImportFacade {
 
-    MealImportResponse importMeal(String description, List<MultipartFile> images, DeviceId deviceId);
+    String submitImportJob(String description, List<MultipartFile> images, DeviceId deviceId);
 
-    MealDraftResponse analyzeMeal(String description, List<MultipartFile> images, DeviceId deviceId);
+    String submitAnalyzeJob(String description, List<MultipartFile> images, DeviceId deviceId);
+
+    MealImportJobResponse getJobStatus(UUID jobId, DeviceId deviceId);
 
     MealDraftResponse updateDraft(UUID draftId, MealDraftUpdateRequest request, DeviceId deviceId);
 

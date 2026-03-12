@@ -27,4 +27,9 @@ class TestAsyncConfiguration implements AsyncConfigurer {
     Executor getAsyncExecutor() {
         return new SyncTaskExecutor()
     }
+
+    @Bean("mealImportExecutor")
+    Executor mealImportExecutor() {
+        return new SyncTaskExecutor()
+    }
 }

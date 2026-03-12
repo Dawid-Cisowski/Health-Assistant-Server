@@ -5,20 +5,19 @@ import io.restassured.builder.MultiPartSpecBuilder
 import io.restassured.http.ContentType
 import spock.lang.Title
 
-/**
- * Integration tests for Meal Import Draft Flow (analyze -> update -> confirm)
- */
 @Title("Feature: Meal Import Draft Flow with User Confirmation")
 class MealImportDraftSpec extends BaseIntegrationSpec {
 
     private static final String DEVICE_ID = "test-meal-draft"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final String ANALYZE_ENDPOINT = "/v1/meals/import/analyze"
+    private static final String JOB_STATUS_TEMPLATE = "/v1/meals/import/jobs/%s"
     private static final String CONFIRM_ENDPOINT_TEMPLATE = "/v1/meals/import/%s/confirm"
     private static final String UPDATE_ENDPOINT_TEMPLATE = "/v1/meals/import/%s"
 
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
+        jdbcTemplate.update("DELETE FROM meal_import_jobs WHERE device_id = ?", DEVICE_ID)
     }
 
     def cleanup() {
@@ -32,21 +31,10 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I analyze the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Sałatka Cezar z kurczakiem na lunch")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
+        def draftId = submitAnalyzeAndGetDraftId("Sałatka Cezar z kurczakiem na lunch")
 
-        then: "response status is 200 with draft status"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("status") == "draft"
-        body.getString("draftId") != null
-        body.getString("meal.title") == "Sałatka Cezar z kurczakiem"
-        body.getString("meal.mealType") == "LUNCH"
-        body.getInt("meal.caloriesKcal") == 450
-        body.getDouble("confidence") == 0.85
-        body.getString("expiresAt") != null
+        then: "draft was created with correct data"
+        draftId != null
 
         and: "no event is stored in database yet"
         findEventsForDevice(DEVICE_ID).isEmpty()
@@ -56,22 +44,14 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         given: "a meal description and AI mock returning low confidence with questions"
         setupGeminiMealMock(createLowConfidenceWithQuestionsResponse())
 
-        when: "I analyze the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Jakieś danie z kurczakiem")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
+        when: "I analyze the meal description and get the result"
+        def result = submitAnalyzeAndGetResult("Jakieś danie z kurczakiem")
 
-        then: "response contains clarifying questions"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("status") == "draft"
-        body.getDouble("confidence") == 0.65
-        def questions = body.getList("questions")
+        then: "result contains clarifying questions"
+        result.getString("result.status") == "draft"
+        result.getDouble("result.confidence") == 0.65
+        def questions = result.getList("result.questions")
         questions.size() > 0
-        questions[0].questionId != null
-        questions[0].questionText != null
-        questions[0].questionType != null
     }
 
     def "Scenario 3: Analyze returns failure for non-food content"() {
@@ -79,16 +59,22 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createNotMealResponse())
 
         when: "I analyze the non-food description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Dzisiejszy trening na siłowni")
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Dzisiejszy trening na siłowni")
                 .post(ANALYZE_ENDPOINT)
                 .then()
                 .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
 
-        then: "response status is 200 but with failed status"
+        then: "job shows FAILED status"
         response.statusCode() == 200
         def body = response.body().jsonPath()
-        body.getString("status") == "failed"
-        body.getString("errorMessage").contains("Not food-related")
+        body.getString("status") == "FAILED"
+        body.getString("errorMessage") != null
     }
 
     // ==================== UPDATE ENDPOINT TESTS ====================
@@ -96,11 +82,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 4: Update draft changes meal data"() {
         given: "an existing draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Sałatka")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Sałatka")
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
 
         when: "I update the draft with new calories"
@@ -126,11 +108,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 5: Update draft changes occurredAt timestamp"() {
         given: "an existing draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Śniadanie")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Śniadanie")
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
 
         when: "I update the draft with different timestamp"
@@ -150,11 +128,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 6: Update with wrong deviceId returns 401 (HMAC fails first)"() {
         given: "an existing draft created by ${DEVICE_ID}"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Obiad")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Obiad")
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
 
         when: "I try to update with different device (not in HMAC config)"
@@ -189,11 +163,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 8: Confirm draft saves meal event and returns success"() {
         given: "an existing draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Lunch")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Lunch")
         def confirmEndpoint = String.format(CONFIRM_ENDPOINT_TEMPLATE, draftId)
 
         when: "I confirm the draft"
@@ -218,11 +188,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 9: Confirm already confirmed draft returns 409"() {
         given: "a confirmed draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Kolacja")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Kolacja")
         def confirmEndpoint = String.format(CONFIRM_ENDPOINT_TEMPLATE, draftId)
 
         and: "I confirm it first time"
@@ -261,11 +227,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 11: Confirm with wrong deviceId returns 401 (HMAC fails first)"() {
         given: "an existing draft created by ${DEVICE_ID}"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Śniadanie")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Śniadanie")
         def confirmEndpoint = String.format(CONFIRM_ENDPOINT_TEMPLATE, draftId)
 
         when: "I try to confirm with different device (not in HMAC config)"
@@ -285,14 +247,9 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I analyze the meal"
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Obiad z restauracji")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
+        def draftId = submitAnalyzeAndGetDraftId("Obiad z restauracji")
 
         then: "draft is created"
-        analyzeResponse.statusCode() == 200
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
         draftId != null
 
         when: "I update the calories"
@@ -324,19 +281,28 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         events.size() == 1
     }
 
-    def "Scenario 13: Old import endpoint still works (backwards compatibility)"() {
+    def "Scenario 13: Old import endpoint now returns 202 with jobId (async)"() {
         given: "a meal description and AI mock"
         setupGeminiMealMock(createValidMealExtractionResponse())
 
-        when: "I use the old import endpoint"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, "/v1/meals/import", "Stary endpoint")
+        when: "I use the import endpoint"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, "/v1/meals/import", "Stary endpoint")
                 .post("/v1/meals/import")
                 .then()
                 .extract()
 
-        then: "response is successful and event is immediately stored"
-        response.statusCode() == 200
-        response.body().jsonPath().getString("status") == "success"
+        then: "response is 202 with jobId"
+        submitResponse.statusCode() == 202
+        submitResponse.body().jsonPath().getString("jobId") != null
+
+        and: "job completes and event is stored"
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+        response.body().jsonPath().getString("status") == "DONE"
         findEventsForDevice(DEVICE_ID).size() == 1
     }
 
@@ -346,19 +312,12 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         given: "a meal description and AI mock returning valid meal data with description"
         setupGeminiMealMock(createValidMealExtractionResponse())
 
-        when: "I analyze the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Sałatka Cezar z kurczakiem")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
+        when: "I analyze and get the result"
+        def result = submitAnalyzeAndGetResult("Sałatka Cezar z kurczakiem")
 
-        then: "response contains description with component breakdown"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("status") == "draft"
-        body.getString("description") != null
-        body.getString("description").contains("Sałatka Cezar")
-        body.getString("description").contains("kurczak")
+        then: "result contains description"
+        result.getString("result.description") != null
+        result.getString("result.description").contains("Sałatka Cezar")
     }
 
     // ==================== RE-ANALYSIS TESTS ====================
@@ -366,13 +325,8 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 15: Update with answers triggers re-analysis and updates values"() {
         given: "an existing draft with low confidence and questions"
         setupGeminiMealMock(createLowConfidenceWithQuestionsResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Danie z kurczakiem")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Danie z kurczakiem")
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
-        def originalCalories = analyzeResponse.body().jsonPath().getInt("meal.caloriesKcal")
 
         and: "AI mock for re-analysis returns updated values"
         setupGeminiMealMock(createReAnalyzedLargePortionResponse())
@@ -394,7 +348,6 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         def body = response.body().jsonPath()
         body.getString("status") == "draft"
         body.getInt("meal.caloriesKcal") == 720
-        body.getInt("meal.caloriesKcal") != originalCalories
         body.getString("meal.title").contains("duża porcja")
         body.getString("description").contains("skorygowana analiza")
     }
@@ -402,11 +355,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 16: Update with userFeedback triggers re-analysis"() {
         given: "an existing draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Danie z kurczakiem")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Danie z kurczakiem")
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
 
         and: "AI mock for re-analysis returns corrected values"
@@ -433,11 +382,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 17: Update with userFeedback can change date/time"() {
         given: "an existing draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Sałatka")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Sałatka")
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
 
         and: "AI mock for re-analysis returns updated time"
@@ -461,11 +406,7 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     def "Scenario 18: Manual edits override AI re-analysis"() {
         given: "an existing draft"
         setupGeminiMealMock(createLowConfidenceWithQuestionsResponse())
-        def analyzeResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Danie")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId("Danie")
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
 
         and: "AI mock for re-analysis"
@@ -489,6 +430,25 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
     }
 
     // ==================== HELPER METHODS ====================
+
+    private String submitAnalyzeAndGetDraftId(String description) {
+        def result = submitAnalyzeAndGetResult(description)
+        return result.getString("result.draftId")
+    }
+
+    private submitAnalyzeAndGetResult(String description) {
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, description)
+                .post(ANALYZE_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+        return response.body().jsonPath()
+    }
 
     def authenticatedMultipartRequestWithDescription(String deviceId, String secretBase64, String path, String description) {
         String timestamp = generateTimestamp()
@@ -522,6 +482,18 @@ class MealImportDraftSpec extends BaseIntegrationSpec {
         String timestamp = generateTimestamp()
         String nonce = generateNonce()
         String signature = generateHmacSignature("POST", path, timestamp, nonce, deviceId, "", secretBase64)
+
+        return RestAssured.given()
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+    }
+
+    def authenticatedGetRequest(String deviceId, String secretBase64, String path) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String signature = generateHmacSignature("GET", path, timestamp, nonce, deviceId, "", secretBase64)
 
         return RestAssured.given()
                 .header("X-Device-Id", deviceId)

@@ -1,9 +1,11 @@
 package com.healthassistant.mealimport;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.mealimport.api.MealImportFacade;
 import com.healthassistant.mealimport.api.dto.MealDraftResponse;
 import com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest;
+import com.healthassistant.mealimport.api.dto.MealImportJobResponse;
 import com.healthassistant.mealimport.api.dto.MealImportResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -32,69 +35,92 @@ class MealImportController {
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-        summary = "Import meal from description and/or photos",
-        description = "Upload a text description and/or photos of a meal. AI analyzes the content, " +
-            "estimates nutritional values, and creates a MealRecorded.v1 event. " +
+        summary = "Submit async meal import job",
+        description = "Upload a text description and/or photos of a meal. Returns a jobId for polling. " +
+            "AI analyzes the content asynchronously and creates a MealRecorded.v1 event when done. " +
             "At least one of description or images is required.",
         security = @SecurityRequirement(name = "HmacHeaderAuth")
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Meal extraction processed (check status field)"),
+        @ApiResponse(responseCode = "202", description = "Import job accepted, poll for status"),
         @ApiResponse(responseCode = "400", description = "Invalid input (no description or images, invalid image type)"),
         @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
-    ResponseEntity<MealImportResponse> importMeal(
+    ResponseEntity<?> submitImport(
         @RequestParam(value = "description", required = false) String description,
         @RequestParam(value = "images", required = false) List<MultipartFile> images,
         @RequestAttribute("deviceId") String deviceId
     ) {
         log.info("Meal import request from device {}, description: {}, images: {}",
-            deviceId,
+            SecurityUtils.maskDeviceId(deviceId),
             description != null ? description.length() + " chars" : "none",
             images != null ? images.size() : 0);
 
         try {
-            MealImportResponse response = mealImportFacade.importMeal(
+            String jobId = mealImportFacade.submitImportJob(
                 description, images, DeviceId.of(deviceId)
             );
-            return ResponseEntity.ok(response);
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("jobId", jobId));
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid meal import from device {}: {}", deviceId, e.getMessage());
+            log.warn("Invalid meal import from device {}: {}", SecurityUtils.maskDeviceId(deviceId), e.getMessage());
             return ResponseEntity.badRequest().body(MealImportResponse.failure(e.getMessage()));
         }
     }
 
     @PostMapping(value = "/import/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-        summary = "Analyze meal and create draft",
-        description = "Upload a text description and/or photos of a meal. AI analyzes the content, " +
-            "estimates nutritional values, and creates a draft for review. " +
+        summary = "Submit async meal analysis job",
+        description = "Upload a text description and/or photos of a meal. Returns a jobId for polling. " +
+            "AI analyzes the content asynchronously and creates a draft for review. " +
             "Returns clarifying questions if confidence is low. Does NOT save to database yet.",
         security = @SecurityRequirement(name = "HmacHeaderAuth")
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Draft created (check status field)"),
+        @ApiResponse(responseCode = "202", description = "Analysis job accepted, poll for status"),
         @ApiResponse(responseCode = "400", description = "Invalid input (no description or images, invalid image type)"),
         @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
     })
-    ResponseEntity<MealDraftResponse> analyzeMeal(
+    ResponseEntity<?> submitAnalyze(
         @RequestParam(value = "description", required = false) String description,
         @RequestParam(value = "images", required = false) List<MultipartFile> images,
         @RequestAttribute("deviceId") String deviceId
     ) {
         log.info("Meal analysis request from device {}, description: {}, images: {}",
-            deviceId,
+            SecurityUtils.maskDeviceId(deviceId),
             description != null ? description.length() + " chars" : "none",
             images != null ? images.size() : 0);
 
         try {
-            MealDraftResponse response = mealImportFacade.analyzeMeal(
+            String jobId = mealImportFacade.submitAnalyzeJob(
                 description, images, DeviceId.of(deviceId)
             );
-            return ResponseEntity.ok(response);
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("jobId", jobId));
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid meal analysis from device {}: {}", deviceId, e.getMessage());
+            log.warn("Invalid meal analysis from device {}: {}", SecurityUtils.maskDeviceId(deviceId), e.getMessage());
             return ResponseEntity.badRequest().body(MealDraftResponse.failure(e.getMessage()));
+        }
+    }
+
+    @GetMapping(value = "/import/jobs/{jobId}")
+    @Operation(
+        summary = "Get meal import job status",
+        description = "Poll for the status of an async meal import or analysis job.",
+        security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Job status returned"),
+        @ApiResponse(responseCode = "404", description = "Job not found"),
+        @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<MealImportJobResponse> getJobStatus(
+        @PathVariable UUID jobId,
+        @RequestAttribute("deviceId") String deviceId
+    ) {
+        try {
+            MealImportJobResponse response = mealImportFacade.getJobStatus(jobId, DeviceId.of(deviceId));
+            return ResponseEntity.ok(response);
+        } catch (JobNotFoundException e) {
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -116,7 +142,7 @@ class MealImportController {
         @RequestBody MealDraftUpdateRequest request,
         @RequestAttribute("deviceId") String deviceId
     ) {
-        log.info("Draft update request for {} from device {}", draftId, deviceId);
+        log.info("Draft update request for {} from device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
 
         try {
             MealDraftResponse response = mealImportFacade.updateDraft(
@@ -124,15 +150,15 @@ class MealImportController {
             );
             return ResponseEntity.ok(response);
         } catch (DraftNotFoundException e) {
-            log.warn("Draft not found {} for device {}", draftId, deviceId);
+            log.warn("Draft not found {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(MealDraftResponse.failure(e.getMessage()));
         } catch (DraftAlreadyConfirmedException e) {
-            log.warn("Draft already confirmed {} for device {}", draftId, deviceId);
+            log.warn("Draft already confirmed {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(MealDraftResponse.failure(e.getMessage()));
         } catch (DraftExpiredException e) {
-            log.warn("Draft expired {} for device {}", draftId, deviceId);
+            log.warn("Draft expired {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.GONE)
                 .body(MealDraftResponse.failure(e.getMessage()));
         }
@@ -155,7 +181,7 @@ class MealImportController {
         @PathVariable UUID draftId,
         @RequestAttribute("deviceId") String deviceId
     ) {
-        log.info("Draft confirm request for {} from device {}", draftId, deviceId);
+        log.info("Draft confirm request for {} from device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
 
         try {
             MealImportResponse response = mealImportFacade.confirmDraft(
@@ -163,15 +189,15 @@ class MealImportController {
             );
             return ResponseEntity.ok(response);
         } catch (DraftNotFoundException e) {
-            log.warn("Draft not found {} for device {}", draftId, deviceId);
+            log.warn("Draft not found {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(MealImportResponse.failure(e.getMessage()));
         } catch (DraftAlreadyConfirmedException e) {
-            log.warn("Draft already confirmed {} for device {}", draftId, deviceId);
+            log.warn("Draft already confirmed {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(MealImportResponse.failure(e.getMessage()));
         } catch (DraftExpiredException e) {
-            log.warn("Draft expired {} for device {}", draftId, deviceId);
+            log.warn("Draft expired {} for device {}", draftId, SecurityUtils.maskDeviceId(deviceId));
             return ResponseEntity.status(HttpStatus.GONE)
                 .body(MealImportResponse.failure(e.getMessage()));
         }

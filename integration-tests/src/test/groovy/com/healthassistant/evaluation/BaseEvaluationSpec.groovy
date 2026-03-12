@@ -220,6 +220,7 @@ abstract class BaseEvaluationSpec extends Specification {
         jdbcTemplate.update("DELETE FROM meal_catalog_products WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM examinations WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM medical_exam_import_drafts WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_import_jobs WHERE device_id = ?", deviceId)
     }
 
     void seedCatalogProduct(String title, String mealType, int calories, int protein, int fat, int carbs, String healthRating) {
