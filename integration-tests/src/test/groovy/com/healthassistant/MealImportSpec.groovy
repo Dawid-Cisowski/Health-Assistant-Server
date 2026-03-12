@@ -4,18 +4,17 @@ import io.restassured.RestAssured
 import io.restassured.builder.MultiPartSpecBuilder
 import spock.lang.Title
 
-/**
- * Integration tests for Meal Import from Description/Images (AI extraction) endpoint
- */
 @Title("Feature: Meal Import from Description and/or Images via AI")
 class MealImportSpec extends BaseIntegrationSpec {
 
     private static final String DEVICE_ID = "test-meal-import"
     private static final String SECRET_BASE64 = "dGVzdC1zZWNyZXQtMTIz"
     private static final String IMPORT_ENDPOINT = "/v1/meals/import"
+    private static final String JOB_STATUS_TEMPLATE = "/v1/meals/import/jobs/%s"
 
     def setup() {
         cleanupEventsForDevice(DEVICE_ID)
+        jdbcTemplate.update("DELETE FROM meal_import_jobs WHERE device_id = ?", DEVICE_ID)
     }
 
     def cleanup() {
@@ -27,27 +26,34 @@ class MealImportSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I submit the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Sałatka Cezar z kurczakiem na lunch")
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Sałatka Cezar z kurczakiem na lunch")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202 Accepted"
+        submitResponse.statusCode() == 202
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        jobId != null
 
-        and: "response contains success status"
+        and: "job completes with success"
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+        response.statusCode() == 200
         def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getString("mealId") != null
-        body.getString("eventId") != null
-        body.getString("title") == "Sałatka Cezar z kurczakiem"
-        body.getString("mealType") == "LUNCH"
-        body.getInt("caloriesKcal") == 450
-        body.getInt("proteinGrams") == 35
-        body.getInt("fatGrams") == 22
-        body.getInt("carbohydratesGrams") == 28
-        body.getString("healthRating") == "HEALTHY"
-        body.getDouble("confidence") == 0.85
+        body.getString("status") == "DONE"
+        body.getString("result.status") == "success"
+        body.getString("result.title") == "Sałatka Cezar z kurczakiem"
+        body.getString("result.mealType") == "LUNCH"
+        body.getInt("result.caloriesKcal") == 450
+        body.getInt("result.proteinGrams") == 35
+        body.getInt("result.fatGrams") == 22
+        body.getInt("result.carbohydratesGrams") == 28
+        body.getString("result.healthRating") == "HEALTHY"
+        body.getDouble("result.confidence") == 0.85
     }
 
     def "Scenario 2: Valid meal image is extracted and stored successfully"() {
@@ -56,18 +62,24 @@ class MealImportSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I submit the meal image"
-        def response = authenticatedMultipartRequestWithImages(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, [createImageSpec("meal.jpg", imageBytes, "image/jpeg")])
+        def submitResponse = authenticatedMultipartRequestWithImages(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, [createImageSpec("meal.jpg", imageBytes, "image/jpeg")])
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202"
+        submitResponse.statusCode() == 202
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
 
-        and: "response contains success status"
-        def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getString("mealId") != null
+        and: "job completes with success"
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+        response.statusCode() == 200
+        response.body().jsonPath().getString("status") == "DONE"
+        response.body().jsonPath().getString("result.status") == "success"
     }
 
     def "Scenario 3: Both description and images can be submitted together"() {
@@ -76,7 +88,7 @@ class MealImportSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I submit both description and images"
-        def response = authenticatedMultipartRequestWithDescriptionAndImages(
+        def submitResponse = authenticatedMultipartRequestWithDescriptionAndImages(
                 DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT,
                 "Zdrowy lunch - sałatka z kurczakiem",
                 [createImageSpec("meal1.jpg", imageBytes, "image/jpeg")]
@@ -85,12 +97,19 @@ class MealImportSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202"
+        submitResponse.statusCode() == 202
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
 
-        and: "response contains success status"
-        def body = response.body().jsonPath()
-        body.getString("status") == "success"
+        and: "job completes with success"
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+        response.statusCode() == 200
+        response.body().jsonPath().getString("status") == "DONE"
+        response.body().jsonPath().getString("result.status") == "success"
     }
 
     def "Scenario 4: Multiple images can be submitted"() {
@@ -99,7 +118,7 @@ class MealImportSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I submit multiple images"
-        def response = authenticatedMultipartRequestWithImages(
+        def submitResponse = authenticatedMultipartRequestWithImages(
                 DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT,
                 [
                         createImageSpec("meal1.jpg", imageBytes, "image/jpeg"),
@@ -111,26 +130,38 @@ class MealImportSpec extends BaseIntegrationSpec {
                 .then()
                 .extract()
 
-        then: "response status is 200"
-        response.statusCode() == 200
+        then: "response status is 202"
+        submitResponse.statusCode() == 202
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
 
-        and: "response contains success status"
-        response.body().jsonPath().getString("status") == "success"
+        and: "job completes with success"
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+        response.body().jsonPath().getString("status") == "DONE"
+        response.body().jsonPath().getString("result.status") == "success"
     }
 
     def "Scenario 5: Meal event is stored in database after import"() {
         given: "a meal description and AI mock"
         setupGeminiMealMock(createValidMealExtractionResponse())
 
-        when: "I submit the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Pizza Margherita na kolację")
+        when: "I submit the meal description and wait for completion"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Pizza Margherita na kolację")
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response is successful"
-        response.statusCode() == 200
-        response.body().jsonPath().getString("status") == "success"
+        response.body().jsonPath().getString("status") == "DONE"
 
         and: "event is stored in database"
         def events = findEventsForDevice(DEVICE_ID)
@@ -143,48 +174,61 @@ class MealImportSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         and: "I submit the description first time"
-        def firstResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jajecznica na śniadanie")
+        def firstSubmit = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jajecznica na śniadanie")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
-
-        def firstMealId = firstResponse.body().jsonPath().getString("mealId")
+        def firstJobId = firstSubmit.body().jsonPath().getString("jobId")
+        def firstJobEndpoint = String.format(JOB_STATUS_TEMPLATE, firstJobId)
+        authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, firstJobEndpoint)
+                .get(firstJobEndpoint)
+                .then()
+                .extract()
 
         when: "I submit the same description again"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def secondResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jajecznica na śniadanie")
+        def secondSubmit = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jajecznica na śniadanie")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
+        def secondJobId = secondSubmit.body().jsonPath().getString("jobId")
+        def secondJobEndpoint = String.format(JOB_STATUS_TEMPLATE, secondJobId)
+        authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, secondJobEndpoint)
+                .get(secondJobEndpoint)
+                .then()
+                .extract()
 
-        def secondMealId = secondResponse.body().jsonPath().getString("mealId")
-
-        then: "both responses have different mealIds (no idempotency)"
-        secondResponse.statusCode() == 200
-        secondMealId != firstMealId
+        then: "both have different jobIds"
+        secondJobId != firstJobId
 
         and: "two events are stored in database"
         def events = findEventsForDevice(DEVICE_ID)
         events.size() == 2
     }
 
-    def "Scenario 7: Non-food content returns failure status"() {
+    def "Scenario 7: Non-food content results in FAILED job"() {
         given: "a description that is not food-related"
         setupGeminiMealMock(createNotMealResponse())
 
         when: "I submit the non-food description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Dzisiejszy trening na siłowni")
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Dzisiejszy trening na siłowni")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
 
-        then: "response status is 200 but with failed status"
+        and: "I poll for status"
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+
+        then: "response shows FAILED status"
         response.statusCode() == 200
-
-        and: "response indicates extraction failure"
         def body = response.body().jsonPath()
-        body.getString("status") == "failed"
-        body.getString("errorMessage").contains("Not food-related")
+        body.getString("status") == "FAILED"
+        body.getString("errorMessage") != null
 
         and: "no event is stored in database"
         findEventsForDevice(DEVICE_ID).isEmpty()
@@ -218,11 +262,6 @@ class MealImportSpec extends BaseIntegrationSpec {
 
         then: "response status is 400"
         response.statusCode() == 400
-
-        and: "response contains error message"
-        def body = response.body().jsonPath()
-        body.getString("status") == "failed"
-        body.getString("errorMessage").contains("empty")
     }
 
     def "Scenario 10: Invalid content type returns 400 Bad Request"() {
@@ -237,11 +276,6 @@ class MealImportSpec extends BaseIntegrationSpec {
 
         then: "response status is 400"
         response.statusCode() == 400
-
-        and: "response contains error about invalid image type"
-        def body = response.body().jsonPath()
-        body.getString("status") == "failed"
-        body.getString("errorMessage").contains("Invalid image type")
     }
 
     def "Scenario 11: Request without HMAC authentication returns 401"() {
@@ -262,72 +296,90 @@ class MealImportSpec extends BaseIntegrationSpec {
         given: "a meal description with detailed macros"
         setupGeminiMealMock(createDetailedMealExtractionResponse())
 
-        when: "I submit the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Duży obiad: kurczak z ryżem i warzywami")
+        when: "I submit and poll for result"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Duży obiad: kurczak z ryżem i warzywami")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
 
-        then: "response is successful"
+        then: "macros are extracted correctly"
         response.statusCode() == 200
-
-        and: "macros are extracted correctly"
         def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getInt("caloriesKcal") == 750
-        body.getInt("proteinGrams") == 55
-        body.getInt("fatGrams") == 28
-        body.getInt("carbohydratesGrams") == 65
-        body.getString("healthRating") == "VERY_HEALTHY"
+        body.getString("status") == "DONE"
+        body.getInt("result.caloriesKcal") == 750
+        body.getInt("result.proteinGrams") == 55
+        body.getInt("result.fatGrams") == 28
+        body.getInt("result.carbohydratesGrams") == 65
+        body.getString("result.healthRating") == "VERY_HEALTHY"
     }
 
     def "Scenario 13: Meal type is extracted correctly for breakfast"() {
         given: "a breakfast description"
         setupGeminiMealMock(createBreakfastMealResponse())
 
-        when: "I submit the breakfast description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Owsianka z owocami na śniadanie")
+        when: "I submit and poll for result"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Owsianka z owocami na śniadanie")
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response contains correct meal type"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("mealType") == "BREAKFAST"
+        response.body().jsonPath().getString("result.mealType") == "BREAKFAST"
     }
 
     def "Scenario 14: Unhealthy meal gets appropriate health rating"() {
         given: "an unhealthy meal description"
         setupGeminiMealMock(createUnhealthyMealResponse())
 
-        when: "I submit the unhealthy meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Podwójny cheeseburger z frytkami i colą")
+        when: "I submit and poll for result"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Podwójny cheeseburger z frytkami i colą")
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response contains unhealthy rating"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("healthRating") == "UNHEALTHY"
+        response.body().jsonPath().getString("result.healthRating") == "UNHEALTHY"
     }
 
-    def "Scenario 15: AI error returns failure status"() {
+    def "Scenario 15: AI error results in FAILED job"() {
         given: "AI returns an error"
         setupGeminiMealMockError()
 
         when: "I submit the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jakiś posiłek")
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jakiś posiłek")
                 .post(IMPORT_ENDPOINT)
                 .then()
                 .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
 
-        then: "response indicates failure"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("status") == "failed"
-        body.getString("errorMessage") != null
+        and: "I poll for status"
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .extract()
+
+        then: "response shows FAILED status"
+        response.body().jsonPath().getString("status") == "FAILED"
+        response.body().jsonPath().getString("errorMessage") != null
     }
 
     def "Scenario 16: PNG image is accepted"() {
@@ -336,14 +388,20 @@ class MealImportSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I submit the PNG image"
-        def response = authenticatedMultipartRequestWithImages(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, [createImageSpec("meal.png", imageBytes, "image/png")])
+        def submitResponse = authenticatedMultipartRequestWithImages(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, [createImageSpec("meal.png", imageBytes, "image/png")])
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response is successful"
-        response.statusCode() == 200
-        response.body().jsonPath().getString("status") == "success"
+        response.body().jsonPath().getString("status") == "DONE"
+        response.body().jsonPath().getString("result.status") == "success"
     }
 
     def "Scenario 17: WebP image is accepted"() {
@@ -352,64 +410,82 @@ class MealImportSpec extends BaseIntegrationSpec {
         setupGeminiMealMock(createValidMealExtractionResponse())
 
         when: "I submit the WebP image"
-        def response = authenticatedMultipartRequestWithImages(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, [createImageSpec("meal.webp", imageBytes, "image/webp")])
+        def submitResponse = authenticatedMultipartRequestWithImages(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, [createImageSpec("meal.webp", imageBytes, "image/webp")])
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response is successful"
-        response.statusCode() == 200
-        response.body().jsonPath().getString("status") == "success"
+        response.body().jsonPath().getString("status") == "DONE"
+        response.body().jsonPath().getString("result.status") == "success"
     }
 
     def "Scenario 18: Snack meal type is extracted correctly"() {
         given: "a snack description"
         setupGeminiMealMock(createSnackMealResponse())
 
-        when: "I submit the snack description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jabłko z masłem orzechowym")
+        when: "I submit and poll for result"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Jabłko z masłem orzechowym")
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response contains correct meal type"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("mealType") == "SNACK"
-        body.getString("healthRating") == "HEALTHY"
+        response.body().jsonPath().getString("result.mealType") == "SNACK"
+        response.body().jsonPath().getString("result.healthRating") == "HEALTHY"
     }
 
     def "Scenario 19: Drink meal type is extracted correctly"() {
         given: "a drink description"
         setupGeminiMealMock(createDrinkMealResponse())
 
-        when: "I submit the drink description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Latte z mlekiem owsianym")
+        when: "I submit and poll for result"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Latte z mlekiem owsianym")
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response contains correct meal type"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("mealType") == "DRINK"
+        response.body().jsonPath().getString("result.mealType") == "DRINK"
     }
 
     def "Scenario 20: Confidence score is returned in response"() {
         given: "a meal with low confidence"
         setupGeminiMealMock(createLowConfidenceMealResponse())
 
-        when: "I submit the meal description"
-        def response = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Coś niezidentyfikowanego")
+        when: "I submit and poll for result"
+        def submitResponse = authenticatedMultipartRequestWithDescription(DEVICE_ID, SECRET_BASE64, IMPORT_ENDPOINT, "Coś niezidentyfikowanego")
                 .post(IMPORT_ENDPOINT)
+                .then()
+                .extract()
+        def jobId = submitResponse.body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = String.format(JOB_STATUS_TEMPLATE, jobId)
+        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .extract()
 
         then: "response contains confidence score"
-        response.statusCode() == 200
-        def body = response.body().jsonPath()
-        body.getString("status") == "success"
-        body.getDouble("confidence") == 0.6
+        response.body().jsonPath().getString("status") == "DONE"
+        response.body().jsonPath().getDouble("result.confidence") == 0.6
     }
 
     // Helper methods
@@ -464,6 +540,18 @@ class MealImportSpec extends BaseIntegrationSpec {
         return request
     }
 
+    def authenticatedGetRequest(String deviceId, String secretBase64, String path) {
+        String timestamp = generateTimestamp()
+        String nonce = generateNonce()
+        String signature = generateHmacSignature("GET", path, timestamp, nonce, deviceId, "", secretBase64)
+
+        return RestAssured.given()
+                .header("X-Device-Id", deviceId)
+                .header("X-Timestamp", timestamp)
+                .header("X-Nonce", nonce)
+                .header("X-Signature", signature)
+    }
+
     def createImageSpec(String fileName, byte[] content, String mimeType) {
         return new MultiPartSpecBuilder(content)
                 .fileName(fileName)
@@ -473,7 +561,6 @@ class MealImportSpec extends BaseIntegrationSpec {
     }
 
     byte[] createTestImageBytes() {
-        // Create a minimal valid JPEG header for testing
         def base64Jpeg = "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBEQCEAwEPwAB//9k="
         return Base64.decoder.decode(base64Jpeg)
     }

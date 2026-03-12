@@ -1,10 +1,9 @@
 package com.healthassistant.mealimport;
 
+import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.ImageValidationUtils;
-import com.healthassistant.config.ImportConstants;
 import com.healthassistant.config.SecurityUtils;
-import io.micrometer.core.instrument.Timer;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand;
 import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
@@ -19,22 +18,28 @@ import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.mealimport.api.MealImportFacade;
 import com.healthassistant.mealimport.api.dto.MealDraftResponse;
 import com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest;
+import com.healthassistant.mealimport.api.dto.MealImportJobResponse;
 import com.healthassistant.mealimport.api.dto.MealImportResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 class MealImportService implements MealImportFacade {
 
@@ -45,21 +50,111 @@ class MealImportService implements MealImportFacade {
     private final MealEventMapper eventMapper;
     private final HealthEventsFacade healthEventsFacade;
     private final MealImportDraftRepository draftRepository;
+    private final MealImportJobRepository jobRepository;
+    private final MealImportJobProcessor jobProcessor;
     private final MealsFacade mealsFacade;
     private final MealCatalogFacade mealCatalogFacade;
     private final AiMetricsRecorder aiMetrics;
+    private final ObjectMapper objectMapper;
+
+    MealImportService(
+            MealContentExtractor contentExtractor,
+            MealEventMapper eventMapper,
+            HealthEventsFacade healthEventsFacade,
+            MealImportDraftRepository draftRepository,
+            MealImportJobRepository jobRepository,
+            @Lazy MealImportJobProcessor jobProcessor,
+            MealsFacade mealsFacade,
+            MealCatalogFacade mealCatalogFacade,
+            AiMetricsRecorder aiMetrics,
+            ObjectMapper objectMapper
+    ) {
+        this.contentExtractor = contentExtractor;
+        this.eventMapper = eventMapper;
+        this.healthEventsFacade = healthEventsFacade;
+        this.draftRepository = draftRepository;
+        this.jobRepository = jobRepository;
+        this.jobProcessor = jobProcessor;
+        this.mealsFacade = mealsFacade;
+        this.mealCatalogFacade = mealCatalogFacade;
+        this.aiMetrics = aiMetrics;
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     @Transactional
-    public MealImportResponse importMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
+    public String submitImportJob(String description, List<MultipartFile> images, DeviceId deviceId) {
         validateInput(description, images);
+        if (images != null && !images.isEmpty()) {
+            images.forEach(ImageValidationUtils::validateImage);
+        }
+
+        List<MealImportJob.ImageEntry> imageData = serializeImages(images);
+
+        MealImportJob job = MealImportJob.createImportJob(deviceId.value(), description, imageData);
+        job = jobRepository.save(job);
+
+        UUID jobId = job.getId();
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    jobProcessor.processJob(jobId);
+                }
+            }
+        );
+
+        return jobId.toString();
+    }
+
+    @Override
+    @Transactional
+    public String submitAnalyzeJob(String description, List<MultipartFile> images, DeviceId deviceId) {
+        validateInput(description, images);
+        if (images != null && !images.isEmpty()) {
+            images.forEach(ImageValidationUtils::validateImage);
+        }
+
+        List<MealImportJob.ImageEntry> imageData = serializeImages(images);
+
+        MealImportJob job = MealImportJob.createAnalyzeJob(deviceId.value(), description, imageData);
+        job = jobRepository.save(job);
+
+        UUID jobId = job.getId();
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    jobProcessor.processJob(jobId);
+                }
+            }
+        );
+
+        return jobId.toString();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MealImportJobResponse getJobStatus(UUID jobId, DeviceId deviceId) {
+        MealImportJob job = jobRepository.findByIdAndDeviceId(jobId, deviceId.value())
+            .orElseThrow(() -> new JobNotFoundException(jobId));
+
+        return switch (job.getStatus()) {
+            case PENDING -> MealImportJobResponse.pending(jobId.toString(), job.getJobType().name());
+            case PROCESSING -> MealImportJobResponse.processing(jobId.toString(), job.getJobType().name());
+            case DONE -> {
+                Object result = parseResult(job.getResult(), job.getJobType());
+                yield MealImportJobResponse.done(jobId.toString(), job.getJobType().name(), result);
+            }
+            case FAILED -> MealImportJobResponse.failed(jobId.toString(), job.getJobType().name(), job.getErrorMessage());
+        };
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    MealImportResponse executeImport(String description, List<MultipartFile> images, DeviceId deviceId) {
         var sample = aiMetrics.startTimer();
         if (images != null) {
             aiMetrics.recordImportImageCount("meal", images.size());
-        }
-
-        if (images != null && !images.isEmpty()) {
-            images.forEach(ImageValidationUtils::validateImage);
         }
 
         try {
@@ -137,39 +232,9 @@ class MealImportService implements MealImportFacade {
         }
     }
 
-    private void validateInput(String description, List<MultipartFile> images) {
-        boolean hasDescription = description != null && !description.isBlank();
-        boolean hasImages = images != null && !images.isEmpty();
-
-        if (!hasDescription && !hasImages) {
-            throw new IllegalArgumentException("Either description or images required");
-        }
-
-        if (images != null && images.size() > MAX_FILES_COUNT) {
-            throw new IllegalArgumentException("Maximum " + MAX_FILES_COUNT + " images allowed");
-        }
-
-        if (images != null) {
-            long totalSize = images.stream().mapToLong(MultipartFile::getSize).sum();
-            if (totalSize > MAX_TOTAL_SIZE) {
-                throw new IllegalArgumentException("Total images size exceeds 50MB limit");
-            }
-        }
-    }
-
-    private String generateMealId() {
-        return "meal-" + UUID.randomUUID().toString().substring(0, 12);
-    }
-
-    @Override
-    @Transactional
-    public MealDraftResponse analyzeMeal(String description, List<MultipartFile> images, DeviceId deviceId) {
-        validateInput(description, images);
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    MealDraftResponse executeAnalyze(String description, List<MultipartFile> images, DeviceId deviceId) {
         var sample = aiMetrics.startTimer();
-
-        if (images != null && !images.isEmpty()) {
-            images.forEach(ImageValidationUtils::validateImage);
-        }
 
         try {
             MealTimeContext timeContext = buildMealTimeContext(deviceId.value());
@@ -220,6 +285,30 @@ class MealImportService implements MealImportFacade {
             aiMetrics.recordImportRequest("meal", sample, "error", "draft");
             return MealDraftResponse.failure(e.getMessage());
         }
+    }
+
+    private void validateInput(String description, List<MultipartFile> images) {
+        boolean hasDescription = description != null && !description.isBlank();
+        boolean hasImages = images != null && !images.isEmpty();
+
+        if (!hasDescription && !hasImages) {
+            throw new IllegalArgumentException("Either description or images required");
+        }
+
+        if (images != null && images.size() > MAX_FILES_COUNT) {
+            throw new IllegalArgumentException("Maximum " + MAX_FILES_COUNT + " images allowed");
+        }
+
+        if (images != null) {
+            long totalSize = images.stream().mapToLong(MultipartFile::getSize).sum();
+            if (totalSize > MAX_TOTAL_SIZE) {
+                throw new IllegalArgumentException("Total images size exceeds 50MB limit");
+            }
+        }
+    }
+
+    private String generateMealId() {
+        return "meal-" + UUID.randomUUID().toString().substring(0, 12);
     }
 
     @Override
@@ -423,6 +512,36 @@ class MealImportService implements MealImportFacade {
             draft.getExpiresAt(),
             draftItems
         );
+    }
+
+    private List<MealImportJob.ImageEntry> serializeImages(List<MultipartFile> images) {
+        if (images == null || images.isEmpty()) {
+            return List.of();
+        }
+        return images.stream()
+            .map(img -> {
+                try {
+                    String base64 = Base64.getEncoder().encodeToString(img.getBytes());
+                    return new MealImportJob.ImageEntry(base64, img.getContentType(), img.getOriginalFilename());
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Failed to read image: " + e.getMessage(), e);
+                }
+            })
+            .toList();
+    }
+
+    private Object parseResult(String resultJson, MealImportJobType jobType) {
+        if (resultJson == null) return null;
+        try {
+            if (jobType == MealImportJobType.IMPORT) {
+                return objectMapper.readValue(resultJson, MealImportResponse.class);
+            } else {
+                return objectMapper.readValue(resultJson, MealDraftResponse.class);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse job result JSON: {}", e.getMessage());
+            return null;
+        }
     }
 
     private MealTimeContext buildMealTimeContext(String deviceId) {

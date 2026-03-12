@@ -84,6 +84,12 @@
         <Bug pattern="UWF_UNWRITTEN_FIELD"/>
     </Match>
 
+    <!-- Inner record fileName() vs another package's filename() - different classes, false positive -->
+    <Match>
+        <Class name="com.healthassistant.mealimport.MealImportJob$ImageEntry"/>
+        <Bug pattern="NM_CONFUSING"/>
+    </Match>
+
     <!-- Local records with combine() for Stream.reduce() - needed for parallel stream contract -->
     <Match>
         <Class name="~com\.healthassistant\.workout\.ExerciseStatisticsCalculator\$\d+.*"/>

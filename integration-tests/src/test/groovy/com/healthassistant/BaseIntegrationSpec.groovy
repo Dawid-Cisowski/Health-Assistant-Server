@@ -192,7 +192,9 @@ abstract class BaseIntegrationSpec extends Specification {
             // Health pillars imaging specs
             "test-hp-imaging",
             // Assistant medical exam tools specs
-            "test-assistant-medical"
+            "test-assistant-medical",
+            // Meal import jobs specs
+            "test-meal-jobs"
         ]
         def devicesMap = new StringBuilder('{')
         def first = true
@@ -1034,6 +1036,7 @@ abstract class BaseIntegrationSpec extends Specification {
         // Medical exams cleanup (cascade: lab_results + attachments deleted automatically)
         jdbcTemplate.update("DELETE FROM examinations WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM medical_exam_import_drafts WHERE device_id = ?", deviceId)
+        jdbcTemplate.update("DELETE FROM meal_import_jobs WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM health_pillar_ai_summaries WHERE device_id = ?", deviceId)
     }
 

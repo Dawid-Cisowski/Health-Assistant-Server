@@ -41,12 +41,7 @@ class MealImportEdgeCasesSpec extends BaseIntegrationSpec {
     def "Scenario 1: Confirm expired draft returns 410 Gone"() {
         given: "a draft that has been created"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Sałatka")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .statusCode(200)
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId(DEVICE_ID, SECRET_BASE64, "Sałatka")
 
         and: "the draft is expired (manually set expiresAt in the past)"
         expireDraft(draftId)
@@ -65,12 +60,7 @@ class MealImportEdgeCasesSpec extends BaseIntegrationSpec {
     def "Scenario 2: Update expired draft returns 410 Gone"() {
         given: "a draft that has been created"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Obiad")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .statusCode(200)
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId(DEVICE_ID, SECRET_BASE64, "Obiad")
 
         and: "the draft is expired"
         expireDraft(draftId)
@@ -92,12 +82,7 @@ class MealImportEdgeCasesSpec extends BaseIntegrationSpec {
     def "Scenario 3: Device cannot access another device's draft"() {
         given: "device 1 creates a draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Śniadanie")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .statusCode(200)
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId(DEVICE_ID, SECRET_BASE64, "Śniadanie")
 
         when: "device 2 tries to confirm device 1's draft"
         def confirmEndpoint = String.format(CONFIRM_ENDPOINT_TEMPLATE, draftId)
@@ -113,12 +98,7 @@ class MealImportEdgeCasesSpec extends BaseIntegrationSpec {
     def "Scenario 4: Device cannot update another device's draft"() {
         given: "device 1 creates a draft"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Lunch")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .statusCode(200)
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId(DEVICE_ID, SECRET_BASE64, "Lunch")
 
         when: "device 2 tries to update device 1's draft"
         def updateEndpoint = String.format(UPDATE_ENDPOINT_TEMPLATE, draftId)
@@ -138,15 +118,22 @@ class MealImportEdgeCasesSpec extends BaseIntegrationSpec {
         given: "a draft is created"
         setupGeminiMealMock(createValidMealExtractionResponse())
 
-        when: "I analyze a meal"
-        def analyzeResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Kolacja")
+        when: "I analyze a meal and poll for result"
+        def jobId = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Kolacja")
                 .post(ANALYZE_ENDPOINT)
+                .then()
+                .statusCode(202)
+                .extract()
+                .body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = "/v1/meals/import/jobs/${jobId}"
+        def analyzeResult = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
                 .then()
                 .statusCode(200)
                 .extract()
 
         then: "draft has expiresAt set to approximately 24 hours from now"
-        def expiresAt = analyzeResponse.body().jsonPath().getString("expiresAt")
+        def expiresAt = analyzeResult.body().jsonPath().getString("result.expiresAt")
         expiresAt != null
         def expiresInstant = Instant.parse(expiresAt)
         def now = Instant.now()
@@ -158,12 +145,7 @@ class MealImportEdgeCasesSpec extends BaseIntegrationSpec {
     def "Scenario 6: Confirmed draft cannot be updated"() {
         given: "a draft that has been confirmed"
         setupGeminiMealMock(createValidMealExtractionResponse())
-        def analyzeResponse = authenticatedMultipartRequest(DEVICE_ID, SECRET_BASE64, ANALYZE_ENDPOINT, "Deser")
-                .post(ANALYZE_ENDPOINT)
-                .then()
-                .statusCode(200)
-                .extract()
-        def draftId = analyzeResponse.body().jsonPath().getString("draftId")
+        def draftId = submitAnalyzeAndGetDraftId(DEVICE_ID, SECRET_BASE64, "Deser")
 
         and: "the draft is confirmed"
         def confirmEndpoint = String.format(CONFIRM_ENDPOINT_TEMPLATE, draftId)
@@ -241,6 +223,22 @@ class MealImportEdgeCasesSpec extends BaseIntegrationSpec {
                 .header("X-Signature", signature)
                 .contentType(ContentType.JSON)
                 .body(bodyJson)
+    }
+
+    String submitAnalyzeAndGetDraftId(String deviceId, String secretBase64, String description) {
+        def jobId = authenticatedMultipartRequest(deviceId, secretBase64, ANALYZE_ENDPOINT, description)
+                .post(ANALYZE_ENDPOINT)
+                .then()
+                .statusCode(202)
+                .extract()
+                .body().jsonPath().getString("jobId")
+        def jobStatusEndpoint = "/v1/meals/import/jobs/${jobId}"
+        return authenticatedGetRequest(deviceId, secretBase64, jobStatusEndpoint)
+                .get(jobStatusEndpoint)
+                .then()
+                .statusCode(200)
+                .extract()
+                .body().jsonPath().getString("result.draftId")
     }
 
     void setupGeminiMealMock(String jsonResponse) {
