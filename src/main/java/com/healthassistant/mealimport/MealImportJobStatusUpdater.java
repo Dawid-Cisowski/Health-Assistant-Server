@@ -17,25 +17,28 @@ class MealImportJobStatusUpdater {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void markProcessing(UUID jobId) {
-        jobRepository.findById(jobId).ifPresent(job -> {
-            job.markProcessing();
-            jobRepository.save(job);
-        });
+        var job = jobRepository.findById(jobId)
+            .orElseThrow(() -> new JobNotFoundException(jobId));
+        job.markProcessing();
+        jobRepository.save(job);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void markDone(UUID jobId, String resultJson) {
-        jobRepository.findById(jobId).ifPresent(job -> {
-            job.markDone(resultJson);
-            jobRepository.save(job);
-        });
+        var job = jobRepository.findById(jobId)
+            .orElseThrow(() -> new JobNotFoundException(jobId));
+        job.markDone(resultJson);
+        jobRepository.save(job);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void markFailed(UUID jobId, String safeErrorMessage) {
-        jobRepository.findById(jobId).ifPresent(job -> {
-            job.markFailed(safeErrorMessage);
-            jobRepository.save(job);
-        });
+        jobRepository.findById(jobId).ifPresentOrElse(
+            job -> {
+                job.markFailed(safeErrorMessage);
+                jobRepository.save(job);
+            },
+            () -> log.warn("Job {} not found when trying to mark as FAILED", jobId)
+        );
     }
 }

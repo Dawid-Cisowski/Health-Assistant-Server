@@ -60,38 +60,41 @@ class MealImportJob {
 
     record ImageEntry(String base64Bytes, String contentType, String fileName) {}
 
-    static MealImportJob createImportJob(String deviceId, String description, List<ImageEntry> imageData) {
+    static MealImportJob create(MealImportJobType jobType, String deviceId, String description, List<ImageEntry> imageData) {
+        var now = Instant.now();
         var job = new MealImportJob();
+        job.id = UUID.randomUUID();
         job.deviceId = deviceId;
-        job.jobType = MealImportJobType.IMPORT;
+        job.jobType = jobType;
         job.status = MealImportJobStatus.PENDING;
         job.description = description;
         job.imageData = imageData;
-        return job;
-    }
-
-    static MealImportJob createAnalyzeJob(String deviceId, String description, List<ImageEntry> imageData) {
-        var job = new MealImportJob();
-        job.deviceId = deviceId;
-        job.jobType = MealImportJobType.ANALYZE;
-        job.status = MealImportJobStatus.PENDING;
-        job.description = description;
-        job.imageData = imageData;
+        job.createdAt = now;
+        job.updatedAt = now;
+        job.expiresAt = now.plus(2, ChronoUnit.HOURS);
         return job;
     }
 
     void markProcessing() {
+        if (this.status != MealImportJobStatus.PENDING) {
+            throw new IllegalStateException("Cannot transition to PROCESSING from " + this.status);
+        }
         this.status = MealImportJobStatus.PROCESSING;
     }
 
     void markDone(String resultJson) {
+        if (this.status != MealImportJobStatus.PROCESSING) {
+            throw new IllegalStateException("Cannot transition to DONE from " + this.status);
+        }
         this.status = MealImportJobStatus.DONE;
         this.result = resultJson;
+        this.imageData = null;
     }
 
     void markFailed(String safeErrorMessage) {
         this.status = MealImportJobStatus.FAILED;
         this.errorMessage = safeErrorMessage;
+        this.imageData = null;
     }
 
     boolean isPending() {
@@ -104,23 +107,6 @@ class MealImportJob {
 
     boolean isFailed() {
         return this.status == MealImportJobStatus.FAILED;
-    }
-
-    @PrePersist
-    void onCreate() {
-        if (id == null) {
-            id = UUID.randomUUID();
-        }
-        var now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
-        if (expiresAt == null) {
-            expiresAt = now.plus(2, ChronoUnit.HOURS);
-        }
     }
 
     @PreUpdate

@@ -25,69 +25,58 @@ class MealImportJobProcessor {
     private static final String SAFE_NOT_MEAL_ERROR = "Content does not appear to be food-related.";
     private static final String SAFE_EXTRACTION_ERROR = "Could not extract valid meal data from provided content.";
 
-    private final MealImportJobRepository jobRepository;
     private final MealImportJobStatusUpdater statusUpdater;
     private final MealImportService mealImportService;
     private final ObjectMapper objectMapper;
 
     @Async("mealImportExecutor")
-    void processJob(UUID jobId) {
-        log.info("Processing meal import job {}", jobId);
+    public void processJob(UUID jobId, MealImportJobType jobType, String deviceIdStr,
+                           String description, List<MealImportJob.ImageEntry> imageData) {
+        log.info("Processing meal import job {} type={} device={}",
+            jobId, jobType, SecurityUtils.maskDeviceId(deviceIdStr));
         statusUpdater.markProcessing(jobId);
 
-        var jobOpt = jobRepository.findById(jobId);
-        if (jobOpt.isEmpty()) {
-            log.error("Job {} not found for processing", jobId);
-            return;
-        }
-
-        var job = jobOpt.get();
-        var deviceId = DeviceId.of(job.getDeviceId());
+        var deviceId = DeviceId.of(deviceIdStr);
+        List<MultipartFile> images = reconstructImages(imageData);
 
         try {
-            List<MultipartFile> images = reconstructImages(job);
-
-            if (job.getJobType() == MealImportJobType.IMPORT) {
-                processImportJob(jobId, job, deviceId, images);
+            if (jobType == MealImportJobType.IMPORT) {
+                processImportJob(jobId, description, images, deviceId);
             } else {
-                processAnalyzeJob(jobId, job, deviceId, images);
+                processAnalyzeJob(jobId, description, images, deviceId);
             }
         } catch (Exception e) {
             log.warn("Meal import job {} failed for device {}: {}",
-                jobId, SecurityUtils.maskDeviceId(job.getDeviceId()), e.getMessage());
+                jobId, SecurityUtils.maskDeviceId(deviceIdStr), e.getMessage());
             statusUpdater.markFailed(jobId, SAFE_IMPORT_ERROR);
         }
     }
 
-    private void processImportJob(UUID jobId, MealImportJob job, DeviceId deviceId, List<MultipartFile> images) throws Exception {
-        MealImportResponse result = mealImportService.executeImport(job.getDescription(), images, deviceId);
+    private void processImportJob(UUID jobId, String description, List<MultipartFile> images, DeviceId deviceId) throws Exception {
+        MealImportResponse result = mealImportService.executeImport(description, images, deviceId);
         if ("failed".equals(result.status())) {
-            var safeError = determineSafeError(result.errorMessage());
-            statusUpdater.markFailed(jobId, safeError);
+            statusUpdater.markFailed(jobId, determineSafeError(result.errorMessage()));
             return;
         }
-        var resultJson = objectMapper.writeValueAsString(result);
-        statusUpdater.markDone(jobId, resultJson);
+        statusUpdater.markDone(jobId, objectMapper.writeValueAsString(result));
         log.info("Meal import job {} completed successfully", jobId);
     }
 
-    private void processAnalyzeJob(UUID jobId, MealImportJob job, DeviceId deviceId, List<MultipartFile> images) throws Exception {
-        MealDraftResponse result = mealImportService.executeAnalyze(job.getDescription(), images, deviceId);
+    private void processAnalyzeJob(UUID jobId, String description, List<MultipartFile> images, DeviceId deviceId) throws Exception {
+        MealDraftResponse result = mealImportService.executeAnalyze(description, images, deviceId);
         if ("failed".equals(result.status())) {
-            var safeError = determineSafeError(result.errorMessage());
-            statusUpdater.markFailed(jobId, safeError);
+            statusUpdater.markFailed(jobId, determineSafeError(result.errorMessage()));
             return;
         }
-        var resultJson = objectMapper.writeValueAsString(result);
-        statusUpdater.markDone(jobId, resultJson);
+        statusUpdater.markDone(jobId, objectMapper.writeValueAsString(result));
         log.info("Meal analyze job {} completed successfully", jobId);
     }
 
-    private List<MultipartFile> reconstructImages(MealImportJob job) {
-        if (job.getImageData() == null || job.getImageData().isEmpty()) {
+    private List<MultipartFile> reconstructImages(List<MealImportJob.ImageEntry> imageData) {
+        if (imageData == null || imageData.isEmpty()) {
             return List.of();
         }
-        return job.getImageData().stream()
+        return imageData.stream()
             .<MultipartFile>map(entry -> new InMemoryMultipartFile(
                 entry.fileName(),
                 entry.contentType(),
