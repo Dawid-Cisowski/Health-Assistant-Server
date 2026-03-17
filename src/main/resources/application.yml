@@ -74,6 +74,9 @@ server:
   tomcat:
     max-http-form-post-size: 50MB
     connection-timeout: 300000
+  mvc:
+    async:
+      request-timeout: 300000
   error:
     include-message: always
     include-binding-errors: always
