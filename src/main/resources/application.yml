@@ -63,6 +63,7 @@ spring:
           options:
             model: ${GEMINI_MODEL:gemini-3-flash-preview}
             temperature: 0.8
+            thinking-budget: 0
     chat:
       observations:
         include-prompt: false
