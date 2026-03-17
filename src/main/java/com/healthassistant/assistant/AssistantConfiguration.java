@@ -24,8 +24,6 @@ class AssistantConfiguration {
 
     @Bean
     ToolCallAdvisor toolCallAdvisor() {
-        return ToolCallAdvisor.builder()
-                .disableInternalConversationHistory()
-                .build();
+        return ToolCallAdvisor.builder().build();
     }
 }
