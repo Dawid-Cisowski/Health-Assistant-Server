@@ -84,9 +84,20 @@ class AssistantController {
             return createRateLimitExceededResponse();
         }
 
+        var chunkIndex = new AtomicInteger(0);
+        var streamStart = Instant.now().toEpochMilli();
+
         return assistantFacade.streamChat(request, deviceId)
+                .doOnNext(event -> {
+                    int idx = chunkIndex.incrementAndGet();
+                    long elapsed = Instant.now().toEpochMilli() - streamStart;
+                    log.debug("SSE chunk #{} type={} elapsed={}ms device={}", idx, event.getClass().getSimpleName(), elapsed, maskDeviceId(deviceId));
+                })
                 .map(this::serializeToSseEvent)
-                .doOnComplete(() -> log.info("SSE stream completed for device {}", maskDeviceId(deviceId)))
+                .doOnComplete(() -> {
+                    long total = Instant.now().toEpochMilli() - streamStart;
+                    log.info("SSE stream completed for device {} — {} chunks in {}ms", maskDeviceId(deviceId), chunkIndex.get(), total);
+                })
                 .doOnError(error -> log.error("SSE stream failed for device {}", maskDeviceId(deviceId), error));
     }
 

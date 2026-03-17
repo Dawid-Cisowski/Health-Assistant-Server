@@ -247,6 +247,9 @@ class AssistantService implements AssistantFacade {
 
     private Flux<AssistantEvent> callAndEmit(ConversationContext ctx, Timer.Sample timerSample) {
         var fullContent = new StringBuffer();
+        var firstChunk = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var chunkCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        var modelStart = System.currentTimeMillis();
 
         return chatClient.prompt()
                 .messages(ctx.messages())
@@ -256,10 +259,17 @@ class AssistantService implements AssistantFacade {
                 .stream()
                 .content()
                 .subscribeOn(Schedulers.boundedElastic())
-                .doOnNext(fullContent::append)
+                .doOnNext(chunk -> {
+                    if (firstChunk.compareAndSet(true, false)) {
+                        log.info("First content chunk from model after {}ms (conversation {})", System.currentTimeMillis() - modelStart, ctx.conversationId());
+                    }
+                    chunkCount.incrementAndGet();
+                    fullContent.append(chunk);
+                })
                 .<AssistantEvent>map(ContentEvent::new)
                 .concatWith(Flux.defer(() -> {
                     var content = fullContent.toString();
+                    log.info("Model stream finished: {} chunks, {} chars, {}ms total (conversation {})", chunkCount.get(), content.length(), System.currentTimeMillis() - modelStart, ctx.conversationId());
                     if (!content.isBlank()) {
                         conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
                         log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
