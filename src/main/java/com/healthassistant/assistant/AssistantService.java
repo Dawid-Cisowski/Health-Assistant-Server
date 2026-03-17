@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,7 @@ class AssistantService implements AssistantFacade {
     private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final ChatClient chatClient;
+    private final ToolCallAdvisor toolCallAdvisor;
     private final HealthTools healthTools;
     private final ConversationService conversationService;
     private final AiMetricsRecorder aiMetrics;
@@ -243,40 +245,32 @@ class AssistantService implements AssistantFacade {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    // NOTE: Using .call() instead of .stream() because Spring AI 2.0.0-M2 has a bug
-    // where streaming with Gemini 3 + tool calling fails due to missing thought_signature.
-    // See: https://github.com/spring-projects/spring-ai/issues/5167
-    // Switch to .stream().content() when this is fixed.
     private Flux<AssistantEvent> callAndEmit(ConversationContext ctx, Timer.Sample timerSample) {
-        return Mono.fromCallable(() -> {
-                    var response = chatClient.prompt()
-                            .messages(ctx.messages())
-                            .tools(healthTools)
-                            .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
-                            .call()
-                            .chatResponse();
+        var fullContent = new StringBuffer();
 
-                    var content = Optional.ofNullable(response.getResult())
-                            .map(r -> r.getOutput().getText())
-                            .orElse("");
-
+        return chatClient.prompt()
+                .messages(ctx.messages())
+                .tools(healthTools)
+                .toolContext(Map.of(HealthTools.TOOL_CONTEXT_DEVICE_ID, ctx.deviceId()))
+                .advisors(toolCallAdvisor)
+                .stream()
+                .content()
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnNext(fullContent::append)
+                .<AssistantEvent>map(ContentEvent::new)
+                .concatWith(Flux.defer(() -> {
+                    var content = fullContent.toString();
                     if (!content.isBlank()) {
                         conversationService.saveMessage(ctx.conversationId(), MessageRole.ASSISTANT, content);
                         log.info("Saved assistant response ({} chars) to conversation {}", content.length(), ctx.conversationId());
                     } else {
-                        log.warn("Empty response from AI for conversation {}", ctx.conversationId());
+                        log.warn("Empty streaming response from AI for conversation {}", ctx.conversationId());
                     }
-
                     aiMetrics.recordChatRequest(timerSample, "success");
-                    return content;
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .<AssistantEvent>flatMapMany(content -> Flux.just(
-                        new ContentEvent(content),
-                        new DoneEvent(ctx.conversationId())
-                ))
+                    return Flux.<AssistantEvent>just(new DoneEvent(ctx.conversationId()));
+                }))
                 .doOnError(error -> {
-                    log.error("Error in chat call", error);
+                    log.error("Error in chat stream", error);
                     aiMetrics.recordChatRequest(timerSample, "error");
                     aiMetrics.recordAiError("chat", "api_error");
                 })

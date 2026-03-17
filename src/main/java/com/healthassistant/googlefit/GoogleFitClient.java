@@ -1,75 +1,64 @@
 package com.healthassistant.googlefit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import feign.RequestInterceptor;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
-@FeignClient(
-        name = "googleFitClient",
-        url = "${app.google-fit.api-url:https://www.googleapis.com/fitness/v1}",
-        configuration = GoogleFitClient.FeignConfig.class
-)
- interface GoogleFitClient {
+@Component
+class GoogleFitClient {
 
-    @PostMapping("/users/me/dataset:aggregate")
-    GoogleFitAggregateResponse fetchAggregated(@RequestBody AggregateRequest request);
+    private final RestClient restClient;
 
-    @GetMapping("/users/me/sessions")
-    GoogleFitSessionsResponse fetchSessions(
-            @RequestParam("startTime") String startTime,
-            @RequestParam("endTime") String endTime,
-            @RequestParam(value = "includeDeleted", defaultValue = "false") boolean includeDeleted
-    );
+    GoogleFitClient(
+            GoogleFitOAuthService oAuthService,
+            @Value("${app.google-fit.api-url:https://www.googleapis.com/fitness/v1}") String apiUrl
+    ) {
+        this.restClient = RestClient.builder()
+                .baseUrl(apiUrl)
+                .requestInterceptor((request, body, execution) -> {
+                    request.getHeaders().setBearerAuth(oAuthService.getAccessToken());
+                    return execution.execute(request, body);
+                })
+                .build();
+    }
+
+    GoogleFitAggregateResponse fetchAggregated(AggregateRequest request) {
+        return restClient.post()
+                .uri("/users/me/dataset:aggregate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .body(GoogleFitAggregateResponse.class);
+    }
+
+    GoogleFitSessionsResponse fetchSessions(String startTime, String endTime, boolean includeDeleted) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/users/me/sessions")
+                        .queryParam("startTime", startTime)
+                        .queryParam("endTime", endTime)
+                        .queryParam("includeDeleted", includeDeleted)
+                        .build())
+                .retrieve()
+                .body(GoogleFitSessionsResponse.class);
+    }
 
     record AggregateRequest(
-            @JsonProperty("aggregateBy")
-            List<DataTypeAggregate> aggregateBy,
-
-            @JsonProperty("bucketByTime")
-            BucketByTime bucketByTime,
-
-            @JsonProperty("startTimeMillis")
-            Long startTimeMillis,
-
-            @JsonProperty("endTimeMillis")
-            Long endTimeMillis
-    ) {
-    }
+            @JsonProperty("aggregateBy") List<DataTypeAggregate> aggregateBy,
+            @JsonProperty("bucketByTime") BucketByTime bucketByTime,
+            @JsonProperty("startTimeMillis") Long startTimeMillis,
+            @JsonProperty("endTimeMillis") Long endTimeMillis
+    ) {}
 
     record DataTypeAggregate(
-            @JsonProperty("dataTypeName")
-            String dataTypeName
-    ) {
-    }
+            @JsonProperty("dataTypeName") String dataTypeName
+    ) {}
 
     record BucketByTime(
-            @JsonProperty("durationMillis")
-            Long durationMillis
-    ) {
-    }
-
-    @Configuration
-    class FeignConfig {
-        private final GoogleFitOAuthService oAuthService;
-
-        FeignConfig(GoogleFitOAuthService oAuthService) {
-            this.oAuthService = oAuthService;
-        }
-
-        @Bean
-        public RequestInterceptor requestInterceptor() {
-            return requestTemplate -> {
-                String accessToken = oAuthService.getAccessToken();
-                requestTemplate.header("Authorization", "Bearer " + accessToken);
-            };
-        }
-    }
+            @JsonProperty("durationMillis") Long durationMillis
+    ) {}
 }
