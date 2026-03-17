@@ -63,10 +63,6 @@ spring:
           options:
             model: ${GEMINI_MODEL:gemini-3-flash-preview}
             temperature: 0.8
-            # WORKAROUND: disables Gemini thinking tokens to fix streaming failures in Spring AI 2.0.0-M3
-            # See: https://github.com/spring-projects/spring-ai/issues/5167
-            # TODO: Remove when Spring AI streaming + thinking is fixed
-            thinking-budget: 0
     chat:
       observations:
         include-prompt: false
