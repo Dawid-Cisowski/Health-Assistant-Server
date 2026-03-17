@@ -246,7 +246,7 @@ class AssistantService implements AssistantFacade {
     }
 
     private Flux<AssistantEvent> callAndEmit(ConversationContext ctx, Timer.Sample timerSample) {
-        var fullContent = new StringBuilder();
+        var fullContent = new StringBuffer();
 
         return chatClient.prompt()
                 .messages(ctx.messages())

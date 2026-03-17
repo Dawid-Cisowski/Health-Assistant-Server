@@ -16,7 +16,7 @@ class AssistantConfiguration {
     private final ChatGuardrailAdvisor chatGuardrailAdvisor;
 
     @Bean
-    public ChatClient chatClient(ChatClient.Builder builder) {
+    ChatClient chatClient(ChatClient.Builder builder) {
         return builder
                 .defaultAdvisors(chatGuardrailAdvisor)
                 .build();
