@@ -3,6 +3,7 @@ package com.healthassistant.assistant;
 import com.healthassistant.assistant.advisor.ChatGuardrailAdvisor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +19,13 @@ class AssistantConfiguration {
     public ChatClient chatClient(ChatClient.Builder builder) {
         return builder
                 .defaultAdvisors(chatGuardrailAdvisor)
+                .build();
+    }
+
+    @Bean
+    ToolCallAdvisor toolCallAdvisor() {
+        return ToolCallAdvisor.builder()
+                .disableInternalConversationHistory()
                 .build();
     }
 }
