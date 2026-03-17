@@ -2,7 +2,7 @@ plugins {
     java
     groovy
     jacoco
-    id("org.springframework.boot") version "4.0.2"
+    id("org.springframework.boot") version "4.1.0-M2"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.github.spotbugs") version "6.0.26"
     id("org.sonarqube") version "5.1.0.4882"
@@ -39,9 +39,8 @@ repositories {
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.ai:spring-ai-bom:2.0.0-M2")
+        mavenBom("org.springframework.ai:spring-ai-bom:2.0.0-M3")
         mavenBom("org.springframework.modulith:spring-modulith-bom:2.0.1")
-        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.0")
     }
 }
 
@@ -59,9 +58,6 @@ dependencies {
 
     // Spring AI
     implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
-
-    // Feign client (version managed by Spring Cloud BOM)
-    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 
     // Firebase Cloud Messaging
     implementation("com.google.firebase:firebase-admin:9.4.3")
