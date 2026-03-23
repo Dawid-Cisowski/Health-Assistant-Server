@@ -1,29 +1,29 @@
 {
-    "timestamp": "2026-03-16T07:13:22.541933106Z",
+    "timestamp": "2026-03-23T07:06:28.457551970Z",
     "summary": {
         "totalTests": 8,
         "passedTests": 6,
         "failedTests": 2,
         "totalTokens": 0,
         "totalCostUsd": 0.0,
-        "avgResponseMs": 6574.5
+        "avgResponseMs": 6629.875
     },
     "byModel": {
         "gemini-3-pro-preview": {
             "passed": 3,
-            "failed": 2,
+            "failed": 1,
             "inputTokens": 0,
             "outputTokens": 0,
             "totalCostUsd": 0.0,
-            "avgResponseMs": 6667.8
+            "avgResponseMs": 6725
         },
         "gemini-3-flash-preview": {
             "passed": 3,
-            "failed": 0,
+            "failed": 1,
             "inputTokens": 0,
             "outputTokens": 0,
             "totalCostUsd": 0.0,
-            "avgResponseMs": 6419
+            "avgResponseMs": 6534.75
         }
     },
     "tests": [
@@ -35,9 +35,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 6440,
+            "responseTimeMs": 6172,
             "ttftMs": null,
-            "timestamp": "2026-03-16T07:12:21.579063249Z",
+            "timestamp": "2026-03-23T07:05:27.146688658Z",
             "errorMessage": null
         },
         {
@@ -48,9 +48,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 6148,
+            "responseTimeMs": 6230,
             "ttftMs": null,
-            "timestamp": "2026-03-16T07:12:29.983437357Z",
+            "timestamp": "2026-03-23T07:05:35.756781462Z",
             "errorMessage": null
         },
         {
@@ -61,48 +61,48 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 6871,
+            "responseTimeMs": 7616,
             "ttftMs": null,
-            "timestamp": "2026-03-16T07:12:38.620918100Z",
+            "timestamp": "2026-03-23T07:05:45.072532872Z",
             "errorMessage": "Judge score: 0.0, reason: LLM Judge returned empty response"
         },
         {
             "testId": "BM-R02",
             "testName": "Weekly report AI summary",
             "model": "gemini-3-pro-preview",
+            "passed": true,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "estimatedCostUsd": 0.0,
+            "responseTimeMs": 6976,
+            "ttftMs": null,
+            "timestamp": "2026-03-23T07:05:54.874761028Z",
+            "errorMessage": null
+        },
+        {
+            "testId": "BM-R02",
+            "testName": "Weekly report AI summary",
+            "model": "gemini-3-flash-preview",
             "passed": false,
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 8568,
+            "responseTimeMs": 7533,
             "ttftMs": null,
-            "timestamp": "2026-03-16T07:12:50.071652677Z",
+            "timestamp": "2026-03-23T07:06:04.038426103Z",
             "errorMessage": "Judge score: 0.0, reason: LLM Judge returned empty response"
         },
         {
             "testId": "BM-R02",
             "testName": "Weekly report AI summary",
-            "model": "gemini-3-pro-preview",
-            "passed": true,
-            "inputTokens": 0,
-            "outputTokens": 0,
-            "estimatedCostUsd": 0.0,
-            "responseTimeMs": 5919,
-            "ttftMs": null,
-            "timestamp": "2026-03-16T07:12:58.839239740Z",
-            "errorMessage": null
-        },
-        {
-            "testId": "BM-R02",
-            "testName": "Weekly report AI summary",
             "model": "gemini-3-flash-preview",
             "passed": true,
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 6412,
+            "responseTimeMs": 6619,
             "ttftMs": null,
-            "timestamp": "2026-03-16T07:13:06.916048163Z",
+            "timestamp": "2026-03-23T07:06:13.411076162Z",
             "errorMessage": null
         },
         {
@@ -113,9 +113,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 5541,
+            "responseTimeMs": 6136,
             "ttftMs": null,
-            "timestamp": "2026-03-16T07:13:13.736296246Z",
+            "timestamp": "2026-03-23T07:06:20.706068464Z",
             "errorMessage": null
         },
         {
@@ -126,9 +126,9 @@
             "inputTokens": 0,
             "outputTokens": 0,
             "estimatedCostUsd": 0.0,
-            "responseTimeMs": 6697,
+            "responseTimeMs": 5757,
             "ttftMs": null,
-            "timestamp": "2026-03-16T07:13:21.693983329Z",
+            "timestamp": "2026-03-23T07:06:27.600949539Z",
             "errorMessage": null
         }
     ]
