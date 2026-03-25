@@ -37,11 +37,13 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 
 @Component
@@ -67,6 +69,7 @@ class HealthTools {
     private final MedicalExamsFacade medicalExamsFacade;
     private final ObjectMapper objectMapper;
     private final AiMetricsRecorder aiMetrics;
+    private final UserMemoryService userMemoryService;
 
     // ==================== READ TOOLS ====================
 
@@ -1283,6 +1286,69 @@ class HealthTools {
             throw new IllegalStateException("deviceId not found in ToolContext");
         }
         return (String) deviceId;
+    }
+
+    // ==================== MEMORY TOOLS ====================
+
+    @Tool(name = "saveUserMemory",
+          description = "Saves an important personal fact about the user to long-term memory, persisted across all conversations. " +
+                        "Use PROACTIVELY when user shares preferences, goals, constraints, injuries, or habits worth remembering. " +
+                        "Calling this with an existing key overwrites the old value. " +
+                        "key: short snake_case English string (e.g. 'dietary_preference', 'training_time', 'injury'). " +
+                        "value: concise description of the fact.")
+    public Object saveUserMemory(String key, String value, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        return validateAndExecuteMutation("saveUserMemory", () -> {
+            if (key == null || key.isBlank()) {
+                throw new IllegalArgumentException("Memory key must not be blank.");
+            }
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException("Memory value must not be blank.");
+            }
+            userMemoryService.upsertMemory(deviceId, key.trim(), value.trim());
+            log.info("Memory saved: key='{}' for device {}", sanitizeForLog(key), maskDeviceId(deviceId));
+            return new MutationSuccess("Memory saved: " + key.trim(), Map.of("key", key.trim(), "value", value.trim()));
+        });
+    }
+
+    @Tool(name = "deleteUserMemory",
+          description = "Deletes a previously saved memory fact about the user. " +
+                        "Use when a fact is outdated, incorrect, or the user asks to forget something. " +
+                        "key: the exact key of the memory to delete.")
+    public Object deleteUserMemory(String key, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        return validateAndExecuteMutation("deleteUserMemory", () -> {
+            if (key == null || key.isBlank()) {
+                throw new IllegalArgumentException("Memory key must not be blank.");
+            }
+            var deleted = userMemoryService.deleteMemory(deviceId, key.trim());
+            if (!deleted) {
+                throw new IllegalArgumentException("No memory found with key: " + key.trim());
+            }
+            log.info("Memory deleted: key='{}' for device {}", sanitizeForLog(key), maskDeviceId(deviceId));
+            return new MutationSuccess("Memory deleted: " + key.trim(), null);
+        });
+    }
+
+    @Tool(name = "getUserMemories",
+          description = "Lists all personal facts currently remembered about the user across all conversations. " +
+                        "Use when user asks 'what do you remember about me?' or to check existing memories before saving.")
+    public Object getUserMemories(ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        return validateAndExecuteMutation("getUserMemories", () -> {
+            var memories = userMemoryService.loadMemories(deviceId);
+            var memoriesMap = memories.stream()
+                    .collect(Collectors.toMap(
+                            UserMemory::getMemoryKey,
+                            UserMemory::getMemoryValue,
+                            (a, b) -> a,
+                            LinkedHashMap::new
+                    ));
+            return new MutationSuccess(
+                    memories.isEmpty() ? "No memories saved yet." : "Found " + memories.size() + " saved memories.",
+                    memoriesMap
+            );
+        });
     }
 
     record ToolError(String message) {}
