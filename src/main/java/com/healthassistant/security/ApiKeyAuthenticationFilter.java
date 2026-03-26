@@ -51,13 +51,11 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+        String token = extractToken(request);
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String token = authHeader.substring(BEARER_PREFIX.length());
         if (token.isBlank()) {
             log.warn("API key authentication failed for path {}: empty token", safePath);
             sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "API_KEY_AUTH_FAILED", "Invalid authentication credentials");
@@ -83,6 +81,15 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         request.setAttribute("deviceId", deviceId);
         log.debug("API key authentication successful, device: {}", SecurityUtils.maskDeviceId(deviceId));
         filterChain.doFilter(request, response);
+    }
+
+    /** Bearer header first, then ?token= query param (for MCP clients that can't set headers). */
+    private String extractToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+            return authHeader.substring(BEARER_PREFIX.length());
+        }
+        return request.getParameter("token");
     }
 
     private boolean requiresAuthentication(String path) {
