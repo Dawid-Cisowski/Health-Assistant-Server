@@ -62,6 +62,8 @@ spring:
         name: health-assistant
         version: 1.0.0
         base-url: ${MCP_BASE_URL:}
+        streamable-http:
+          mcp-endpoint: /sse
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
