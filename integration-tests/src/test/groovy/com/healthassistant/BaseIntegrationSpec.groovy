@@ -225,6 +225,9 @@ abstract class BaseIntegrationSpec extends Specification {
         System.setProperty("app.api-key.key", "test-api-key-for-integration-testing!!")
         System.setProperty("app.api-key.device-id", "test-api-key")
 
+        // Enable Spring AI MCP server for integration tests
+        System.setProperty("spring.ai.mcp.server.enabled", "true")
+
         // Configure WireMock URLs for Google Fit API and OAuth
         String wireMockUrl = "http://localhost:${wireMockServer.port()}"
         System.setProperty("app.google-fit.api-url", wireMockUrl)
