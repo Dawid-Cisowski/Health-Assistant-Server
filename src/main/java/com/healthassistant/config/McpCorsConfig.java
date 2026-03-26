@@ -24,5 +24,29 @@ class McpCorsConfig implements WebMvcConfigurer {
                 .allowedMethods("GET", "POST", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(false);
+
+        registry.addMapping("/.well-known/**")
+                .allowedOrigins("https://claude.ai")
+                .allowedMethods("GET")
+                .allowedHeaders("*")
+                .allowCredentials(false);
+
+        registry.addMapping("/register")
+                .allowedOrigins("https://claude.ai")
+                .allowedMethods("POST", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(false);
+
+        registry.addMapping("/authorize")
+                .allowedOrigins("https://claude.ai")
+                .allowedMethods("GET")
+                .allowedHeaders("*")
+                .allowCredentials(false);
+
+        registry.addMapping("/token")
+                .allowedOrigins("https://claude.ai")
+                .allowedMethods("POST", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(false);
     }
 }
