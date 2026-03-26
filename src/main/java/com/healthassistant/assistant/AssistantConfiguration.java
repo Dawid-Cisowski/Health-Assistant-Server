@@ -9,6 +9,7 @@ import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 @Configuration
 @ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
@@ -31,7 +32,7 @@ class AssistantConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "spring.ai.mcp.server.enabled", havingValue = "true")
-    ToolCallbackProvider healthMcpTools(HealthTools healthTools) {
+    ToolCallbackProvider healthMcpTools(@Lazy HealthTools healthTools) {
         return MethodToolCallbackProvider.builder()
                 .toolObjects(healthTools)
                 .build();
