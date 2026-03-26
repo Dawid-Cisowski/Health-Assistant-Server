@@ -54,6 +54,9 @@ abstract class BaseIntegrationSpec extends Specification {
     // Legacy constant for backward compatibility - use getTestDeviceId() instead
     static final String TEST_DEVICE_ID = "test-device"
 
+    // API key for Bearer token authentication tests
+    static final String TEST_API_KEY = "test-api-key-for-integration-testing!!"
+
     // Generate unique device ID per test class for parallel isolation
     String getTestDeviceId() {
         return "test-${this.class.simpleName.toLowerCase().hashCode().abs() % 10000}"
@@ -177,6 +180,8 @@ abstract class BaseIntegrationSpec extends Specification {
             // Medical exams specs
             "test-medical-exams", "test-medical-exam-import", "test-medical-attach",
             "test-medical-links", "test-medical-search",
+            // API key authentication device (used when Bearer token auth is active)
+            "test-api-key",
             // CDA import specs
             "test-cda-import",
             // Section interpretation specs
@@ -214,6 +219,11 @@ abstract class BaseIntegrationSpec extends Specification {
         System.setProperty("app.hmac.devices-json", devicesMap.toString())
         System.setProperty("app.hmac.tolerance-seconds", "600")
         System.setProperty("app.nonce.cache-ttl-seconds", "600")
+
+        // Configure API key auth for integration tests
+        System.setProperty("app.api-key.enabled", "true")
+        System.setProperty("app.api-key.key", "test-api-key-for-integration-testing!!")
+        System.setProperty("app.api-key.device-id", "test-api-key")
 
         // Configure WireMock URLs for Google Fit API and OAuth
         String wireMockUrl = "http://localhost:${wireMockServer.port()}"
@@ -596,6 +606,12 @@ abstract class BaseIntegrationSpec extends Specification {
                 .header("X-Nonce", nonce)
                 .header("X-Signature", signature)
                 .body(body)
+    }
+
+    def authenticatedBearerRequest() {
+        return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer ${TEST_API_KEY}")
     }
 
     def authenticatedDeleteRequest(String deviceId, String secretBase64, String path) {

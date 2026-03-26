@@ -119,6 +119,11 @@ app:
     tolerance-seconds: ${HMAC_TOLERANCE_SEC:600}
   nonce:
     cache-ttl-seconds: ${NONCE_CACHE_TTL_SEC:600}
+  api-key:
+    enabled: ${CLAUDE_API_KEY_ENABLED:false}
+    key: ${CLAUDE_API_KEY:}
+    device-id: ${CLAUDE_DEVICE_ID:claude-ai}
+    read-only: ${CLAUDE_READ_ONLY:false}
   batch:
     max-events: 100
   google-fit:
