@@ -61,6 +61,7 @@ spring:
         enabled: ${MCP_ENABLED:false}
         name: health-assistant
         version: 1.0.0
+        base-url: ${MCP_BASE_URL:}
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
