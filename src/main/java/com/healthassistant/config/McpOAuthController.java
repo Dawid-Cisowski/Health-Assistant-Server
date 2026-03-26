@@ -42,6 +42,18 @@ class McpOAuthController {
     // Single-use auth codes: code → apiKey (cleared after token exchange)
     private final Map<String, String> pendingCodes = new ConcurrentHashMap<>();
 
+    // ── RFC 9728 — OAuth 2.0 Protected Resource Metadata ────────────────────
+    @GetMapping("/.well-known/oauth-protected-resource")
+    Map<String, Object> protectedResourceMetadata() {
+        log.debug("MCP OAuth: protected resource metadata request");
+        return Map.of(
+                "resource", baseUrl,
+                "authorization_servers", List.of(baseUrl),
+                "scopes_supported", List.of("claudeai"),
+                "bearer_methods_supported", List.of("header", "query")
+        );
+    }
+
     // ── RFC 8414 — Authorization Server Metadata ────────────────────────────
     @GetMapping("/.well-known/oauth-authorization-server")
     Map<String, Object> oauthMetadata() {

@@ -107,7 +107,8 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/v1/exercises")
             || path.startsWith("/v1/reports")
             || path.startsWith("/v1/medical-exams")
-            || path.equals("/sse");
+            || path.equals("/sse")
+            || path.equals("/mcp");
     }
 
     private static byte[] computeSha256(byte[] input) {
