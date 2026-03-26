@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,9 +38,10 @@ class AssistantService implements AssistantFacade {
     private final ToolCallAdvisor toolCallAdvisor;
     private final HealthTools healthTools;
     private final ConversationService conversationService;
+    private final UserMemoryService userMemoryService;
     private final AiMetricsRecorder aiMetrics;
 
-    private String buildSystemInstruction(LocalDate currentDate) {
+    private String buildSystemInstruction(LocalDate currentDate, List<UserMemory> memories) {
         return """
             CRITICAL ANTI-HALLUCINATION RULES (ABSOLUTE - NEVER VIOLATE):
             1. NEVER invent, fabricate, estimate, or guess ANY health data numbers.
@@ -220,7 +222,21 @@ class AssistantService implements AssistantFacade {
 
             IMPORTANT: Date ranges ALWAYS include CURRENT DATE as the end date unless explicitly asking about past periods.
             When user asks "ostatni miesiąc" (last month), include today's date in the range - end date = CURRENT DATE.
-            """.formatted(currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+
+            PERSISTENT USER MEMORY (facts you learned about the user in previous conversations):
+            %s
+
+            MEMORY RULES:
+            - Use memories above to personalize every response (greet by goal, reference known preferences, avoid known dislikes).
+            - When user shares a new personal fact worth remembering (preference, goal, constraint, injury, dietary habit, lifestyle), call saveUserMemory immediately WITHOUT asking the user.
+            - Use short snake_case English keys (e.g. 'dietary_preference', 'training_time', 'goal_weight', 'injury').
+            - When a fact changes, call saveUserMemory with the same key to overwrite it.
+            - When user says "forget X" or a memory becomes invalid, call deleteUserMemory.
+            - When user asks "co o mnie pamiętasz?" or "what do you remember about me?", call getUserMemories to retrieve the current list.
+            """.formatted(
+                currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                formatMemoriesForPrompt(memories)
+            );
     }
 
     @Override
@@ -238,7 +254,8 @@ class AssistantService implements AssistantFacade {
             var conversationId = conversationService.getOrCreateConversation(request.conversationId(), deviceId);
             var history = conversationService.loadConversationHistory(conversationId);
             var currentDate = LocalDate.now(POLAND_ZONE);
-            var systemInstruction = buildSystemInstruction(currentDate);
+            var memories = userMemoryService.loadMemories(deviceId);
+            var systemInstruction = buildSystemInstruction(currentDate, memories);
             var messages = conversationService.buildMessageList(history, systemInstruction, request.message());
             conversationService.saveMessage(conversationId, MessageRole.USER, request.message());
             return new ConversationContext(conversationId, messages, deviceId);
@@ -285,6 +302,15 @@ class AssistantService implements AssistantFacade {
                     aiMetrics.recordAiError("chat", "api_error");
                 })
                 .onErrorResume(error -> Flux.just(createErrorEvent(error)));
+    }
+
+    private static String formatMemoriesForPrompt(List<UserMemory> memories) {
+        if (memories.isEmpty()) {
+            return "No memories saved yet.";
+        }
+        return memories.stream()
+                .map(m -> "- " + m.getMemoryKey() + ": " + m.getMemoryValue())
+                .collect(Collectors.joining("\n"));
     }
 
     private record ConversationContext(UUID conversationId, List<Message> messages, String deviceId) {}
