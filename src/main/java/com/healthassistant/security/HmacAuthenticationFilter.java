@@ -12,6 +12,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Objects;
 
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 2)
 @RequiredArgsConstructor
 @Slf4j
 class HmacAuthenticationFilter extends OncePerRequestFilter {
@@ -41,6 +44,11 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
 
         if (!requiresAuthentication(path)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (request.getAttribute("deviceId") != null) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -81,7 +89,9 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/v1/routines")
             || path.startsWith("/v1/exercises")
             || path.startsWith("/v1/reports")
-            || path.startsWith("/v1/medical-exams");
+            || path.startsWith("/v1/medical-exams")
+            || path.startsWith("/mcp")
+            || path.equals("/sse");
     }
 
     private DeviceId validateHmacAuthentication(HttpServletRequest request)

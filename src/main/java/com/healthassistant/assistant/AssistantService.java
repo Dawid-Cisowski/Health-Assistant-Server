@@ -55,6 +55,13 @@ class AssistantService implements AssistantFacade {
             - When comparing periods: if one period has no data, say "brak danych za ten okres" - don't make up numbers.
             - Each number you report MUST come directly from a tool response field.
 
+            MEDICAL EXAM DATA — ABSOLUTE RULE:
+            - When getMedicalExams returns empty list or no exams exist: say ONLY "Nie masz zapisanych badań laboratoryjnych."
+            - NEVER mention any specific lab values (cholesterol, glucose, TSH etc.) if no exam data is returned.
+            - Your general medical knowledge of typical values is COMPLETELY FORBIDDEN to use here.
+            - Example of FORBIDDEN response: "Twój cholesterol może wynosić ~195 mg/dL" — this is HALLUCINATION.
+            - Example of CORRECT response: "Nie masz żadnych zapisanych badań. Dodaj wyniki przez import badań."
+
             CRITICAL DATA INTEGRITY RULE:
             - You MUST call a tool BEFORE answering ANY question about health data (steps, sleep, calories, workouts, meals).
             - NEVER assume, guess, or say "you have 0 steps" or "no data" without FIRST calling the appropriate tool.

@@ -25,6 +25,7 @@ import com.healthassistant.steps.api.StepsFacade;
 import com.healthassistant.weight.api.WeightFacade;
 import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.config.AiMetricsRecorder;
+import com.healthassistant.config.AppProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
@@ -69,6 +70,7 @@ class HealthTools {
     private final MedicalExamsFacade medicalExamsFacade;
     private final ObjectMapper objectMapper;
     private final AiMetricsRecorder aiMetrics;
+    private final AppProperties appProperties;
     private final UserMemoryService userMemoryService;
 
     // ==================== READ TOOLS ====================
@@ -1278,14 +1280,14 @@ class HealthTools {
     }
 
     private String getDeviceId(ToolContext toolContext) {
-        if (toolContext == null || toolContext.getContext() == null) {
-            throw new IllegalStateException("ToolContext or context map is null - deviceId not available");
+        if (toolContext != null && toolContext.getContext() != null) {
+            var id = toolContext.getContext().get(TOOL_CONTEXT_DEVICE_ID);
+            if (id instanceof String s && !s.isBlank()) {
+                return s;
+            }
         }
-        var deviceId = toolContext.getContext().get(TOOL_CONTEXT_DEVICE_ID);
-        if (deviceId == null) {
-            throw new IllegalStateException("deviceId not found in ToolContext");
-        }
-        return (String) deviceId;
+        // MCP fallback: Bearer token auth always maps to the configured API-key device ID
+        return appProperties.getApiKey().getDeviceId();
     }
 
     // ==================== MEMORY TOOLS ====================

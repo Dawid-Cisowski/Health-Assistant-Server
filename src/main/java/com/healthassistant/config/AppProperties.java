@@ -11,6 +11,12 @@ import org.springframework.context.annotation.Configuration;
 
 import jakarta.annotation.PostConstruct;
 
+import lombok.AccessLevel;
+import lombok.Setter;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,11 +33,13 @@ public class AppProperties {
     private final NonceConfig nonce = new NonceConfig();
     private final GoogleFitConfig googleFit = new GoogleFitConfig();
     private final EnergyRequirementsConfig energyRequirements = new EnergyRequirementsConfig();
+    private final ApiKeyConfig apiKey = new ApiKeyConfig();
 
     @PostConstruct
     public void init() {
         hmac.init();
         energyRequirements.validate();
+        apiKey.validate();
     }
 
     @Data
@@ -91,6 +99,47 @@ public class AppProperties {
         private String apiUrl;
         private String oauthUrl;
         private String deviceId = "google-fit";
+    }
+
+    @Data
+    public static class ApiKeyConfig {
+        private boolean enabled = false;
+        private String key;
+        private String deviceId = "claude-ai";
+        private boolean readOnly = false;
+
+        @Setter(AccessLevel.NONE)
+        private byte[] keyHash;
+
+        public byte[] getKeyHash() {
+            return keyHash == null ? null : keyHash.clone();
+        }
+
+        public void validate() {
+            if (!enabled) {
+                return;
+            }
+            if (key == null || key.isBlank()) {
+                throw new IllegalStateException("app.api-key.key must be configured when app.api-key.enabled=true");
+            }
+            if (key.length() < 32) {
+                throw new IllegalStateException("app.api-key.key must be at least 32 characters long");
+            }
+            this.keyHash = computeSha256(key.getBytes(StandardCharsets.UTF_8));
+        }
+
+        private static byte[] computeSha256(byte[] input) {
+            try {
+                return MessageDigest.getInstance("SHA-256").digest(input);
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException("SHA-256 not available", e);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "ApiKeyConfig{enabled=" + enabled + ", deviceId='" + deviceId + "', readOnly=" + readOnly + "}";
+        }
     }
 
     @Data
