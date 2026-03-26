@@ -164,12 +164,16 @@ class MedicalExamContentExtractor {
                 - Leave results[] for all ECG structural markers (P-wave, QRS, QT/QTc intervals etc.)
                   as separate lab results if found. Use codes from COMMON MARKER CODES if available.
 
-                ENDOSCOPY / IMAGING EXTRACTION RULES (applies to GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO, HISTOPATHOLOGY):
+                ULTRASOUND (USG) EXTRACTION RULES (applies to ABDOMINAL_USG, THYROID_USG):
+                - Set reportText with the COMPLETE verbatim findings text, formatted as Markdown
+                - Set conclusions with a 2-3 sentence medical summary in Polish, formatted as Markdown
+                - Leave results[] EMPTY — do NOT add any result entries for USG exams
+
+                ENDOSCOPY / OTHER IMAGING EXTRACTION RULES (applies to GASTROSCOPY, COLONOSCOPY, CHEST_XRAY, ECHO, HISTOPATHOLOGY):
                 - Set reportText with the COMPLETE verbatim findings text copied from the document (all organs, observations, measurements), formatted as Markdown
                 - Set conclusions with a 2-3 sentence medical summary of the key findings — write in Polish, formatted as Markdown
                 - ALSO add exactly ONE status result to results[]:
                     - markerCode: use the exam-specific overall code (e.g. GASTROSCOPY_OVERALL for GASTROSCOPY, ECHO_OVERALL for ECHO,
-                      USG_ABDOMINAL_OVERALL for ABDOMINAL_USG, USG_THYROID_OVERALL for THYROID_USG,
                       CHEST_XRAY_OVERALL for CHEST_XRAY, COLONOSCOPY_OVERALL for COLONOSCOPY,
                       HISTOPATH_OVERALL for HISTOPATHOLOGY)
                     - valueNumeric: 2 if findings are normal/unremarkable, 1 if minor/watchful findings requiring monitoring,
@@ -187,7 +191,8 @@ class MedicalExamContentExtractor {
                 IMPORTANT RULES:
                 1. Set isMedicalReport=false if document is NOT a medical exam result
                 2. For LAB exams (MORPHOLOGY, LIPID_PANEL, THYROID, etc.): extract ALL markers into results[], include reference ranges
-                3. For IMAGING/ENDOSCOPY exams (GASTROSCOPY, COLONOSCOPY, ABDOMINAL_USG, THYROID_USG, CHEST_XRAY, ECHO, HISTOPATHOLOGY): add exactly ONE overall status result to results[] — use reportText + conclusions for full narrative
+                3. For ABDOMINAL_USG and THYROID_USG: leave results[] EMPTY — use reportText + conclusions only
+                   For other IMAGING/ENDOSCOPY exams (GASTROSCOPY, COLONOSCOPY, CHEST_XRAY, ECHO, HISTOPATHOLOGY): add exactly ONE overall status result to results[] — use reportText + conclusions for full narrative
                 4. For each lab result, always provide markerCode (use the codes above when possible)
                 5. Report confidence (0.0-1.0) based on document clarity
                 """;
