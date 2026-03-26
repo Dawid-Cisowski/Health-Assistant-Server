@@ -56,6 +56,11 @@ spring:
       spec: expireAfterWrite=${NONCE_CACHE_TTL_SEC:600}s,maximumSize=10000
 
   ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:false}
+        name: health-assistant
+        version: 1.0.0
     google:
       genai:
         api-key: ${GEMINI_API_KEY}

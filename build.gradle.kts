@@ -58,6 +58,7 @@ dependencies {
 
     // Spring AI
     implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
+    implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
 
     // Firebase Cloud Messaging
     implementation("com.google.firebase:firebase-admin:9.4.3")
