@@ -51,7 +51,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
-class HealthTools {
+public class HealthTools {
 
     static final String TOOL_CONTEXT_DEVICE_ID = "deviceId";
 
