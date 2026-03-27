@@ -1,10 +1,13 @@
 package com.healthassistant.meals.api;
 
 import com.healthassistant.healthevents.api.dto.StoredEventData;
+import com.healthassistant.mealcatalog.api.CatalogSortOrder;
+import com.healthassistant.mealcatalog.api.dto.CatalogProductResponse;
 import com.healthassistant.meals.api.dto.EnergyRequirementsResponse;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.meals.api.dto.MealResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
+import com.healthassistant.meals.api.dto.RecordMealFromCatalogRequest;
 import com.healthassistant.meals.api.dto.RecordMealRequest;
 import com.healthassistant.meals.api.dto.UpdateMealRequest;
 
@@ -29,4 +32,8 @@ public interface MealsFacade {
     void projectEvents(List<StoredEventData> events);
 
     Optional<EnergyRequirementsResponse> getEnergyRequirements(String deviceId, LocalDate date);
+
+    List<CatalogProductResponse> browseCatalog(String deviceId, String query, CatalogSortOrder sortOrder, int limit);
+
+    MealResponse recordMealFromCatalog(String deviceId, RecordMealFromCatalogRequest request);
 }

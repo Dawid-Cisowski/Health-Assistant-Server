@@ -1,12 +1,16 @@
 package com.healthassistant.meals;
 
+import com.healthassistant.config.SecurityUtils;
 import com.healthassistant.config.api.dto.ErrorResponse;
 import com.healthassistant.healthevents.api.model.DeviceId;
+import com.healthassistant.mealcatalog.api.CatalogSortOrder;
+import com.healthassistant.mealcatalog.api.dto.CatalogProductResponse;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.meals.api.dto.EnergyRequirementsResponse;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.meals.api.dto.MealResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
+import com.healthassistant.meals.api.dto.RecordMealFromCatalogRequest;
 import com.healthassistant.meals.api.dto.RecordMealRequest;
 import com.healthassistant.meals.api.dto.UpdateMealRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +19,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +32,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.regex.Pattern;
 
 @RestController
@@ -119,6 +126,51 @@ class MealsController {
         return ResponseEntity.ok(summary);
     }
 
+    @GetMapping("/catalog")
+    @Operation(
+            summary = "Browse meal catalog",
+            description = "Search or browse the meal catalog. Empty query returns all products sorted by usage or alphabetically.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Catalog products returned"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed")
+    })
+    ResponseEntity<List<CatalogProductResponse>> browseCatalog(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "USAGE") CatalogSortOrder sort,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int limit,
+            @RequestHeader("X-Device-Id") String deviceId
+    ) {
+        validateDeviceId(deviceId);
+        log.info("Browsing catalog for device {} q='{}' sort={} limit={}",
+                SecurityUtils.maskDeviceId(deviceId), q == null ? "" : SecurityUtils.sanitizeForLog(q), sort, limit);
+        return ResponseEntity.ok(mealsFacade.browseCatalog(deviceId, q, sort, limit));
+    }
+
+    @PostMapping("/from-catalog")
+    @Operation(
+            summary = "Record meal from catalog",
+            description = "Creates a meal from one or more catalog products. Macros are summed with optional portion multipliers.",
+            security = @SecurityRequirement(name = "HmacHeaderAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Meal recorded successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+            @ApiResponse(responseCode = "401", description = "HMAC authentication failed"),
+            @ApiResponse(responseCode = "422", description = "One or more catalog product IDs not found")
+    })
+    ResponseEntity<MealResponse> recordMealFromCatalog(
+            @Valid @RequestBody RecordMealFromCatalogRequest request,
+            @RequestHeader("X-Device-Id") String deviceId
+    ) {
+        validateDeviceId(deviceId);
+        log.info("Recording meal from catalog for device {} ({} products)",
+                SecurityUtils.maskDeviceId(deviceId), request.products().size());
+        MealResponse response = mealsFacade.recordMealFromCatalog(deviceId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     @PostMapping
     @Operation(
             summary = "Record a new meal",
@@ -191,6 +243,14 @@ class MealsController {
     ResponseEntity<Void> handleMealNotFound(MealNotFoundException ex) {
         log.warn("Meal not found");
         return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(CatalogProductNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleCatalogProductNotFound(CatalogProductNotFoundException ex) {
+        log.warn("Catalog product(s) not found: {}", ex.getMissingIds());
+        return ResponseEntity.unprocessableEntity()
+                .body(new ErrorResponse("CATALOG_PRODUCT_NOT_FOUND",
+                        "One or more catalog products were not found", null));
     }
 
     @ExceptionHandler(BackdatingValidationException.class)

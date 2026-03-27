@@ -3,6 +3,7 @@ package com.healthassistant.mealcatalog.api.dto;
 import java.time.Instant;
 
 public record CatalogProductResponse(
+        Long id,
         String title,
         String mealType,
         Integer caloriesKcal,

@@ -176,7 +176,7 @@ abstract class BaseIntegrationSpec extends Specification {
             // Assistant mutation specs
             "test-assistant-mutation",
             // Meal catalog specs
-            "test-meal-catalog",
+            "test-meal-catalog", "test-catalog-browse", "test-meal-from-catalog",
             // Medical exams specs
             "test-medical-exams", "test-medical-exam-import", "test-medical-attach",
             "test-medical-links", "test-medical-search",

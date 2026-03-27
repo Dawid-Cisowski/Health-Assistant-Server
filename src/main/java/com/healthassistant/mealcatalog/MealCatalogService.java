@@ -1,12 +1,15 @@
 package com.healthassistant.mealcatalog;
 
 import com.healthassistant.config.SecurityUtils;
+import com.healthassistant.mealcatalog.api.CatalogSortOrder;
 import com.healthassistant.mealcatalog.api.MealCatalogFacade;
 import com.healthassistant.mealcatalog.api.dto.CatalogProductResponse;
 import com.healthassistant.mealcatalog.api.dto.SaveProductRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -20,7 +23,7 @@ import java.util.stream.IntStream;
 @Slf4j
 class MealCatalogService implements MealCatalogFacade {
 
-    private static final int MAX_SEARCH_RESULTS = 10;
+    private static final int MAX_CATALOG_LIMIT = 50;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final CatalogProductRepository repository;
@@ -96,12 +99,12 @@ class MealCatalogService implements MealCatalogFacade {
     @Override
     @Transactional(readOnly = true)
     public List<CatalogProductResponse> searchProducts(String deviceId, String query, int maxResults) {
-        int effectiveLimit = Math.min(Math.max(maxResults, 1), MAX_SEARCH_RESULTS);
+        int effectiveLimit = Math.min(Math.max(maxResults, 1), MAX_CATALOG_LIMIT);
         log.debug("Searching catalog for device {}: query='{}', limit={}",
                 SecurityUtils.maskDeviceId(deviceId), SecurityUtils.sanitizeForLog(query), effectiveLimit);
 
         String escapedQuery = escapeLikeWildcards(query);
-        return repository.searchByDeviceIdAndQuery(deviceId, escapedQuery, PageRequest.of(0, effectiveLimit))
+        return repository.searchByDeviceIdAndQuery(deviceId, escapedQuery, PageRequest.of(0, effectiveLimit, Sort.by("usageCount").descending()))
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -110,7 +113,7 @@ class MealCatalogService implements MealCatalogFacade {
     @Override
     @Transactional(readOnly = true)
     public List<CatalogProductResponse> getTopProducts(String deviceId, int limit) {
-        int effectiveLimit = Math.min(Math.max(limit, 1), MAX_SEARCH_RESULTS);
+        int effectiveLimit = Math.min(Math.max(limit, 1), MAX_CATALOG_LIMIT);
         log.debug("Fetching top {} catalog products for device {}", effectiveLimit, SecurityUtils.maskDeviceId(deviceId));
 
         return repository.findByDeviceIdOrderByUsageCountDesc(deviceId, PageRequest.of(0, effectiveLimit))
@@ -121,6 +124,7 @@ class MealCatalogService implements MealCatalogFacade {
 
     private CatalogProductResponse toResponse(CatalogProduct product) {
         return new CatalogProductResponse(
+                product.getId(),
                 product.getTitle(),
                 product.getMealType(),
                 product.getCaloriesKcal(),
@@ -131,6 +135,34 @@ class MealCatalogService implements MealCatalogFacade {
                 product.getUsageCount(),
                 product.getLastUsedAt()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CatalogProductResponse> browseCatalog(String deviceId, String query, CatalogSortOrder sortOrder, int limit) {
+        int effectiveLimit = Math.min(Math.max(limit, 1), MAX_CATALOG_LIMIT);
+        Sort sort = sortOrder == CatalogSortOrder.ALPHABETICAL
+                ? Sort.by("title").ascending()
+                : Sort.by("usageCount").descending();
+        Pageable pageable = PageRequest.of(0, effectiveLimit, sort);
+
+        if (query == null || query.isBlank()) {
+            return repository.findByDeviceId(deviceId, pageable).stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
+        return repository.searchByDeviceIdAndQuery(deviceId, escapeLikeWildcards(query), pageable)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CatalogProductResponse> getProductsByIds(String deviceId, List<Long> ids) {
+        return repository.findAllByIdInAndDeviceId(ids, deviceId).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     private static String escapeLikeWildcards(String input) {
