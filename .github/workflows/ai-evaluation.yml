@@ -1,0 +1,47 @@
+name: AI Evaluation Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: 'Test class filter (e.g. *AiMealCatalogEvalSpec, leave empty for all)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  ai-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run AI evaluation tests
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          FILTER="${{ github.event.inputs.test_filter }}"
+          if [ -n "$FILTER" ]; then
+            ./gradlew :integration-tests:evaluationTest --tests "$FILTER" --no-daemon
+          else
+            ./gradlew :integration-tests:evaluationTest --no-daemon
+          fi
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-evaluation-reports-${{ github.run_number }}
+          path: integration-tests/build/reports/tests/evaluationTest/
+          retention-days: 30

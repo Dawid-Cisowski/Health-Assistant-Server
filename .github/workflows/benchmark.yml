@@ -1,9 +1,6 @@
 name: AI Benchmark Tests
 
 on:
-  schedule:
-    # Run every Monday at 6:00 AM UTC
-    - cron: '0 6 * * 1'
   workflow_dispatch:
     inputs:
       models:
