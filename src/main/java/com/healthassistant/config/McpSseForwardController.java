@@ -6,6 +6,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 
 import java.io.IOException;
@@ -21,9 +23,23 @@ import java.io.IOException;
 class McpSseForwardController {
 
     @PostMapping("/sse")
-    void forwardToMcp(HttpServletRequest request, HttpServletResponse response)
+    void forwardPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         log.debug("MCP: forwarding POST /sse → /mcp");
+        request.getRequestDispatcher("/mcp").forward(request, response);
+    }
+
+    @GetMapping("/sse")
+    void forwardGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        log.debug("MCP: forwarding GET /sse → /mcp");
+        request.getRequestDispatcher("/mcp").forward(request, response);
+    }
+
+    @DeleteMapping("/sse")
+    void forwardDelete(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        log.debug("MCP: forwarding DELETE /sse → /mcp");
         request.getRequestDispatcher("/mcp").forward(request, response);
     }
 }
