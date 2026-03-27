@@ -62,7 +62,7 @@ spring:
         name: health-assistant
         version: 1.0.0
         base-url: ${MCP_BASE_URL:}
-        # Streamable HTTP at /mcp (default), POST /sse forwarded there via McpSseForwardController
+        protocol: STREAMABLE
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
