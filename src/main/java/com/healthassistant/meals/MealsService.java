@@ -7,14 +7,20 @@ import com.healthassistant.healthevents.api.dto.StoreHealthEventsResult;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
 import com.healthassistant.healthevents.api.dto.payload.EventCorrectedPayload;
 import com.healthassistant.healthevents.api.dto.payload.EventDeletedPayload;
+import com.healthassistant.healthevents.api.dto.payload.HealthRating;
 import com.healthassistant.healthevents.api.dto.payload.MealRecordedPayload;
 import com.healthassistant.healthevents.api.model.DeviceId;
 import com.healthassistant.healthevents.api.model.IdempotencyKey;
+import com.healthassistant.mealcatalog.api.CatalogSortOrder;
+import com.healthassistant.mealcatalog.api.MealCatalogFacade;
+import com.healthassistant.mealcatalog.api.dto.CatalogProductResponse;
+import com.healthassistant.mealcatalog.api.dto.SaveProductRequest;
 import com.healthassistant.meals.api.MealsFacade;
 import com.healthassistant.meals.api.dto.EnergyRequirementsResponse;
 import com.healthassistant.meals.api.dto.MealDailyDetailResponse;
 import com.healthassistant.meals.api.dto.MealResponse;
 import com.healthassistant.meals.api.dto.MealsRangeSummaryResponse;
+import com.healthassistant.meals.api.dto.RecordMealFromCatalogRequest;
 import com.healthassistant.meals.api.dto.RecordMealRequest;
 import com.healthassistant.meals.api.dto.UpdateMealRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -27,9 +33,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -45,6 +53,15 @@ class MealsService implements MealsFacade {
     private static final String MEAL_V1 = "MealRecorded.v1";
     private static final String EVENT_DELETED_V1 = "EventDeleted.v1";
     private static final String EVENT_CORRECTED_V1 = "EventCorrected.v1";
+    // Explicit unhealthiness score: VERY_HEALTHY=0 (best) .. VERY_UNHEALTHY=4 (worst).
+    // Using a Map instead of ordinal order makes this robust against enum reordering.
+    private static final Map<HealthRating, Integer> UNHEALTHINESS_SCORE = Map.of(
+            HealthRating.VERY_HEALTHY, 0,
+            HealthRating.HEALTHY, 1,
+            HealthRating.NEUTRAL, 2,
+            HealthRating.UNHEALTHY, 3,
+            HealthRating.VERY_UNHEALTHY, 4
+    );
 
     private final MealDailyProjectionJpaRepository dailyRepository;
     private final MealProjectionJpaRepository mealRepository;
@@ -52,6 +69,7 @@ class MealsService implements MealsFacade {
     private final HealthEventsFacade healthEventsFacade;
     private final ObjectMapper objectMapper;
     private final EnergyRequirementsService energyRequirementsService;
+    private final MealCatalogFacade mealCatalogFacade;
 
     MealsService(
             MealDailyProjectionJpaRepository dailyRepository,
@@ -59,7 +77,8 @@ class MealsService implements MealsFacade {
             MealsProjector mealsProjector,
             HealthEventsFacade healthEventsFacade,
             ObjectMapper objectMapper,
-            @Lazy EnergyRequirementsService energyRequirementsService
+            @Lazy EnergyRequirementsService energyRequirementsService,
+            MealCatalogFacade mealCatalogFacade
     ) {
         this.dailyRepository = dailyRepository;
         this.mealRepository = mealRepository;
@@ -67,6 +86,7 @@ class MealsService implements MealsFacade {
         this.healthEventsFacade = healthEventsFacade;
         this.objectMapper = objectMapper;
         this.energyRequirementsService = energyRequirementsService;
+        this.mealCatalogFacade = mealCatalogFacade;
     }
 
     @Override
@@ -361,6 +381,107 @@ class MealsService implements MealsFacade {
                 request.carbohydratesGrams(),
                 request.healthRating().name()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CatalogProductResponse> browseCatalog(String deviceId, String query, CatalogSortOrder sortOrder, int limit) {
+        return mealCatalogFacade.browseCatalog(deviceId, query, sortOrder, limit);
+    }
+
+    @Override
+    @Transactional
+    public MealResponse recordMealFromCatalog(String deviceId, RecordMealFromCatalogRequest request) {
+        List<Long> ids = request.products().stream()
+                .map(RecordMealFromCatalogRequest.CatalogProductSelection::productId)
+                .toList();
+
+        List<CatalogProductResponse> products = mealCatalogFacade.getProductsByIds(deviceId, ids);
+
+        Set<Long> foundIds = products.stream()
+                .map(CatalogProductResponse::id)
+                .collect(Collectors.toSet());
+        List<Long> missingIds = ids.stream()
+                .filter(id -> !foundIds.contains(id))
+                .distinct()
+                .toList();
+        if (!missingIds.isEmpty()) {
+            throw new CatalogProductNotFoundException(missingIds);
+        }
+
+        Map<Long, CatalogProductResponse> productsById = products.stream()
+                .collect(Collectors.toMap(CatalogProductResponse::id, Function.identity()));
+
+        int totalCalories = sumNutrient(request.products(), productsById, CatalogProductResponse::caloriesKcal);
+        int totalProtein = sumNutrient(request.products(), productsById, CatalogProductResponse::proteinGrams);
+        int totalFat = sumNutrient(request.products(), productsById, CatalogProductResponse::fatGrams);
+        int totalCarbs = sumNutrient(request.products(), productsById, CatalogProductResponse::carbohydratesGrams);
+
+        HealthRating worstRating = products.stream()
+                .map(CatalogProductResponse::healthRating)
+                .filter(r -> r != null && !r.isBlank())
+                .map(r -> {
+                    try {
+                        return HealthRating.valueOf(r);
+                    } catch (IllegalArgumentException e) {
+                        log.warn("Unknown health rating value '{}' in catalog, treating as NEUTRAL", r);
+                        return HealthRating.NEUTRAL;
+                    }
+                })
+                .max(Comparator.comparingInt(UNHEALTHINESS_SCORE::get))
+                .orElse(HealthRating.NEUTRAL);
+
+        String title = (request.title() != null && !request.title().isBlank())
+                ? request.title()
+                : products.stream()
+                        .map(CatalogProductResponse::title)
+                        .collect(Collectors.joining(", "));
+        if (title.length() > 500) {
+            title = title.substring(0, 500);
+        }
+
+        Instant occurredAt = request.occurredAt() != null ? request.occurredAt() : Instant.now();
+        var mealRequest = new RecordMealRequest(
+                title,
+                request.mealType(),
+                totalCalories,
+                totalProtein,
+                totalFat,
+                totalCarbs,
+                worstRating,
+                occurredAt
+        );
+
+        MealResponse response = recordMeal(deviceId, mealRequest);
+
+        products.forEach(p -> {
+            try {
+                mealCatalogFacade.saveProduct(deviceId, new SaveProductRequest(
+                        p.title(),
+                        request.mealType().name(),
+                        p.caloriesKcal(),
+                        p.proteinGrams(),
+                        p.fatGrams(),
+                        p.carbohydratesGrams(),
+                        p.healthRating()
+                ));
+            } catch (Exception e) {
+                log.warn("Failed to update catalog usage for product id={}", p.id(), e);
+            }
+        });
+
+        return response;
+    }
+
+    private int sumNutrient(List<RecordMealFromCatalogRequest.CatalogProductSelection> selections,
+                            Map<Long, CatalogProductResponse> productsById,
+                            Function<CatalogProductResponse, Integer> nutrientExtractor) {
+        return selections.stream()
+                .mapToInt(sel -> {
+                    Integer base = nutrientExtractor.apply(productsById.get(sel.productId()));
+                    return Math.toIntExact(Math.round((base != null ? base : 0) * sel.effectiveMultiplier()));
+                })
+                .sum();
     }
 
     private void validateBackdating(Instant occurredAt) {
