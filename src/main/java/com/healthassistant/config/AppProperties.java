@@ -156,8 +156,8 @@ public class AppProperties {
         private int fatRestDay = 80;
 
         public void validate() {
-            if (surplusKcal < 0 || surplusKcal > 1000) {
-                throw new IllegalStateException("surplusKcal must be between 0 and 1000, got: " + surplusKcal);
+            if (surplusKcal < -1000 || surplusKcal > 1000) {
+                throw new IllegalStateException("surplusKcal must be between -1000 and 1000, got: " + surplusKcal);
             }
             if (baseMultiplier < 1.0 || baseMultiplier > 3.0) {
                 throw new IllegalStateException("baseMultiplier must be between 1.0 and 3.0, got: " + baseMultiplier);
