@@ -157,7 +157,7 @@ app:
     storage:
       local-path: ${MEDICAL_EXAMS_LOCAL_PATH:${java.io.tmpdir}/healthassistant/medical-exams}
   energy-requirements:
-    surplus-kcal: 0
+    surplus-kcal: -300
     base-multiplier: 1.35
     steps-threshold: 4000
     steps-interval: 2000
