@@ -81,7 +81,7 @@ All DTOs should be Java Records. Use Value Objects (Records with validation) ins
 ### Tech Stack
 - **Java 21** (virtual threads, records, sealed classes, pattern matching)
 - **Spring Boot 4.0.2** + **Spring AI 2.0.0-M2** (Gemini) + **Spring Modulith 2.0.1**
-- **PostgreSQL 16** (JSONB) + **Flyway** (V1–V58)
+- **PostgreSQL 16** (JSONB) + **Flyway** (V1–V74+)
 - **Spock** (Groovy) + **Testcontainers** + **REST Assured** + **WireMock**
 - **SpotBugs + PMD + JaCoCo** for code quality
 
@@ -182,12 +182,15 @@ When adding a new module, you MUST update these files:
 4. **Flyway migration** - include `version` column in any new projection table
 
 Other gotchas:
-- Integration test specs (~84 files) all fail without Docker/Testcontainers — this is normal for `./gradlew :test`
+- Integration test specs (~90 files) all fail without Docker/Testcontainers — this is normal for `./gradlew :test`
 - PMD has a pre-existing false positive on `projectionModulesShouldNotDependOnImportModules`
 - `@ConditionalOnProperty` required for optional features (AI, GCS storage, notifications)
 - `DraftCleanupScheduler` in `medicalexamimport` must use `@Component("medicalExamDraftCleanupScheduler")` to avoid Spring bean name conflict with `mealimport`'s scheduler
 - `@PostMapping("/{draftId}/confirm")` has `@RequestBody(required = false)` — callers MUST send `Content-Type: application/json` even with no body, otherwise Spring returns 415
 - `@ManyToOne @MapsId` requires explicit `@JoinColumn(name = "col")` — Hibernate will derive the wrong column name from the field name otherwise
+- **JPQL LIKE with user input**: always use `ESCAPE '\\'` in the `@Query` and escape `%`, `_`, `\` in the Java code before passing to the query. Without `ESCAPE`, Hibernate/PostgreSQL behavior is dialect-dependent. Example: `LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\'`
+- **`mealcatalog` has no controller** — its endpoints (`GET /v1/meals/catalog`, `POST /v1/meals/from-catalog`) are served by `MealsController` in the `meals` module, which depends on `MealCatalogFacade`
+- **AI evaluation and benchmark tests** are manual-only (GitHub Actions `workflow_dispatch`). They do NOT run on push/PR. Run via: Actions → "AI Evaluation Tests" or "AI Benchmark Tests" → Run workflow
 
 ---
 
@@ -200,6 +203,7 @@ Other gotchas:
 ### Optional
 - `GEMINI_API_KEY` - for AI assistant + image imports
 - `GEMINI_MODEL` - default: `gemini-3-flash-preview`
+- `app.energy-requirements.surplus-kcal` - calorie surplus/deficit applied on top of TDEE (range -1000..1000, negative = deficit, default 300)
 - `app.medicalexams.gcs.enabled=true` - enables GCS file storage
 - `app.medicalexams.gcs.bucket-name` - GCS bucket
 - `app.medicalexams.gcs.credentials-json` - service account JSON (env var)
@@ -253,6 +257,8 @@ See `EventValidator.java` for detailed validation rules.
 - `GET /v1/workouts/{workoutId}` | `GET /v1/workouts?from=&to=`
 - `GET /v1/sleep/range?from=&to=`
 - `GET /v1/meals/range?from=&to=`
+- `GET /v1/meals/catalog?q=&sort=USAGE|ALPHABETICAL&limit=` - browse personal product catalog
+- `POST /v1/meals/from-catalog` - record meal from catalog products (no AI, sums macros)
 - `GET /v1/weight/latest` | `GET /v1/weight/range?from=&to=`
 - `GET /v1/heartrate/range?from=&to=`
 - `GET /v1/exercises/{exerciseId}/statistics?from=&to=`
