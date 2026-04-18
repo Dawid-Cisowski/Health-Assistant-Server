@@ -12,49 +12,51 @@ on:
 #
 # WYMAGANE VARIABLES W GITHUB REPO SETTINGS:
 #   GCP_PROJECT_ID    — np. my-project-123456
-#   GCP_REGION        — np. europe-west1  (default)
+#   GCP_REGION        — np. europe-central2  (default)
 #   CLOUD_RUN_SERVICE — np. health-assistant (default)
 #   AR_REPOSITORY     — np. health-assistant (default)
 # ============================================================
 
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  GCP_REGION: ${{ vars.GCP_REGION || 'europe-west1' }}
-  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'health-assistant' }}
-  AR_REPOSITORY: ${{ vars.AR_REPOSITORY || 'health-assistant' }}
+  GCP_REGION: ${{ vars.GCP_REGION || 'europe-central2' }}
+  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'health-assistant-event-collector' }}
+  AR_REPOSITORY: ${{ vars.AR_REPOSITORY || 'health-assistant-event-collector' }}
 
 jobs:
   build-and-deploy:
-    # Standard runner ma 7GB RAM — może być za mało.
-    # Jeśli OOM: zmień na self-hosted lub większy runner.
-    # Dla GitHub Pro/Teams użyj: ubuntu-latest-16-cores (16GB)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # GraalVM 25 Community Edition — Spring Boot 4.1.x wymaga Java 25 dla native image
-      - name: Set up GraalVM CE 25
+      # Krok 1: GraalVM 25 CE — tylko dla native-image binary (NIE jako JAVA_HOME)
+      # Gradle 8.x + Kotlin DSL nie parsuje wersji "25.0.2" → Gradle musi używać Java 21
+      - name: Set up GraalVM CE 25 (native-image only)
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '25'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          set-java-home: 'false'
+
+      # Krok 2: Java 21 jako JAVA_HOME dla Gradle
+      - name: Set up JDK 21 for Gradle
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
           cache: 'gradle'
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # Native compile — ograniczenia pamięci dla 7GB runner
-      # Peak RSS: ~8-12GB. Jeśli fail z OOM, użyj self-hosted runner.
+      # Gradle używa Java 21, native-image używa GraalVM 25 przez GRAALVM_HOME
       - name: Build native image
-        run: |
-          ./gradlew nativeCompile --no-daemon -x test -x spotbugsMain -x pmdMain
+        run: ./gradlew nativeCompile --no-daemon -x test -x spotbugsMain -x pmdMain
         env:
           GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx2g -Dorg.gradle.workers.max=1'
-          # Ograniczamy pamięć Gradle żeby zostawić więcej dla native-image
 
-      # Authenticate to Google Cloud
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
