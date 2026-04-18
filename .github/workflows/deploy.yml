@@ -1,0 +1,93 @@
+name: Deploy Native Image
+
+on:
+  push:
+    branches: [master]
+
+# ============================================================
+# WYMAGANE SECRETS W GITHUB REPO SETTINGS:
+#   GCP_SA_KEY        — Service Account JSON z prawami:
+#                       roles/run.admin, roles/artifactregistry.writer,
+#                       roles/iam.serviceAccountUser
+#
+# WYMAGANE VARIABLES W GITHUB REPO SETTINGS:
+#   GCP_PROJECT_ID    — np. my-project-123456
+#   GCP_REGION        — np. europe-west1  (default)
+#   CLOUD_RUN_SERVICE — np. health-assistant (default)
+#   AR_REPOSITORY     — np. health-assistant (default)
+# ============================================================
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION || 'europe-west1' }}
+  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'health-assistant' }}
+  AR_REPOSITORY: ${{ vars.AR_REPOSITORY || 'health-assistant' }}
+
+jobs:
+  build-and-deploy:
+    # Standard runner ma 7GB RAM — może być za mało.
+    # Jeśli OOM: zmień na self-hosted lub większy runner.
+    # Dla GitHub Pro/Teams użyj: ubuntu-latest-16-cores (16GB)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GraalVM 25 Community Edition — Spring Boot 4.1.x wymaga Java 25 dla native image
+      - name: Set up GraalVM CE 25
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Native compile — ograniczenia pamięci dla 7GB runner
+      # Peak RSS: ~8-12GB. Jeśli fail z OOM, użyj self-hosted runner.
+      - name: Build native image
+        run: |
+          ./gradlew nativeCompile --no-daemon -x test -x spotbugsMain -x pmdMain
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx2g -Dorg.gradle.workers.max=1'
+          # Ograniczamy pamięć Gradle żeby zostawić więcej dla native-image
+
+      # Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/health-assistant:${{ github.sha }}"
+          IMAGE_LATEST="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/health-assistant:latest"
+
+          docker build -f Dockerfile.native-runtime -t "$IMAGE" -t "$IMAGE_LATEST" .
+          docker push "$IMAGE"
+          docker push "$IMAGE_LATEST"
+
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.CLOUD_RUN_SERVICE }}
+          region: ${{ env.GCP_REGION }}
+          image: ${{ env.IMAGE }}
+          flags: |
+            --min-instances=0
+            --max-instances=10
+            --memory=512Mi
+            --cpu=1
+            --concurrency=80
+            --startup-cpu-boost
+            --port=8080

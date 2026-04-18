@@ -3,7 +3,9 @@ plugins {
     groovy
     jacoco
     id("org.springframework.boot") version "4.1.0-M2"
+    id("org.springframework.boot.aot") version "4.1.0-M2"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.graalvm.buildtools.native") version "0.10.4"
     id("com.github.spotbugs") version "6.0.26"
     id("org.sonarqube") version "5.1.0.4882"
     pmd
@@ -79,7 +81,7 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:caffeine")
 
     // OpenAPI documentation (Spring Boot 4.0 compatible)
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0-M1")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
 
     // JSON processing
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
@@ -144,6 +146,14 @@ tasks.named<Pmd>("pmdTest") {
     source = source.matching { exclude("**/*.groovy") }
 }
 
+// Exclude AOT-generated source sets from SpotBugs and PMD (generated code)
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    if (name.contains("Aot", ignoreCase = true)) enabled = false
+}
+tasks.withType<Pmd>().configureEach {
+    if (name.contains("Aot", ignoreCase = true)) enabled = false
+}
+
 // PMD configuration
 pmd {
     isConsoleOutput = true
@@ -167,6 +177,33 @@ tasks.jacocoTestReport {
     reports {
         xml.required = true
         html.required = true
+    }
+}
+
+// GraalVM Native Image configuration — Spring Boot 4.1.x requires GraalVM 25 (Java 25) for native
+graalvmNative {
+    toolchainDetection.set(false) // używa JAVA_HOME — musi wskazywać na GraalVM 25
+    binaries {
+        named("main") {
+            imageName.set("health-assistant")
+            // Explicitly add AOT source set outputs — required for Spring Boot 4.1.x + native-buildtools 0.10.4
+            classpath(
+                sourceSets.getByName("aot").output,
+                sourceSets.getByName("aot").runtimeClasspath
+            )
+            buildArgs.addAll(
+                "--no-fallback",
+                "--initialize-at-build-time=org.apache.logging.log4j.layout.template",
+                "--initialize-at-run-time=com.lmax.disruptor",
+                "--initialize-at-run-time=com.google.firebase",
+                "--initialize-at-run-time=com.google.auth",
+                "--initialize-at-run-time=io.netty",
+                "--initialize-at-run-time=io.grpc.netty.shaded",
+                "--initialize-at-run-time=com.google.cloud.storage",
+                "--initialize-at-run-time=com.google.cloud.http.HttpTransportOptions",
+                "-H:+ReportExceptionStackTraces"
+            )
+        }
     }
 }
 

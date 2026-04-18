@@ -1,0 +1,18 @@
+# Runtime-only Dockerfile — używany przez GitHub Actions deploy workflow.
+# Zakłada że native binary jest już skompilowany przez `./gradlew nativeCompile`
+# (GraalVM jest na runnerze, nie tutaj).
+#
+# Do lokalnego buildu od zera (bez GraalVM lokalnie) użyj Dockerfile.native.
+
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /app
+
+COPY build/native/nativeCompile/health-assistant /app/health-assistant
+
+ENV PORT=8080
+ENV SPRING_PROFILES_ACTIVE=production
+
+USER nonroot
+EXPOSE 8080
+
+ENTRYPOINT ["/app/health-assistant", "--server.port=8080"]

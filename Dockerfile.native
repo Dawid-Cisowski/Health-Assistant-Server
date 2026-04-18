@@ -1,14 +1,8 @@
-# ============================================================
-# Native Image multi-stage build
-# Build stage: GraalVM 25 Community Edition
-# Runtime stage: distroless/static (no JVM needed)
-# ============================================================
-
-# --- build stage ---
+# --- build stage: GraalVM Community Edition 21 (native-image pre-installed) ---
 FROM ghcr.io/graalvm/native-image-community:25 AS build
 WORKDIR /app
 
-# Cache Gradle dependencies
+# Cache dependencies
 COPY gradlew ./
 COPY gradle gradle
 COPY build.gradle.kts settings.gradle.kts ./
@@ -17,13 +11,11 @@ RUN chmod +x ./gradlew && ./gradlew dependencies --no-daemon -q || true
 # Copy sources
 COPY src src
 COPY META-INF META-INF
-COPY src/main/resources/META-INF/native-image src/main/resources/META-INF/native-image
 
-# Native compile — no tests, no static analysis
-# Spring Boot 4.1.x requires GraalVM 25 (Java 25) for native image
+# Native compilation — wymaga min. 6GB RAM, zajmuje 5-10 minut
 RUN ./gradlew nativeCompile --no-daemon -x test -x spotbugsMain -x pmdMain
 
-# --- runtime stage (no JVM — native binary is self-contained) ---
+# --- runtime stage: distroless/static (brak JVM — nie potrzebny dla native binary) ---
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 

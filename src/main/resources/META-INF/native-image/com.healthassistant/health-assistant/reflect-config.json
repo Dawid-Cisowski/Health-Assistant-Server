@@ -1,0 +1,22 @@
+[
+  {
+    "name": "com.healthassistant.HealthAssistantApplication__ApplicationContextInitializer",
+    "allPublicConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "com.healthassistant.HealthAssistantApplication__BeanDefinitions",
+    "allPublicConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "com.healthassistant.HealthAssistantApplication__BeanFactoryRegistrations",
+    "allPublicConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "com.healthassistant.HealthAssistantApplication__EnvironmentPostProcessor",
+    "allPublicConstructors": true,
+    "allPublicMethods": true
+  }
+]

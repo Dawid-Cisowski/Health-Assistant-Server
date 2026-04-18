@@ -6,9 +6,9 @@
     </Properties>
 
     <Appenders>
-        <!-- Console appender with JSON layout for production -->
+        <!-- Console appender — PatternLayout works in both JVM and native image -->
         <Console name="JsonConsole" target="SYSTEM_OUT">
-            <JsonTemplateLayout eventTemplateUri="classpath:JsonLayout.json"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} %-5level [%thread] %logger{36} - %msg%n%throwable"/>
         </Console>
 
         <!-- Console appender with pattern layout for local development -->
