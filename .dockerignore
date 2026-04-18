@@ -1,5 +1,8 @@
 # Build artifacts
 build/
+!build/native/
+!build/native/nativeCompile/
+!build/native/nativeCompile/health-assistant
 target/
 *.jar
 *.war
