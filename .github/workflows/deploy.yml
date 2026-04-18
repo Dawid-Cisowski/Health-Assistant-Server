@@ -89,6 +89,6 @@ jobs:
             --memory=512Mi \
             --cpu=1 \
             --concurrency=80 \
-            --startup-cpu-boost \
+            --cpu-boost \
             --port=8080 \
             --quiet
