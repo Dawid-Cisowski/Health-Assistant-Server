@@ -5,8 +5,9 @@ import tools.jackson.databind.ObjectMapper;
 import com.healthassistant.dailysummary.api.dto.DailySummary;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Map;
 
@@ -20,9 +21,23 @@ class GenerateDailySummaryCommandHandler {
     private final DailySummaryAggregator aggregator;
     private final DailySummaryJpaRepository jpaRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public void handle(GenerateDailySummaryCommand command) {
+        try {
+            executeInTransaction(command);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Version conflict for daily summary {}/{}, retrying once",
+                    maskDeviceId(command.deviceId()), command.date());
+            executeInTransaction(command);
+        }
+    }
+
+    private void executeInTransaction(GenerateDailySummaryCommand command) {
+        transactionTemplate.executeWithoutResult(status -> doHandle(command));
+    }
+
+    private void doHandle(GenerateDailySummaryCommand command) {
         log.info("Generating daily summary for device: {} date: {}", maskDeviceId(command.deviceId()), command.date());
 
         DailySummary summary = aggregator.aggregate(command.deviceId(), command.date());

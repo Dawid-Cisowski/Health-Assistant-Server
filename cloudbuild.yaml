@@ -1,0 +1,21 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '$_IMAGE_NAME'
+      - '.'
+    timeout: '1800s'  # 30 minut — native compile zajmuje ~10 min na Cloud Build
+
+images:
+  - '$_IMAGE_NAME'
+
+options:
+  machineType: 'E2_HIGHCPU_8'  # 8 vCPU, 8GB RAM — minimum dla native image
+  diskSizeGb: 100
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _IMAGE_NAME: 'gcr.io/$PROJECT_ID/health-assistant:$COMMIT_SHA'
+
+timeout: '2000s'
