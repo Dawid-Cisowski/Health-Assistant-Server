@@ -2,7 +2,7 @@
 build/
 !build/native/
 !build/native/nativeCompile/
-!build/native/nativeCompile/health-assistant
+!build/native/nativeCompile/**
 target/
 *.jar
 *.war

@@ -4,10 +4,12 @@
 #
 # Do lokalnego buildu od zera (bez GraalVM lokalnie) użyj Dockerfile.native.
 
-FROM gcr.io/distroless/static-debian12:nonroot
+# base-debian12 (nie static) — potrzebne glibc dla JDK native libraries (.so)
+FROM gcr.io/distroless/base-debian12:nonroot
 WORKDIR /app
 
-COPY build/native/nativeCompile/health-assistant /app/health-assistant
+# Kopiuj binary i wszystkie .so biblioteki (libawt.so, libjvm.so etc.)
+COPY build/native/nativeCompile/ /app/
 
 ENV PORT=8080
 ENV SPRING_PROFILES_ACTIVE=production
