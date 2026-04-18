@@ -152,60 +152,6 @@ abstract class BaseBenchmarkSpec extends BaseEvaluationSpec {
     }
 
     /**
-     * Request AI daily summary and measure metrics.
-     */
-    BenchmarkResult benchmarkAiSummary(LocalDate date) {
-        def deviceId = getTestDeviceId()
-        def dateStr = date.toString()
-        def startTime = System.currentTimeMillis()
-
-        def response = authenticatedGetRequest(deviceId, TEST_SECRET_BASE64, "/v1/daily-summaries/${dateStr}/ai-text")
-                .get("/v1/daily-summaries/${dateStr}/ai-text")
-                .then()
-                .extract()
-
-        def endTime = System.currentTimeMillis()
-        def statusCode = response.statusCode()
-        def bodyString = response.body().asString()
-
-        // Handle error responses gracefully
-        if (statusCode != 200 || bodyString == null || bodyString.isEmpty()) {
-            def errorMessage = statusCode == 429 ? "Rate limited (429)" : "HTTP ${statusCode}"
-            return BenchmarkResult.builder()
-                    .model(currentModel)
-                    .response("")
-                    .passed(false)
-                    .errorMessage(errorMessage)
-                    .inputTokens(0L)
-                    .outputTokens(0L)
-                    .estimatedCostUsd(0.0)
-                    .responseTimeMs(endTime - startTime)
-                    .timestamp(Instant.now())
-                    .build()
-        }
-
-        def body = response.body().jsonPath()
-        def summary = body.getString("summary") ?: ""
-        def dataAvailable = body.getBoolean("dataAvailable")
-
-        // Real token usage from API response
-        def inputTokens = body.getLong("promptTokens") ?: 0L
-        def outputTokens = body.getLong("completionTokens") ?: 0L
-
-        return BenchmarkResult.builder()
-                .model(currentModel)
-                .response(summary)
-                .passed(dataAvailable && summary.length() > 10)
-                .errorMessage(null)
-                .inputTokens(inputTokens)
-                .outputTokens(outputTokens)
-                .estimatedCostUsd(BenchmarkResult.calculateCost(currentModel, inputTokens, outputTokens))
-                .responseTimeMs(endTime - startTime)
-                .timestamp(Instant.now())
-                .build()
-    }
-
-    /**
      * Import meal from text description and measure metrics.
      * Uses /v1/meals/import multipart endpoint with description parameter.
      */

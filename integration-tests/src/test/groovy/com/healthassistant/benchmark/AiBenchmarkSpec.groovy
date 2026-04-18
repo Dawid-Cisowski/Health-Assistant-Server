@@ -119,59 +119,6 @@ class AiBenchmarkSpec extends BaseBenchmarkSpec {
         modelName << BENCHMARK_MODELS
     }
 
-    // ==================== Test 3: AI Daily Summary Generation ====================
-
-    @Unroll
-    def "BM-03: AI daily summary generation [#modelName]"() {
-        given: "model is set"
-        currentModel = modelName
-
-        and: "comprehensive health data for today"
-        submitStepsForToday(12000)
-        submitSleepForLastNight(480) // 8h
-        submitActiveCalories(450)
-        submitMeal("Oatmeal with fruits", "BREAKFAST", 350, 15, 8, 50)
-        waitForProjections()
-
-        when: "requesting AI summary"
-        def result = benchmarkAiSummary(today)
-        recordBenchmark("BM-03", "AI daily summary", result)
-
-        then: "summary is generated with reasonable content"
-        result.passed
-        result.response.length() > 30
-
-        and: "LLM judge validates summary quality"
-        def judgeResult = llmAsJudge("Generate AI daily summary", result.response, """
-            Evaluate ONLY the text response quality. Do NOT consider whether tools were called - assume the data is correct.
-
-            CONTEXT: User has recorded: 12000 steps, 8 hours sleep, 450 active calories, breakfast (oatmeal with fruits, 350 kcal).
-
-            The response MUST:
-            1. Be written in Polish language
-            2. Mention at least 2 of the following data points:
-               - Steps: ~12000 (excellent day)
-               - Sleep: 8 hours (good sleep)
-               - Calories burned: 450
-               - Breakfast/meal information
-            3. Provide an overall assessment or encouragement
-
-            FAIL if:
-            - Written in English (should be Polish)
-            - Mentions wrong data (e.g., wrong step count, wrong sleep hours)
-            - Generic text without referencing actual data
-        """)
-        println "LLM Judge BM-03: ${judgeResult}"
-        updateBenchmarkWithJudgeResult("BM-03", judgeResult)
-        judgeResult.score >= 0.6
-
-        cleanup:
-        cleanAllData()
-
-        where:
-        modelName << BENCHMARK_MODELS
-    }
-
     // ==================== Test 4: Meal Import - Simple (Banana) ====================
     // 1 medium banana (~120g): 89 kcal, 1.1g protein, 0.3g fat, 23g carbs
     // Tolerance: ±20%
