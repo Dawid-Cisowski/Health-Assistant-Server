@@ -69,6 +69,7 @@ public class HealthAssistantNativeHints {
             registerLog4j2Resources(hints);
             registerJdkVersionDetectionMethods(hints);
             registerCaffeineCache(hints, classLoader);
+            registerFlywayExtensions(hints, classLoader);
         }
 
         private void registerToolReflection(RuntimeHints hints) {
@@ -151,6 +152,24 @@ public class HealthAssistantNativeHints {
                 IdempotencyKey.class,
                 StoredEventData.class
             ).forEach(type -> hints.reflection().registerType(type, FULL_REFLECTION));
+        }
+
+        private void registerFlywayExtensions(RuntimeHints hints, ClassLoader classLoader) {
+            // Flyway uses Jackson to serialize/deserialize ConfigurationExtension implementations.
+            // All public methods need to be registered for reflection.
+            List.of(
+                "org.flywaydb.core.internal.publishing.PublishingConfigurationExtension",
+                "org.flywaydb.core.extensibility.ConfigurationExtension",
+                "org.flywaydb.core.internal.configuration.extensions.PrepareScriptsConfigurationExtension",
+                "org.flywaydb.core.internal.configuration.extensions.MigrateExtension",
+                "org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension"
+            ).forEach(typeName ->
+                hints.reflection().registerTypeIfPresent(classLoader, typeName,
+                    MemberCategory.INVOKE_PUBLIC_METHODS,
+                    MemberCategory.INVOKE_DECLARED_METHODS,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.DECLARED_FIELDS)
+            );
         }
 
         private void registerCaffeineCache(RuntimeHints hints, ClassLoader classLoader) {
