@@ -155,13 +155,17 @@ public class HealthAssistantNativeHints {
         }
 
         private void registerFlywayExtensions(RuntimeHints hints, ClassLoader classLoader) {
-            // Flyway uses Jackson to serialize/deserialize ConfigurationExtension implementations.
-            // All public methods need to be registered for reflection.
+            // Flyway uses Jackson to serialize/copy ALL ConfigurationExtension implementations.
+            // Every public method of every extension needs to be registered.
             List.of(
-                "org.flywaydb.core.internal.publishing.PublishingConfigurationExtension",
                 "org.flywaydb.core.extensibility.ConfigurationExtension",
-                "org.flywaydb.core.internal.configuration.extensions.PrepareScriptsConfigurationExtension",
-                "org.flywaydb.core.internal.configuration.extensions.MigrateExtension",
+                "org.flywaydb.core.internal.publishing.PublishingConfigurationExtension",
+                "org.flywaydb.core.api.migration.baseline.BaselineMigrationConfigurationExtension",
+                "org.flywaydb.core.internal.configuration.extensions.SecretsManagerConfigurationExtension",
+                "org.flywaydb.core.internal.command.clean.CleanModeConfigurationExtension",
+                "org.flywaydb.core.internal.proprietaryStubs.OfflinePermitConfigurationExtensionStub",
+                "org.flywaydb.core.internal.proprietaryStubs.PATTokenConfigurationExtensionStub",
+                "org.flywaydb.core.internal.proprietaryStubs.LicensingConfigurationExtensionStub",
                 "org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension"
             ).forEach(typeName ->
                 hints.reflection().registerTypeIfPresent(classLoader, typeName,
