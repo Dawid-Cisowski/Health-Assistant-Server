@@ -68,6 +68,7 @@ public class HealthAssistantNativeHints {
             registerDeserializers(hints, classLoader);
             registerLog4j2Resources(hints);
             registerJdkVersionDetectionMethods(hints);
+            registerCaffeineCache(hints, classLoader);
         }
 
         private void registerToolReflection(RuntimeHints hints) {
@@ -150,6 +151,36 @@ public class HealthAssistantNativeHints {
                 IdempotencyKey.class,
                 StoredEventData.class
             ).forEach(type -> hints.reflection().registerType(type, FULL_REFLECTION));
+        }
+
+        private void registerCaffeineCache(RuntimeHints hints, ClassLoader classLoader) {
+            // Caffeine loads cache implementation classes via Class.forName() at runtime.
+            // The class name encodes the configuration: S=Strong, W=WriteExpiry, S=Stats etc.
+            // For our config (expireAfterWrite + recordStats): SSSW
+            // Register all common SS* variants to cover future config changes.
+            List.of(
+                "com.github.benmanes.caffeine.cache.SSSW",
+                "com.github.benmanes.caffeine.cache.SSSWR",
+                "com.github.benmanes.caffeine.cache.SSW",
+                "com.github.benmanes.caffeine.cache.SSWR",
+                "com.github.benmanes.caffeine.cache.SSMS",
+                "com.github.benmanes.caffeine.cache.SSMSW",
+                "com.github.benmanes.caffeine.cache.SSMSR",
+                "com.github.benmanes.caffeine.cache.SSMSWR",
+                "com.github.benmanes.caffeine.cache.SSSMS",
+                "com.github.benmanes.caffeine.cache.SSSMSAW",
+                "com.github.benmanes.caffeine.cache.SS",
+                "com.github.benmanes.caffeine.cache.SSR",
+                "com.github.benmanes.caffeine.cache.SSA",
+                "com.github.benmanes.caffeine.cache.SSAR",
+                "com.github.benmanes.caffeine.cache.SSAW",
+                "com.github.benmanes.caffeine.cache.SSAWR"
+            ).forEach(typeName ->
+                hints.reflection().registerTypeIfPresent(classLoader, typeName,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INVOKE_PUBLIC_METHODS,
+                    MemberCategory.DECLARED_FIELDS)
+            );
         }
 
         private void registerJdkVersionDetectionMethods(RuntimeHints hints) {
