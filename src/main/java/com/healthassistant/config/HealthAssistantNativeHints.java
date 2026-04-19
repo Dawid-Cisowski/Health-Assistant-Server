@@ -70,6 +70,7 @@ public class HealthAssistantNativeHints {
             registerJdkVersionDetectionMethods(hints);
             registerCaffeineCache(hints, classLoader);
             registerFlywayExtensions(hints, classLoader);
+            registerHibernateStrategies(hints, classLoader);
         }
 
         private void registerToolReflection(RuntimeHints hints) {
@@ -152,6 +153,60 @@ public class HealthAssistantNativeHints {
                 IdempotencyKey.class,
                 StoredEventData.class
             ).forEach(type -> hints.reflection().registerType(type, FULL_REFLECTION));
+        }
+
+        private void registerHibernateStrategies(RuntimeHints hints, ClassLoader classLoader) {
+            // Hibernate uses StrategySelectorImpl.create() which calls getDeclaredConstructor()
+            // All registered strategy implementation classes need no-args constructor reflection.
+            List.of(
+                "org.hibernate.boot.model.naming.ImplicitNamingStrategyComponentPathImpl",
+                "org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl",
+                "org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyHbmImpl",
+                "org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl",
+                "org.hibernate.boot.model.relational.ColumnOrderingStrategyLegacy",
+                "org.hibernate.boot.model.relational.ColumnOrderingStrategyStandard",
+                "org.hibernate.cache.internal.DefaultCacheKeysFactory",
+                "org.hibernate.cache.internal.SimpleCacheKeysFactory",
+                "org.hibernate.id.enhanced.LegacyNamingStrategy",
+                "org.hibernate.id.enhanced.SingleNamingStrategy",
+                "org.hibernate.id.enhanced.StandardNamingStrategy",
+                "org.hibernate.query.sqm.mutation.internal.cte.CteInsertStrategy",
+                "org.hibernate.query.sqm.mutation.internal.cte.CteMutationStrategy",
+                "org.hibernate.query.sqm.mutation.internal.temptable.GlobalTemporaryTableInsertStrategy",
+                "org.hibernate.query.sqm.mutation.internal.temptable.GlobalTemporaryTableMutationStrategy",
+                "org.hibernate.query.sqm.mutation.internal.temptable.LocalTemporaryTableInsertStrategy",
+                "org.hibernate.query.sqm.mutation.internal.temptable.LocalTemporaryTableMutationStrategy",
+                "org.hibernate.query.sqm.mutation.internal.temptable.PersistentTableInsertStrategy",
+                "org.hibernate.query.sqm.mutation.internal.temptable.PersistentTableMutationStrategy",
+                "org.hibernate.resource.transaction.backend.jdbc.internal.JdbcResourceLocalTransactionCoordinatorBuilderImpl",
+                "org.hibernate.resource.transaction.backend.jta.internal.JtaTransactionCoordinatorBuilderImpl",
+                "org.hibernate.type.format.jackson.JacksonIntegration",
+                // PostgreSQL dialect type classes — loaded by class name in PostgreSQLDialect
+                "org.hibernate.dialect.type.PostgreSQLInetJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLCastingInetJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLArrayJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLArrayJdbcTypeConstructor",
+                "org.hibernate.dialect.type.PostgreSQLCastingJsonJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLCastingJsonArrayJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLCastingJsonArrayJdbcTypeConstructor",
+                "org.hibernate.dialect.type.PostgreSQLEnumJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLOrdinalEnumJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLIntervalSecondJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLCastingIntervalSecondJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLUUIDJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLJsonPGObjectJsonType",
+                "org.hibernate.dialect.type.PostgreSQLJsonPGObjectJsonbType",
+                "org.hibernate.dialect.type.PostgreSQLJsonArrayPGObjectType",
+                "org.hibernate.dialect.type.PostgreSQLJsonArrayPGObjectJsonJdbcTypeConstructor",
+                "org.hibernate.dialect.type.PostgreSQLJsonArrayPGObjectJsonbJdbcTypeConstructor",
+                "org.hibernate.dialect.type.PostgreSQLStructCastingJdbcType",
+                "org.hibernate.dialect.type.PostgreSQLStructPGObjectJdbcType"
+            ).forEach(typeName ->
+                hints.reflection().registerTypeIfPresent(classLoader, typeName,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INVOKE_PUBLIC_METHODS,
+                    MemberCategory.DECLARED_FIELDS)
+            );
         }
 
         private void registerFlywayExtensions(RuntimeHints hints, ClassLoader classLoader) {
