@@ -52,7 +52,7 @@ sign_and_call() {
   local path=$2
   local body=${3:-""}
 
-  local ts=$(date -u +%s)
+  local ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   local nonce=$(uuidgen | tr -d '-' | tr '[:upper:]' '[:lower:]')
   local sign_str="${method}\n${path}\n${ts}\n${nonce}\n${DEVICE_ID}\n${body}"
   local sig=$(printf "$sign_str" | openssl dgst -sha256 -hmac "$SECRET" -binary | base64)
@@ -88,16 +88,16 @@ echo "=== Calling all endpoints ==="
 
 sign_and_call GET "/actuator/health"
 sign_and_call GET "/v1/daily-summaries/2026-04-19"
-sign_and_call GET "/v1/daily-summaries/range?from=2026-04-01&to=2026-04-19"
+sign_and_call GET "/v1/daily-summaries/range?startDate=2026-04-01&endDate=2026-04-19"
 sign_and_call GET "/v1/steps/daily/2026-04-19"
-sign_and_call GET "/v1/steps/daily/range?from=2026-04-01&to=2026-04-19"
-sign_and_call GET "/v1/workouts?from=2026-04-01&to=2026-04-19"
-sign_and_call GET "/v1/sleep/range?from=2026-04-01&to=2026-04-19"
-sign_and_call GET "/v1/meals/range?from=2026-04-01&to=2026-04-19"
+sign_and_call GET "/v1/steps/daily/range?startDate=2026-04-01&endDate=2026-04-19"
+sign_and_call GET "/v1/workouts?from=2026-04-01&endDate=2026-04-19"
+sign_and_call GET "/v1/sleep/range?startDate=2026-04-01&endDate=2026-04-19"
+sign_and_call GET "/v1/meals/range?startDate=2026-04-01&endDate=2026-04-19"
 sign_and_call GET "/v1/meals/catalog?q=test&limit=5"
 sign_and_call GET "/v1/weight/latest"
-sign_and_call GET "/v1/weight/range?from=2026-04-01&to=2026-04-19"
-sign_and_call GET "/v1/heartrate/range?from=2026-04-01&to=2026-04-19"
+sign_and_call GET "/v1/weight/range?startDate=2026-04-01&endDate=2026-04-19"
+sign_and_call GET "/v1/heartrate/range?startDate=2026-04-01&endDate=2026-04-19"
 sign_and_call GET "/v1/medical-exams"
 sign_and_call GET "/v1/medical-exams/types"
 sign_and_call GET "/v1/medical-exams/marker-trend?markerCode=GLUCOSE"
