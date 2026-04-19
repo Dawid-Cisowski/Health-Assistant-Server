@@ -4,8 +4,8 @@
 #
 # Do lokalnego buildu od zera (bez GraalVM lokalnie) użyj Dockerfile.native.
 
-# base-debian12 (nie static) — potrzebne glibc dla JDK native libraries (.so)
-FROM gcr.io/distroless/base-debian12:nonroot
+# cc-debian12 — glibc + libz + libgcc (potrzebne dla GraalVM native binary)
+FROM gcr.io/distroless/cc-debian12:nonroot
 WORKDIR /app
 
 # Kopiuj binary i wszystkie .so biblioteki (libawt.so, libjvm.so etc.)
