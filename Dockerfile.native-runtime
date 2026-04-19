@@ -1,15 +1,17 @@
 # Runtime-only Dockerfile — używany przez GitHub Actions deploy workflow.
-# Zakłada że native binary jest już skompilowany przez `./gradlew nativeCompile`
-# (GraalVM jest na runnerze, nie tutaj).
-#
-# Do lokalnego buildu od zera (bez GraalVM lokalnie) użyj Dockerfile.native.
+# Zakłada że native binary jest już skompilowany przez `./gradlew nativeCompile`.
 
-# cc-debian12 — glibc + libz + libgcc (potrzebne dla GraalVM native binary)
-FROM gcr.io/distroless/cc-debian12:nonroot
+# debian:12-slim ma glibc + libz + inne system libs potrzebne przez GraalVM native
+FROM debian:12-slim
+
+RUN useradd -u 1000 -m nonroot
+
 WORKDIR /app
 
 # Kopiuj binary i wszystkie .so biblioteki (libawt.so, libjvm.so etc.)
 COPY build/native/nativeCompile/ /app/
+
+RUN chmod +x /app/health-assistant && chown -R nonroot:nonroot /app
 
 ENV PORT=8080
 ENV SPRING_PROFILES_ACTIVE=production
