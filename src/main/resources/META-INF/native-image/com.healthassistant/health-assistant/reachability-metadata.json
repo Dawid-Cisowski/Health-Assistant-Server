@@ -247,7 +247,9 @@
       ]
     },
     {
-      "type": "com.healthassistant.activity.ActivityBucket"
+      "type": "com.healthassistant.activity.ActivityBucket",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.activity.ActivityBucketFactory",
@@ -754,7 +756,9 @@
       "type": "com.healthassistant.assistant.package-info"
     },
     {
-      "type": "com.healthassistant.bodymeasurements.BodyMeasurement"
+      "type": "com.healthassistant.bodymeasurements.BodyMeasurement",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.bodymeasurements.BodyMeasurementFactory",
@@ -890,7 +894,9 @@
       "type": "com.healthassistant.bodymeasurements.package-info"
     },
     {
-      "type": "com.healthassistant.calories.CaloriesBucket"
+      "type": "com.healthassistant.calories.CaloriesBucket",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.calories.CaloriesBucketFactory",
@@ -2244,7 +2250,9 @@
       "type": "com.healthassistant.mealimport.DraftCleanupScheduler"
     },
     {
-      "type": "com.healthassistant.mealimport.ExtractedMealData"
+      "type": "com.healthassistant.mealimport.ExtractedMealData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.mealimport.MealContentExtractor"
@@ -2376,13 +2384,19 @@
       "type": "com.healthassistant.mealimport.MealImportService"
     },
     {
-      "type": "com.healthassistant.mealimport.api.dto.ClarifyingQuestion"
+      "type": "com.healthassistant.mealimport.api.dto.ClarifyingQuestion",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
-      "type": "com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest"
+      "type": "com.healthassistant.mealimport.api.dto.MealDraftUpdateRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
-      "type": "com.healthassistant.mealimport.api.dto.QuestionAnswer"
+      "type": "com.healthassistant.mealimport.api.dto.QuestionAnswer",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.mealimport.package-info"
@@ -2408,7 +2422,9 @@
       "type": "com.healthassistant.meals.MacroCalculator"
     },
     {
-      "type": "com.healthassistant.meals.Meal"
+      "type": "com.healthassistant.meals.Meal",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.meals.MealDailyProjectionJpaEntity",
@@ -2563,7 +2579,9 @@
       "type": "com.healthassistant.medicalexamimport.DraftCleanupScheduler"
     },
     {
-      "type": "com.healthassistant.medicalexamimport.ExtractedExamData"
+      "type": "com.healthassistant.medicalexamimport.ExtractedExamData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.medicalexamimport.MedicalExamContentExtractor"
@@ -2619,10 +2637,14 @@
       "type": "com.healthassistant.medicalexamimport.NoOpMedicalExamSectionInterpreter"
     },
     {
-      "type": "com.healthassistant.medicalexamimport.api.dto.DraftSectionUpdateRequest"
+      "type": "com.healthassistant.medicalexamimport.api.dto.DraftSectionUpdateRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
-      "type": "com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftUpdateRequest"
+      "type": "com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftUpdateRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.medicalexamimport.package-info"
@@ -2926,7 +2948,9 @@
       "type": "com.healthassistant.medicalexams.api.MedicalExamsFacade"
     },
     {
-      "type": "com.healthassistant.medicalexams.api.dto.AttachmentStorageResult"
+      "type": "com.healthassistant.medicalexams.api.dto.AttachmentStorageResult",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.medicalexams.package-info"
@@ -3180,7 +3204,9 @@
       ]
     },
     {
-      "type": "com.healthassistant.sleep.SleepSession"
+      "type": "com.healthassistant.sleep.SleepSession",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.sleep.SleepSessionFactory",
@@ -3247,7 +3273,9 @@
       "type": "com.healthassistant.sleepimport.SleepImportService"
     },
     {
-      "type": "com.healthassistant.steps.StepsBucket"
+      "type": "com.healthassistant.steps.StepsBucket",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.steps.StepsBucketFactory",
@@ -3395,7 +3423,9 @@
       "type": "com.healthassistant.weight.WeightEventsListener"
     },
     {
-      "type": "com.healthassistant.weight.WeightMeasurement"
+      "type": "com.healthassistant.weight.WeightMeasurement",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.weight.WeightMeasurementFactory",
@@ -3509,7 +3539,9 @@
       "type": "com.healthassistant.weightimport.package-info"
     },
     {
-      "type": "com.healthassistant.workout.Exercise"
+      "type": "com.healthassistant.workout.Exercise",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.workout.ExerciseCatalog",
@@ -3567,7 +3599,9 @@
       "type": "com.healthassistant.workout.ExerciseNameMappingRepository"
     },
     {
-      "type": "com.healthassistant.workout.ExerciseSet"
+      "type": "com.healthassistant.workout.ExerciseSet",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.workout.ExerciseStatisticsController"
@@ -3659,7 +3693,9 @@
       "type": "com.healthassistant.workout.RoutineService"
     },
     {
-      "type": "com.healthassistant.workout.Workout"
+      "type": "com.healthassistant.workout.Workout",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true
     },
     {
       "type": "com.healthassistant.workout.WorkoutController"
@@ -17525,6 +17561,1147 @@
       "type": "org.hibernate.bytecode.internal.none.BytecodeProviderImpl",
       "allPublicConstructors": true,
       "allDeclaredConstructors": true
+    },
+    {
+      "type": "com.healthassistant.activity.ActiveMinutes",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.activity.api.dto.ActivityDailyBreakdownResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.activity.api.dto.ActivityRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.appevents.api.dto.SubmitHealthEventsRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ChatRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ContentEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ConversationDetailResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ConversationMessageResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ConversationSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.DoneEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ErrorEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ToolCallEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.assistant.api.dto.ToolResultEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.bodymeasurements.api.dto.BodyMeasurementLatestResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.bodymeasurements.api.dto.BodyMeasurementRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.bodymeasurements.api.dto.BodyMeasurementResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.bodymeasurements.api.dto.BodyMeasurementSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.bodymeasurements.api.dto.BodyPartHistoryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.bodymeasurements.api.dto.UpdateBodyMeasurementRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.calories.CaloriesAmount",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.calories.api.dto.CaloriesDailyBreakdownResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.calories.api.dto.CaloriesRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.config.api.dto.ErrorResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.dailysummary.GenerateDailySummaryCommand",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.dailysummary.api.dto.AiDailySummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.dailysummary.api.dto.AiHealthReportResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.dailysummary.api.dto.DailySummary",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.dailysummary.api.dto.DailySummaryRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.dailysummary.api.dto.DailySummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.googlefit.GoogleFitAggregateResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.googlefit.GoogleFitBucketData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.googlefit.GoogleFitSession",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.googlefit.GoogleFitSessionsResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.googlefit.api.SyncDayResult",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.guardrails.api.GuardrailResult",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.CompensationTargetInfo",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.Event",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.EventValidationError",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.HeartRateStats",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.TimeRange",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.EventData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.ExistingSleepInfo",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.StoreHealthEventsCommand",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.StoreHealthEventsResult",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.StoredEventData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.ActivityEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.AllEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.BodyMeasurementsEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.CaloriesEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.CompensationEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.HeartRateEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.MealsEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.RestingHeartRateEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.SleepEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.StepsEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.WeightEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.events.WorkoutEventsStoredEvent",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.ActiveCaloriesPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.ActiveMinutesPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.BodyMeasurementPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.DistanceBucketPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.EventCorrectedPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.EventDeletedPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.HeartRatePayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.MealRecordedPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.RestingHeartRatePayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.SleepSessionPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.StepsPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.WalkingSessionPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.WeightMeasurementPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.dto.payload.WorkoutPayload",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.model.DeviceId",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.model.EventId",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.model.IdempotencyKey",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.healthevents.api.model.StepsBucketedRecorded",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.heartrate.api.dto.HeartRateDataPointResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.heartrate.api.dto.HeartRateRangeResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.heartrate.api.dto.RestingHeartRateResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.mealcatalog.api.dto.CatalogProductResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.mealcatalog.api.dto.SaveProductRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.mealimport.AiMealExtractionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.mealimport.MealTimeContext",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.mealimport.api.dto.MealDraftResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.mealimport.api.dto.MealImportJobResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.mealimport.api.dto.MealImportResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.Macros",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.EnergyRequirementsResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.MacroTargets",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.MealDailyDetailResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.MealResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.MealsRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.RecordMealFromCatalogRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.RecordMealRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.meals.api.dto.UpdateMealRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexamimport.AiMedicalExamExtractionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexamimport.api.dto.ConfirmDraftRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexamimport.api.dto.DraftSectionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexamimport.api.dto.ExtractedResultData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexamimport.api.dto.MedicalExamDraftResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.AddLabResultsRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.AttachmentDownloadUrlResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.CreateExaminationRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.ExamTypeDefinitionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.ExaminationAttachmentResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.ExaminationDetailResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.ExaminationSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.HealthPillarDetailResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.HealthPillarHeroMetric",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.HealthPillarMarkerResult",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.HealthPillarSectionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.HealthPillarSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.HealthPillarsDashboardResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.LabResultEntry",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.LabResultResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.LinkExaminationRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.LinkedExaminationResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.MarkerDataPoint",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.MarkerDefinitionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.MarkerTrendResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.UpdateExaminationRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.medicalexams.api.dto.UpdateLabResultRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.ComparisonMetric",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.GoalEvaluation",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.GoalResult",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.HealthReportDetailResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.HealthReportSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.PeriodComparison",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.RangeReportDataSnapshot",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.reports.api.dto.ReportDataSnapshot",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.sleep.SleepDuration",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.sleep.SleepStages",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.sleep.api.dto.SleepDailyDetailResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.sleep.api.dto.SleepRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.sleepimport.AiSleepExtractionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.sleepimport.ExtractedSleepData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.sleepimport.api.dto.SleepImportResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.steps.StepCount",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.steps.api.dto.StepsDailyBreakdownResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.steps.api.dto.StepsRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.weight.api.dto.WeightLatestResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.weight.api.dto.WeightMeasurementResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.weight.api.dto.WeightRangeSummaryResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.weightimport.AiWeightExtractionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.weightimport.ExtractedWeightData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.weightimport.api.dto.WeightImportResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.Reps",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.Volume",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.Weight",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.ExerciseDefinition",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.ExerciseStatisticsResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.PersonalRecordsResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.RoutineExerciseRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.RoutineExerciseResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.RoutineListResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.RoutineRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.RoutineResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.UpdateWorkoutRequest",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.WorkoutDetailResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.WorkoutMutationResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workout.api.dto.WorkoutReprojectionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workoutimport.AiWorkoutExtractionResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workoutimport.ExtractedWorkoutData",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.healthassistant.workoutimport.api.dto.WorkoutImportResponse",
+      "allPublicMethods": true,
+      "allDeclaredMethods": true,
+      "allPublicConstructors": true,
+      "allDeclaredFields": true
     }
   ],
   "resources": [
