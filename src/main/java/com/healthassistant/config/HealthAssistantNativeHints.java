@@ -166,7 +166,8 @@ public class HealthAssistantNativeHints {
                 "org.flywaydb.core.internal.proprietaryStubs.OfflinePermitConfigurationExtensionStub",
                 "org.flywaydb.core.internal.proprietaryStubs.PATTokenConfigurationExtensionStub",
                 "org.flywaydb.core.internal.proprietaryStubs.LicensingConfigurationExtensionStub",
-                "org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension"
+                "org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension",
+                "org.flywaydb.database.postgresql.TransactionalModel"
             ).forEach(typeName ->
                 hints.reflection().registerTypeIfPresent(classLoader, typeName,
                     MemberCategory.INVOKE_PUBLIC_METHODS,
