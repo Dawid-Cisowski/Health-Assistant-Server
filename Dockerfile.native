@@ -1,0 +1,30 @@
+# --- build stage: GraalVM Community Edition 21 (native-image pre-installed) ---
+FROM ghcr.io/graalvm/native-image-community:25 AS build
+WORKDIR /app
+
+# Cache dependencies
+COPY gradlew ./
+COPY gradle gradle
+COPY build.gradle.kts settings.gradle.kts ./
+RUN chmod +x ./gradlew && ./gradlew dependencies --no-daemon -q || true
+
+# Copy sources
+COPY src src
+COPY META-INF META-INF
+
+# Native compilation — wymaga min. 6GB RAM, zajmuje 5-10 minut
+RUN ./gradlew nativeCompile --no-daemon -x test -x spotbugsMain -x pmdMain
+
+# --- runtime stage: distroless/static (brak JVM — nie potrzebny dla native binary) ---
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /app
+
+COPY --from=build /app/build/native/nativeCompile/health-assistant /app/health-assistant
+
+ENV PORT=8080
+ENV SPRING_PROFILES_ACTIVE=production
+
+USER nonroot
+EXPOSE 8080
+
+ENTRYPOINT ["/app/health-assistant", "--server.port=8080"]

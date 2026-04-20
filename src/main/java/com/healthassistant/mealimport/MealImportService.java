@@ -49,7 +49,7 @@ class MealImportService implements MealImportFacade {
     private final HealthEventsFacade healthEventsFacade;
     private final MealImportDraftRepository draftRepository;
     private final MealImportJobRepository jobRepository;
-    private final MealImportJobProcessor jobProcessor;
+    private final MealImportJobProcessorPort jobProcessor;
     private final MealsFacade mealsFacade;
     private final MealCatalogFacade mealCatalogFacade;
     private final AiMetricsRecorder aiMetrics;
@@ -60,7 +60,7 @@ class MealImportService implements MealImportFacade {
             HealthEventsFacade healthEventsFacade,
             MealImportDraftRepository draftRepository,
             MealImportJobRepository jobRepository,
-            @Lazy MealImportJobProcessor jobProcessor,
+            @Lazy MealImportJobProcessorPort jobProcessor,
             MealsFacade mealsFacade,
             MealCatalogFacade mealCatalogFacade,
             AiMetricsRecorder aiMetrics

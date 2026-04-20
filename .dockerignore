@@ -1,5 +1,8 @@
 # Build artifacts
 build/
+!build/native/
+!build/native/nativeCompile/
+!build/native/nativeCompile/**
 target/
 *.jar
 *.war

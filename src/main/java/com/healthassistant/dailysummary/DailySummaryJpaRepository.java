@@ -20,9 +20,9 @@ interface DailySummaryJpaRepository extends JpaRepository<DailySummaryJpaEntity,
     List<DailySummaryJpaEntity> findByDeviceIdAndDateBetweenOrderByDateAsc(
             String deviceId, LocalDate startDate, LocalDate endDate);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
-    @Query("UPDATE DailySummaryJpaEntity d SET d.lastEventAt = :timestamp WHERE d.deviceId = :deviceId AND d.date IN :dates")
+    @Query("UPDATE DailySummaryJpaEntity d SET d.lastEventAt = :timestamp, d.version = d.version + 1 WHERE d.deviceId = :deviceId AND d.date IN :dates")
     void updateLastEventAtForDates(
             @Param("deviceId") String deviceId,
             @Param("dates") Set<LocalDate> dates,

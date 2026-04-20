@@ -1,0 +1,22 @@
+# Runtime-only Dockerfile — używany przez GitHub Actions deploy workflow.
+# Zakłada że native binary jest już skompilowany przez `./gradlew nativeCompile`.
+
+# debian:12-slim ma glibc + libz + inne system libs potrzebne przez GraalVM native
+FROM debian:12-slim
+
+RUN useradd -u 1000 -m nonroot
+
+WORKDIR /app
+
+# Kopiuj binary i wszystkie .so biblioteki (libawt.so, libjvm.so etc.)
+COPY build/native/nativeCompile/ /app/
+
+RUN chmod +x /app/health-assistant && chown -R nonroot:nonroot /app
+
+ENV PORT=8080
+ENV SPRING_PROFILES_ACTIVE=production
+
+USER nonroot
+EXPOSE 8080
+
+ENTRYPOINT ["/app/health-assistant", "--server.port=8080"]

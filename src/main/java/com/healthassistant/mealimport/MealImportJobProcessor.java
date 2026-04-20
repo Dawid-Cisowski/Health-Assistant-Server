@@ -19,7 +19,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-class MealImportJobProcessor {
+class MealImportJobProcessor implements MealImportJobProcessorPort {
 
     private static final String SAFE_IMPORT_ERROR = "Meal import processing failed. Please try again.";
     private static final String SAFE_NOT_MEAL_ERROR = "Content does not appear to be food-related.";
