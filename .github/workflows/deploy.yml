@@ -62,7 +62,7 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --min-instances=0 \
             --cpu-boost \
-            --allow-unauthenticated=false \
+            --no-allow-unauthenticated \
             --quiet
 
           gcloud run services update-traffic ${{ env.CLOUD_RUN_SERVICE }} \
