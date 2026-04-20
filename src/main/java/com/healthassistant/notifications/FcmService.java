@@ -7,7 +7,6 @@ import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -19,8 +18,7 @@ import java.util.Map;
 @ConditionalOnProperty(name = "app.notifications.enabled", havingValue = "true")
 class FcmService {
 
-    // ObjectProvider gives lazy resolution — Firebase SDK initializes only on first notification send
-    private final ObjectProvider<FirebaseMessaging> firebaseMessagingProvider;
+    private final FirebaseMessaging firebaseMessaging;
 
     record SendResult(boolean success, boolean tokenInvalid) {}
 
@@ -37,7 +35,7 @@ class FcmService {
                 .build();
 
         try {
-            String messageId = firebaseMessagingProvider.getObject().send(message);
+            String messageId = firebaseMessaging.send(message);
             log.debug("FCM message sent successfully, messageId: {}", messageId);
             return new SendResult(true, false);
         } catch (FirebaseMessagingException e) {

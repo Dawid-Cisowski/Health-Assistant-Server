@@ -11,7 +11,6 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -24,7 +23,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@Lazy
 @Slf4j
 @ConditionalOnProperty(prefix = "app.medicalexams.gcs", name = "enabled", havingValue = "true")
 class GcsStorageService implements FileStorageService {
@@ -41,31 +39,25 @@ class GcsStorageService implements FileStorageService {
     @Value("${app.medicalexams.gcs.signed-url-hours:168}")
     private int signedUrlHours;
 
-    private volatile Storage storage;
+    private Storage storage;
 
-    private Storage getStorage() {
-        if (storage == null) {
-            synchronized (this) {
-                if (storage == null) {
-                    try {
-                        var builder = StorageOptions.newBuilder();
-                        if (credentialsJson != null && !credentialsJson.isBlank()) {
-                            var stream = new ByteArrayInputStream(credentialsJson.getBytes(StandardCharsets.UTF_8));
-                            builder.setCredentials(GoogleCredentials.fromStream(stream));
-                        } else if (credentialsFile != null && !credentialsFile.isBlank()) {
-                            try (var stream = new FileInputStream(credentialsFile)) {
-                                builder.setCredentials(GoogleCredentials.fromStream(stream));
-                            }
-                        }
-                        storage = builder.build().getService();
-                        log.info("GCS storage initialized for bucket: {}", bucketName);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException("Failed to initialize GCS storage", e);
-                    }
+    @PostConstruct
+    void init() {
+        try {
+            var builder = StorageOptions.newBuilder();
+            if (credentialsJson != null && !credentialsJson.isBlank()) {
+                var stream = new ByteArrayInputStream(credentialsJson.getBytes(StandardCharsets.UTF_8));
+                builder.setCredentials(GoogleCredentials.fromStream(stream));
+            } else if (credentialsFile != null && !credentialsFile.isBlank()) {
+                try (var stream = new FileInputStream(credentialsFile)) {
+                    builder.setCredentials(GoogleCredentials.fromStream(stream));
                 }
             }
+            storage = builder.build().getService();
+            log.info("GCS storage initialized for bucket: {}", bucketName);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to initialize GCS storage", e);
         }
-        return storage;
     }
 
     @Override
@@ -77,7 +69,7 @@ class GcsStorageService implements FileStorageService {
                 .setContentType(contentType)
                 .build();
 
-        getStorage().create(blobInfo, data);
+        storage.create(blobInfo, data);
         log.debug("Uploaded file to GCS bucket {}", bucketName);
 
         var signedUrl = generateSignedUrl(blobInfo);
@@ -87,7 +79,7 @@ class GcsStorageService implements FileStorageService {
     @Override
     public void delete(String storageKey) {
         try {
-            getStorage().delete(bucketName, storageKey);
+            storage.delete(bucketName, storageKey);
             log.debug("Deleted GCS object from bucket {}", bucketName);
         } catch (Exception e) {
             log.warn("Failed to delete GCS object", e);
@@ -110,7 +102,7 @@ class GcsStorageService implements FileStorageService {
 
     private String generateSignedUrl(BlobInfo blobInfo) {
         try {
-            return getStorage().signUrl(blobInfo, signedUrlHours, TimeUnit.HOURS,
+            return storage.signUrl(blobInfo, signedUrlHours, TimeUnit.HOURS,
                     Storage.SignUrlOption.withV4Signature()).toString();
         } catch (Exception e) {
             log.warn("Could not generate signed URL (requires Service Account credentials): {}",

@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -25,7 +24,6 @@ class FirebaseConfig {
     private String firebaseCredentialsJson;
 
     @Bean
-    @Lazy
     FirebaseApp firebaseApp() throws IOException {
         if (FirebaseApp.getApps().stream().anyMatch(app -> FirebaseApp.DEFAULT_APP_NAME.equals(app.getName()))) {
             return FirebaseApp.getInstance();
@@ -46,7 +44,6 @@ class FirebaseConfig {
     }
 
     @Bean
-    @Lazy
     FirebaseMessaging firebaseMessaging(FirebaseApp firebaseApp) {
         return FirebaseMessaging.getInstance(firebaseApp);
     }
