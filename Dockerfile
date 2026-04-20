@@ -23,11 +23,17 @@ FROM eclipse-temurin:21-jre AS cds
 WORKDIR /app
 COPY --from=build /app/build/libs/*.jar /app/app.jar
 
-# Training run: Spring ładuje kontekst i kończy po refresh.
-# || true — brak DB w buildzie powoduje błąd, ale archiwum JVM/Spring klas
-# i tak zostaje zapisane przez -XX:ArchiveClassesAtExit przy wyjściu JVM.
+# Training run: Spring ładuje pełny kontekst i kończy po refresh.
+# Wyłączamy Flyway, eager DB connect, Firebase i GCS żeby kontekst
+# załadował się bez infrastruktury — maksymalizuje klasy w archiwum CDS.
 RUN java -Dspring.context.exit=onRefresh \
     -XX:ArchiveClassesAtExit=/app/app.jsa \
+    -Dspring.flyway.enabled=false \
+    -Dspring.jpa.hibernate.ddl-auto=none \
+    -Dspring.datasource.url=jdbc:postgresql://localhost:5432/cds \
+    -Dspring.datasource.hikari.initialization-fail-timeout=-1 \
+    -Dapp.notifications.enabled=false \
+    -Dapp.medicalexams.gcs.enabled=false \
     -jar /app/app.jar || true
 
 # --- runtime stage ---
