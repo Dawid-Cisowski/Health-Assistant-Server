@@ -1,5 +1,7 @@
 # Production profile (Google Cloud Run + Cloud SQL)
 spring:
+  main:
+    lazy-initialization: true  # Defer bean init to first request — reduces cold start ~8-10s
   datasource:
     # Cloud SQL connection via socket factory
     # Format: jdbc:postgresql:///<DB_NAME>?cloudSqlInstance=<CONNECTION_NAME>&socketFactory=com.google.cloud.sql.postgres.SocketFactory
@@ -8,7 +10,7 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:10}
-      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
       connection-timeout: 45000
       idle-timeout: 300000
       max-lifetime: 1800000
