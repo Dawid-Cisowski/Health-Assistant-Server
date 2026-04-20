@@ -37,14 +37,6 @@ class NotificationScheduler {
         this.deviceId = deviceId;
     }
 
-    @Scheduled(cron = "0 0 8 * * *", zone = "Europe/Warsaw")
-    void sendDailyNotifications() {
-        LocalDate yesterday = LocalDate.now(POLAND_ZONE).minusDays(1);
-        log.info("Starting daily notification for date: {}", yesterday);
-
-        generateAndNotify(ReportType.DAILY, yesterday, yesterday, "Daily");
-    }
-
     @Scheduled(cron = "0 0 8 * * MON", zone = "Europe/Warsaw")
     void sendWeeklyNotifications() {
         LocalDate today = LocalDate.now(POLAND_ZONE);

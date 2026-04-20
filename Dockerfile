@@ -1,38 +1,55 @@
-# ============================================================
-# Native Image multi-stage build
-# Build stage: GraalVM 25 Community Edition
-# Runtime stage: distroless/static (no JVM needed)
-# ============================================================
-
 # --- build stage ---
-FROM ghcr.io/graalvm/native-image-community:25 AS build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 
-# Cache Gradle dependencies
+# Kopiujemy tylko pliki builda, żeby zcache'ować zależności
 COPY gradlew ./
 COPY gradle gradle
 COPY build.gradle.kts settings.gradle.kts ./
-RUN chmod +x ./gradlew && ./gradlew dependencies --no-daemon -q || true
 
-# Copy sources
+# Pobierz zależności (cache)
+RUN chmod +x ./gradlew && ./gradlew dependencies --no-daemon || true
+
+# Dopiero teraz źródła
 COPY src src
-COPY META-INF META-INF
-COPY src/main/resources/META-INF/native-image src/main/resources/META-INF/native-image
 
-# Native compile — no tests, no static analysis
-# Spring Boot 4.1.x requires GraalVM 25 (Java 25) for native image
-RUN ./gradlew nativeCompile --no-daemon -x test -x spotbugsMain -x pmdMain
+# Build bez testów
+RUN ./gradlew bootJar --no-daemon -x test
 
-# --- runtime stage (no JVM — native binary is self-contained) ---
-FROM gcr.io/distroless/static-debian12:nonroot
+# --- CDS training stage ---
+# Generuje Class Data Sharing archive z załadowanymi klasami Spring/JVM
+# Redukuje cold start z ~15-20s do ~3-5s
+FROM eclipse-temurin:21-jre AS cds
+WORKDIR /app
+COPY --from=build /app/build/libs/*.jar /app/app.jar
+
+# Training run: Spring ładuje kontekst i kończy po refresh.
+# || true — brak DB w buildzie powoduje błąd, ale archiwum JVM/Spring klas
+# i tak zostaje zapisane przez -XX:ArchiveClassesAtExit przy wyjściu JVM.
+RUN java -Dspring.context.exit=onRefresh \
+    -XX:ArchiveClassesAtExit=/app/app.jsa \
+    -jar /app/app.jar || true
+
+# --- runtime stage ---
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-COPY --from=build /app/build/native/nativeCompile/health-assistant /app/health-assistant
+COPY --from=build /app/build/libs/*.jar /app/app.jar
+COPY --from=cds /app/app.jsa /app/app.jsa
 
 ENV PORT=8080
 ENV SPRING_PROFILES_ACTIVE=production
 
-USER nonroot
+RUN useradd --no-create-home --shell /bin/false appuser
+USER appuser
 EXPOSE 8080
 
-ENTRYPOINT ["/app/health-assistant", "--server.port=8080"]
+# Uwaga: HEALTHCHECK z Dockera jest ignorowany w Cloud Run
+# Zamiast tego włącz Spring Actuator i ustaw /actuator/health jako probe w serwisie.
+
+ENTRYPOINT ["java", \
+  "-XX:SharedArchiveFile=/app/app.jsa", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-Dserver.port=${PORT}", \
+  "-jar", "/app/app.jar"]

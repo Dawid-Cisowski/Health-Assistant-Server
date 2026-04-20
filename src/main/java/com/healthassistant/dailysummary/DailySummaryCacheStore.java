@@ -27,20 +27,6 @@ class DailySummaryCacheStore {
     }
 
     @Transactional
-    void trySaveSummaryCache(String deviceId, LocalDate date, String aiSummary) {
-        try {
-            repository.findByDeviceIdAndDate(deviceId, date).ifPresent(entity -> {
-                entity.cacheAiSummary(aiSummary);
-                repository.save(entity);
-                log.info("Cached AI summary for date: {}", date);
-            });
-        } catch (ObjectOptimisticLockingFailureException e) {
-            log.warn("Optimistic lock conflict saving AI summary for device {} date {}: concurrent update detected, result not cached",
-                    maskDeviceId(deviceId), date);
-        }
-    }
-
-    @Transactional
     void trySaveReportCache(String deviceId, LocalDate date, String aiReport) {
         try {
             repository.findByDeviceIdAndDate(deviceId, date).ifPresent(entity -> {

@@ -10,10 +10,6 @@ import io.restassured.http.ContentType
 import org.springframework.beans.factory.annotation.Autowired
 import spock.lang.Title
 
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
 /**
  * Integration tests verifying custom AI metrics are recorded correctly
  * and exposed via the /actuator/prometheus endpoint.
@@ -62,51 +58,6 @@ class AiMetricsSpec extends BaseIntegrationSpec {
         and: "chat duration timer is recorded"
         def chatDuration = meterRegistry.find("ai.chat.duration").timer()
         chatDuration != null
-    }
-
-    // ==================== AI Summary Metrics ====================
-
-    def "should record summary metrics when AI daily summary is generated"() {
-        given: "configured AI response"
-        TestChatModelConfiguration.setResponse("super dzien, duzo krokow!")
-
-        and: "health data exists"
-        def summaryDate = LocalDate.of(2025, 12, 20)
-        def dateStr = summaryDate.format(DateTimeFormatter.ISO_DATE)
-        def summaryZoned = summaryDate.atStartOfDay(ZoneId.of("Europe/Warsaw"))
-
-        def stepsEvent = [
-            idempotencyKey: "steps-metrics-test-1",
-            type          : "StepsBucketedRecorded.v1",
-            occurredAt    : summaryZoned.plusHours(10).toInstant().toString(),
-            payload       : [
-                bucketStart  : summaryZoned.plusHours(9).toInstant().toString(),
-                bucketEnd    : summaryZoned.plusHours(10).toInstant().toString(),
-                count        : 8500,
-                originPackage: "com.google.android.apps.fitness"
-            ]
-        ]
-
-        authenticatedPostRequestWithBody(DEVICE_ID, SECRET_BASE64, "/v1/health-events", JsonOutput.toJson([
-            events  : [stepsEvent],
-            deviceId: DEVICE_ID
-        ]))
-            .post("/v1/health-events")
-            .then()
-            .statusCode(200)
-
-        when: "AI daily summary is requested"
-        def response = authenticatedGetRequest(DEVICE_ID, SECRET_BASE64, "/v1/daily-summaries/${dateStr}/ai-text")
-                .get("/v1/daily-summaries/${dateStr}/ai-text")
-                .then()
-                .extract()
-
-        then: "request succeeds"
-        response.statusCode() == 200
-
-        and: "summary request counter is recorded"
-        def summaryCounter = meterRegistry.find("ai.summary.requests").counter()
-        summaryCounter != null
     }
 
     // ==================== Guardrail Metrics ====================

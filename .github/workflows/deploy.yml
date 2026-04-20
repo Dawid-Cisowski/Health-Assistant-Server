@@ -1,20 +1,21 @@
-name: Deploy Native Image
+name: Deploy to Cloud Run
 
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 # ============================================================
 # WYMAGANE SECRETS W GITHUB REPO SETTINGS:
-#   GCP_SA_KEY        — Service Account JSON z prawami:
+#   GCP_SA_KEY        — base64-encoded Service Account JSON z prawami:
 #                       roles/run.admin, roles/artifactregistry.writer,
 #                       roles/iam.serviceAccountUser
 #
-# WYMAGANE VARIABLES W GITHUB REPO SETTINGS:
+# WYMAGANE VARIABLES W GITHUB REPO SETTINGS (opcjonalne, mają defaults):
 #   GCP_PROJECT_ID    — np. my-project-123456
-#   GCP_REGION        — np. europe-central2  (default)
-#   CLOUD_RUN_SERVICE — np. health-assistant (default)
-#   AR_REPOSITORY     — np. health-assistant (default)
+#   GCP_REGION        — np. europe-central2
+#   CLOUD_RUN_SERVICE — np. health-assistant-event-collector
+#   AR_REPOSITORY     — np. health-assistant-event-collector
 # ============================================================
 
 env:
@@ -24,38 +25,13 @@ env:
   AR_REPOSITORY: ${{ vars.AR_REPOSITORY || 'health-assistant-event-collector' }}
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
-
-      # Krok 1: GraalVM 25 CE — tylko dla native-image binary (NIE jako JAVA_HOME)
-      # Gradle 8.x + Kotlin DSL nie parsuje wersji "25.0.2" → Gradle musi używać Java 21
-      - name: Set up GraalVM CE 25 (native-image only)
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '25'
-          distribution: 'graalvm-community'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          set-java-home: 'false'
-
-      # Krok 2: Java 21 jako JAVA_HOME dla Gradle
-      - name: Set up JDK 21 for Gradle
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      # Gradle używa Java 21, native-image używa GraalVM 25 przez GRAALVM_HOME
-      - name: Build native image
-        run: ./gradlew nativeCompile --no-daemon -x test -x spotbugsMain -x pmdMain
-        env:
-          GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx2g -Dorg.gradle.workers.max=1'
 
       # GCP_SA_KEY przechowywane jako base64 (unika problemów z \n w private key)
       - name: Authenticate to Google Cloud
@@ -73,7 +49,7 @@ jobs:
           IMAGE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/health-assistant:${{ github.sha }}"
           IMAGE_LATEST="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/health-assistant:latest"
 
-          docker build -f Dockerfile.native-runtime -t "$IMAGE" -t "$IMAGE_LATEST" .
+          docker build -t "$IMAGE" -t "$IMAGE_LATEST" .
           docker push "$IMAGE"
           docker push "$IMAGE_LATEST"
 
@@ -85,10 +61,10 @@ jobs:
             --image "${{ env.IMAGE }}" \
             --region ${{ env.GCP_REGION }} \
             --min-instances=0 \
-            --max-instances=10 \
-            --memory=512Mi \
-            --cpu=1 \
-            --concurrency=80 \
             --cpu-boost \
-            --port=8080 \
+            --allow-unauthenticated=false \
             --quiet
+
+          gcloud run services update-traffic ${{ env.CLOUD_RUN_SERVICE }} \
+            --region ${{ env.GCP_REGION }} \
+            --to-latest
