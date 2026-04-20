@@ -63,7 +63,7 @@ jobs:
             --min-instances=0 \
             --memory=1Gi \
             --cpu-boost \
-            --no-allow-unauthenticated \
+            --allow-unauthenticated \
             --quiet
 
           gcloud run services update-traffic ${{ env.CLOUD_RUN_SERVICE }} \
