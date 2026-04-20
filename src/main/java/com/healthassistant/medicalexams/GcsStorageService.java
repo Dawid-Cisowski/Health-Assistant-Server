@@ -11,6 +11,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -23,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@Lazy
 @Slf4j
 @ConditionalOnProperty(prefix = "app.medicalexams.gcs", name = "enabled", havingValue = "true")
 class GcsStorageService implements FileStorageService {
