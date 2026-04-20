@@ -1,7 +1,6 @@
 # Production profile (Google Cloud Run + Cloud SQL)
 spring:
-  main:
-    lazy-initialization: true  # Defer bean init to first request — reduces cold start ~8-10s
+
   datasource:
     # Cloud SQL connection via socket factory
     # Format: jdbc:postgresql:///<DB_NAME>?cloudSqlInstance=<CONNECTION_NAME>&socketFactory=com.google.cloud.sql.postgres.SocketFactory
