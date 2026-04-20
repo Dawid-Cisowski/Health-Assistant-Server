@@ -82,11 +82,6 @@ class DailySummaryJpaEntity {
         this.summary = summary;
     }
 
-    void cacheAiSummary(String aiSummary) {
-        this.aiSummary = aiSummary;
-        this.aiSummaryGeneratedAt = Instant.now();
-    }
-
     void cacheAiReport(String aiReport) {
         this.aiReport = aiReport;
         this.aiReportGeneratedAt = Instant.now();
