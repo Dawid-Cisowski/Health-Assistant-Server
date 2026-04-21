@@ -28,7 +28,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@Lazy
 @RequiredArgsConstructor
 @Slf4j
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
