@@ -27,6 +27,11 @@ springdoc:
   swagger-ui:
     enabled: false
 
+spring:
+  modulith:
+    events:
+      republish-outstanding-events-on-restart: false
+
 logging:
   level:
     root: INFO
