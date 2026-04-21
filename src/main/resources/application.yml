@@ -21,6 +21,7 @@ spring:
       max-lifetime: 1800000
 
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
     show-sql: false
@@ -32,8 +33,6 @@ spring:
           batch_size: 50
         order_inserts: true
         order_updates: true
-        temp:
-          use_jdbc_metadata_defaults: false  # Skip DB metadata query at startup (~0.5s saved)
 
   flyway:
     enabled: true
