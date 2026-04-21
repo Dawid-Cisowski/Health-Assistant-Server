@@ -21,16 +21,15 @@ spring:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:none}
     show-sql: false
 
+  modulith:
+    events:
+      republish-outstanding-events-on-restart: false
+
 springdoc:
   api-docs:
     enabled: false
   swagger-ui:
     enabled: false
-
-spring:
-  modulith:
-    events:
-      republish-outstanding-events-on-restart: false
 
 logging:
   level:
