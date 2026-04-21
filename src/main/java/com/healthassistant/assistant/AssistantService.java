@@ -1,6 +1,7 @@
 package com.healthassistant.assistant;
 
 import com.healthassistant.assistant.api.AssistantFacade;
+import org.springframework.context.annotation.Lazy;
 import com.healthassistant.assistant.api.dto.*;
 import com.healthassistant.config.AiMetricsRecorder;
 import com.healthassistant.config.SecurityUtils;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Lazy
 @RequiredArgsConstructor
 @Slf4j
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.assistant.enabled", havingValue = "true", matchIfMissing = true)
