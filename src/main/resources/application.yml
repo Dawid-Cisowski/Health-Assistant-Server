@@ -2,6 +2,10 @@ spring:
   application:
     name: health-assistant-event-collector
 
+  threads:
+    virtual:
+      enabled: true  # Project Loom virtual threads — faster async on Java 21
+
   # Jackson 3.x defaults to ISO-8601 date serialization
 
   profiles:
@@ -29,8 +33,8 @@ spring:
           batch_size: 50
         order_inserts: true
         order_updates: true
-        bytecode:
-          provider: none  # Disable ByteBuddy — required for GraalVM native image
+        temp:
+          use_jdbc_metadata_defaults: false  # Skip DB metadata query at startup (~0.5s saved)
 
   flyway:
     enabled: true
