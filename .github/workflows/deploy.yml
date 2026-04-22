@@ -61,8 +61,8 @@ jobs:
             --image "${{ env.IMAGE }}" \
             --region ${{ env.GCP_REGION }} \
             --min-instances=0 \
-            --memory=1Gi \
-            --cpu-boost \
+            --max-instances=3 \
+            --memory=768Mi \
             --allow-unauthenticated \
             --quiet
 
