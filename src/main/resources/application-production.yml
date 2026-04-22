@@ -23,7 +23,7 @@ spring:
 
   modulith:
     events:
-      republish-outstanding-events-on-restart: false
+      republish-outstanding-events-on-restart: true
 
 springdoc:
   api-docs:

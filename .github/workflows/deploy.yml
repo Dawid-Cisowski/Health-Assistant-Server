@@ -63,6 +63,8 @@ jobs:
             --min-instances=0 \
             --max-instances=3 \
             --memory=768Mi \
+            --cpu-boost \
+            --no-cpu-throttling=false \
             --allow-unauthenticated \
             --quiet
 
