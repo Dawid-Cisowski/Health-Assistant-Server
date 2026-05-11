@@ -134,7 +134,7 @@ abstract class BaseIntegrationSpec extends Specification {
             // Event validation specs
             "test-steps-valid", "test-sleep-valid", "test-meal-event",
             "test-heartrate", "test-active-cal", "test-active-min",
-            "test-distance", "test-walking", "test-exception",
+            "test-distance", "test-walking", "test-cycling", "test-running", "test-exception",
             // Import and other specs
             "test-meal-draft", "test-gfit",
             // Concurrency specs
@@ -1057,10 +1057,20 @@ abstract class BaseIntegrationSpec extends Specification {
         jdbcTemplate.update("DELETE FROM medical_exam_import_drafts WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM meal_import_jobs WHERE device_id = ?", deviceId)
         jdbcTemplate.update("DELETE FROM health_pillar_ai_summaries WHERE device_id = ?", deviceId)
+        // Routines cleanup (routine_exercises cascade-deleted automatically)
+        jdbcTemplate.update("DELETE FROM routines WHERE device_id = ?", deviceId)
     }
 
     void cleanupMealCatalogForDevice(String deviceId) {
         jdbcTemplate.update("DELETE FROM meal_catalog_products WHERE device_id = ?", deviceId)
+    }
+
+    /**
+     * Wraps a single event JSON into a health-events batch request body.
+     * Use this instead of defining createHealthEventsRequest() locally in each spec.
+     */
+    String wrapEventsRequest(String deviceId, String eventJson) {
+        return """{"events": [${eventJson}], "deviceId": "${deviceId}"}"""
     }
 }
 
