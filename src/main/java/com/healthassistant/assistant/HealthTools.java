@@ -738,6 +738,160 @@ public class HealthTools {
         });
     }
 
+    // ==================== ROUTINE (WORKOUT PLAN) TOOLS ====================
+
+    @Tool(name = "getExerciseCatalog",
+          description = "Returns the full list of available exercises that can be used when creating or updating workout routines. " +
+                        "Each exercise has an id (use this when creating routines), name, primaryMuscle, and muscles. " +
+                        "Call this before createWorkoutRoutine or updateWorkoutRoutine to find correct exercise IDs.")
+    public Object getExerciseCatalog(ToolContext toolContext) {
+        log.info("Fetching exercise catalog for device {}", maskDeviceId(getDeviceId(toolContext)));
+        return validateAndExecuteMutation("getExerciseCatalog", () -> {
+            var exercises = workoutFacade.getAllExercises();
+            log.info("Exercise catalog fetched: {} exercises", exercises.size());
+            return new ExerciseCatalogResult(exercises);
+        });
+    }
+
+    @Tool(name = "getWorkoutRoutines",
+          description = "Returns all workout routines (training plans) saved for the user. " +
+                        "Each routine has: id (UUID), name, description, colorTheme, createdAt, exerciseCount. " +
+                        "Use getWorkoutRoutineDetail(routineId) to see the full exercise list for a specific routine.")
+    public Object getWorkoutRoutines(ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Fetching workout routines for device {}", maskDeviceId(deviceId));
+        return validateAndExecuteMutation("getWorkoutRoutines", () -> {
+            var routines = workoutFacade.getRoutines(deviceId);
+            log.info("Routines fetched: {} routines", routines.size());
+            return new RoutineListResult(routines);
+        });
+    }
+
+    @Tool(name = "getWorkoutRoutineDetail",
+          description = "Returns full details of a specific workout routine including all exercises. " +
+                        "PARAMETER: routineId (String, required) - UUID of the routine (from getWorkoutRoutines response).")
+    public Object getWorkoutRoutineDetail(String routineId, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Fetching routine {} for device {}", sanitizeForLog(routineId), maskDeviceId(deviceId));
+        return validateAndExecuteMutation("getWorkoutRoutineDetail", () -> {
+            UUID id;
+            try {
+                id = UUID.fromString(routineId);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid routineId: '" + sanitizeForLog(routineId) + "'. Must be a valid UUID.", e);
+            }
+            return workoutFacade.getRoutine(id, deviceId)
+                    .orElseThrow(() -> new IllegalArgumentException("Routine not found: " + sanitizeForLog(routineId)));
+        });
+    }
+
+    @Tool(name = "createWorkoutRoutine",
+          description = "Creates a new workout routine (training plan) with exercises. " +
+                        "Call getExerciseCatalog first to find valid exercise IDs. " +
+                        "PARAMETERS: " +
+                        "name (String, required) - routine name, max 100 chars. " +
+                        "description (String, optional) - routine description. " +
+                        "colorTheme (String, optional) - CSS class, e.g. 'bg-blue-500', 'bg-red-500', 'bg-green-500'. Defaults to 'bg-indigo-500'. " +
+                        "exercisesJson (String, required) - JSON array of exercises. Each must have: " +
+                        "exerciseId (String from catalog), orderIndex (int, starts at 1), defaultSets (int, default 3), notes (String, optional). " +
+                        "Example: '[{\"exerciseId\":\"chest_1\",\"orderIndex\":1,\"defaultSets\":4,\"notes\":\"Focus on form\"},{\"exerciseId\":\"back_1\",\"orderIndex\":2,\"defaultSets\":3}]'")
+    public Object createWorkoutRoutine(String name, String description, String colorTheme,
+                                       String exercisesJson, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Creating routine '{}' for device {}", sanitizeForLog(name), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("createWorkoutRoutine", () -> {
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("name is required and cannot be blank.");
+            }
+            if (name.trim().length() > 100) {
+                throw new IllegalArgumentException("name must be at most 100 characters.");
+            }
+            var exercises = parseRoutineExercises(exercisesJson);
+            var request = new com.healthassistant.workout.api.dto.RoutineRequest(name.trim(), description, colorTheme, exercises);
+            var response = workoutFacade.createRoutine(request, deviceId);
+            log.info("Routine created: id={}, name='{}'", response.id(), sanitizeForLog(response.name()));
+            return new MutationSuccess("Routine '" + response.name() + "' created successfully",
+                    new RoutineCreateResult(response.id().toString()));
+        });
+    }
+
+    @Tool(name = "updateWorkoutRoutine",
+          description = "Updates an existing workout routine. Replaces all exercises with the new list. " +
+                        "PARAMETERS: " +
+                        "routineId (String, required) - UUID of the routine to update (from getWorkoutRoutines). " +
+                        "name (String, required) - new routine name, max 100 chars. " +
+                        "description (String, optional) - new description. " +
+                        "colorTheme (String, optional) - CSS class, e.g. 'bg-blue-500'. " +
+                        "exercisesJson (String, required) - JSON array of exercises (same format as createWorkoutRoutine).")
+    public Object updateWorkoutRoutine(String routineId, String name, String description,
+                                       String colorTheme, String exercisesJson, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Updating routine {} for device {}", sanitizeForLog(routineId), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("updateWorkoutRoutine", () -> {
+            UUID id;
+            try {
+                id = UUID.fromString(routineId);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid routineId: '" + sanitizeForLog(routineId) + "'. Must be a valid UUID.", e);
+            }
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("name is required and cannot be blank.");
+            }
+            if (name.trim().length() > 100) {
+                throw new IllegalArgumentException("name must be at most 100 characters.");
+            }
+            var exercises = parseRoutineExercises(exercisesJson);
+            var request = new com.healthassistant.workout.api.dto.RoutineRequest(name.trim(), description, colorTheme, exercises);
+            return workoutFacade.updateRoutine(id, request, deviceId)
+                    .map(response -> {
+                        log.info("Routine updated: id={}", id);
+                        return (Object) new MutationSuccess("Routine '" + response.name() + "' updated successfully", null);
+                    })
+                    .orElseThrow(() -> new IllegalArgumentException("Routine not found: " + sanitizeForLog(routineId)));
+        });
+    }
+
+    @Tool(name = "deleteWorkoutRoutine",
+          description = "Deletes a workout routine. IMPORTANT: Always confirm with the user before deleting. " +
+                        "PARAMETER: routineId (String, required) - UUID of the routine to delete (from getWorkoutRoutines).")
+    public Object deleteWorkoutRoutine(String routineId, ToolContext toolContext) {
+        var deviceId = getDeviceId(toolContext);
+        log.info("Deleting routine {} for device {}", sanitizeForLog(routineId), maskDeviceId(deviceId));
+
+        return validateAndExecuteMutation("deleteWorkoutRoutine", () -> {
+            UUID id;
+            try {
+                id = UUID.fromString(routineId);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid routineId: '" + sanitizeForLog(routineId) + "'. Must be a valid UUID.", e);
+            }
+            if (!workoutFacade.deleteRoutine(id, deviceId)) {
+                throw new IllegalArgumentException("Routine not found: " + sanitizeForLog(routineId));
+            }
+            log.info("Routine deleted: id={}", id);
+            return new MutationSuccess("Routine deleted successfully", null);
+        });
+    }
+
+    private List<com.healthassistant.workout.api.dto.RoutineExerciseRequest> parseRoutineExercises(String exercisesJson) {
+        List<com.healthassistant.workout.api.dto.RoutineExerciseRequest> exercises;
+        try {
+            exercises = objectMapper.readValue(exercisesJson,
+                    objectMapper.getTypeFactory().constructCollectionType(
+                            List.class, com.healthassistant.workout.api.dto.RoutineExerciseRequest.class));
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "Invalid exercisesJson format. Expected JSON array like: " +
+                    "[{\"exerciseId\":\"chest_1\",\"orderIndex\":1,\"defaultSets\":3}]", e);
+        }
+        if (exercises.isEmpty()) {
+            throw new IllegalArgumentException("exercises list cannot be empty. Provide at least one exercise.");
+        }
+        return exercises;
+    }
+
     @Tool(name = "recordSleep",
           description = "Records a sleep session for the user. " +
                         "PARAMETERS: " +
@@ -1364,4 +1518,10 @@ public class HealthTools {
     record SleepRecordResult(String eventId, Instant sleepStart, Instant sleepEnd, int totalMinutes) {}
 
     record BodyMeasurementRecordResult(String eventId, String measurementId, Instant measuredAt) {}
+
+    record ExerciseCatalogResult(List<com.healthassistant.workout.api.dto.ExerciseDefinition> exercises) {}
+
+    record RoutineListResult(List<com.healthassistant.workout.api.dto.RoutineListResponse> routines) {}
+
+    record RoutineCreateResult(String routineId) {}
 }

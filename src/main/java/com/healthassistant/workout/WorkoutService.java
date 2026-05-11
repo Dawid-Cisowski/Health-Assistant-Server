@@ -14,6 +14,9 @@ import com.healthassistant.healthevents.api.model.IdempotencyKey;
 import com.healthassistant.workout.api.WorkoutFacade;
 import com.healthassistant.workout.api.dto.ExerciseDefinition;
 import com.healthassistant.workout.api.dto.PersonalRecordsResponse;
+import com.healthassistant.workout.api.dto.RoutineListResponse;
+import com.healthassistant.workout.api.dto.RoutineRequest;
+import com.healthassistant.workout.api.dto.RoutineResponse;
 import com.healthassistant.workout.api.dto.UpdateWorkoutRequest;
 import com.healthassistant.workout.api.dto.WorkoutDetailResponse;
 import com.healthassistant.workout.api.dto.WorkoutMutationResponse;
@@ -55,6 +58,7 @@ class WorkoutService implements WorkoutFacade {
     private final ExerciseStatisticsService exerciseStatisticsService;
     private final HealthEventsFacade healthEventsFacade;
     private final ObjectMapper objectMapper;
+    private final RoutineService routineService;
 
     @Override
     public Optional<WorkoutDetailResponse> getWorkoutDetails(String deviceId, String workoutId) {
@@ -400,6 +404,34 @@ class WorkoutService implements WorkoutFacade {
                 counter[0], counter[1], events.size());
 
         return new WorkoutReprojectionResponse(counter[0], counter[1], events.size());
+    }
+
+    @Override
+    public List<RoutineListResponse> getRoutines(String deviceId) {
+        return routineService.getRoutines(deviceId);
+    }
+
+    @Override
+    public Optional<RoutineResponse> getRoutine(UUID id, String deviceId) {
+        return routineService.getRoutine(id, deviceId);
+    }
+
+    @Override
+    @Transactional
+    public RoutineResponse createRoutine(RoutineRequest request, String deviceId) {
+        return routineService.createRoutine(request, deviceId);
+    }
+
+    @Override
+    @Transactional
+    public Optional<RoutineResponse> updateRoutine(UUID id, RoutineRequest request, String deviceId) {
+        return routineService.updateRoutine(id, request, deviceId);
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteRoutine(UUID id, String deviceId) {
+        return routineService.deleteRoutine(id, deviceId);
     }
 
 }
