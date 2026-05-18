@@ -90,6 +90,7 @@ class HmacAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/v1/exercises")
             || path.startsWith("/v1/reports")
             || path.startsWith("/v1/medical-exams")
+            || path.startsWith("/v1/audit")
             || path.equals("/sse")
             || path.equals("/mcp");
     }

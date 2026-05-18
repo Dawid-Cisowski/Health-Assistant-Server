@@ -31,7 +31,7 @@ class ModularityTests {
                 "meals", "mealimport", "mealcatalog", "googlefit", "assistant", "security", "config",
                 "weight", "weightimport", "heartrate", "guardrails",
                 "bodymeasurements", "notifications", "reports",
-                "medicalexams", "medicalexamimport"
+                "medicalexams", "medicalexamimport", "audit"
         );
 
         var actualModules = modules.stream()
