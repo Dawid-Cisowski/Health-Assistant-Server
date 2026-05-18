@@ -46,7 +46,7 @@ public class AuditService {
             dailyRecords.add(new DailyAuditRecord(
                     currentDate,
                     dayEvents.size(),
-                    dayEvents.stream().map(e -> e.eventType().name()).toList()
+                    dayEvents.stream().map(e -> e.eventType().value()).toList()
             ));
             
             currentDate = currentDate.plusDays(1);
