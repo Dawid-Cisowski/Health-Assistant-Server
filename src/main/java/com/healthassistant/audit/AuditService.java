@@ -1,65 +1,57 @@
 package com.healthassistant.audit;
 
-import com.healthassistant.audit.api.AuditFacade;
-import com.healthassistant.audit.api.dto.AuditEventEntry;
 import com.healthassistant.audit.api.dto.AuditTimelineResponse;
+import com.healthassistant.audit.api.dto.DailyAuditRecord;
 import com.healthassistant.healthevents.api.HealthEventsFacade;
 import com.healthassistant.healthevents.api.dto.StoredEventData;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-/**
- * Builds an audit timeline by querying health events.
- *
- * Refactored to use a single optimized date-range query instead of the N+1 pattern.
- */
 @Service
-@RequiredArgsConstructor
-@Slf4j
-class AuditService implements AuditFacade {
-
-    private static final ZoneId POLAND_ZONE = ZoneId.of("Europe/Warsaw");
+public class AuditService {
 
     private final HealthEventsFacade healthEventsFacade;
 
-    @Override
-    @Transactional(readOnly = true)
+    public AuditService(HealthEventsFacade healthEventsFacade) {
+        this.healthEventsFacade = healthEventsFacade;
+    }
+
     public AuditTimelineResponse buildTimeline(String deviceId, LocalDate startDate, LocalDate endDate) {
-        Map<LocalDate, List<AuditEventEntry>> eventsByDay = new LinkedHashMap<>();
+        Instant startInstant = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant endInstant = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
 
-        // Initialize the map with empty lists for each day in the range
-        for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
-            eventsByDay.put(day, new ArrayList<>());
+        // Fetch all events for the device in the given date range in a single query
+        List<StoredEventData> allEvents = healthEventsFacade.findEventsForDateRange(deviceId, startInstant, endInstant);
+
+        // Group events by day
+        Map<LocalDate, List<StoredEventData>> eventsByDay = allEvents.stream()
+                .collect(Collectors.groupingBy(event -> 
+                        event.occurredAt().atZone(ZoneId.systemDefault()).toLocalDate()));
+
+        List<DailyAuditRecord> dailyRecords = new ArrayList<>();
+        
+        // Iterate through the date range to ensure every day is represented, even if empty
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            List<StoredEventData> dayEvents = eventsByDay.getOrDefault(currentDate, List.of());
+            
+            dailyRecords.add(new DailyAuditRecord(
+                    currentDate,
+                    dayEvents.size(),
+                    dayEvents.stream().map(e -> e.eventType().name()).toList()
+            ));
+            
+            currentDate = currentDate.plusDays(1);
         }
 
-        Instant startInstant = startDate.atStartOfDay(POLAND_ZONE).toInstant();
-        Instant endInstant = endDate.plusDays(1).atStartOfDay(POLAND_ZONE).toInstant();
-
-        // Single optimized query to fetch all events for the device in the date range
-        List<StoredEventData> events = healthEventsFacade.findEventsForDateRange(deviceId, startInstant, endInstant);
-
-        for (StoredEventData event : events) {
-            LocalDate eventDate = LocalDate.ofInstant(event.occurredAt(), POLAND_ZONE);
-            if (!eventDate.isBefore(startDate) && !eventDate.isAfter(endDate)) {
-                eventsByDay.get(eventDate).add(new AuditEventEntry(
-                        event.eventType().value(),
-                        event.occurredAt(),
-                        event.deviceId().value(),
-                        event.idempotencyKey().value()
-                ));
-            }
-        }
-
-        return new AuditTimelineResponse(startDate, endDate, eventsByDay);
+        return new AuditTimelineResponse(deviceId, dailyRecords);
     }
 }
