@@ -68,8 +68,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ inputs.gemini_model || 'gemini-3-pro-preview' }}
-          GCP_PROJECT: ${{ vars.GCP_PROJECT || 'health-assistant-477621' }}
-          GCP_SERVICE: ${{ vars.GCP_SERVICE || 'health-assistant-event-collector' }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+          GCP_SERVICE: ${{ vars.GCP_SERVICE }}
           GCP_WINDOW: ${{ inputs.gcp_window || '24h' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python -u legacyFighter.py

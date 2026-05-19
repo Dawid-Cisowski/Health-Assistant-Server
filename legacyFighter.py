@@ -63,8 +63,8 @@ def _log_event(event: dict) -> None:
 # TOOLS
 # ==========================================
 
-GCP_PROJECT = os.environ.get("GCP_PROJECT", "health-assistant-477621")
-GCP_SERVICE = os.environ.get("GCP_SERVICE", "health-assistant-event-collector")
+GCP_PROJECT = os.environ.get("GCP_PROJECT")
+GCP_SERVICE = os.environ.get("GCP_SERVICE")
 GCP_WINDOW = os.environ.get("GCP_WINDOW", "24h")
 _GCP_ALERTS_CACHE: str | None = None
 
@@ -374,7 +374,19 @@ def _call_with_retry(fn, label: str = "Gemini API"):
     raise last_err
 
 
+def _assert_required_env() -> None:
+    """Fail fast if required configuration is missing — no hidden defaults."""
+    missing = [name for name in ("GCP_PROJECT", "GCP_SERVICE") if not os.environ.get(name)]
+    if missing:
+        raise RuntimeError(
+            f"Missing required environment variables: {missing}. "
+            f"Set them as GitHub Variables (Settings → Variables → Actions) "
+            f"or in your .env for local runs."
+        )
+
+
 def run_legacy_fighter() -> None:
+    _assert_required_env()
     _assert_clean_worktree()
     project_rules = _load_project_rules()
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
