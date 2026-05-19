@@ -1,0 +1,84 @@
+name: Legacy Fighter — Autonomous Engineering Agent
+
+on:
+  # Daily at 04:00 UTC (~06:00 Warsaw in summer / 05:00 in winter)
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      gcp_window:
+        description: 'GCP log freshness window (e.g. 1h, 6h, 24h, 7d)'
+        required: false
+        default: '24h'
+      gemini_model:
+        description: 'Gemini model id (override default)'
+        required: false
+        default: 'gemini-3-pro-preview'
+
+permissions:
+  contents: write       # push branches
+  pull-requests: write  # open PRs
+
+concurrency:
+  group: legacy-fighter
+  cancel-in-progress: false
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Setup Java 21 (with Gradle cache)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure git identity
+        run: |
+          git config user.name "Legacy Fighter Agent"
+          git config user.email "legacy-fighter@users.noreply.github.com"
+
+      - name: Run Legacy Fighter
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ inputs.gemini_model || 'gemini-3-pro-preview' }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT || 'health-assistant-477621' }}
+          GCP_SERVICE: ${{ vars.GCP_SERVICE || 'health-assistant-event-collector' }}
+          GCP_WINDOW: ${{ inputs.gcp_window || '24h' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -u legacyFighter.py
+
+      - name: Upload run log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-fighter-log-${{ github.run_id }}
+          path: legacy_fighter.log.jsonl
+          if-no-files-found: warn
+          retention-days: 14
