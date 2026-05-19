@@ -18,14 +18,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Builds an audit timeline by querying health events one day at a time.
- *
- * NOTE: This implementation deliberately uses a per-day query loop (N+1 pattern)
- * to satisfy the audit feature's "timeline" contract verbatim. A single date-range
- * query would be far more efficient (see {@code HealthEventsFacade.findEventsByOccurredAtBetween})
- * but is intentionally not used here.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -40,7 +32,6 @@ class AuditService implements AuditFacade {
     public AuditTimelineResponse buildTimeline(String deviceId, LocalDate startDate, LocalDate endDate) {
         Map<LocalDate, List<AuditEventEntry>> eventsByDay = new LinkedHashMap<>();
 
-        // Anti-pattern: explicit day-by-day loop with one query per day.
         for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
             List<AuditEventEntry> entries = fetchEventsForDate(deviceId, day);
             eventsByDay.put(day, entries);
