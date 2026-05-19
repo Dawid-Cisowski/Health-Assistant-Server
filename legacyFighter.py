@@ -86,12 +86,21 @@ def fetch_gcp_alerts() -> str:
                 "--format=json", f"--project={GCP_PROJECT}", "--verbosity=error"
             ], capture_output=True, text=True, timeout=60)
         except subprocess.TimeoutExpired:
+            print("⚠️  [GCP] gcloud logging read timed out (>60s)", flush=True)
+            _log_event({"event": "gcloud_error", "filter": filter_expr[:120], "reason": "timeout"})
             return []
-        if r.returncode != 0 or not r.stdout.strip():
+        if r.returncode != 0:
+            print(f"⚠️  [GCP] gcloud failed (exit {r.returncode}): {r.stderr[:500]}", flush=True)
+            _log_event({"event": "gcloud_error", "filter": filter_expr[:120],
+                        "exit_code": r.returncode, "stderr": r.stderr[:500]})
+            return []
+        if not r.stdout.strip():
             return []
         try:
             return json.loads(r.stdout)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"⚠️  [GCP] failed to parse gcloud JSON output: {e}", flush=True)
+            _log_event({"event": "gcloud_error", "filter": filter_expr[:120], "reason": "json_decode"})
             return []
 
     base = f'resource.type="cloud_run_revision" AND resource.labels.service_name="{GCP_SERVICE}"'
