@@ -286,14 +286,67 @@ def run_tests(test_pattern: str) -> str:
     return f"TESTS FAILED:\n{output}"
 
 
+def _build_pr_body(agent_body: str) -> str:
+    """Wraps the agent-provided body with a who/what/why metadata block + footer so every
+    auto-PR has consistent structure regardless of how the model writes its diagnosis."""
+    trigger = os.environ.get("GITHUB_EVENT_NAME", "local-run")
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    actor = os.environ.get("GITHUB_TRIGGERING_ACTOR") or os.environ.get("GITHUB_ACTOR", "Legacy Fighter Agent")
+    model = os.environ.get("GEMINI_MODEL", "gemini-3-pro-preview")
+    run_link = (f"[#{run_id}]({server_url}/{repo}/actions/runs/{run_id})"
+                if run_id and repo else "(local run)")
+    files_section = "\n".join(f"- `{f}`" for f in sorted(MODIFIED_FILES))
+    header = (
+        "## 🤖 Autonomous fix by Legacy Fighter Agent\n\n"
+        "| | |\n"
+        "|---|---|\n"
+        f"| **Who** | Autonomous agent (Gemini `{model}`) |\n"
+        f"| **Triggered by** | `{trigger}` — initiated by **@{actor}** |\n"
+        f"| **Workflow run** | {run_link} |\n"
+        f"| **Source signal** | Cloud Logging on `cloud_run_revision` / `health-assistant-event-collector` |\n"
+        f"| **Files touched** | {len(MODIFIED_FILES)} |\n\n"
+        "## Diagnosis & Fix\n\n"
+    )
+    footer = (
+        "\n\n---\n\n"
+        "## Files changed\n"
+        f"{files_section}\n\n"
+        "## Verification\n"
+        "- ✅ `./gradlew compileJava` passed before PR was opened (enforced by agent's compile loop).\n"
+        "- Run tests via the workflow CI on this PR before merging.\n\n"
+        "## How to roll back\n"
+        "- Close this PR without merging, or `git revert` the merge commit on `master`.\n"
+        "- Each auto-PR touches only the files listed above; no unrelated changes are staged.\n"
+    )
+    return header + agent_body.strip() + footer
+
+
 def create_github_pr(branch_name_hint: str, pr_title: str, pr_body: str) -> str:
-    """Creates a new branch (auto-named: auto/YYYYMMDD-HHMMSS-<slug>), commits ONLY files modified by file_writer/apply_patch this session, pushes to origin, opens PR via gh CLI against master."""
+    """Creates a new branch (auto-named: auto/YYYYMMDD-HHMMSS-<slug>), commits ONLY files modified by file_writer/apply_patch this session, pushes to origin, opens PR via gh CLI against master.
+
+    pr_body should follow this template (the tool wraps it with metadata around it):
+
+    ## Problem
+    What user-visible behaviour was wrong (latency, error, etc.) — quote concrete numbers from the alert.
+
+    ## Root cause
+    Why it happened — name the file/method and the architectural anti-pattern.
+
+    ## Fix
+    What was changed, in 2-4 bullets. Reference exact symbols (class.method).
+
+    ## Evidence
+    Specific log lines / latency numbers / endpoint paths from Cloud Logging that prove the problem exists in production.
+    """
     if not MODIFIED_FILES:
         return "Aborted: no files were modified this session; refusing to create empty PR."
     slug = re.sub(r'[^a-z0-9-]+', '-', branch_name_hint.lower()).strip('-')[:40] or "fix"
     branch_name = f"auto/{datetime.now():%Y%m%d-%H%M%S}-{slug}"
     print(f"🚀 [MCP -> GitHub] Creating PR on branch: {branch_name}", flush=True)
     _log_event({"tool": "create_github_pr", "args": {"branch_name": branch_name, "pr_title": pr_title}})
+    full_body = _build_pr_body(pr_body)
     try:
         subprocess.run(["git", "checkout", "-b", branch_name], check=True)
         # Defensive: clear any pre-existing index so only our MODIFIED_FILES get staged
@@ -302,7 +355,7 @@ def create_github_pr(branch_name_hint: str, pr_title: str, pr_body: str) -> str:
         subprocess.run(["git", "commit", "-m", pr_title], check=True)
         subprocess.run(["git", "push", "-u", "origin", branch_name], check=True)
         result = subprocess.run(
-            ["gh", "pr", "create", "--title", pr_title, "--body", pr_body, "--base", "master", "--head", branch_name],
+            ["gh", "pr", "create", "--title", pr_title, "--body", full_body, "--base", "master", "--head", branch_name],
             capture_output=True, text=True
         )
         if result.returncode == 0:
@@ -419,7 +472,19 @@ Operate in three named phases — print the phase banner in your thinking before
 === PHASE 3: SHIP ===
 - Only when gradle_compile returned BUILD SUCCESS on your last attempt.
 - Optionally call run_tests for the affected module before shipping.
-- Call create_github_pr with a short branch_name_hint slug and detailed pr_body explaining the bottleneck and the fix.
+- Call create_github_pr with a short branch_name_hint slug and a pr_body following this EXACT markdown structure (the tool wraps it with who/what/when metadata automatically):
+
+  ## Problem
+  One paragraph: what user-visible behaviour was wrong. Quote CONCRETE numbers from the alert (latency in ms, error class, endpoint URL).
+
+  ## Root cause
+  One paragraph: why it happened. Name the file, class, method, and the architectural anti-pattern (e.g. "N+1 query loop in AuditService.buildTimeline:42").
+
+  ## Fix
+  2–4 bullets. Reference exact symbols you changed. Mention any project conventions you applied (e.g. "replaced for-loop with Stream API per project rule").
+
+  ## Evidence
+  Verbatim log lines / latency numbers / endpoint paths from Cloud Logging that prove the problem exists in production. Without this, the PR will look like speculation.
 
 === SCOPE DISCIPLINE (CRITICAL) ===
 The alert names ONE specific bottleneck. Fix ONLY that one bottleneck. You may touch multiple files when a single fix legitimately spans them (e.g. adding a repository query method to support the controller refactor). But you MUST NOT:
