@@ -18,6 +18,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 @Entity
 @Table(name = "medical_exam_import_drafts", indexes = {
         @Index(name = "idx_medical_exam_import_drafts_device", columnList = "device_id"),
@@ -80,7 +82,8 @@ class MedicalExamImportDraft {
      * Allows attaching the original document to the examination at confirm time
      * without re-uploading.
      */
-    record StoredFile(
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record StoredFile(
             String storageKey,
             String publicUrl,
             String provider,
@@ -93,7 +96,8 @@ class MedicalExamImportDraft {
      * Embedded record stored as JSONB — holds all extracted exam data that can be
      * user-modified before confirmation. Supports multiple sections from a single document.
      */
-    record ExtractedData(
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ExtractedData(
             String date,
             String performedAt,
             String laboratory,
@@ -101,7 +105,8 @@ class MedicalExamImportDraft {
             List<SectionRecord> sections,
             String importSource
     ) {
-        record SectionRecord(
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public record SectionRecord(
                 String examTypeCode,
                 String title,
                 String reportText,
