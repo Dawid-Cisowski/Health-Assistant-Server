@@ -1,7 +1,9 @@
 package com.healthassistant.medicalexamimport.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record ExtractedResultData(
         String markerCode,
         String markerName,
