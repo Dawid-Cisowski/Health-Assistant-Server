@@ -21,7 +21,7 @@ class DraftCleanupScheduler {
     @Scheduled(cron = "0 0 3 * * *")
     public void cleanupExpiredDrafts() {
         var now = Instant.now();
-        var expired = draftRepository.findAllByStatusAndExpiresAtBefore(
+        var expired = draftRepository.findExpiredDraftsForCleanup(
                 MedicalExamImportDraft.DraftStatus.PENDING, now);
 
         if (expired.isEmpty()) {
@@ -30,7 +30,7 @@ class DraftCleanupScheduler {
         }
 
         List<UUID> expiredIds = expired.stream()
-                .map(MedicalExamImportDraft::getId)
+                .map(MedicalExamImportDraftRepository.ExpiredDraftInfo::getId)
                 .toList();
 
         List<String> storageKeys = expired.stream()
