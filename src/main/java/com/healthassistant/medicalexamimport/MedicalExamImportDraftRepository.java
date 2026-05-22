@@ -15,8 +15,15 @@ interface MedicalExamImportDraftRepository extends JpaRepository<MedicalExamImpo
 
     Optional<MedicalExamImportDraft> findByIdAndDeviceId(UUID id, String deviceId);
 
-    List<MedicalExamImportDraft> findAllByStatusAndExpiresAtBefore(
-            MedicalExamImportDraft.DraftStatus status, Instant before);
+    interface ExpiredDraftInfo {
+        UUID getId();
+        List<MedicalExamImportDraft.StoredFile> getStoredFiles();
+    }
+
+    @Query("SELECT d.id as id, d.storedFiles as storedFiles FROM MedicalExamImportDraft d WHERE d.status = :status AND d.expiresAt < :before")
+    List<ExpiredDraftInfo> findExpiredDraftsForCleanup(
+            @Param("status") MedicalExamImportDraft.DraftStatus status,
+            @Param("before") Instant before);
 
     @Modifying
     @Transactional
