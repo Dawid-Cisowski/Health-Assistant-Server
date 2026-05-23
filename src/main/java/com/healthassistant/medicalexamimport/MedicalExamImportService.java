@@ -32,7 +32,6 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 @Slf4j
 class MedicalExamImportService implements MedicalExamImportFacade {
@@ -96,6 +95,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
     }
 
     @Override
+    @Transactional
     public MedicalExamDraftResponse updateDraft(UUID draftId, MedicalExamDraftUpdateRequest request,
                                                  String deviceId) {
         var draft = findDraftForDevice(draftId, deviceId);
@@ -106,6 +106,7 @@ class MedicalExamImportService implements MedicalExamImportFacade {
     }
 
     @Override
+    @Transactional
     public List<ExaminationDetailResponse> confirmDraft(UUID draftId, String deviceId, UUID relatedExaminationId) {
         var draft = findDraftForDevice(draftId, deviceId);
         validateDraftEditable(draft);

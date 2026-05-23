@@ -37,7 +37,6 @@ class WorkoutImportService implements WorkoutImportFacade {
     private final AiMetricsRecorder aiMetrics;
 
     @Override
-    @Transactional
     public WorkoutImportResponse importFromImage(MultipartFile image, DeviceId deviceId) {
         ImageValidationUtils.validateImage(image);
         var sample = aiMetrics.startTimer();
