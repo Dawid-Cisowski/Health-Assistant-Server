@@ -27,22 +27,40 @@ class EventRepositoryAdapter implements EventRepository {
     private final HealthEventJpaRepository jpaRepository;
     private final ObjectMapper objectMapper;
 
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @Override
     @Transactional
     public void saveAll(List<Event> events) {
-        List<HealthEventJpaEntity> entities = events.stream()
-                .map(event -> HealthEventJpaEntity.builder()
-                        .eventId(event.eventId().value())
-                        .idempotencyKey(event.idempotencyKey().value())
-                        .eventType(event.eventType().value())
-                        .occurredAt(event.occurredAt())
-                        .payload(toMap(event.payload()))
-                        .deviceId(event.deviceId().value())
-                        .createdAt(event.createdAt())
-                        .build())
-                .toList();
-        jpaRepository.saveAll(entities);
-        jpaRepository.flush();
+        if (events.isEmpty()) {
+            return;
+        }
+        
+        String sql = "INSERT INTO health_events (version, event_id, idempotency_key, event_type, occurred_at, payload, device_id, created_at) " +
+                     "VALUES (0, ?, ?, ?, ?, ?::jsonb, ?, ?)";
+                     
+        jdbcTemplate.batchUpdate(sql, new org.springframework.jdbc.core.BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(java.sql.PreparedStatement ps, int i) throws java.sql.SQLException {
+                Event event = events.get(i);
+                ps.setString(1, event.eventId().value());
+                ps.setString(2, event.idempotencyKey().value());
+                ps.setString(3, event.eventType().value());
+                ps.setTimestamp(4, java.sql.Timestamp.from(event.occurredAt()));
+                try {
+                    ps.setString(5, objectMapper.writeValueAsString(event.payload()));
+                } catch (tools.jackson.core.JacksonException e) {
+                    throw new RuntimeException("Failed to serialize payload", e);
+                }
+                ps.setString(6, event.deviceId().value());
+                ps.setTimestamp(7, java.sql.Timestamp.from(event.createdAt()));
+            }
+
+            @Override
+            public int getBatchSize() {
+                return events.size();
+            }
+        });
     }
 
     @Override

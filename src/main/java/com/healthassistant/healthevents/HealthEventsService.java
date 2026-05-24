@@ -86,17 +86,12 @@ class HealthEventsService implements HealthEventsFacade {
 
         StoreHealthEventsResult result = commandHandler.handle(command);
 
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                if (!result.affectedDates().isEmpty()) {
-                    publishTypedEvents(result);
-                }
-                if (!result.compensationTargets().isEmpty()) {
-                    publishCompensationEvents(result, command.deviceId().value());
-                }
-            }
-        });
+        if (!result.affectedDates().isEmpty()) {
+            publishTypedEvents(result);
+        }
+        if (!result.compensationTargets().isEmpty()) {
+            publishCompensationEvents(result, command.deviceId().value());
+        }
 
         return result;
     }
