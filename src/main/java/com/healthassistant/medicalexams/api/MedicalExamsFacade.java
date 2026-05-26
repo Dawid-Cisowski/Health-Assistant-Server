@@ -29,6 +29,8 @@ public interface MedicalExamsFacade {
 
     ExaminationDetailResponse getExamination(String deviceId, UUID examId);
 
+    List<ExaminationDetailResponse> getExaminations(String deviceId, List<UUID> examIds);
+
     ExaminationDetailResponse createExamination(String deviceId, CreateExaminationRequest request);
 
     ExaminationDetailResponse updateExamination(String deviceId, UUID examId, UpdateExaminationRequest request);
@@ -65,6 +67,8 @@ public interface MedicalExamsFacade {
     AttachmentDownloadUrlResponse getAttachmentDownloadUrl(String deviceId, UUID examId, UUID attachmentId);
 
     ExaminationDetailResponse linkExaminations(String deviceId, UUID examId, UUID linkedExaminationId);
+
+    void linkExaminationsBulk(String deviceId, List<UUID> examIds);
 
     void unlinkExaminations(String deviceId, UUID examId, UUID linkedExaminationId);
 

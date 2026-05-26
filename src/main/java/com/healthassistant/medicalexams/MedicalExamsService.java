@@ -91,6 +91,25 @@ class MedicalExamsService implements MedicalExamsFacade {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ExaminationDetailResponse> getExaminations(String deviceId, List<UUID> examIds) {
+        if (examIds == null || examIds.isEmpty()) return List.of();
+        var exams = examinationRepository.findAllByDeviceIdAndIdIn(deviceId, examIds);
+        
+        var allLinks = examinationLinkRepository.findAllLinksForExaminations(examIds);
+        
+        return exams.stream().map(exam -> {
+            var linkedExaminations = allLinks.stream()
+                    .filter(link -> link.getExaminationA().getId().equals(exam.getId()) || link.getExaminationB().getId().equals(exam.getId()))
+                    .map(link -> link.getExaminationA().getId().equals(exam.getId())
+                            ? link.getExaminationB() : link.getExaminationA())
+                    .map(ExaminationResponseMapper::toLinkedExaminationResponse)
+                    .toList();
+            return ExaminationResponseMapper.toDetailResponse(exam, linkedExaminations);
+        }).toList();
+    }
+
+    @Override
     public ExaminationDetailResponse createExamination(String deviceId, CreateExaminationRequest request) {
         var examType = examTypeRepository.findById(request.examTypeCode())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown exam type: " + request.examTypeCode()));
@@ -337,6 +356,42 @@ class MedicalExamsService implements MedicalExamsFacade {
         examinationLinkRepository.save(ExaminationLink.create(exam, linkedExam));
         log.info("Linked examination {} with {} for device {}", examId, linkedExaminationId, maskDeviceId(deviceId));
         return toDetailResponse(exam);
+    }
+
+    @Override
+    public void linkExaminationsBulk(String deviceId, List<UUID> examIds) {
+        if (examIds == null || examIds.size() < 2) return;
+        
+        var exams = examinationRepository.findAllByDeviceIdAndIdIn(deviceId, examIds);
+        if (exams.size() != examIds.size()) {
+            throw new IllegalArgumentException("Some examinations not found or do not belong to device");
+        }
+        
+        var examsById = exams.stream().collect(java.util.stream.Collectors.toMap(Examination::getId, e -> e));
+        var existingLinks = new java.util.ArrayList<>(examinationLinkRepository.findAllLinksForExaminations(examIds));
+        
+        for (int i = 0; i < examIds.size(); i++) {
+            for (int j = i + 1; j < examIds.size(); j++) {
+                var idA = examIds.get(i);
+                var idB = examIds.get(j);
+                if (idA.equals(idB)) continue;
+                
+                var ids = orderedIds(idA, idB);
+                var exists = existingLinks.stream().anyMatch(l -> 
+                    (l.getExaminationA().getId().equals(ids[0]) && l.getExaminationB().getId().equals(ids[1])) ||
+                    (l.getExaminationA().getId().equals(ids[1]) && l.getExaminationB().getId().equals(ids[0]))
+                );
+                
+                if (!exists) {
+                    var examA = examsById.get(idA);
+                    var examB = examsById.get(idB);
+                    var newLink = ExaminationLink.create(examA, examB);
+                    examinationLinkRepository.save(newLink);
+                    existingLinks.add(newLink);
+                }
+            }
+        }
+        log.info("Bulk linked {} examinations for device {}", examIds.size(), maskDeviceId(deviceId));
     }
 
     @Override

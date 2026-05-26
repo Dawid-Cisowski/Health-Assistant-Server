@@ -24,12 +24,16 @@ class GenerateDailySummaryCommandHandler {
     private final TransactionTemplate transactionTemplate;
 
     public void handle(GenerateDailySummaryCommand command) {
-        try {
-            executeInTransaction(command);
-        } catch (ObjectOptimisticLockingFailureException e) {
-            log.warn("Version conflict for daily summary {}/{}, retrying once",
-                    maskDeviceId(command.deviceId()), command.date());
-            executeInTransaction(command);
+        int maxRetries = 3;
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                executeInTransaction(command);
+                return;
+            } catch (ObjectOptimisticLockingFailureException e) {
+                if (i == maxRetries - 1) throw e;
+                log.warn("Version conflict for daily summary {}/{}, retrying ({}/{})",
+                        maskDeviceId(command.deviceId()), command.date(), i + 1, maxRetries);
+            }
         }
     }
 
