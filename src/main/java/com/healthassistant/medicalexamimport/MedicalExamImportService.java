@@ -122,8 +122,11 @@ class MedicalExamImportService implements MedicalExamImportFacade {
         linkExaminationsToEachOther(deviceId, examinations);
 
         if (relatedExaminationId != null) {
-            examinations.forEach(exam ->
-                    medicalExamsFacade.linkExaminations(deviceId, exam.id(), relatedExaminationId));
+            var allIdsToLink = java.util.stream.Stream.concat(
+                    examinations.stream().map(ExaminationDetailResponse::id),
+                    java.util.stream.Stream.of(relatedExaminationId)
+            ).toList();
+            medicalExamsFacade.linkExaminationsBulk(deviceId, allIdsToLink);
         }
 
         attachStoredFilesToAll(deviceId, draft, examinations);
@@ -135,9 +138,8 @@ class MedicalExamImportService implements MedicalExamImportFacade {
                 draftId, examinations.size(), SecurityUtils.maskDeviceId(deviceId));
 
         // Re-fetch examinations to include all created links in the response
-        return examinations.stream()
-                .map(exam -> medicalExamsFacade.getExamination(deviceId, exam.id()))
-                .toList();
+        var examIds = examinations.stream().map(ExaminationDetailResponse::id).toList();
+        return medicalExamsFacade.getExaminations(deviceId, examIds);
     }
 
     private ExaminationDetailResponse createExamFromSection(
@@ -177,11 +179,8 @@ class MedicalExamImportService implements MedicalExamImportFacade {
 
     private void linkExaminationsToEachOther(String deviceId, List<ExaminationDetailResponse> examinations) {
         if (examinations.size() < 2) return;
-        // O(n²) pair linking — acceptable for typical section counts (3-5 per document)
         var examIds = examinations.stream().map(ExaminationDetailResponse::id).toList();
-        IntStream.range(0, examIds.size())
-                .forEach(i -> IntStream.range(i + 1, examIds.size())
-                        .forEach(j -> medicalExamsFacade.linkExaminations(deviceId, examIds.get(i), examIds.get(j))));
+        medicalExamsFacade.linkExaminationsBulk(deviceId, examIds);
     }
 
     private void attachStoredFilesToAll(String deviceId, MedicalExamImportDraft draft,

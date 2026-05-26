@@ -16,6 +16,12 @@ interface ExaminationLinkRepository extends JpaRepository<ExaminationLink, Exami
            "WHERE a.id = :examId OR b.id = :examId")
     List<ExaminationLink> findAllLinksForExamination(@Param("examId") UUID examId);
 
+    @Query("SELECT DISTINCT l FROM ExaminationLink l " +
+           "JOIN FETCH l.examinationA a JOIN FETCH a.examType " +
+           "JOIN FETCH l.examinationB b JOIN FETCH b.examType " +
+           "WHERE a.id IN :examIds OR b.id IN :examIds")
+    List<ExaminationLink> findAllLinksForExaminations(@Param("examIds") List<UUID> examIds);
+
     @Query("SELECT l FROM ExaminationLink l WHERE l.examinationA.id = :idA AND l.examinationB.id = :idB")
     Optional<ExaminationLink> findLinkByOrderedIds(@Param("idA") UUID idA, @Param("idB") UUID idB);
 }

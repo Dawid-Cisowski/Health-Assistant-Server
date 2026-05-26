@@ -47,4 +47,8 @@ interface ExaminationRepository extends JpaRepository<Examination, UUID> {
     @Query("SELECT e FROM Examination e LEFT JOIN FETCH e.results LEFT JOIN FETCH e.attachments "
             + "WHERE e.deviceId = :deviceId AND e.id = :id")
     Optional<Examination> findByDeviceIdAndIdWithDetails(String deviceId, UUID id);
+
+    @Query("SELECT DISTINCT e FROM Examination e LEFT JOIN FETCH e.results LEFT JOIN FETCH e.attachments "
+            + "WHERE e.deviceId = :deviceId AND e.id IN :ids")
+    List<Examination> findAllByDeviceIdAndIdIn(@Param("deviceId") String deviceId, @Param("ids") List<UUID> ids);
 }
