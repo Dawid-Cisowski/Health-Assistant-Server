@@ -113,15 +113,24 @@ class WorkoutService implements WorkoutFacade {
                 endDate
         );
 
+        var workoutIds = workouts.stream().map(WorkoutProjectionJpaEntity::getWorkoutId).toList();
+        Map<String, Map<String, List<WorkoutSetProjectionJpaEntity>>> setsByWorkoutAndExercise = workoutIds.isEmpty()
+                ? Map.of()
+                : setRepository.findByWorkoutIdIn(workoutIds).stream()
+                        .collect(Collectors.groupingBy(WorkoutSetProjectionJpaEntity::getWorkoutId,
+                                Collectors.groupingBy(WorkoutSetProjectionJpaEntity::getExerciseName)));
+
         return workouts.stream()
                 .map(workout -> {
+                    var setsByExercise = setsByWorkoutAndExercise.getOrDefault(workout.getWorkoutId(), Map.of());
                     List<WorkoutDetailResponse.ExerciseDetail> exerciseDetails = workout.getExercises().stream()
                             .sorted(Comparator.comparing(WorkoutExerciseProjectionJpaEntity::getOrderInWorkout))
                             .map(exercise -> new WorkoutDetailResponse.ExerciseDetail(
                                     exercise.getExerciseId(), exercise.getExerciseName(),
                                     exercise.getMuscleGroup(), exercise.getOrderInWorkout(),
                                     exercise.getTotalSets(), exercise.getTotalVolumeKg(),
-                                    exercise.getMaxWeightKg(), List.of()))
+                                    exercise.getMaxWeightKg(),
+                                    toSetDetails(setsByExercise.getOrDefault(exercise.getExerciseName(), List.of()))))
                             .toList();
 
                     return new WorkoutDetailResponse(
@@ -130,6 +139,15 @@ class WorkoutService implements WorkoutFacade {
                             workout.getTotalSets(), workout.getTotalVolumeKg(), workout.getTotalWorkingVolumeKg(),
                             exerciseDetails);
                 })
+                .toList();
+    }
+
+    private static List<WorkoutDetailResponse.SetDetail> toSetDetails(List<WorkoutSetProjectionJpaEntity> sets) {
+        return sets.stream()
+                .sorted(Comparator.comparing(WorkoutSetProjectionJpaEntity::getSetNumber))
+                .map(set -> new WorkoutDetailResponse.SetDetail(
+                        set.getSetNumber(), set.getWeightKg(), set.getReps(),
+                        set.getIsWarmup(), set.getVolumeKg()))
                 .toList();
     }
 

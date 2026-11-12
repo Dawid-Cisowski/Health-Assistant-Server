@@ -32,6 +32,7 @@ import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
@@ -624,11 +625,16 @@ public class HealthTools {
     }
 
     @Tool(name = "recordWeight",
-          description = "Records a weight measurement for the user. " +
+          description = "Records a weight measurement for the user, optionally with full body composition from a smart scale (e.g. a scale app screenshot). " +
                         "PARAMETERS: " +
                         "weightKg (String, required) - weight in kilograms, e.g. '82.5'. Must be between 1 and 500. " +
-                        "measuredAt (String, optional) - ISO-8601 UTC timestamp, e.g. '2025-11-24T07:00:00Z'. If not provided, defaults to now.")
-    public Object recordWeight(String weightKg, String measuredAt, ToolContext toolContext) {
+                        "measuredAt (String, optional) - ISO-8601 UTC timestamp, e.g. '2025-11-24T07:00:00Z'. If not provided, defaults to now. " +
+                        "bodyCompositionJson (String, optional) - JSON object with any subset of: " +
+                        "score (int 0-100), bmi, bodyFatPercent, musclePercent, hydrationPercent, boneMassKg, bmrKcal (int), " +
+                        "visceralFatLevel (int 1-59), subcutaneousFatPercent, proteinPercent, metabolicAge (int), idealWeightKg, " +
+                        "weightControlKg (negative = need to lose), fatMassKg, leanBodyMassKg, muscleMassKg, proteinMassKg, bodyType (String, e.g. 'STANDARD'). " +
+                        "Example: '{\"bodyFatPercent\":19.5,\"musclePercent\":53.2,\"visceralFatLevel\":9,\"bmrKcal\":1720}'")
+    public Object recordWeight(String weightKg, String measuredAt, String bodyCompositionJson, ToolContext toolContext) {
         var deviceId = getDeviceId(toolContext);
         log.info("Recording weight for device {}", maskDeviceId(deviceId));
 
@@ -641,13 +647,15 @@ public class HealthTools {
             var timestamp = measuredAt != null && !measuredAt.isBlank()
                     ? parseInstant(measuredAt, "measuredAt")
                     : Instant.now();
+            var bc = parseBodyComposition(bodyCompositionJson);
 
             var measurementId = "assistant-weight-" + UUID.randomUUID();
             var payload = new WeightMeasurementPayload(
-                    measurementId, timestamp, null, parsedWeight,
-                    null, null, null, null, null,
-                    null, null, null, null, null,
-                    null, null, null, null, null, null, null, "ASSISTANT"
+                    measurementId, timestamp, bc.score(), parsedWeight,
+                    bc.bmi(), bc.bodyFatPercent(), bc.musclePercent(), bc.hydrationPercent(), bc.boneMassKg(),
+                    bc.bmrKcal(), bc.visceralFatLevel(), bc.subcutaneousFatPercent(), bc.proteinPercent(), bc.metabolicAge(),
+                    bc.idealWeightKg(), bc.weightControlKg(), bc.fatMassKg(), bc.leanBodyMassKg(), bc.muscleMassKg(),
+                    bc.proteinMassKg(), bc.bodyType(), "ASSISTANT"
             );
 
             var idempotencyKey = deviceId + "|weight|" + measurementId;
@@ -1323,6 +1331,7 @@ public class HealthTools {
     }
 
     private static final int MAX_TITLE_LENGTH = 200;
+    private static final int MAX_BODY_COMPOSITION_JSON_LENGTH = 2000;
     private static final int MAX_WORKOUT_BACKDATE_DAYS = 30;
 
     private void validateTitle(String title) {
@@ -1510,6 +1519,32 @@ public class HealthTools {
     record ToolError(String message) {}
 
     record MutationSuccess(String message, Object data) {}
+
+    private BodyComposition parseBodyComposition(String bodyCompositionJson) {
+        if (bodyCompositionJson == null || bodyCompositionJson.isBlank()) {
+            return BodyComposition.EMPTY;
+        }
+        if (bodyCompositionJson.length() > MAX_BODY_COMPOSITION_JSON_LENGTH) {
+            throw new IllegalArgumentException("bodyCompositionJson is too long");
+        }
+        try {
+            var parsed = objectMapper.readerFor(BodyComposition.class)
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .<BodyComposition>readValue(bodyCompositionJson);
+            return parsed != null ? parsed : BodyComposition.EMPTY;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid bodyCompositionJson format. Please provide a JSON object with supported body composition fields.", e);
+        }
+    }
+
+    record BodyComposition(Integer score, BigDecimal bmi, BigDecimal bodyFatPercent, BigDecimal musclePercent,
+                           BigDecimal hydrationPercent, BigDecimal boneMassKg, Integer bmrKcal, Integer visceralFatLevel,
+                           BigDecimal subcutaneousFatPercent, BigDecimal proteinPercent, Integer metabolicAge,
+                           BigDecimal idealWeightKg, BigDecimal weightControlKg, BigDecimal fatMassKg,
+                           BigDecimal leanBodyMassKg, BigDecimal muscleMassKg, BigDecimal proteinMassKg, String bodyType) {
+        static final BodyComposition EMPTY = new BodyComposition(null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null);
+    }
 
     record WeightRecordResult(String eventId, BigDecimal weightKg, Instant measuredAt) {}
 
