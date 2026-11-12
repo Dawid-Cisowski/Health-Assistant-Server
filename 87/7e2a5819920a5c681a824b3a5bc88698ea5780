@@ -1,0 +1,29 @@
+src/main/java/com/healthassistant/assistant/HealthTools.java
+  s_e119a29fac6e90::t_3bd10f311a3bd4 628,631-637,650,654-658,1523-1530,1534-1547
+  s_e119a29fac6e90::t_bbdaa8e78f9738 35,1334,1531-1533
+  s_e119a29fac6e90::t_82ab908864a191 1548
+integration-tests/src/test/groovy/com/healthassistant/AssistantMutationToolsSpec.groovy
+  s_e119a29fac6e90::t_91e0d2c61d5e53 240,253,261,270,279,286-344,373-404
+  s_e119a29fac6e90::t_55f8626b628d31 405
+src/main/java/com/healthassistant/workout/WorkoutService.java
+  s_e119a29fac6e90::t_bbdaa8e78f9738 116-122,125,132-133,145-150
+  s_e119a29fac6e90::t_4a841f12d9daa6 151-153
+src/main/java/com/healthassistant/workout/WorkoutSetProjectionJpaRepository.java
+  s_e119a29fac6e90::t_bbdaa8e78f9738 40-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "877e2a5819920a5c681a824b3a5bc88698ea5780",
+  "prompts": {},
+  "sessions": {
+    "s_e119a29fac6e90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e193aa31-607f-4110-b1a1-bb6f99143754",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Dawid Cisowski <135721525+dawidci-papaya@users.noreply.github.com>"
+    }
+  }
+}
