@@ -237,7 +237,7 @@ class AssistantMutationToolsSpec extends BaseIntegrationSpec {
 
     def "recordWeight should record a weight measurement"() {
         when: "recording weight through the tool"
-        def result = healthTools.recordWeight("82.5", null, createToolContext())
+        def result = healthTools.recordWeight("82.5", null, null, createToolContext())
 
         then: "result is a MutationSuccess"
         isMutationSuccess(result)
@@ -250,7 +250,7 @@ class AssistantMutationToolsSpec extends BaseIntegrationSpec {
         def thismorning = Instant.now().minus(3, ChronoUnit.HOURS).toString()
 
         when: "recording weight with timestamp"
-        def result = healthTools.recordWeight("75.0", thismorning, createToolContext())
+        def result = healthTools.recordWeight("75.0", thismorning, null, createToolContext())
 
         then: "result is a MutationSuccess"
         isMutationSuccess(result)
@@ -258,7 +258,7 @@ class AssistantMutationToolsSpec extends BaseIntegrationSpec {
 
     def "recordWeight should return ToolError for invalid weight"() {
         when: "recording weight with non-numeric value"
-        def result = healthTools.recordWeight("abc", null, createToolContext())
+        def result = healthTools.recordWeight("abc", null, null, createToolContext())
 
         then: "result is a ToolError"
         isToolError(result)
@@ -267,7 +267,7 @@ class AssistantMutationToolsSpec extends BaseIntegrationSpec {
 
     def "recordWeight should return ToolError for zero weight"() {
         when: "recording zero weight"
-        def result = healthTools.recordWeight("0", null, createToolContext())
+        def result = healthTools.recordWeight("0", null, null, createToolContext())
 
         then: "result is a ToolError"
         isToolError(result)
@@ -276,11 +276,70 @@ class AssistantMutationToolsSpec extends BaseIntegrationSpec {
 
     def "recordWeight should return ToolError for weight exceeding 500 kg"() {
         when: "recording weight over 500"
-        def result = healthTools.recordWeight("501", null, createToolContext())
+        def result = healthTools.recordWeight("501", null, null, createToolContext())
 
         then: "result is a ToolError"
         isToolError(result)
         result.message().contains("between 1 and 500")
+    }
+
+    def "recordWeight should store full body composition from scale screenshot"() {
+        given: "body composition read from a smart scale screenshot"
+        def measuredAt = Instant.now().minus(1, ChronoUnit.HOURS).toString()
+        def bodyCompositionJson = '''{
+            "score": 88, "bmi": 24.1, "bodyFatPercent": 19.5, "musclePercent": 53.2,
+            "hydrationPercent": 58.1, "boneMassKg": 3.1, "bmrKcal": 1720, "visceralFatLevel": 9,
+            "subcutaneousFatPercent": 17.2, "proteinPercent": 17.4, "metabolicAge": 30,
+            "idealWeightKg": 74.0, "weightControlKg": -4.2, "fatMassKg": 15.6,
+            "leanBodyMassKg": 64.4, "muscleMassKg": 42.5, "proteinMassKg": 13.9, "bodyType": "STANDARD"
+        }'''
+
+        when: "recording weight with body composition"
+        def result = healthTools.recordWeight("80.0", measuredAt, bodyCompositionJson, createToolContext())
+
+        then: "result is a MutationSuccess"
+        isMutationSuccess(result)
+
+        when: "reading weight data back"
+        def today = LocalDate.now().toString()
+        def weekAgo = LocalDate.now().minusDays(7).toString()
+        def m = healthTools.getWeightData(weekAgo, today, createToolContext()).measurements().first()
+
+        then: "all body composition fields are persisted"
+        m.weightKg() == new BigDecimal("80.0")
+        m.score() == 88
+        m.bodyFatPercent() == new BigDecimal("19.5")
+        m.musclePercent() == new BigDecimal("53.2")
+        m.visceralFatLevel() == 9
+        m.metabolicAge() == 30
+        m.muscleMassKg() == new BigDecimal("42.5")
+        m.bodyType() == "STANDARD"
+    }
+
+    def "recordWeight should return ToolError for invalid bodyCompositionJson"() {
+        when:
+        def result = healthTools.recordWeight("80.0", null, "not-json", createToolContext())
+
+        then:
+        isToolError(result)
+        result.message().contains("bodyCompositionJson")
+    }
+
+    def "recordWeight should return ToolError for out-of-range body composition value"() {
+        when:
+        def result = healthTools.recordWeight("80.0", null, '{"bodyFatPercent": 150}', createToolContext())
+
+        then:
+        isToolError(result)
+    }
+
+    def "recordWeight should return ToolError for unknown body composition field"() {
+        when:
+        def result = healthTools.recordWeight("80.0", null, '{"weightKg": 90, "source": "X"}', createToolContext())
+
+        then:
+        isToolError(result)
+        result.message().contains("bodyCompositionJson")
     }
 
     // ===================== recordWorkout =====================
@@ -309,6 +368,39 @@ class AssistantMutationToolsSpec extends BaseIntegrationSpec {
         result.message().contains("3 sets")
         result.data().exerciseCount() == 1
         result.data().totalSets() == 3
+    }
+
+    def "getWorkoutData should return per-set breakdown (weight, reps, warmup)"() {
+        given: "a recorded workout"
+        def performedAt = Instant.now().minus(2, ChronoUnit.HOURS).toString()
+        def exercisesJson = '''[
+            {"name": "Bench Press", "orderInWorkout": 1, "sets": [
+                {"setNumber": 1, "weightKg": 40.0, "reps": 12, "isWarmup": true},
+                {"setNumber": 2, "weightKg": 80.0, "reps": 8, "isWarmup": false}
+            ]},
+            {"name": "Squat", "orderInWorkout": 2, "sets": [
+                {"setNumber": 1, "weightKg": 100.0, "reps": 5, "isWarmup": false}
+            ]}
+        ]'''
+        healthTools.recordWorkout(performedAt, "Mixed", exercisesJson, createToolContext())
+
+        when: "reading workouts through the tool"
+        def today = LocalDate.now().toString()
+        def weekAgo = LocalDate.now().minusDays(7).toString()
+        def workouts = healthTools.getWorkoutData(weekAgo, today, createToolContext())
+
+        then: "each exercise contains its sets"
+        workouts.size() == 1
+        def bench = workouts.first().exercises().find { it.orderInWorkout() == 1 }
+        bench.sets().size() == 2
+        bench.sets()[0].setNumber() == 1
+        bench.sets()[0].weightKg() == new BigDecimal("40.0")
+        bench.sets()[0].reps() == 12
+        bench.sets()[0].isWarmup()
+        bench.sets()[1].reps() == 8
+        def squat = workouts.first().exercises().find { it.orderInWorkout() == 2 }
+        squat.sets().size() == 1
+        squat.sets()[0].reps() == 5
     }
 
     def "recordWorkout should return ToolError for empty exercises"() {

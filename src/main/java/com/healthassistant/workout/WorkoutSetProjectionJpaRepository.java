@@ -37,6 +37,8 @@ interface WorkoutSetProjectionJpaRepository extends JpaRepository<WorkoutSetProj
 
     List<WorkoutSetProjectionJpaEntity> findByWorkoutIdOrderByExerciseNameAscSetNumberAsc(String workoutId);
 
+    List<WorkoutSetProjectionJpaEntity> findByWorkoutIdIn(List<String> workoutIds);
+
     void deleteByWorkoutId(String workoutId);
 
     @Query("SELECT s FROM WorkoutSetProjectionJpaEntity s " +
